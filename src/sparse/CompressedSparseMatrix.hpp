@@ -406,6 +406,10 @@ namespace strumpack {
                         std::vector<Triplet<scalar_t>>&,
                         std::vector<Triplet<scalar_t>>&) const = 0;
     virtual void
+    set_front_elements(integer_t, integer_t, const std::vector<integer_t>&,
+                       Triplet<scalar_t>*, Triplet<scalar_t>*,
+                       Triplet<scalar_t>*) const = 0;
+    virtual void
     count_front_elements(integer_t, integer_t, const std::vector<integer_t>&,
                          std::size_t&, std::size_t&, std::size_t&) const = 0;
 

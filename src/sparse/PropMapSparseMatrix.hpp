@@ -90,6 +90,10 @@ namespace strumpack {
                              std::vector<Triplet<scalar_t>>&,
                              std::vector<Triplet<scalar_t>>&,
                              std::vector<Triplet<scalar_t>>&) const override;
+    void set_front_elements(integer_t, integer_t,
+                            const std::vector<integer_t>&,
+                            Triplet<scalar_t>*, Triplet<scalar_t>*,
+                            Triplet<scalar_t>*) const override;
     void count_front_elements(integer_t, integer_t,
                               const std::vector<integer_t>&,
                               std::size_t&, std::size_t&, std::size_t&)

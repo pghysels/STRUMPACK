@@ -85,9 +85,8 @@ namespace strumpack {
         f.push_back(dynamic_cast<FG_t*>(F));
       std::size_t max_dsep = 0;
 #pragma omp parallel for                                               \
-  reduction(+:Isize,elems11,elems12,elems21)                           \
   reduction(+:L_size,U_size,Schur_size,piv_size,total_upd_size)        \
-  reduction(+:N8,N16,N24,N32,factors_small)                            \
+  reduction(+:N8,N16,N24,N32,factors_small,Isize)                      \
   reduction(max:max_dsep)
       for (auto F : f) {
         const std::size_t dsep = F->dim_sep();
@@ -108,9 +107,26 @@ namespace strumpack {
         if (A) {
           if (F->lchild_) Isize += F->lchild_->dim_upd();
           if (F->rchild_) Isize += F->rchild_->dim_upd();
+        }
+      }
+      auto small_fronts = N8 + N16 + N24 + N32;
+      if (small_fronts && small_fronts != f.size())
+        std::partition
+          (f.begin(), f.end(), [](const FG_t* const& a) -> bool {
+            return a->dim_sep() <= 32; });
+      if (A) {
+        elems11.resize(f.size()+1);
+        elems12.resize(f.size()+1);
+        elems21.resize(f.size()+1);
+#pragma omp parallel for
+        for (std::size_t i=0; i<f.size(); i++)
           A->count_front_elements
-            (F->sep_begin(), F->sep_end(), F->upd(),
-             elems11, elems12, elems21);
+            (f[i]->sep_begin(), f[i]->sep_end(), f[i]->upd(),
+             elems11[i+1], elems12[i+1], elems21[i+1]);
+        for (std::size_t i=0; i<f.size(); i++) {
+          elems11[i+1] += elems11[i];
+          elems12[i+1] += elems12[i];
+          elems21[i+1] += elems21[i];
         }
       }
       factor_size = L_size + U_size;
@@ -123,7 +139,8 @@ namespace strumpack {
       ea_bytes =
         round_to_16(sizeof(gpu::AssembleData<scalar_t>) * f.size()) +
         round_to_16(sizeof(std::size_t) * Isize) +
-        round_to_16(sizeof(Triplet<scalar_t>) * (elems11 + elems12 + elems21));
+        round_to_16(sizeof(Triplet<scalar_t>) *
+                    (elems11.back() + elems12.back() + elems21.back()));
     }
 
     void print_info(int l, int lvls) {
@@ -137,16 +154,19 @@ namespace strumpack {
                 << " MB for Schur complements" << std::endl;
     }
 
-    long long total_flops() {
-      long long level_flops = 0;
+    void flops(long long& level_flops, long long& small_flops) {
+      level_flops = small_flops = 0;
+#pragma omp parallel for reduction(+: level_flops, small_flops)
       for (auto F : f) {
-        level_flops += LU_flops(F->F11_) +
+        auto flops = LU_flops(F->F11_) +
           gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
                      F->F21_, F->F12_, scalar_t(1.)) +
           trsm_flops(Side::L, scalar_t(1.), F->F11_, F->F12_) +
           trsm_flops(Side::R, scalar_t(1.), F->F11_, F->F21_);
+        level_flops += flops;
+        if (F->dim_sep() <= 32)
+          small_flops += flops;
       }
-      return level_flops;
     }
 
     /*
@@ -197,10 +217,12 @@ namespace strumpack {
     }
 
     std::vector<FG_t*> f;
-    std::size_t L_size = 0, U_size = 0, factor_size = 0, factors_small = 0,
-      Schur_size = 0, piv_size = 0, total_upd_size = 0,
-      work_bytes = 0, N8 = 0, N16 = 0, N24 = 0, N32 = 0,
-      Isize = 0, elems11 = 0, elems12 = 0, elems21 = 0, ea_bytes = 0;
+    std::size_t L_size = 0, U_size = 0, factor_size = 0,
+      factors_small = 0, Schur_size = 0, piv_size = 0,
+      total_upd_size = 0,  work_bytes = 0,
+      N8 = 0, N16 = 0, N24 = 0, N32 = 0,
+      Isize = 0, ea_bytes = 0;
+    std::vector<std::size_t> elems11, elems12, elems21;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
     int getrf_work_size = 0;
@@ -297,39 +319,31 @@ namespace strumpack {
   (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
-    std::vector<Trip_t> e11, e12, e21;
-    e11.reserve(L.elems11);
-    e12.reserve(L.elems12);
-    e21.reserve(L.elems21);
-    std::vector<std::array<std::size_t,3>> ne(N+1);
-    for (std::size_t n=0; n<N; n++) {
-      auto& f = *(L.f[n]);
-      ne[n] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
-      A.push_front_elements
-        (f.sep_begin_, f.sep_end_, f.upd_, e11, e12, e21);
-    }
-    ne[N] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
     auto hasmbl = reinterpret_cast<gpu::AssembleData<scalar_t>*>(hea_mem);
     auto Iptr = reinterpret_cast<std::size_t*>(round_to_16(hasmbl + N));
-    {
-      auto helems = reinterpret_cast<Trip_t*>(round_to_16(Iptr + L.Isize));
-      std::copy(e11.begin(), e11.end(), helems);
-      std::copy(e12.begin(), e12.end(), helems + e11.size());
-      std::copy(e21.begin(), e21.end(), helems + e11.size() + e12.size());
-    }
+    auto e11 = reinterpret_cast<Trip_t*>(round_to_16(Iptr + L.Isize));
+    auto e12 = e11 + L.elems11.back();
+    auto e21 = e12 + L.elems12.back();
     auto dasmbl = reinterpret_cast<gpu::AssembleData<scalar_t>*>(dea_mem);
     auto dIptr = reinterpret_cast<std::size_t*>(round_to_16(dasmbl + N));
-    auto delems = reinterpret_cast<Trip_t*>(round_to_16(dIptr + L.Isize));
-    auto de11 = delems;
-    auto de12 = de11 + e11.size();
-    auto de21 = de12 + e12.size();
+    auto de11 = reinterpret_cast<Trip_t*>(round_to_16(dIptr + L.Isize));
+    auto de12 = de11 + L.elems11.back();
+    auto de21 = de12 + L.elems12.back();
+#pragma omp parallel for
     for (std::size_t n=0; n<N; n++) {
       auto& f = *(L.f[n]);
+      A.set_front_elements
+        (f.sep_begin_, f.sep_end_, f.upd_,
+         e11+L.elems11[n], e12+L.elems12[n], e21+L.elems21[n]);
       hasmbl[n] = gpu::AssembleData<scalar_t>
         (f.dim_sep(), f.dim_upd(), f.F11_.data(), f.F12_.data(),
          f.F21_.data(), f.F22_.data(),
-         ne[n+1][0]-ne[n][0], ne[n+1][1]-ne[n][1], ne[n+1][2]-ne[n][2],
-         de11+ne[n][0], de12+ne[n][1], de21+ne[n][2]);
+         L.elems11[n+1]-L.elems11[n], L.elems12[n+1]-L.elems12[n],
+         L.elems21[n+1]-L.elems21[n],
+         de11+L.elems11[n], de12+L.elems12[n], de21+L.elems21[n]);
+    }
+    for (std::size_t n=0; n<N; n++) {
+      auto& f = *(L.f[n]);
       if (f.lchild_) {
         auto c = dynamic_cast<FG_t*>(f.lchild_.get());
         hasmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), dIptr);
@@ -540,11 +554,6 @@ namespace strumpack {
         }
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
-        std::size_t small_fronts = L.N8 + L.N16 + L.N24 + L.N32;
-        if (small_fronts && small_fronts != L.f.size())
-          std::partition
-            (L.f.begin(), L.f.end(), [](const FG_t* const& a) -> bool {
-              return a->dim_sep() <= 32; });
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
         old_work = work_mem;
@@ -555,6 +564,7 @@ namespace strumpack {
         e_assemble.record();
 
         // default stream
+        std::size_t small_fronts = L.N8 + L.N16 + L.N24 + L.N32;
         factor_small_fronts(L, small_fronts, fdata, opts);
         gpu::Event e_small;
         e_small.record();
@@ -667,8 +677,10 @@ namespace strumpack {
         std::cerr << "Out of memory" << std::endl;
         abort();
       }
-      auto level_flops = L.total_flops();
+      long long level_flops, small_flops;
+      L.flops(level_flops, small_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
+      STRUMPACK_FLOPS(small_flops);
       if (opts.verbose()) {
         auto level_time = tl.elapsed();
         std::cout << "#   GPU Factorization complete, took: "
