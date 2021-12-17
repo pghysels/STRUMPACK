@@ -580,7 +580,7 @@ namespace strumpack {
           const std::size_t dsep = f.dim_sep();
           const std::size_t dupd = f.dim_upd();
           std::size_t size_front = dsep * (dsep + 2*dupd);
-          if (c == Bf || fc + size_front > pinned.size()) {
+          if (c == Bf || fc + size_front > max_pinned) {
             chunks.push_back(c);
             factors_chunk.push_back(fc);
             c = fc = 0;
@@ -612,8 +612,7 @@ namespace strumpack {
           std::vector<gpu::Event> events(chunks.size());
 
           for (std::size_t c=0, n=small_fronts; c<chunks.size(); c++) {
-            int s = c % streams.size();
-            int n0 = n;
+            int s = c % streams.size(), n0 = n;
 #pragma omp parallel
 #pragma omp single
             {
@@ -625,7 +624,7 @@ namespace strumpack {
 #pragma omp taskloop //num_tasks(omp_get_num_threads()-1)
                   for (std::size_t i=0; i<fc; i++)
                     host_factors[i] = pin[(c-1) % 2][i];
-                  host_factors += factors_chunk[c-1];
+                  host_factors += fc;
                 }
               }
 #pragma omp task
@@ -658,7 +657,7 @@ namespace strumpack {
             }
           }
           copy_stream.synchronize();
-          auto fc = factors_chunk[chunks.size()-1];
+          auto fc = factors_chunk.back();
 #pragma omp parallel for
           for (std::size_t i=0; i<fc; i++)
             host_factors[i] = pin[(chunks.size()-1) % 2][i];
