@@ -27,8 +27,9 @@
  *
  */
 #include <array>
+#include <limits>
 
-#include "FrontDPCpp.hpp"
+#include "FrontSYCL.hpp"
 
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
@@ -79,7 +80,7 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfo {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FDPC_t = FrontDPCpp<scalar_t,integer_t>;
+    using FSYCL_t = FrontSYCL<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
 
@@ -90,7 +91,7 @@ namespace strumpack {
               cl::sycl::queue& q, const SpMat_t* A=nullptr) {
       f.reserve(fronts.size());
       for (auto& F : fronts)
-        f.push_back(dynamic_cast<FDPC_t*>(F));
+        f.push_back(dynamic_cast<FSYCL_t*>(F));
       for (auto F : f) {
         auto dsep = F->dim_sep();
         auto dupd = F->dim_upd();
@@ -189,7 +190,7 @@ namespace strumpack {
       }
     }
 
-    std::vector<FDPC_t*> f;
+    std::vector<FSYCL_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
                    Schur_size = 0, piv_size = 0, total_upd_size = 0,
                    work_bytes = 0, Isize = 0, ea_bytes = 0,
@@ -199,13 +200,13 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t>
-  FrontDPCpp<scalar_t,integer_t>::FrontDPCpp
+  FrontSYCL<scalar_t,integer_t>::FrontSYCL
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t>
-  FrontDPCpp<scalar_t,integer_t>::~FrontDPCpp() {
+  FrontSYCL<scalar_t,integer_t>::~FrontSYCL() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     const std::size_t dupd = dim_upd();
     const std::size_t dsep = dim_sep();
@@ -214,14 +215,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::release_work_memory() {
+  FrontSYCL<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
     host_Schur_.release();
   }
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontSYCL<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
@@ -230,7 +231,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::extend_add_to_dense
+  FrontSYCL<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
     const std::size_t pdsep = paF11.rows();
@@ -281,38 +282,19 @@ namespace strumpack {
     return peak_dmem;
   }
 
-  template<typename T> void
-  ea_kernel(int x, int y, int d1, int d2, int dCB,
-            T* F11, T* F12, T* F21, T* F22, T* CB, std::size_t* I) {
-    if (x >= dCB || y >= dCB) return;
-    auto Ix = I[x], Iy = I[y];
-    if (Ix < d1) {
-      if (Iy < d1) F11[Iy+Ix*d1] += CB[y+x*dCB];
-      else F21[Iy-d1+Ix*d2] += CB[y+x*dCB];
-    } else {
-      if (Iy < d1) F12[Iy+(Ix-d1)*d1] += CB[y+x*dCB];
-      else F22[Iy-d1+(Ix-d1)*d2] += CB[y+x*dCB];
-    }
-  }
-
-  template<typename T> struct Assemble11 {
-    AssembleData<T>* dat_;
-    Assemble11(AssembleData<T>* dat) : dat_(dat) {}
+  template<typename T> struct Assemble {
+    AssembleData<T>* dat;
+    std::size_t nf;
+    Assemble(AssembleData<T>* d, std::size_t N) : dat(d), nf(N) {}
     void operator()(cl::sycl::nd_item<2> it) const {
-      auto& F = dat_[it.get_group(0)];
+      std::size_t op = it.get_global_id(0);
+      if (op >= nf) return;
+      auto& F = dat[op];
       auto idx = it.get_global_id(1);
-      if (idx >= F.n11) return;
-      auto& t = F.e11[idx];
-      F.F11[t.r + t.c*F.d1] = t.v;
-    }
-  };
-
-  template<typename T> struct Assemble1221 {
-    AssembleData<T>* dat_;
-    Assemble1221(AssembleData<T>* dat) : dat_(dat) {}
-    void operator()(cl::sycl::nd_item<2> it) const {
-      auto& F = dat_[it.get_group(0)];
-      auto idx = it.get_global_id(1);
+      if (idx < F.n11) {
+	auto& t = F.e11[idx];
+	F.F11[t.r + t.c*F.d1] = t.v;
+      }
       if (idx < F.n12) {
         auto& t = F.e12[idx];
         F.F12[t.r + t.c*F.d1] = t.v;
@@ -324,27 +306,44 @@ namespace strumpack {
     }
   };
 
-  template<typename T> struct EA1 {
-    AssembleData<T>* dat_;
-    EA1(AssembleData<T>* dat) : dat_(dat) {}
+  template<typename T, unsigned int unroll> struct EA {
+    AssembleData<T>* dat;
+    bool left;
+    std::size_t nf;
+    EA(AssembleData<T>* d, std::size_t N, bool l)
+      : dat(d), nf(N), left(l) {}
     void operator()(cl::sycl::nd_item<3> it) const {
-      auto& F = dat_[it.get_group(0)];
-      if (F.CB1)
-        ea_kernel(it.get_global_id(1), it.get_global_id(2),
-                  F.d1, F.d2, F.dCB1, F.F11, F.F12, F.F21,
-                  F.F22, F.CB1, F.I1);
-    }
-  };
-
-  template<typename T> struct EA2 {
-    AssembleData<T>* dat_;
-    EA2(AssembleData<T>* dat) : dat_(dat) {}
-    void operator()(cl::sycl::nd_item<3> it) const {
-      auto& F = dat_[it.get_group(0)];
-      if (F.CB2)
-        ea_kernel(it.get_global_id(1), it.get_global_id(2),
-                  F.d1, F.d2, F.dCB2, F.F11, F.F12, F.F21,
-                  F.F22, F.CB2, F.I2);
+      int y = it.get_global_id(2),
+        x0 = it.get_group(1) * unroll,
+        z = it.get_global_id(0);
+      if (z >= nf) return;
+      auto& f = dat[z];
+      auto CB = left ? f.CB1 : f.CB2;
+      if (!CB) return;
+      auto dCB = left ? f.dCB1 : f.dCB2;
+      if (y >= dCB) return;
+      auto I = left ? f.I1 : f.I2;
+      auto Iy = I[y];
+      CB += y + x0*dCB;
+      int d1 = f.d1, d2 = f.d2;
+      int ld;
+      T* F[2];
+      if (Iy < d1) {
+        ld = d1;
+        F[0] = f.F11+Iy;
+        F[1] = f.F12+Iy-d1*d1;
+      } else {
+        ld = d2;
+        F[0] = f.F21+Iy-d1;
+        F[1] = f.F22+Iy-d1-d1*d2;
+      }
+#pragma unroll
+      for (int i=0; i<unroll; i++) {
+        int x = x0 + i;
+        if (x >= dCB) break;
+        auto Ix = I[x];
+        F[Ix >= d1][Ix*ld] += CB[i*dCB];
+      }
     }
   };
 
@@ -352,10 +351,10 @@ namespace strumpack {
 
 
   template<typename scalar_t, typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::front_assembly
+  FrontSYCL<scalar_t,integer_t>::front_assembly
   (cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
    char* hea_mem, char* dea_mem) {
-    using FDPC_t = FrontDPCpp<scalar_t,integer_t>;
+    using FSYCL_t = FrontSYCL<scalar_t,integer_t>;
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
     std::vector<Trip_t> e11, e12, e21;
@@ -392,7 +391,7 @@ namespace strumpack {
          ne[n+1][0]-ne[n][0], ne[n+1][1]-ne[n][1], ne[n+1][2]-ne[n][2],
          de11+ne[n][0], de12+ne[n][1], de21+ne[n][2]);
       if (f.lchild_) {
-        auto c = dynamic_cast<FDPC_t*>(f.lchild_.get());
+        auto c = dynamic_cast<FSYCL_t*>(f.lchild_.get());
         hasmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), dIptr);
         auto u = c->upd_to_parent(&f);
         std::copy(u.begin(), u.end(), Iptr);
@@ -400,7 +399,7 @@ namespace strumpack {
         dIptr += u.size();
       }
       if (f.rchild_) {
-        auto c = dynamic_cast<FDPC_t*>(f.rchild_.get());
+        auto c = dynamic_cast<FSYCL_t*>(f.rchild_.get());
         hasmbl[n].set_ext_add_right(c->dim_upd(), c->F22_.data(), dIptr);
         auto u = c->upd_to_parent(&f);
         std::copy(u.begin(), u.end(), Iptr);
@@ -410,38 +409,51 @@ namespace strumpack {
     }
     dpcpp::memcpy<char>(q, dea_mem, hea_mem, L.ea_bytes);
     q.wait_and_throw();
-    // const unsigned int MAX_BLOCKS_Y =
-    //   q.get_device().get_info<cl::sycl::info::device::max_work_group_size>();
-    // const unsigned int MAX_BLOCKS_Z = MAX_BLOCKS_Y;
     { // front assembly from sparse matrix
-      std::size_t nt1 = 128, nt2 = 32;
-      std::size_t max1 = nt1, max2 = nt2;
-      for (std::size_t f=0; f<N; f++) {
-        max1 = std::max(max1, hasmbl[f].n11);
-        max2 = std::max(max2, std::max(hasmbl[f].n12, hasmbl[f].n21));
-      }
-      // TODO check if N is larger than allowed max
-      cl::sycl::range<2> global{N, rnd(max1, nt1)}, local{1, nt1};
-      q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                     Assemble11<scalar_t>(dasmbl));
-      if (max2) {
-        cl::sycl::range<2> global{N, rnd(max2, nt2)}, local{1, nt2};
-        q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                       Assemble1221<scalar_t>(dasmbl));
+      std::size_t nnz = 0;
+      for (std::size_t f=0; f<N; f++)
+        nnz = std::max
+	  (nnz, std::max(hasmbl[f].n11, std::max(hasmbl[f].n12, hasmbl[f].n21)));
+      if (nnz) {
+	std::size_t nt = 512, ops = 1;
+	while (nt > nnz) {
+	  nt /= 2;
+	  ops *= 2;
+	}
+	// std::cout << "assemble, N= " << rnd(N,ops) << " nnz= " << nnz
+	// 	  << " ops= " << ops << " nt= " << nt << std::endl;
+	assert(rnd(N,ops) * rnd(nnz,nt) < std::numeric_limits<int>::max());
+	cl::sycl::range<2> global{rnd(N,ops), rnd(nnz,nt)}, local{ops, nt};
+	q.parallel_for(cl::sycl::nd_range<2>{global, local},
+		       Assemble<scalar_t>(dasmbl, N));
       }
     }
     q.wait_and_throw();
     { // extend-add
-      std::size_t nt = 16;
-      std::size_t maxCB = nt;
+      std::size_t gCB = 0;
       for (std::size_t f=0; f<N; f++)
-        maxCB = std::max(maxCB, std::max(hasmbl[f].dCB1, hasmbl[f].dCB2));
-      auto gCB = rnd(maxCB, nt);
-      cl::sycl::range<3> global{N, gCB, gCB}, local{1, nt, nt};
-      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA1<scalar_t>(dasmbl));
-      q.wait_and_throw();
-      q.parallel_for(cl::sycl::nd_range<3>{global, local}, EA2<scalar_t>(dasmbl));
-      q.wait_and_throw();
+        gCB = std::max(gCB, std::max(hasmbl[f].dCB1, hasmbl[f].dCB2));
+      if (gCB) {
+	std::size_t nt = 256, ops = 1;
+	const unsigned int unroll = 16;
+	while (nt > gCB) {
+	  nt /= 2;
+	  ops *= 2;
+	}
+	std::size_t gx = (gCB + unroll - 1) / unroll;
+	gCB = rnd(gCB, nt);
+	assert(gCB * gx * rnd(N,ops) < std::numeric_limits<int>::max());
+	cl::sycl::range<3> global{rnd(N, ops), gx, gCB}, local{ops, 1, nt};
+	//std::cout << "ext-add, N= " << std::min(128ul, N-n) << " gCB= " << gCB << " nt= " << nt << std::endl;
+	// std::cout << "ext-add, N= " << rnd(N,ops) << " gx= " << gx << " gCB= " << gCB
+	// 	  << " ops= " << ops << " nt= " << nt << std::endl;
+	q.parallel_for(cl::sycl::nd_range<3>{global, local},
+		       EA<scalar_t,unroll>(dasmbl, N, true));
+	q.wait_and_throw();
+	q.parallel_for(cl::sycl::nd_range<3>{global, local},
+		       EA<scalar_t,unroll>(dasmbl, N, false));
+	q.wait_and_throw();
+      }
     }
   }
 
@@ -491,10 +503,27 @@ namespace strumpack {
       }
       scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
     }
-    std::size_t set_level(cl::sycl::queue& q, const LInfo_t& L, bool Schur) {
+    std::size_t set_level(cl::sycl::queue& q, const LInfo_t& L, bool Schur, std::size_t B=0) {
       std::size_t i = 0;
       for (auto& f : L.f) {
 	if (Schur && (f->dim_sep() == 0 || f->dim_upd() == 0))
+	  continue;
+	if (f->dim_sep() <= B)
+	  continue;
+        ds[i] = f->dim_sep();
+        du[i] = f->dim_upd();
+        F11[i] = f->F11_.data();  F12[i] = f->F12_.data();
+        F21[i] = f->F21_.data();  F22[i] = f->F22_.data();
+        piv[i] = f->piv_;
+        i++;
+      }
+      return i;
+    }
+    std::size_t set_level_small(cl::sycl::queue& q, const LInfo_t& L,
+				std::size_t Bmin, std::size_t Bmax) {
+      std::size_t i = 0;
+      for (auto& f : L.f) {
+	if (f->dim_sep() <= Bmin || f->dim_sep() > Bmax)
 	  continue;
         ds[i] = f->dim_sep();
         du[i] = f->dim_upd();
@@ -517,10 +546,114 @@ namespace strumpack {
   };
 
 
+  template<std::size_t B, typename scalar_t, typename integer_t>
+  struct PartialFactor {
+    // BatchMetaData<scalar_t,integer_t>* bdata_;
+    // PartialFactor(BatchMetaData<scalar_t,integer_t>* bdata) : bdata_(bdata) {}
+    std::int64_t *ds_, *du_, **piv_;
+    scalar_t **F11_, **F12_, **F21_, **F22_;
+    PartialFactor(std::int64_t *ds, std::int64_t *du, std::int64_t **piv,
+		  scalar_t **F11, scalar_t **F12, scalar_t **F21, scalar_t **F22)
+      : ds_(ds), du_(du), piv_(piv),
+	F11_(F11), F12_(F12), F21_(F21), F22_(F22) {}
+    void operator()(cl::sycl::nd_item<3> it) const {		
+      auto front = it.get_group(0);
+      int j = it.get_global_id(1), i = it.get_global_id(2);
+      // int n = bdata_->ds[front], n2 = bdata_->du[front];
+      // auto A11 = bdata_->F11[front];
+      // auto piv = bdata_->piv[front];
+      int n = ds_[front], n2 = du_[front];
+      auto A11 = F11_[front];
+      auto piv = piv_[front];
+      for (int k=0; k<n; k++) {		
+        if (i == 0 && j == 0)		
+          piv[k] = k + 1;
+
+        // TODO make p and Amax global?		
+        auto p = k;		
+        auto Amax = std::abs(A11[k+k*n]);		
+        for (int l=k+1; l<n; l++) {		
+          auto tmp = std::abs(A11[l+k*n]);		
+          if (tmp > Amax) {		
+            Amax = tmp;		
+            p = l;		
+          }		
+        }		
+        if (i == 0 && j == 0)		
+          piv[k] = p + 1;		
+        it.barrier();		
+        if (Amax == scalar_t(0.)) {		
+          // TODO		
+          // if (info == 0)		
+          //   info = k;		
+        } else {		
+	  // swap row k with the pivot row		
+	  if (j < n && i == k && p != k) {		
+	    auto tmp = A11[k+j*n];		
+	    A11[k+j*n] = A11[p+j*n];		
+	    A11[p+j*n] = tmp;		
+	  }
+	}
+        it.barrier();		
+
+
+	// divide by the pivot element		
+        if (j == k && i > k && i < n)		
+          A11[i+j*n] /= A11[k+k*n];		
+        it.barrier();		
+        // Schur update		
+        if (j > k && i > k && j < n && i < n)		
+          A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];		
+        it.barrier();		
+      // }		
+      }		
+      
+      auto A12 = F12_[front];		
+      for (int cb=0; cb<n2; cb+=B) {		
+        int c = cb + j;		
+        bool col = c < n2;		
+        // L trsm (unit diag)		
+        for (int k=0; k<n; k++) {		
+          if (i > k && i < n && col)		
+            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];		
+          it.barrier();		
+        }		
+        // U trsm		
+        for (int k=n-1; k>=0; k--) {		
+          if (i == k && col)		
+            A12[k+c*n] /= A11[k+k*n];		
+          it.barrier();		
+          if (i < k && col)		
+            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];		
+            it.barrier();		
+        }		
+      }		
+      // Schur GEMM		
+      auto A22 = F22_[front], A21 = F21_[front];		
+      for (int c=j; c<n2; c+=B)		
+        for (int r=i; r<n2; r+=B)		
+          for (int k=0; k<n; k++)		
+            A22[r+c*n2] -= A21[r+k*n2] * A12[k+c*n];		
+    }		
+  };
+
+
+  template<std::size_t B, typename scalar_t, typename integer_t>
+  void partial_factor_small(cl::sycl::queue& q, std::size_t nb,
+			    BatchMetaData<scalar_t,integer_t>& batch) {
+    if (!nb) return;
+    cl::sycl::range<3> global{nb, B, B}, local{1, B, B};
+    q.parallel_for(cl::sycl::nd_range<3>{global, local},
+		   PartialFactor<B, scalar_t, integer_t>
+		     (batch.ds, batch.du, batch.piv,
+		      batch.F11, batch.F12, batch.F21, batch.F22));
+  }		
+
   template<typename scalar_t, typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::factor_batch
+  FrontSYCL<scalar_t,integer_t>::factor_batch
   (cl::sycl::queue& q, const LInfo_t& L, Batch_t& batch,
    const Opts_t& opts) {
+#if 0
     auto nb = batch.set_level(q, L, false);
     oneapi::mkl::lapack::getrf_batch
       (q, batch.ds, batch.ds, batch.F11, batch.ds, batch.piv,
@@ -535,10 +668,47 @@ namespace strumpack {
        batch.alpha, const_cast<const scalar_t**>(batch.F21), batch.du,
        const_cast<const scalar_t**>(batch.F12), batch.ds,
        batch.beta, batch.F22, batch.du, nb, batch.group_sizes).wait();
+#else
+    auto Bmax = 16;
+    auto nb = batch.set_level_small(q, L, 0, 8);
+    partial_factor_small<8, scalar_t, integer_t>(q, nb, batch);
+    q.wait();
+    nb = batch.set_level_small(q, L, 8, 16);
+    partial_factor_small<16, scalar_t, integer_t>(q, nb, batch);
+    q.wait();
+
+    nb = batch.set_level(q, L, false, Bmax);
+    oneapi::mkl::lapack::getrf_batch
+      (q, batch.ds, batch.ds, batch.F11, batch.ds, batch.piv,
+       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
+    nb = batch.set_level(q, L, true, Bmax);
+    oneapi::mkl::lapack::getrs_batch
+      (q, batch.op, batch.ds, batch.du, batch.F11, batch.ds,
+       batch.piv, batch.F12, batch.ds,
+       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
+    oneapi::mkl::blas::column_major::gemm_batch
+      (q, batch.op, batch.op, batch.du, batch.du, batch.ds,
+       batch.alpha, const_cast<const scalar_t**>(batch.F21), batch.du,
+       const_cast<const scalar_t**>(batch.F12), batch.ds,
+       batch.beta, batch.F22, batch.du, nb, batch.group_sizes).wait();
+#endif
+    // #else
+    // auto nb = batch.set_level(q, L, false);
+    // for (auto& f : L.f)
+    //   dpcpp::getrf(q, f->F11_, f->piv_, batch.scratchpad.get(),
+    //                batch.lwork).wait();
+    // nb = batch.set_level(q, L, true);
+    // for (auto& f : L.f)
+    //   dpcpp::getrs(q, Trans::N, f->F11_, f->piv_, f->F12_,
+    // 		   batch.scratchpad.get(), batch.lwork).wait();
+    // for (auto& f : L.f)
+    //   dpcpp::gemm(q, Trans::N, Trans::N, scalar_t(-1.),
+    // 		  f->F21_, f->F12_, scalar_t(1.), f->F22_).wait();
+    // #endif
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::split_smaller
+  FrontSYCL<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (opts.verbose())
@@ -639,16 +809,78 @@ namespace strumpack {
     }
   }
 
+
+  template<auto query, typename T>
+  void do_query(const T& obj_to_query, const std::string& name, int indent=4) {
+    std::cout << std::string(indent, ' ') << name << " is '"
+	      << obj_to_query.template get_info<query>() << "'\n";
+  }
+ 
+
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::multifrontal_factorization
+  FrontSYCL<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     cl::sycl::queue q(cl::sycl::default_selector{});
+    // cl::sycl::queue q(cl::sycl::cpu_selector{});
     if (opts.verbose())
       std::cout << "# SYCL/DPC++ selected device: "
                 << q.get_device().get_info<cl::sycl::info::device::name>()
                 << std::endl;
 
+
+    // Loop through the available platforms
+    for (auto const& this_platform : cl::sycl::platform::get_platforms() ) {
+      std::cout << "Found Platform:\n";
+      do_query<cl::sycl::info::platform::name>
+	(this_platform, "info::platform::name");
+      do_query<cl::sycl::info::platform::vendor>
+	(this_platform, "info::platform::vendor");
+      do_query<cl::sycl::info::platform::version>
+	(this_platform, "info::platform::version");
+      do_query<cl::sycl::info::platform::profile>
+	(this_platform, "info::platform::profile");
+      // Loop through the devices available in this plaform
+      for (auto &dev : this_platform.get_devices() ) {
+	std::cout << " Device: "
+		  << dev.get_info<cl::sycl::info::device::name>() << "\n";
+	std::cout << "is_host(): "
+		  << (dev.is_host() ? "Yes" : "No") << "\n";
+	std::cout << "is_cpu(): "
+		  << (dev.is_cpu() ? "Yes" : "No") << "\n";
+	std::cout << "is_gpu(): "
+		  << (dev.is_gpu() ? "Yes" : "No") << "\n";
+	std::cout << "is_accelerator(): "
+		  << (dev.is_accelerator() ? "Yes" : "No") << "\n";
+	do_query<cl::sycl::info::device::vendor>(dev, "info::device::vendor");
+	do_query<cl::sycl::info::device::driver_version>
+	  (dev, "info::device::driver_version");
+	do_query<cl::sycl::info::device::max_work_item_dimensions>
+	  (dev, "info::device::max_work_item_dimensions");
+	do_query<cl::sycl::info::device::max_work_group_size>
+	  (dev, "info::device::max_work_group_size");
+	do_query<cl::sycl::info::device::mem_base_addr_align>
+	  (dev, "info::device::mem_base_addr_align");
+	do_query<cl::sycl::info::device::partition_max_sub_devices>
+	  (dev, "info::device::partition_max_sub_devices");	
+	// do_query<cl::sycl::info::device::max_work_item_sizes>
+	//   (dev, "info::device::max_work_item_sizes");	
+	std::cout << "    info::device::max_work_item_sizes" << " is '"
+		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[0] << "'\n";
+	std::cout << "    info::device::max_work_item_sizes" << " is '"
+		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[1] << "'\n";
+	std::cout << "    info::device::max_work_item_sizes" << " is '"
+		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[2] << "'\n";
+
+	// std::cout << "    info::device::max_work_item_size<1>" << " is '"
+	// 	  << dev.get_info<cl::sycl::info::device::max_work_item_size<1>>() << "'\n";
+	// std::cout << "    info::device::max_work_item_size<1>" << " is '"
+	// 	  << dev.get_info<cl::sycl::info::device::max_work_item_size<2>>() << "'\n";
+	// std::cout << "    info::device::max_work_item_size<1>" << " is '"
+	// 	  << dev.get_info<cl::sycl::info::device::max_work_item_size<3>>() << "'\n";
+      }
+    }
+    
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
     for (int l=lvls-1; l>=0; l--) {
@@ -738,13 +970,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::multifrontal_solve
+  FrontSYCL<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& b, const GPUFactors<scalar_t>* gpu_factors) const {
     FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontSYCL<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
@@ -762,7 +994,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::fwd_solve_phase2
+  FrontSYCL<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
@@ -783,7 +1015,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontSYCL<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (task_depth == 0) {
@@ -801,7 +1033,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontDPCpp<scalar_t,integer_t>::bwd_solve_phase1
+  FrontSYCL<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
@@ -818,19 +1050,19 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class FrontDPCpp<float,int>;
-  template class FrontDPCpp<double,int>;
-  template class FrontDPCpp<std::complex<float>,int>;
-  template class FrontDPCpp<std::complex<double>,int>;
+  template class FrontSYCL<float,int>;
+  template class FrontSYCL<double,int>;
+  template class FrontSYCL<std::complex<float>,int>;
+  template class FrontSYCL<std::complex<double>,int>;
 
-  template class FrontDPCpp<float,long int>;
-  template class FrontDPCpp<double,long int>;
-  template class FrontDPCpp<std::complex<float>,long int>;
-  template class FrontDPCpp<std::complex<double>,long int>;
+  template class FrontSYCL<float,long int>;
+  template class FrontSYCL<double,long int>;
+  template class FrontSYCL<std::complex<float>,long int>;
+  template class FrontSYCL<std::complex<double>,long int>;
 
-  template class FrontDPCpp<float,long long int>;
-  template class FrontDPCpp<double,long long int>;
-  template class FrontDPCpp<std::complex<float>,long long int>;
-  template class FrontDPCpp<std::complex<double>,long long int>;
+  template class FrontSYCL<float,long long int>;
+  template class FrontSYCL<double,long long int>;
+  template class FrontSYCL<std::complex<float>,long long int>;
+  template class FrontSYCL<std::complex<double>,long long int>;
 
 } // end namespace strumpack

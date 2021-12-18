@@ -38,7 +38,7 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t> class BatchMetaData;
   template<typename scalar_t> struct FrontData;
 
-  template<typename scalar_t,typename integer_t> class FrontDPCpp
+  template<typename scalar_t,typename integer_t> class FrontSYCL
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -49,9 +49,9 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontDPCpp(integer_t sep, integer_t sep_begin, integer_t sep_end,
+    FrontSYCL(integer_t sep, integer_t sep_begin, integer_t sep_end,
                std::vector<integer_t>& upd);
-    ~FrontDPCpp();
+    ~FrontSYCL();
 
     void release_work_memory() override;
 
@@ -79,7 +79,7 @@ namespace strumpack {
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override {}
 
-    std::string type() const override { return "FrontDPCpp"; }
+    std::string type() const override { return "FrontSYCL"; }
 
 #if defined(STRUMPACK_USE_MPI)
     void
@@ -96,8 +96,8 @@ namespace strumpack {
     scalar_t* scratchpad_ = nullptr;
     std::int64_t scratchpad_size_ = 0;
 
-    FrontDPCpp(const FrontDPCpp&) = delete;
-    FrontDPCpp& operator=(FrontDPCpp const&) = delete;
+    FrontSYCL(const FrontSYCL&) = delete;
+    FrontSYCL& operator=(FrontSYCL const&) = delete;
 
     void front_assembly(cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);

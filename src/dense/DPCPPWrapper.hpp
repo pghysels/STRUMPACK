@@ -223,7 +223,7 @@ namespace strumpack {
     getrf(cl::sycl::queue& q, DenseMatrix<scalar_t>& A,
           std::int64_t* ipiv, scalar_t* scratchpad,
           std::int64_t scratchpad_size,
-          const cl::sycl::vector_class<cl::sycl::event>& deps={}) {
+          const std::vector<cl::sycl::event>& deps={}) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrf_flops(A.rows(),A.cols()));
       try {
         return oneapi::mkl::lapack::getrf
@@ -241,7 +241,7 @@ namespace strumpack {
           const DenseMatrix<scalar_t>& A, const std::int64_t* ipiv,
           DenseMatrix<scalar_t>& B,
           scalar_t* scratchpad, std::int64_t scratchpad_size,
-          const cl::sycl::vector_class<cl::sycl::event>& deps={}) {
+          const std::vector<cl::sycl::event>& deps={}) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrs_flops(A.rows(),B.cols()));
       try {
         return oneapi::mkl::lapack::getrs
@@ -260,8 +260,7 @@ namespace strumpack {
     gemm(cl::sycl::queue& q, Trans ta, Trans tb,
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& b, scalar_t beta,
-         DenseMatrix<scalar_t>& c,
-         const cl::sycl::vector_class<cl::sycl::event>& deps={}) {
+         DenseMatrix<scalar_t>& c, const std::vector<cl::sycl::event>& deps={}) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::gemm_flops(c.rows(),c.cols(),(ta==Trans::N)?a.cols():a.rows(),alpha,beta));
       STRUMPACK_BYTES((is_complex<scalar_t>()?2:1)*sizeof(scalar_t)*blas::gemm_moves(c.rows(),c.cols(),(ta==Trans::N)?a.cols():a.rows()));
       assert((ta==Trans::N && a.rows()==c.rows()) ||
@@ -282,8 +281,7 @@ namespace strumpack {
     gemv(cl::sycl::queue& q, Trans ta,
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& x, scalar_t beta,
-         DenseMatrix<scalar_t>& y,
-         const cl::sycl::vector_class<cl::sycl::event>& deps={}) {
+         DenseMatrix<scalar_t>& y, const std::vector<cl::sycl::event>& deps={}) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::gemv_flops(a.rows(),a.cols(),alpha,beta));
       STRUMPACK_BYTES((is_complex<scalar_t>()?2:1)*sizeof(scalar_t)*blas::gemv_moves(a.rows(),a.cols()));
       return oneapi::mkl::blas::gemv

@@ -49,8 +49,8 @@
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
 #include "FrontalMatrixGPU.hpp"
 #endif
-#if defined(STRUMPACK_USE_DPCPP)
-#include "FrontDPCpp.hpp"
+#if defined(STRUMPACK_USE_SYCL)
+#include "FrontSYCL.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"
@@ -73,9 +73,9 @@ namespace strumpack {
         front.reset
           (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
 #endif
-#if defined(STRUMPACK_USE_DPCPP)
+#if defined(STRUMPACK_USE_SYCL)
         front.reset
-          (new FrontDPCpp<scalar_t,integer_t>(s, sbegin, send, upd));
+          (new FrontSYCL<scalar_t,integer_t>(s, sbegin, send, upd));
 #endif
         if (root) fc.dense++;
       }

@@ -45,10 +45,10 @@ if(STRUMPACK_USE_HIP)
   #   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip.cpp)
 endif()
 
-if(STRUMPACK_USE_DPCPP)
+if(STRUMPACK_USE_SYCL)
   target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontDPCpp.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/FrontDPCpp.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp)
 endif()
 
 if(STRUMPACK_USE_ZFP)
