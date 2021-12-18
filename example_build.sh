@@ -192,21 +192,17 @@ if ! $found_host; then
     echo "Open this file and modify the CMake command."
     echo "Running CMake ..."
 
-
-
     export METIS_DIR=$HOME/local/metis-5.1.0/install
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
+	  -DCMAKE_BUILD_TYPE=Debug \
 	  -DCMAKE_CXX_COMPILER=dpcpp \
 	  -DCMAKE_C_COMPILER=icx \
 	  -DCMAKE_Fortran_COMPILER=ifx \
-          -DSTRUMPACK_USE_MPI=OFF \
-          -DCMAKE_INSTALL_PREFIX=../install \
-	  -DSTRUMPACK_USE_DPCPP=ON \
-          -DSTRUMPACK_COUNT_FLOPS=ON
+	  -DSTRUMPACK_USE_MPI=OFF \
+	  -DCMAKE_INSTALL_PREFIX=../install \
+	  -DSTRUMPACK_USE_SYCL=ON \
+	  -DSTRUMPACK_COUNT_FLOPS=ON
 
-    # -DTPL_ONEAPI_LIBRARIES="-L${MKLROOT}/lib/intel64;-lmkl_sycl;-lmkl_intel_ilp64;-lmkl_intel_thread;-lmkl_core;-lsycl;-lOpenCL;-liomp5;-lpthread;-lm;-ldl"
-    
     # -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -lmkl_sycl -lmkl_intel_ilp64 -lmkl_intel_thread -lmkl_core -lsycl -lOpenCL -liomp5 -lpthread -lm -ldl "
     # -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
     # -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
