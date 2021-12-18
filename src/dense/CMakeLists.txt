@@ -54,7 +54,7 @@ if(STRUMPACK_USE_HIP)
   install(FILES HIPWrapper.hpp DESTINATION include/dense)
 endif()
 
-if(STRUMPACK_USE_DPCPP)
+if(STRUMPACK_USE_SYCL)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/DPCPPWrapper.hpp)
   install(FILES DPCPPWrapper.hpp DESTINATION include/dense)

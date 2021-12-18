@@ -37,14 +37,16 @@
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
 #include "iterative/IterativeSolvers.hpp"
+
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
-#else
+#endif
+
 #if defined(STRUMPACK_USE_HIP)
 #include "dense/HIPWrapper.hpp"
 #endif
-#endif
-#if defined(STRUMPACK_USE_DPCPP)
+
+#if defined(STRUMPACK_USE_SYCL)
 #include "dense/DPCPPWrapper.hpp"
 #endif
 

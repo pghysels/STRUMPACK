@@ -37,7 +37,7 @@
 #if defined(STRUMPACK_USE_HIP)
 #include "dense/HIPWrapper.hpp"
 #endif
-#if defined(STRUMPACK_USE_DPCPP)
+#if defined(STRUMPACK_USE_SYCL)
 #include "dense/DPCPPWrapper.hpp"
 #endif
 
