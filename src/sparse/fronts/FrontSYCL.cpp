@@ -92,36 +92,49 @@ namespace strumpack {
       f.reserve(fronts.size());
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FSYCL_t*>(F));
+#pragma omp parallel for			\
+  reduction(+:L_size,U_size,Schur_size)		\
+  reduction(+:piv_size,total_upd_size)
       for (auto F : f) {
-        auto dsep = F->dim_sep();
-        auto dupd = F->dim_upd();
+        const std::size_t dsep = F->dim_sep();
+        const std::size_t dupd = F->dim_upd();
         L_size += dsep*dsep + dsep*dupd;
         U_size += dsep*dupd;
         Schur_size += dupd*dupd;
         piv_size += dsep;
         total_upd_size += dupd;
-        F->scratchpad_size_ =
-          std::max(dpcpp::getrf_buffersize<scalar_t>
-                   (q, dsep, dsep, dsep),
-                   dpcpp::getrs_buffersize<scalar_t>
-                   (q, Trans::N, dsep, dupd, dsep, dsep));
-        getr_work_size += F->scratchpad_size_;
-        if (A) {
-          if (F->lchild_) Isize += F->lchild_->dim_upd();
-          if (F->rchild_) Isize += F->rchild_->dim_upd();
+      }
+      if (A) {
+        auto N = f.size();
+        elems11.resize(N+1);
+        elems12.resize(N+1);
+        elems21.resize(N+1);
+        Isize.resize(N+1);
+#pragma omp parallel for
+        for (std::size_t i=0; i<N; i++) {
+          auto& F = *(f[i]);
           A->count_front_elements
-            (F->sep_begin(), F->sep_end(), F->upd(),
-             elems11, elems12, elems21);
+            (F.sep_begin(), F.sep_end(), F.upd(),
+             elems11[i+1], elems12[i+1], elems21[i+1]);
+          if (F.lchild_) Isize[i+1] += F.lchild_->dim_upd();
+          if (F.rchild_) Isize[i+1] += F.rchild_->dim_upd();
+        }
+        for (std::size_t i=0; i<N; i++) {
+          elems11[i+1] += elems11[i];
+          elems12[i+1] += elems12[i];
+          elems21[i+1] += elems21[i];
+          Isize[i+1] += Isize[i];
         }
       }
       factor_size = L_size + U_size;
       work_bytes =
-        round_to_16(sizeof(scalar_t) * (Schur_size + getr_work_size)) +
+	round_to_16(sizeof(scalar_t) * Schur_size) +
         round_to_16(sizeof(std::int64_t) * piv_size);
       ea_bytes =
         round_to_16(sizeof(AssembleData<scalar_t>) * f.size()) +
-        round_to_16(sizeof(std::size_t) * Isize) +
-        round_to_16(sizeof(Triplet<scalar_t>) * (elems11 + elems12 + elems21));
+        round_to_16(sizeof(std::size_t) * Isize.back()) +
+        round_to_16(sizeof(Triplet<scalar_t>) *
+		    (elems11.back() + elems12.back() + elems21.back()));
     }
 
     void print_info(int l, int lvls) {
@@ -154,12 +167,8 @@ namespace strumpack {
         const int dsep = F->dim_sep();
         const int dupd = F->dim_upd();
         F->F11_ = DenseMW_t(dsep, dsep, factors, dsep); factors += dsep*dsep;
-        F->F21_ = DenseMW_t(dupd, dsep, factors, dupd); factors += dupd*dsep;
-      }
-      for (auto F : f) {
-        const int dsep = F->dim_sep();
-        const int dupd = F->dim_upd();
         F->F12_ = DenseMW_t(dsep, dupd, factors, dsep); factors += dsep*dupd;
+        F->F21_ = DenseMW_t(dupd, dsep, factors, dupd); factors += dupd*dsep;
       }
     }
 
@@ -179,10 +188,6 @@ namespace strumpack {
           smem += dupd*dupd;
         }
       }
-      for (auto F : f) {
-        F->scratchpad_ = smem;
-        smem += F->scratchpad_size_;
-      }
       auto imem = reinterpret_cast<std::int64_t*>(round_to_16(smem));
       for (auto F : f) {
         F->piv_ = imem;
@@ -192,10 +197,9 @@ namespace strumpack {
 
     std::vector<FSYCL_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
-                   Schur_size = 0, piv_size = 0, total_upd_size = 0,
-                   work_bytes = 0, Isize = 0, ea_bytes = 0,
-                   elems11 = 0, elems12 = 0, elems21 = 0;
-    std::int64_t getr_work_size = 0;
+       Schur_size = 0, piv_size = 0, total_upd_size = 0,
+       work_bytes = 0, ea_bytes = 0;
+    std::vector<std::size_t> elems11, elems12, elems21, Isize;
   };
 
 
@@ -357,54 +361,42 @@ namespace strumpack {
     using FSYCL_t = FrontSYCL<scalar_t,integer_t>;
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
-    std::vector<Trip_t> e11, e12, e21;
-    e11.reserve(L.elems11);
-    e12.reserve(L.elems12);
-    e21.reserve(L.elems21);
-    std::vector<std::array<std::size_t,3>> ne(N+1);
-    for (std::size_t n=0; n<N; n++) {
-      auto& f = *(L.f[n]);
-      ne[n] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
-      A.push_front_elements
-        (f.sep_begin_, f.sep_end_, f.upd_, e11, e12, e21);
-    }
-    ne[N] = std::array<std::size_t,3>{e11.size(), e12.size(), e21.size()};
     auto hasmbl = reinterpret_cast<AssembleData<scalar_t>*>(hea_mem);
     auto Iptr = reinterpret_cast<std::size_t*>(round_to_16(hasmbl + N));
-    {
-      auto helems = reinterpret_cast<Trip_t*>(round_to_16(Iptr + L.Isize));
-      std::copy(e11.begin(), e11.end(), helems);
-      std::copy(e12.begin(), e12.end(), helems + e11.size());
-      std::copy(e21.begin(), e21.end(), helems + e11.size() + e12.size());
-    }
+    auto e11 = reinterpret_cast<Trip_t*>(round_to_16(Iptr + L.Isize.back()));
+    auto e12 = e11 + L.elems11.back();
+    auto e21 = e12 + L.elems12.back();
     auto dasmbl = reinterpret_cast<AssembleData<scalar_t>*>(dea_mem);
     auto dIptr = reinterpret_cast<std::size_t*>(round_to_16(dasmbl + N));
-    auto delems = reinterpret_cast<Trip_t*>(round_to_16(dIptr + L.Isize));
+    auto delems = reinterpret_cast<Trip_t*>(round_to_16(dIptr + L.Isize.back()));
     auto de11 = delems;
-    auto de12 = de11 + e11.size();
-    auto de21 = de12 + e12.size();
+    auto de12 = de11 + L.elems11.back();
+    auto de21 = de12 + L.elems12.back();
+#pragma omp parallel for
     for (std::size_t n=0; n<N; n++) {
       auto& f = *(L.f[n]);
+      A.set_front_elements
+        (f.sep_begin_, f.sep_end_, f.upd_,
+         e11+L.elems11[n], e12+L.elems12[n], e21+L.elems21[n]);
       hasmbl[n] = AssembleData<scalar_t>
         (f.dim_sep(), f.dim_upd(), f.F11_.data(), f.F12_.data(),
          f.F21_.data(), f.F22_.data(),
-         ne[n+1][0]-ne[n][0], ne[n+1][1]-ne[n][1], ne[n+1][2]-ne[n][2],
-         de11+ne[n][0], de12+ne[n][1], de21+ne[n][2]);
+         L.elems11[n+1]-L.elems11[n], L.elems12[n+1]-L.elems12[n],
+         L.elems21[n+1]-L.elems21[n],
+         de11+L.elems11[n], de12+L.elems12[n], de21+L.elems21[n]);
+      auto fIptr = Iptr + L.Isize[n];
+      auto fdIptr = dIptr + L.Isize[n];
       if (f.lchild_) {
         auto c = dynamic_cast<FSYCL_t*>(f.lchild_.get());
-        hasmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), dIptr);
-        auto u = c->upd_to_parent(&f);
-        std::copy(u.begin(), u.end(), Iptr);
-        Iptr += u.size();
-        dIptr += u.size();
+        hasmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), fdIptr);
+        c->upd_to_parent(&f, fIptr);
+        fIptr += c->dim_upd();
+        fdIptr += c->dim_upd();
       }
       if (f.rchild_) {
         auto c = dynamic_cast<FSYCL_t*>(f.rchild_.get());
-        hasmbl[n].set_ext_add_right(c->dim_upd(), c->F22_.data(), dIptr);
-        auto u = c->upd_to_parent(&f);
-        std::copy(u.begin(), u.end(), Iptr);
-        Iptr += u.size();
-        dIptr += u.size();
+        hasmbl[n].set_ext_add_right(c->dim_upd(), c->F22_.data(), fdIptr);
+        c->upd_to_parent(&f, fIptr);
       }
     }
     dpcpp::memcpy<char>(q, dea_mem, hea_mem, L.ea_bytes);
@@ -595,7 +587,6 @@ namespace strumpack {
 	  }
 	}
         it.barrier();		
-
 
 	// divide by the pivot element		
         if (j == k && i > k && i < n)		
@@ -828,58 +819,50 @@ namespace strumpack {
                 << q.get_device().get_info<cl::sycl::info::device::name>()
                 << std::endl;
 
-
-    // Loop through the available platforms
-    for (auto const& this_platform : cl::sycl::platform::get_platforms() ) {
-      std::cout << "Found Platform:\n";
-      do_query<cl::sycl::info::platform::name>
-	(this_platform, "info::platform::name");
-      do_query<cl::sycl::info::platform::vendor>
-	(this_platform, "info::platform::vendor");
-      do_query<cl::sycl::info::platform::version>
-	(this_platform, "info::platform::version");
-      do_query<cl::sycl::info::platform::profile>
-	(this_platform, "info::platform::profile");
-      // Loop through the devices available in this plaform
-      for (auto &dev : this_platform.get_devices() ) {
-	std::cout << " Device: "
-		  << dev.get_info<cl::sycl::info::device::name>() << "\n";
-	std::cout << "is_host(): "
-		  << (dev.is_host() ? "Yes" : "No") << "\n";
-	std::cout << "is_cpu(): "
-		  << (dev.is_cpu() ? "Yes" : "No") << "\n";
-	std::cout << "is_gpu(): "
-		  << (dev.is_gpu() ? "Yes" : "No") << "\n";
-	std::cout << "is_accelerator(): "
-		  << (dev.is_accelerator() ? "Yes" : "No") << "\n";
-	do_query<cl::sycl::info::device::vendor>(dev, "info::device::vendor");
-	do_query<cl::sycl::info::device::driver_version>
-	  (dev, "info::device::driver_version");
-	do_query<cl::sycl::info::device::max_work_item_dimensions>
-	  (dev, "info::device::max_work_item_dimensions");
-	do_query<cl::sycl::info::device::max_work_group_size>
-	  (dev, "info::device::max_work_group_size");
-	do_query<cl::sycl::info::device::mem_base_addr_align>
-	  (dev, "info::device::mem_base_addr_align");
-	do_query<cl::sycl::info::device::partition_max_sub_devices>
-	  (dev, "info::device::partition_max_sub_devices");	
-	// do_query<cl::sycl::info::device::max_work_item_sizes>
-	//   (dev, "info::device::max_work_item_sizes");	
-	std::cout << "    info::device::max_work_item_sizes" << " is '"
-		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[0] << "'\n";
-	std::cout << "    info::device::max_work_item_sizes" << " is '"
-		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[1] << "'\n";
-	std::cout << "    info::device::max_work_item_sizes" << " is '"
-		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[2] << "'\n";
-
-	// std::cout << "    info::device::max_work_item_size<1>" << " is '"
-	// 	  << dev.get_info<cl::sycl::info::device::max_work_item_size<1>>() << "'\n";
-	// std::cout << "    info::device::max_work_item_size<1>" << " is '"
-	// 	  << dev.get_info<cl::sycl::info::device::max_work_item_size<2>>() << "'\n";
-	// std::cout << "    info::device::max_work_item_size<1>" << " is '"
-	// 	  << dev.get_info<cl::sycl::info::device::max_work_item_size<3>>() << "'\n";
-      }
-    }
+    // // Loop through the available platforms
+    // for (auto const& this_platform : cl::sycl::platform::get_platforms() ) {
+    //   std::cout << "Found Platform:\n";
+    //   do_query<cl::sycl::info::platform::name>
+    // 	(this_platform, "info::platform::name");
+    //   do_query<cl::sycl::info::platform::vendor>
+    // 	(this_platform, "info::platform::vendor");
+    //   do_query<cl::sycl::info::platform::version>
+    // 	(this_platform, "info::platform::version");
+    //   do_query<cl::sycl::info::platform::profile>
+    // 	(this_platform, "info::platform::profile");
+    //   // Loop through the devices available in this plaform
+    //   for (auto &dev : this_platform.get_devices() ) {
+    // 	std::cout << " Device: "
+    // 		  << dev.get_info<cl::sycl::info::device::name>() << "\n";
+    // 	std::cout << "is_host(): "
+    // 		  << (dev.is_host() ? "Yes" : "No") << "\n";
+    // 	std::cout << "is_cpu(): "
+    // 		  << (dev.is_cpu() ? "Yes" : "No") << "\n";
+    // 	std::cout << "is_gpu(): "
+    // 		  << (dev.is_gpu() ? "Yes" : "No") << "\n";
+    // 	std::cout << "is_accelerator(): "
+    // 		  << (dev.is_accelerator() ? "Yes" : "No") << "\n";
+    // 	do_query<cl::sycl::info::device::vendor>(dev, "info::device::vendor");
+    // 	do_query<cl::sycl::info::device::driver_version>
+    // 	  (dev, "info::device::driver_version");
+    // 	do_query<cl::sycl::info::device::max_work_item_dimensions>
+    // 	  (dev, "info::device::max_work_item_dimensions");
+    // 	do_query<cl::sycl::info::device::max_work_group_size>
+    // 	  (dev, "info::device::max_work_group_size");
+    // 	do_query<cl::sycl::info::device::mem_base_addr_align>
+    // 	  (dev, "info::device::mem_base_addr_align");
+    // 	do_query<cl::sycl::info::device::partition_max_sub_devices>
+    // 	  (dev, "info::device::partition_max_sub_devices");	
+    // 	// do_query<cl::sycl::info::device::max_work_item_sizes>
+    // 	//   (dev, "info::device::max_work_item_sizes");	
+    // 	std::cout << "    info::device::max_work_item_sizes" << " is '"
+    // 		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[0] << "'\n";
+    // 	std::cout << "    info::device::max_work_item_sizes" << " is '"
+    // 		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[1] << "'\n";
+    // 	std::cout << "    info::device::max_work_item_sizes" << " is '"
+    // 		  << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[2] << "'\n";
+    //   }
+    // }
     
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);

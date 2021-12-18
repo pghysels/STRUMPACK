@@ -93,8 +93,6 @@ namespace strumpack {
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<std::int64_t> pivot_mem_;
     std::int64_t* piv_ = nullptr;
-    scalar_t* scratchpad_ = nullptr;
-    std::int64_t scratchpad_size_ = 0;
 
     FrontSYCL(const FrontSYCL&) = delete;
     FrontSYCL& operator=(FrontSYCL const&) = delete;
