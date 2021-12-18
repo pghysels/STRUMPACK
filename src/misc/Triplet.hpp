@@ -30,7 +30,7 @@
 
 #include "dense/DenseMatrix.hpp"
 #include "StrumpackConfig.hpp"
-#if defined(STRUMPACK_USE_MPI)
+#if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
 #define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
 #endif
@@ -46,7 +46,7 @@ namespace strumpack {
     Triplet(integer_t row, integer_t col, scalar_t value)
       : r(row), c(col), v(value) {}
 
-#if defined(STRUMPACK_USE_MPI)
+#if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
     static MPI_Datatype mpi_type();
 #endif
   };
@@ -60,7 +60,7 @@ namespace strumpack {
     IdxVal() {}
     IdxVal(integer_t idx, scalar_t value) : i(idx), v(value) {}
 
-#if defined(STRUMPACK_USE_MPI)
+#if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
     static MPI_Datatype mpi_type();
 #endif
   };
@@ -72,7 +72,7 @@ namespace strumpack {
     IdxIJ() {}
     IdxIJ(integer_t ii, integer_t jj) : i(ii), j(jj) {}
 
-#if defined(STRUMPACK_USE_MPI)
+#if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
     static MPI_Datatype mpi_type();
 #endif
   };
@@ -88,7 +88,7 @@ namespace strumpack {
     Quadlet(integer_t row, integer_t col, integer_t block, scalar_t val)
       : r(row), c(col), k(block), v(val) {}
 
-#if defined(STRUMPACK_USE_MPI)
+#if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
     static MPI_Datatype mpi_type();
 #endif
   };

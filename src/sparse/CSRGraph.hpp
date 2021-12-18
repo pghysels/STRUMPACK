@@ -32,7 +32,7 @@
 #include <vector>
 #include <unordered_map>
 
-#include "HSS/HSSPartitionTree.hpp"
+#include "structured/ClusterTree.hpp"
 #include "dense/DenseMatrix.hpp"
 
 namespace strumpack {
@@ -87,7 +87,7 @@ namespace strumpack {
                                         const std::vector<integer_t>& iorder,
                                         integer_t clo, integer_t chi);
 
-    HSS::HSSPartitionTree
+    structured::ClusterTree
     recursive_bisection(int leaf, int conn_level, integer_t* order,
                         integer_t* iorder, integer_t lo, integer_t sep_begin,
                         integer_t sep_end) const;
@@ -104,7 +104,7 @@ namespace strumpack {
 
     void split_recursive(int leaf, int conn_level, integer_t lo,
                          integer_t sep_begin, integer_t sep_end,
-                         integer_t* order, HSS::HSSPartitionTree& tree,
+                         integer_t* order, structured::ClusterTree& tree,
                          integer_t& parts, integer_t part,
                          integer_t count, const Length2Edges& l2) const;
 

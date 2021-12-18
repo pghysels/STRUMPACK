@@ -65,23 +65,26 @@ namespace strumpack {
       else tree.emplace_back(N, -1, -1, -1);
       nbsep++;
     } else {
+      int dhalf = (n0[d] < ld[d]/2) ?
+        std::ceil(dims[d]/2.) : std::floor(dims[d]/2.);
+
       // part 1
       std::array<integer_t,3> part_begin(n0), part_size(dims);
-      part_size[d] = dims[d]/2 - (width/2);
+      part_size[d] = dhalf - (width/2);
       recursive_nested_dissection
         (pbegin, nbsep, part_begin, part_size, ld, tree, gd);
       auto left_root_id = nbsep - 1;
 
       // part 2
-      part_begin[d] = n0[d] + dims[d]/2 + width;
-      part_size[d] = dims[d] - width - dims[d]/2;
+      part_begin[d] = n0[d] + dhalf + width;
+      part_size[d] = dims[d] - width - dhalf;
       recursive_nested_dissection
         (pbegin, nbsep, part_begin, part_size, ld, tree, gd);
       tree[left_root_id].pa = nbsep;
       tree[nbsep-1].pa = nbsep;
 
       // separator
-      part_begin[d] = n0[d] + dims[d]/2  - (width/2);
+      part_begin[d] = n0[d] + dhalf - (width/2);
       part_size[d] = width;
       integer_t sep_size = comps * part_size[0]*part_size[1]*part_size[2];
       for (integer_t z=part_begin[2]; z<part_begin[2]+part_size[2]; z++)
@@ -115,7 +118,7 @@ namespace strumpack {
     gd.stratpar = opts.nd_param();
     if (nx*ny*nz*components != A.size()) {
       nx = opts.nx();
-      ny = opts.nz();
+      ny = opts.ny();
       nz = opts.nz();
       gd.components = opts.components();
       gd.width = opts.separator_width();

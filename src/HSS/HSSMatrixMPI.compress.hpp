@@ -64,13 +64,13 @@ namespace strumpack {
           for (int r=rlo; r<rhi; r++)
             sbuf[destr[r-rlo]+destc[c-clo]].push_back(Ad(r,c));
       } else {
-        auto m0 = this->_ch[0]->rows();
-        auto n0 = this->_ch[0]->cols();
-        auto m1 = this->_ch[1]->rows();
-        auto n1 = this->_ch[1]->cols();
-        this->_ch[0]->redistribute_to_tree_to_buffers
+        auto m0 = child(0)->rows();
+        auto n0 = child(0)->cols();
+        auto m1 = child(1)->rows();
+        auto n1 = child(1)->cols();
+        child(0)->redistribute_to_tree_to_buffers
           (A, Arlo, Aclo, sbuf, dest);
-        this->_ch[1]->redistribute_to_tree_to_buffers
+        child(1)->redistribute_to_tree_to_buffers
           (A, Arlo+m0, Aclo+n0, sbuf, dest+Pl());
         assert(A.MB() == DistM_t::default_MB);
         const auto B = DistM_t::default_MB;
@@ -120,58 +120,58 @@ namespace strumpack {
       const auto Aprows = A.grid()->nprows();
       const auto Apcols = A.grid()->npcols();
       if (this->leaf()) {
-        _A = DistM_t(grid(), this->rows(), this->cols());
+        A_ = DistM_t(grid(), this->rows(), this->cols());
         const auto B = DistM_t::default_MB;
         int rlo, rhi, clo, chi;
-        _A.lranges(rlo, rhi, clo, chi);
+        A_.lranges(rlo, rhi, clo, chi);
         std::vector<int> srcr(rhi-rlo);
         for (int r=rlo; r<rhi; r++)
-          srcr[r-rlo] = ((_A.rowl2g_fixed(r) + Arlo) / B) % Aprows;
+          srcr[r-rlo] = ((A_.rowl2g_fixed(r) + Arlo) / B) % Aprows;
         for (int c=clo; c<chi; c++)
-          for (int srcc=(((_A.coll2g_fixed(c)+Aclo)/B)%Apcols)*Aprows,
+          for (int srcc=(((A_.coll2g_fixed(c)+Aclo)/B)%Apcols)*Aprows,
                  r=rlo; r<rhi; r++)
-            _A(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
+            A_(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
       } else {
-        auto m0 = this->_ch[0]->rows();
-        auto n0 = this->_ch[0]->cols();
-        auto m1 = this->_ch[1]->rows();
-        auto n1 = this->_ch[1]->cols();
-        this->_ch[0]->redistribute_to_tree_from_buffers
+        auto m0 = child(0)->rows();
+        auto n0 = child(0)->cols();
+        auto m1 = child(1)->rows();
+        auto n1 = child(1)->cols();
+        child(0)->redistribute_to_tree_from_buffers
           (A, Arlo, Aclo, pbuf);
-        this->_ch[1]->redistribute_to_tree_from_buffers
+        child(1)->redistribute_to_tree_from_buffers
           (A, Arlo+m0, Aclo+n0, pbuf);
-        _A01 = DistM_t(grid(), m0, n1);
-        _A10 = DistM_t(grid(), m1, n0);
+        A01_ = DistM_t(grid(), m0, n1);
+        A10_ = DistM_t(grid(), m1, n0);
         assert(A.I() == 1 && A.J() == 1);
         const auto B = DistM_t::default_MB;
         int rlo, rhi, clo, chi;
-        _A01.lranges(rlo, rhi, clo, chi);
+        A01_.lranges(rlo, rhi, clo, chi);
         std::vector<int> srcr(rhi-rlo);
         for (int r=rlo; r<rhi; r++)
-          srcr[r-rlo] = ((_A01.rowl2g_fixed(r) + Arlo) / B) % Aprows;
+          srcr[r-rlo] = ((A01_.rowl2g_fixed(r) + Arlo) / B) % Aprows;
         for (int c=clo; c<chi; c++)
-          for (int srcc=(((_A01.coll2g_fixed(c)+Aclo+n0)/B)%Apcols)*Aprows,
+          for (int srcc=(((A01_.coll2g_fixed(c)+Aclo+n0)/B)%Apcols)*Aprows,
                  r=rlo; r<rhi; r++)
-            _A01(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
-        _A10.lranges(rlo, rhi, clo, chi);
+            A01_(r,c) = *(pbuf[srcr[r-rlo] + srcc]++);
+        A10_.lranges(rlo, rhi, clo, chi);
         srcr.resize(rhi-rlo);
         for (int r=rlo; r<rhi; r++)
-          srcr[r-rlo] = ((_A10.rowl2g_fixed(r) + Arlo+m0) / B) % Aprows;
+          srcr[r-rlo] = ((A10_.rowl2g_fixed(r) + Arlo+m0) / B) % Aprows;
         for (int c=clo; c<chi; c++)
-          for (int srcc=(((_A10.coll2g_fixed(c)+Aclo)/B)%Apcols)*Aprows,
+          for (int srcc=(((A10_.coll2g_fixed(c)+Aclo)/B)%Apcols)*Aprows,
                  r=rlo; r<rhi; r++)
-            _A10(r,c) = *(pbuf[srcr[r-rlo]+srcc]++);
+            A10_(r,c) = *(pbuf[srcr[r-rlo]+srcc]++);
       }
     }
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::delete_redistributed_input() {
-      if (this->leaf()) this->_A.clear();
+      if (this->leaf()) A_.clear();
       else {
-        this->_ch[0]->delete_redistributed_input();
-        this->_ch[1]->delete_redistributed_input();
-        this->_A01.clear();
-        this->_A10.clear();
+        child(0)->delete_redistributed_input();
+        child(1)->delete_redistributed_input();
+        A01_.clear();
+        A10_.clear();
       }
     }
 
@@ -368,11 +368,11 @@ namespace strumpack {
       allgather_extraction_indices(lI, lJ, I, J, before, self, after);
       DistM_t dummy;
       for (int i=0; i<before; i++)
-        Aelem(I[i], J[i], dummy, this->_A, 0, 0, comm());
+        Aelem(I[i], J[i], dummy, A_, 0, 0, comm());
       if (I.size()-after-before)
         extract_D_B(Aelem, grid_local(), opts, w, lvl);
       for (int i=I.size()-after; i<int(I.size()); i++)
-        Aelem(I[i], J[i], dummy, this->_A, 0, 0, comm());
+        Aelem(I[i], J[i], dummy, A_, 0, 0, comm());
     }
 
     template<typename scalar_t> void HSSMatrixMPI<scalar_t>::extract_level
@@ -411,15 +411,15 @@ namespace strumpack {
           }
         }
       } else {
-        w.split(this->_ch[0]->dims());
+        w.split(child(0)->dims());
         if (w.lvl < lvl) {
-          this->_ch[0]->get_extraction_indices(I, J, w.c[0], self, lvl);
-          this->_ch[1]->get_extraction_indices(I, J, w.c[1], self, lvl);
+          child(0)->get_extraction_indices(I, J, w.c[0], self, lvl);
+          child(1)->get_extraction_indices(I, J, w.c[1], self, lvl);
           return;
         }
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
         if (this->is_untouched()) {
           self += 2;
           if (Comm().is_root()) {
@@ -449,29 +449,29 @@ namespace strumpack {
             for (std::size_t j=0; j<this->cols(); j++)
               J.back().push_back(j+w.offset.second);
           }
-          _D = DistM_t(grid(), this->rows(), this->cols());
-          B.push_back(DistMW_t(_D));
+          D_ = DistM_t(grid(), this->rows(), this->cols());
+          B.push_back(DistMW_t(D_));
         }
       } else {
-        w.split(this->_ch[0]->dims());
+        w.split(child(0)->dims());
         if (w.lvl < lvl) {
-          this->_ch[0]->get_extraction_indices(I, J, B, lg, w.c[0], self, lvl);
-          this->_ch[1]->get_extraction_indices(I, J, B, lg, w.c[1], self, lvl);
+          child(0)->get_extraction_indices(I, J, B, lg, w.c[0], self, lvl);
+          child(1)->get_extraction_indices(I, J, B, lg, w.c[1], self, lvl);
           return;
         }
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
         if (this->is_untouched()) {
           self += 2;
           if (Comm().is_root()) {
             I.push_back(w.c[0].Ir);  J.push_back(w.c[1].Ic);
             I.push_back(w.c[1].Ir);  J.push_back(w.c[0].Ic);
           }
-          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
-          B.push_back(DistMW_t(_B01));
-          B.push_back(DistMW_t(_B10));
+          B01_ = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          B10_ = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
+          B.push_back(DistMW_t(B01_));
+          B.push_back(DistMW_t(B10_));
         }
       }
     }
@@ -541,24 +541,24 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DistM_t(grid(), this->rows(), this->cols());
-          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
+          D_ = DistM_t(grid(), this->rows(), this->cols());
+          Aelem(I, J, D_, A_, w.offset.first, w.offset.second, comm());
         }
       } else {
         if (w.lvl < lvl) {
-          this->_ch[0]->extract_D_B(Aelem, lg, opts, w.c[0], lvl);
-          this->_ch[1]->extract_D_B(Aelem, lg, opts, w.c[1], lvl);
+          child(0)->extract_D_B(Aelem, lg, opts, w.c[0], lvl);
+          child(1)->extract_D_B(Aelem, lg, opts, w.c[1], lvl);
           return;
         }
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
         if (this->is_untouched()) {
-          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
-          Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
-          Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
+          B01_ = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          B10_ = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
+          Aelem(w.c[0].Ir, w.c[1].Ic, B01_, A01_,
+                w.offset.first, w.offset.second+child(0)->cols(), comm());
+          Aelem(w.c[1].Ir, w.c[0].Ic, B10_, A10_,
+                w.offset.first+child(0)->rows(), w.offset.second, comm());
         }
       }
     }
@@ -577,36 +577,36 @@ namespace strumpack {
             I.push_back(i+w.offset.first);
           for (std::size_t j=0; j<this->cols(); j++)
             J.push_back(j+w.offset.second);
-          _D = DistM_t(grid(), this->rows(), this->cols());
-          Aelem(I, J, _D, _A, w.offset.first, w.offset.second, comm());
+          D_ = DistM_t(grid(), this->rows(), this->cols());
+          Aelem(I, J, D_, A_, w.offset.first, w.offset.second, comm());
         }
       } else {
-        w.split(this->_ch[0]->dims());
-        this->_ch[0]->compress_recursive_original
+        w.split(child(0)->dims());
+        child(0)->compress_recursive_original
           (RS, Aelem, opts, w.c[0], dd);
-        this->_ch[1]->compress_recursive_original
+        child(1)->compress_recursive_original
           (RS, Aelem, opts, w.c[1], dd);
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
         if (this->is_untouched()) {
-          _B01 = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
-          _B10 = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
-          Aelem(w.c[0].Ir, w.c[1].Ic, _B01, _A01,
-                w.offset.first, w.offset.second+this->_ch[0]->cols(), comm());
-          Aelem(w.c[1].Ir, w.c[0].Ic, _B10, _A10,
-                w.offset.first+this->_ch[0]->rows(), w.offset.second, comm());
+          B01_ = DistM_t(grid(), w.c[0].Ir.size(), w.c[1].Ic.size());
+          B10_ = DistM_t(grid(), w.c[1].Ir.size(), w.c[0].Ic.size());
+          Aelem(w.c[0].Ir, w.c[1].Ic, B01_, A01_,
+                w.offset.first, w.offset.second+child(0)->cols(), comm());
+          Aelem(w.c[1].Ir, w.c[0].Ic, B10_, A10_,
+                w.offset.first+child(0)->rows(), w.offset.second, comm());
         }
       }
-      if (w.lvl == 0) this->_U_state = this->_V_state = State::COMPRESSED;
+      if (w.lvl == 0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         compute_local_samples(RS, w, dd);
         if (!this->is_compressed()) {
           if (compute_U_V_bases(RS.R.cols(), opts, w)) {
             reduce_local_samples(RS, w, dd, false);
-            this->_U_state = this->_V_state = State::COMPRESSED;
+            this->U_state_ = this->V_state_ = State::COMPRESSED;
           } else
-            this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
+            this->U_state_ = this->V_state_ = State::PARTIALLY_COMPRESSED;
         } else reduce_local_samples(RS, w, dd, true);
       }
     }
@@ -620,23 +620,23 @@ namespace strumpack {
         if (w.lvl < lvl) return;
       } else {
         if (w.lvl < lvl) {
-          this->_ch[0]->compress_level_original(RS, opts, w.c[0], dd, lvl);
-          this->_ch[1]->compress_level_original(RS, opts, w.c[1], dd, lvl);
+          child(0)->compress_level_original(RS, opts, w.c[0], dd, lvl);
+          child(1)->compress_level_original(RS, opts, w.c[1], dd, lvl);
           return;
         }
         communicate_child_data(w);
-        if (!this->_ch[0]->is_compressed() ||
-            !this->_ch[1]->is_compressed()) return;
+        if (!child(0)->is_compressed() ||
+            !child(1)->is_compressed()) return;
       }
-      if (w.lvl==0) this->_U_state = this->_V_state = State::COMPRESSED;
+      if (w.lvl==0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         compute_local_samples(RS, w, dd);
         if (!this->is_compressed()) {
           if (compute_U_V_bases(RS.R.cols(), opts, w)) {
             reduce_local_samples(RS, w, dd, false);
-            this->_U_state = this->_V_state = State::COMPRESSED;
+            this->U_state_ = this->V_state_ = State::COMPRESSED;
           } else
-            this->_U_state = this->_V_state = State::PARTIALLY_COMPRESSED;
+            this->U_state_ = this->V_state_ = State::PARTIALLY_COMPRESSED;
         } else reduce_local_samples(RS, w, dd, true);
       }
     }
@@ -658,11 +658,11 @@ namespace strumpack {
           w.Sc = DistM_t(grid(), this->rows(), dd);
           copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, w.Sr, 0, 0, grid()->ctxt_all());
           copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, w.Sc, 0, 0, grid()->ctxt_all());
-          gemm(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sr);
-          gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.), w.Sc);
+          gemm(Trans::N, Trans::N, scalar_t(-1), D_, *wR, scalar_t(1.), w.Sr);
+          gemm(Trans::C, Trans::N, scalar_t(-1), D_, *wR, scalar_t(1.), w.Sc);
           STRUMPACK_UPDATE_SAMPLE_FLOPS
-            (gemm_flops(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)) +
-             gemm_flops(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)));
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1), D_, *wR, scalar_t(1.)) +
+             gemm_flops(Trans::C, Trans::N, scalar_t(-1), D_, *wR, scalar_t(1.)));
         } else {
           w.Sr.resize(this->rows(), c_old+dd);
           w.Sc.resize(this->rows(), c_old+dd);
@@ -670,13 +670,13 @@ namespace strumpack {
           DistMW_t wSc_new(this->rows(), dd, w.Sc, 0, c_old);
           copy(this->rows(), dd, RS.leaf_Sr, 0, d_old, wSr_new, 0, 0, grid()->ctxt_all());
           copy(this->rows(), dd, RS.leaf_Sc, 0, d_old, wSc_new, 0, 0, grid()->ctxt_all());
-          gemm(Trans::N, Trans::N, scalar_t(-1), _D, *wR,
+          gemm(Trans::N, Trans::N, scalar_t(-1), D_, *wR,
                scalar_t(1.), wSr_new);
-          gemm(Trans::C, Trans::N, scalar_t(-1), _D, *wR,
+          gemm(Trans::C, Trans::N, scalar_t(-1), D_, *wR,
                scalar_t(1.), wSc_new);
           STRUMPACK_UPDATE_SAMPLE_FLOPS
-            (gemm_flops(Trans::N, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)) +
-             gemm_flops(Trans::C, Trans::N, scalar_t(-1), _D, *wR, scalar_t(1.)));
+            (gemm_flops(Trans::N, Trans::N, scalar_t(-1), D_, *wR, scalar_t(1.)) +
+             gemm_flops(Trans::C, Trans::N, scalar_t(-1), D_, *wR, scalar_t(1.)));
         }
       } else {
         std::size_t c_new, c_lo;
@@ -711,17 +711,17 @@ namespace strumpack {
           copy(w.c[1].Jr.size(), c_new, tmpr1, 0, 0, wSr_new1, 0, 0, grid()->ctxt_all());
         }
 
-        DistM_t wc1Rr(grid(), _B01.cols(), c_new);
-        DistM_t wc0Rr(grid(), _B10.cols(), c_new);
-        copy(_B01.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new, wc1Rr, 0, 0, grid()->ctxt_all());
-        copy(_B10.cols(), c_new, w.c[0].Rr, 0, w.c[0].dR-c_new, wc0Rr, 0, 0, grid()->ctxt_all());
-        gemm(Trans::N, Trans::N, scalar_t(-1.), _B01, wc1Rr,
+        DistM_t wc1Rr(grid(), B01_.cols(), c_new);
+        DistM_t wc0Rr(grid(), B10_.cols(), c_new);
+        copy(B01_.cols(), c_new, w.c[1].Rr, 0, w.c[1].dR-c_new, wc1Rr, 0, 0, grid()->ctxt_all());
+        copy(B10_.cols(), c_new, w.c[0].Rr, 0, w.c[0].dR-c_new, wc0Rr, 0, 0, grid()->ctxt_all());
+        gemm(Trans::N, Trans::N, scalar_t(-1.), B01_, wc1Rr,
              scalar_t(1.), wSr_new0);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), _B10, wc0Rr,
+        gemm(Trans::N, Trans::N, scalar_t(-1.), B10_, wc0Rr,
              scalar_t(1.), wSr_new1);
         STRUMPACK_UPDATE_SAMPLE_FLOPS
-          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _B01, wc1Rr, scalar_t(1.)) +
-           gemm_flops(Trans::N, Trans::N, scalar_t(-1.), _B10, wc0Rr, scalar_t(1.)));
+          (gemm_flops(Trans::N, Trans::N, scalar_t(-1.), B01_, wc1Rr, scalar_t(1.)) +
+           gemm_flops(Trans::N, Trans::N, scalar_t(-1.), B10_, wc0Rr, scalar_t(1.)));
 
         DistMW_t wSc_new0(w.c[0].Jc.size(), c_new, w.Sc, 0, c_lo);
         DistMW_t wSc_new1(w.c[1].Jc.size(), c_new, w.Sc,
@@ -741,17 +741,17 @@ namespace strumpack {
           copy(w.c[1].Jc.size(), c_new, tmpr1, 0, 0, wSc_new1, 0, 0, grid()->ctxt_all());
         }
 
-        DistM_t wc1Rc(grid(), _B10.rows(), c_new);
-        DistM_t wc0Rc(grid(), _B01.rows(), c_new);
-        copy(_B10.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new, wc1Rc, 0, 0, grid()->ctxt_all());
-        copy(_B01.rows(), c_new, w.c[0].Rc, 0, w.c[0].dR-c_new, wc0Rc, 0, 0, grid()->ctxt_all());
-        gemm(Trans::C, Trans::N, scalar_t(-1.), _B10, wc1Rc,
+        DistM_t wc1Rc(grid(), B10_.rows(), c_new);
+        DistM_t wc0Rc(grid(), B01_.rows(), c_new);
+        copy(B10_.rows(), c_new, w.c[1].Rc, 0, w.c[1].dR-c_new, wc1Rc, 0, 0, grid()->ctxt_all());
+        copy(B01_.rows(), c_new, w.c[0].Rc, 0, w.c[0].dR-c_new, wc0Rc, 0, 0, grid()->ctxt_all());
+        gemm(Trans::C, Trans::N, scalar_t(-1.), B10_, wc1Rc,
              scalar_t(1.), wSc_new0);
-        gemm(Trans::C, Trans::N, scalar_t(-1.), _B01, wc0Rc,
+        gemm(Trans::C, Trans::N, scalar_t(-1.), B01_, wc0Rc,
              scalar_t(1.), wSc_new1);
         STRUMPACK_UPDATE_SAMPLE_FLOPS
-          (gemm_flops(Trans::C, Trans::N, scalar_t(-1.), _B10, wc1Rc, scalar_t(1.)) +
-           gemm_flops(Trans::C, Trans::N, scalar_t(-1.), _B01, wc0Rc, scalar_t(1.)));
+          (gemm_flops(Trans::C, Trans::N, scalar_t(-1.), B10_, wc1Rc, scalar_t(1.)) +
+           gemm_flops(Trans::C, Trans::N, scalar_t(-1.), B01_, wc0Rc, scalar_t(1.)));
         w.c[0].Sr.clear(); w.c[0].Sc.clear(); w.c[0].dS = 0;
         w.c[1].Sr.clear(); w.c[1].Sc.clear(); w.c[1].dS = 0;
       }
@@ -762,16 +762,16 @@ namespace strumpack {
       auto rtol = opts.rel_tol() / w.lvl;
       auto atol = opts.abs_tol() / w.lvl;
       auto gT = grid()->transpose();
-      w.Sr.ID_row(_U.E(), _U.P(), w.Jr, rtol, atol, opts.max_rank(), &gT);
-      w.Sc.ID_row(_V.E(), _V.P(), w.Jc, rtol, atol, opts.max_rank(), &gT);
+      w.Sr.ID_row(U_.E(), U_.P(), w.Jr, rtol, atol, opts.max_rank(), &gT);
+      w.Sc.ID_row(V_.E(), V_.P(), w.Jc, rtol, atol, opts.max_rank(), &gT);
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sr, w.Jr.size()));
       STRUMPACK_ID_FLOPS(ID_row_flops(w.Sc, w.Jc.size()));
       notify_inactives_J(w);
       if (d-opts.p() >= opts.max_rank() ||
           (int(w.Jr.size()) <= d - opts.p() &&
            int(w.Jc.size()) <= d - opts.p())) {
-        this->_U_rank = w.Jr.size();  this->_U_rows = w.Sr.rows();
-        this->_V_rank = w.Jc.size();  this->_V_rows = w.Sc.rows();
+        this->U_rank_ = w.Jr.size();  this->U_rows_ = w.Sr.rows();
+        this->V_rank_ = w.Jc.size();  this->V_rows_ = w.Sc.rows();
         w.Ir.reserve(w.Jr.size());
         w.Ic.reserve(w.Jc.size());
         if (this->leaf()) {
@@ -811,36 +811,36 @@ namespace strumpack {
             (this->rows(), c_new, RS.leaf_R, 0, d-c_new);
           w.Rr = DistM_t(grid(), this->V_rank(), c_new);
           w.Rc = DistM_t(grid(), this->U_rank(), c_new);
-          _V.applyC(*tmpR, w.Rr);
-          _U.applyC(*tmpR, w.Rc);
+          V_.applyC(*tmpR, w.Rr);
+          U_.applyC(*tmpR, w.Rc);
           STRUMPACK_REDUCE_SAMPLE_FLOPS
-            (_V.applyC_flops(c_new) + _U.applyC_flops(c_new));
+            (V_.applyC_flops(c_new) + U_.applyC_flops(c_new));
         } else {
           auto tmpR = ConstDistributedMatrixWrapperPtr
             (this->rows(), dd, RS.leaf_R, 0, d_old);
           DistM_t wRr_new(grid(), w.Rr.rows(), dd);
           DistM_t wRc_new(grid(), w.Rc.rows(), dd);
-          _V.applyC(*tmpR, wRr_new);
-          _U.applyC(*tmpR, wRc_new);
+          V_.applyC(*tmpR, wRr_new);
+          U_.applyC(*tmpR, wRc_new);
           STRUMPACK_REDUCE_SAMPLE_FLOPS
-            (_V.applyC_flops(dd) + _U.applyC_flops(dd));
+            (V_.applyC_flops(dd) + U_.applyC_flops(dd));
           w.Rr.hconcat(wRr_new);
           w.Rc.hconcat(wRc_new);
         }
       } else {
         if (!c_old) {
           auto wRr = vconcat
-            (w.c[0].dR, this->_ch[0]->V_rank(), this->_ch[1]->V_rank(),
+            (w.c[0].dR, child(0)->V_rank(), child(1)->V_rank(),
              w.c[0].Rr, w.c[1].Rr, grid(), grid()->ctxt_all());
           auto wRc = vconcat
-            (w.c[0].dR, this->_ch[0]->U_rank(), this->_ch[1]->U_rank(),
+            (w.c[0].dR, child(0)->U_rank(), child(1)->U_rank(),
              w.c[0].Rc, w.c[1].Rc, grid(), grid()->ctxt_all());
           w.Rr = DistM_t(grid(), this->V_rank(), w.c[0].dR);
           w.Rc = DistM_t(grid(), this->U_rank(), w.c[0].dR);
-          _V.applyC(wRr, w.Rr);
-          _U.applyC(wRc, w.Rc);
+          V_.applyC(wRr, w.Rr);
+          U_.applyC(wRc, w.Rc);
           STRUMPACK_REDUCE_SAMPLE_FLOPS
-            (_V.applyC_flops(w.c[0].dR) + _U.applyC_flops(w.c[0].dR));
+            (V_.applyC_flops(w.c[0].dR) + U_.applyC_flops(w.c[0].dR));
         } else {
           DistM_t wRr(grid(), this->V_rows(), dd);
           copy(w.c[0].Ic.size(), dd, w.c[0].Rr, 0, w.c[0].dR - dd, wRr, 0, 0, grid()->ctxt_all());
@@ -853,10 +853,10 @@ namespace strumpack {
 
           DistM_t wRr_new(grid(), w.Rr.rows(), dd);
           DistM_t wRc_new(grid(), w.Rc.rows(), dd);
-          _V.applyC(wRr, wRr_new);
-          _U.applyC(wRc, wRc_new);
+          V_.applyC(wRr, wRr_new);
+          U_.applyC(wRc, wRc_new);
           STRUMPACK_REDUCE_SAMPLE_FLOPS
-            (_V.applyC_flops(dd) + _U.applyC_flops(dd));
+            (V_.applyC_flops(dd) + U_.applyC_flops(dd));
           w.Rr.hconcat(wRr_new);
           w.Rc.hconcat(wRc_new);
         }

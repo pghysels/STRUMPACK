@@ -30,13 +30,15 @@
 #define FRONTAL_MATRIX_LOSSY_HPP
 
 #include "FrontalMatrixDense.hpp"
+#include "structured/StructuredMatrix.hpp"
 
 namespace strumpack {
 
-  template<typename T> class LossyMatrix {
+  template<typename T> class LossyMatrix
+    : public structured::StructuredMatrix<T> {
   public:
     LossyMatrix() {}
-    LossyMatrix(const DenseMatrix<T>& F, uint prec);
+    LossyMatrix(const DenseMatrix<T>& F, int prec);
     DenseMatrix<T> decompress() const {
       DenseMatrix<T> F(rows_, cols_);
       decompress(F);
@@ -44,18 +46,22 @@ namespace strumpack {
     }
     void decompress(DenseMatrix<T>& F) const;
     std::size_t compressed_size() const { return buffer_.size(); }
-    std::size_t rows() const { return rows_; }
-    std::size_t cols() const { return cols_; }
+    std::size_t memory() const override { return compressed_size(); }
+    std::size_t nonzeros() const override { return rows()*cols(); }
+    std::size_t rank() const override { return std::min(rows(), cols()); }
+    std::size_t rows() const override { return rows_; }
+    std::size_t cols() const override { return cols_; }
   private:
     std::size_t rows_ = 0, cols_ = 0;
-    uint prec_ = 16;
+    int prec_ = 16;
     std::vector<unsigned char> buffer_;
   };
 
-  template<typename T> class LossyMatrix<std::complex<T>> {
+  template<typename T> class LossyMatrix<std::complex<T>>
+    : public structured::StructuredMatrix<std::complex<T>> {
   public:
     LossyMatrix() {}
-    LossyMatrix(const DenseMatrix<std::complex<T>>& F, uint prec);
+    LossyMatrix(const DenseMatrix<std::complex<T>>& F, int prec);
     DenseMatrix<std::complex<T>> decompress() const {
       DenseMatrix<std::complex<T>> F(rows(), cols());
       decompress(F);
@@ -65,8 +71,11 @@ namespace strumpack {
     std::size_t compressed_size() const {
       return Freal_.compressed_size() + Fimag_.compressed_size();
     }
-    std::size_t rows() const { return Freal_.rows(); }
-    std::size_t cols() const { return Freal_.cols(); }
+    std::size_t memory() const override { return compressed_size(); }
+    std::size_t nonzeros() const override { return rows()*cols(); }
+    std::size_t rank() const override { return std::min(rows(), cols()); }
+    std::size_t rows() const override { return Freal_.rows(); }
+    std::size_t cols() const override { return Freal_.cols(); }
   private:
     LossyMatrix<T> Freal_, Fimag_;
   };
@@ -83,13 +92,12 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontalMatrixLossy
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd);
+    FrontalMatrixLossy(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                       std::vector<integer_t>& upd);
 
-    void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     int etree_level=0, int task_depth=0) override;
+    void factor(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                VectorPool<scalar_t>& workspace,
+                int etree_level=0, int task_depth=0) override;
 
     std::string type() const override { return "FrontalMatrixLossy"; }
 
@@ -110,7 +118,6 @@ namespace strumpack {
     FrontalMatrixLossy(const FrontalMatrixLossy&) = delete;
     FrontalMatrixLossy& operator=(FrontalMatrixLossy const&) = delete;
   };
-
 
 } // end namespace strumpack
 

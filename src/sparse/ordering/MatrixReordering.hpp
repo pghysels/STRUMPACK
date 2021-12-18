@@ -34,7 +34,6 @@
 
 #include "StrumpackOptions.hpp"
 #include "StrumpackConfig.hpp"
-#include "HSS/HSSPartitionTree.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
 #endif
@@ -55,22 +54,12 @@ namespace strumpack {
 
     virtual ~MatrixReordering();
 
-    int nested_dissection
-    (const Opts_t& opts, const CSR_t& A,
-     int nx, int ny, int nz, int components, int width);
+    int nested_dissection(const Opts_t& opts, const CSR_t& A,
+                          int nx, int ny, int nz,
+                          int components, int width);
 
-    int set_permutation
-    (const Opts_t& opts, const CSR_t& A, const int* p, int base);
-
-// #if defined(STRUMPACK_USE_MPI)
-//     int nested_dissection
-//     (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
-//      int nx, int ny, int nz, int components, int width);
-
-//     int set_permutation
-//     (const Opts_t& opts, const CSR_t& A, const MPIComm& comm,
-//      const int* p, int base);
-// #endif
+    int set_permutation(const Opts_t& opts, const CSR_t& A,
+                        const int* p, int base);
 
     void separator_reordering(const Opts_t& opts, CSR_t& A, F_t* F);
 

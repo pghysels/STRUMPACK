@@ -11,6 +11,9 @@ This script locates the NVIDIA CUDA toolkit and the associated libraries, but
 does not require the ``CUDA`` language be enabled for a given project. This
 module does not search for the NVIDIA CUDA Samples.
 
+.. versionadded:: 3.19
+  QNX support.
+
 Search Behavior
 ^^^^^^^^^^^^^^^
 
@@ -72,11 +75,16 @@ The CUDA Toolkit search behavior uses the following order:
        (2) ensure that the correct ``nvcc`` executable shows up in ``$PATH`` for
        :command:`find_program` to find.
 
+Arguments
+^^^^^^^^^
+
+``[<version>]``
+    The ``[<version>]`` argument requests a version with which the package found
+    should be compatible. See :ref:`find_package version format <FIND_PACKAGE_VERSION_FORMAT>`
+    for more details.
+
 Options
 ^^^^^^^
-
-``VERSION``
-    If specified, describes the version of the CUDA Toolkit to search for.
 
 ``REQUIRED``
     If specified, configuration will error if a suitable CUDA Toolkit is not
@@ -407,7 +415,7 @@ Result variables
 ``CUDAToolkit_VERSION_MAJOR``
     The major version of the CUDA Toolkit.
 
-``CUDAToolkit_VERSION_MAJOR``
+``CUDAToolkit_VERSION_MINOR``
     The minor version of the CUDA Toolkit.
 
 ``CUDAToolkit_VERSION_PATCH``
@@ -426,6 +434,8 @@ Result variables
     Runtime library ``cudart``.
 
 ``CUDAToolkit_LIBRARY_ROOT``
+    .. versionadded:: 3.18
+
     The path to the CUDA Toolkit directory containing the nvvm directory and
     version.txt.
 
@@ -513,12 +523,24 @@ else()
         )
       endif()
 
-      if(CUDAToolkit_NVCC_EXECUTABLE)
-        get_filename_component(CUDAToolkit_BIN_DIR "${CUDAToolkit_NVCC_EXECUTABLE}" DIRECTORY)
+      if(EXISTS "${CUDAToolkit_NVCC_EXECUTABLE}")
+        # If NVCC exists  then invoke it to find the toolkit location.
+        # This allows us to support wrapper scripts (e.g. ccache or colornvcc), CUDA Toolkit,
+        # NVIDIA HPC SDK, and distro's splayed layouts
+        execute_process(COMMAND ${CUDAToolkit_NVCC_EXECUTABLE} "-v" "__cmake_determine_cuda"
+          OUTPUT_VARIABLE _CUDA_NVCC_OUT ERROR_VARIABLE _CUDA_NVCC_OUT)
+        if(_CUDA_NVCC_OUT MATCHES "\\#\\$ TOP=([^\r\n]*)")
+          get_filename_component(CUDAToolkit_BIN_DIR "${CMAKE_MATCH_1}/bin" ABSOLUTE)
+        else()
+          get_filename_component(CUDAToolkit_BIN_DIR "${CUDAToolkit_NVCC_EXECUTABLE}" DIRECTORY)
+        endif()
+        unset(_CUDA_NVCC_OUT)
 
-        set(CUDAToolkit_BIN_DIR "${CUDAToolkit_BIN_DIR}" CACHE PATH "" FORCE)
         mark_as_advanced(CUDAToolkit_BIN_DIR)
-      elseif(CUDAToolkit_SENTINEL_FILE)
+        set(CUDAToolkit_BIN_DIR "${CUDAToolkit_BIN_DIR}" CACHE PATH "" FORCE)
+      endif()
+
+      if(CUDAToolkit_SENTINEL_FILE)
         get_filename_component(CUDAToolkit_BIN_DIR ${CUDAToolkit_SENTINEL_FILE} DIRECTORY ABSOLUTE)
         set(CUDAToolkit_BIN_DIR "${CUDAToolkit_BIN_DIR}/bin")
 
@@ -561,7 +583,7 @@ else()
     _CUDAToolkit_find_root_dir(SEARCH_PATHS "${CUDAToolkit_ROOT}" FIND_FLAGS PATH_SUFFIXES bin NO_DEFAULT_PATH)
   endif()
   if(NOT CUDAToolkit_ROOT_DIR)
-    _CUDAToolkit_find_root_dir(FIND_FLAGS PATHS "ENV CUDA_PATH" PATH_SUFFIXES bin)
+    _CUDAToolkit_find_root_dir(FIND_FLAGS PATHS ENV CUDA_PATH PATH_SUFFIXES bin)
   endif()
 
   # If the user specified CUDAToolkit_ROOT but the toolkit could not be found, this is an error.
@@ -668,18 +690,18 @@ else()
   unset(_CUDAToolkit_version_file)
 endif()
 
-# Handle cross compilation
+# Find target directory when crosscompiling.
 if(CMAKE_CROSSCOMPILING)
   if(CMAKE_SYSTEM_PROCESSOR STREQUAL "armv7-a")
     # Support for NVPACK
     set(CUDAToolkit_TARGET_NAME "armv7-linux-androideabi")
   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-    # Support for arm cross compilation
     set(CUDAToolkit_TARGET_NAME "armv7-linux-gnueabihf")
   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    # Support for aarch64 cross compilation
     if(ANDROID_ARCH_NAME STREQUAL "arm64")
       set(CUDAToolkit_TARGET_NAME "aarch64-linux-androideabi")
+    elseif (CMAKE_SYSTEM_NAME STREQUAL "QNX")
+      set(CUDAToolkit_TARGET_NAME "aarch64-qnx")
     else()
       set(CUDAToolkit_TARGET_NAME "aarch64-linux")
     endif(ANDROID_ARCH_NAME STREQUAL "arm64")
@@ -698,7 +720,10 @@ if(CMAKE_CROSSCOMPILING)
     # PATh
     set(_CUDAToolkit_Pop_ROOT_PATH True)
   endif()
-else()
+endif()
+
+# If not already set we can simply use the toolkit root or it's a scattered installation.
+if(NOT CUDAToolkit_TARGET_DIR)
   # Not cross compiling
   set(CUDAToolkit_TARGET_DIR "${CUDAToolkit_ROOT_DIR}")
   # Now that we have the real ROOT_DIR, find components inside it.
@@ -717,7 +742,21 @@ elseif(NOT CUDAToolkit_FIND_QUIETLY)
   message(STATUS "Unable to find cuda_runtime.h in \"${CUDAToolkit_TARGET_DIR}/include\" for CUDAToolkit_INCLUDE_DIR.")
 endif()
 
+# The NVHPC layout moves math library headers and libraries to a sibling directory.
+# Create a separate variable so this directory can be selectively added to math targets.
+if(NOT EXISTS "${CUDAToolkit_INCLUDE_DIR}/cublas_v2.h")
+  set(CUDAToolkit_MATH_INCLUDE_DIR "${CUDAToolkit_TARGET_DIR}/../../math_libs/include")
+  cmake_path(NORMAL_PATH CUDAToolkit_MATH_INCLUDE_DIR)
+  if(NOT EXISTS "${CUDAToolkit_MATH_INCLUDE_DIR}/cublas_v2.h")
+    if(NOT CUDAToolkit_FIND_QUIETLY)
+      message(STATUS "Unable to find cublas_v2.h in either \"${CUDAToolkit_INCLUDE_DIR}\" or \"${CUDAToolkit_MATH_INCLUDE_DIR}\"")
+    endif()
+    unset(CUDAToolkit_MATH_INCLUDE_DIR)
+  endif()
+endif()
+
 if(CUDAToolkit_NVCC_EXECUTABLE AND
+   CMAKE_CUDA_COMPILER_VERSION AND
    CUDAToolkit_NVCC_EXECUTABLE STREQUAL CMAKE_CUDA_COMPILER)
   # Need to set these based off the already computed CMAKE_CUDA_COMPILER_VERSION value
   # This if statement will always match, but is used to provide variables for MATCH 1,2,3...
@@ -771,6 +810,7 @@ endif()
 
 #-----------------------------------------------------------------------------
 # Perform version comparison and validate all required variables are set.
+#include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs.cmake)
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(CUDAToolkit
   REQUIRED_VARS
@@ -818,14 +858,23 @@ if(CUDAToolkit_FOUND)
       HINTS ${CUDAToolkit_LIBRARY_DIR}
             ENV CUDA_PATH
       PATH_SUFFIXES lib64/stubs lib/x64/stubs lib/stubs stubs
+                    # Support NVHPC splayed math library layout
+                    ../../math_libs/${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}/lib64
+                    ../../math_libs/lib64
     )
 
     mark_as_advanced(CUDA_${lib_name}_LIBRARY)
 
     if (NOT TARGET CUDA::${lib_name} AND CUDA_${lib_name}_LIBRARY)
-      add_library(CUDA::${lib_name} IMPORTED INTERFACE)
+      add_library(CUDA::${lib_name} UNKNOWN IMPORTED)
       target_include_directories(CUDA::${lib_name} SYSTEM INTERFACE "${CUDAToolkit_INCLUDE_DIRS}")
-      target_link_libraries(CUDA::${lib_name} INTERFACE "${CUDA_${lib_name}_LIBRARY}")
+      if(DEFINED CUDAToolkit_MATH_INCLUDE_DIR)
+        string(FIND ${CUDA_${lib_name}_LIBRARY} "math_libs" math_libs)
+        if(NOT ${math_libs} EQUAL -1)
+          target_include_directories(CUDA::${lib_name} SYSTEM INTERFACE "${CUDAToolkit_MATH_INCLUDE_DIR}")
+        endif()
+      endif()
+      set_property(TARGET CUDA::${lib_name} PROPERTY IMPORTED_LOCATION "${CUDA_${lib_name}_LIBRARY}")
       foreach(dep ${arg_DEPS})
         if(TARGET CUDA::${dep})
           target_link_libraries(CUDA::${lib_name} INTERFACE CUDA::${dep})
@@ -859,7 +908,7 @@ if(CUDAToolkit_FOUND)
       target_link_libraries(CUDA::cudart_static_deps INTERFACE Threads::Threads ${CMAKE_DL_LIBS})
     endif()
 
-    if(UNIX AND NOT APPLE)
+    if(UNIX AND NOT APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "QNX"))
       # On Linux, you must link against librt when using the static cuda runtime.
       find_library(CUDAToolkit_rt_LIBRARY rt)
       mark_as_advanced(CUDAToolkit_rt_LIBRARY)
@@ -884,6 +933,23 @@ if(CUDAToolkit_FOUND)
   # cuSOLVER depends on cuBLAS, and cuSPARSE
   _CUDAToolkit_find_and_add_import_lib(cusolver DEPS cublas cusparse)
   _CUDAToolkit_find_and_add_import_lib(cusolver_static DEPS cublas_static cusparse_static culibos)
+
+
+  if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 10.1.2)
+    # cusolver depends on liblapack_static.a starting with CUDA 10.1 update 2,
+    # https://docs.nvidia.com/cuda/archive/11.5.0/cusolver/index.html#static-link-lapack
+    _CUDAToolkit_find_and_add_import_lib(cusolver_lapack_static ALT lapack_static) # implementation detail static lib
+    _CUDAToolkit_find_and_add_import_lib(cusolver_static DEPS cusolver_lapack_static)
+  endif()
+
+  if(CUDAToolkit_VERSION VERSION_GREATER 11.2.1)
+    # cusolver depends on libcusolver_metis and cublasLt
+    # https://docs.nvidia.com/cuda/archive/11.2.2/cusolver/index.html#link-dependency
+    _CUDAToolkit_find_and_add_import_lib(cusolver DEPS cublasLt)
+
+    _CUDAToolkit_find_and_add_import_lib(cusolver_metis_static ALT metis_static) # implementation detail static lib
+    _CUDAToolkit_find_and_add_import_lib(cusolver_static DEPS cusolver_metis_static cublasLt_static)
+  endif()
 
   # nvGRAPH depends on cuRAND, and cuSOLVER.
   _CUDAToolkit_find_and_add_import_lib(nvgraph DEPS curand cusolver)

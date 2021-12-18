@@ -184,11 +184,11 @@ namespace strumpack {
 
 
   template<typename scalar_t>
-  HSS::HSSPartitionTree recursive_2_means
+  structured::ClusterTree recursive_2_means
   (DenseMatrix<scalar_t>& p, std::size_t cluster_size,
    int* perm, std::mt19937& generator) {
     const auto n = p.cols();
-    HSS::HSSPartitionTree tree(n);
+    structured::ClusterTree tree(n);
     if (n < cluster_size) return tree;
     std::vector<std::size_t> nc(2);
     k_means(2, p, nc, perm, generator);
@@ -206,10 +206,10 @@ namespace strumpack {
 
 
   // explicit template instantiations (only for real types!)
-  template HSS::HSSPartitionTree
+  template structured::ClusterTree
   recursive_2_means(DenseMatrix<float>& p, std::size_t cluster_size,
                     int* perm, std::mt19937& generator);
-  template HSS::HSSPartitionTree
+  template structured::ClusterTree
   recursive_2_means(DenseMatrix<double>& p, std::size_t cluster_size,
                     int* perm, std::mt19937& generator);
 

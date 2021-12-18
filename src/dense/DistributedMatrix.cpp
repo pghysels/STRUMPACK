@@ -298,6 +298,15 @@ namespace strumpack {
     : DistributedMatrix(g, M, N, default_MB, default_NB) {
   }
 
+  template<typename scalar_t>
+  DistributedMatrix<scalar_t>::DistributedMatrix
+  (const BLACSGrid* g, int M, int N,
+   const std::function<scalar_t(std::size_t,
+                                std::size_t)>& A)
+    : DistributedMatrix(g, M, N, default_MB, default_NB) {
+    fill(A);
+  }
+
   template<typename scalar_t> DistributedMatrix<scalar_t>::DistributedMatrix
   (const BLACSGrid* g, int M, int N, int MB, int NB) : grid_(g) {
     assert(M >= 0 && N >= 0 && MB >= 0 && NB >= 0);
@@ -345,7 +354,10 @@ namespace strumpack {
 
   template<typename scalar_t>
   DistributedMatrix<scalar_t>::~DistributedMatrix() {
-    clear();
+    if (data_) {
+      STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+      delete[] data_;
+    }
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>&
@@ -434,6 +446,19 @@ namespace strumpack {
     for (int c=clo; c<chi; c++)
       for (int r=rlo; r<rhi; r++)
         operator()(r,c) = a;
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::fill
+  (const std::function<scalar_t(std::size_t, std::size_t)>& A) {
+    if (!active()) return;
+    int rlo, rhi, clo, chi;
+    lranges(rlo, rhi, clo, chi);
+    for (int c=clo; c<chi; c++) {
+      auto cg = coll2g(c);
+      for (int r=rlo; r<rhi; r++)
+        operator()(r,c) = A(rowl2g(r), cg);
+    }
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::random() {
@@ -542,6 +567,13 @@ namespace strumpack {
       desc(), scalar_t(0.), tmp.data(),
       tmp.I(), tmp.J(), tmp.desc());
     return tmp;
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::mult(Trans op,
+                                    const DistributedMatrix<scalar_t>& X,
+                                    DistributedMatrix<scalar_t>& Y) const {
+    gemm(op, Trans::N, scalar_t(1.), *this, X, scalar_t(0.), Y);
   }
 
   template<typename scalar_t> void
@@ -736,6 +768,25 @@ namespace strumpack {
     return *this;
   }
 
+  template<typename scalar_t> DistributedMatrix<scalar_t>&
+  DistributedMatrix<scalar_t>::scale_and_add
+  (scalar_t alpha, const DistributedMatrix<scalar_t>& B) {
+    if (!active()) return *this;
+    assert(grid() == B.grid());
+    int rlo, rhi, clo, chi, Brlo, Brhi, Bclo, Bchi;
+    lranges(rlo, rhi, clo, chi);
+    B.lranges(Brlo, Brhi, Bclo, Bchi);
+    int lc = chi - clo;
+    int lr = rhi - rlo;
+    //#pragma omp taskloop grainsize(64) //collapse(2)
+    for (int c=0; c<lc; ++c)
+      for (int r=0; r<lr; ++r)
+        operator()(r+rlo,c+clo) = alpha * operator()(r+rlo,c+clo)
+          + B(r+Brlo,c+Bclo);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*lc*lr);
+    return *this;
+  }
+
   template<typename scalar_t> typename RealType<scalar_t>::value_type
   DistributedMatrix<scalar_t>::norm() const {
     return normF();
@@ -890,10 +941,7 @@ namespace strumpack {
          c.data(), c.I(), c.J(), c.desc())) {
       std::cerr << "# ERROR: Failure in PGETRS :(" << std::endl; abort();
     }
-    STRUMPACK_FLOPS
-      (is_master() ?
-       ((is_complex<scalar_t>() ? 4:1) *
-        blas::getrs_flops(c.rows(), c.cols())) : 0);
+    STRUMPACK_FLOPS(solve_flops(c));
     return c;
   }
 

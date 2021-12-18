@@ -101,10 +101,10 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t> HSS::HSSPartitionTree recursive_pca
+  template<typename scalar_t> structured::ClusterTree recursive_pca
   (DenseMatrix<scalar_t>& p, std::size_t cluster_size, int* perm) {
     auto n = p.cols();
-    HSS::HSSPartitionTree tree(n);
+    structured::ClusterTree tree(n);
     if (n < cluster_size) return tree;
     std::vector<std::size_t> nc(2);
     pca_partition(p, nc, perm);
@@ -126,9 +126,9 @@ namespace strumpack {
   template void pca_partition
   (DenseMatrix<double>& p, std::vector<std::size_t>& nc, int* perm);
 
-  template HSS::HSSPartitionTree recursive_pca
+  template structured::ClusterTree recursive_pca
   (DenseMatrix<float>& p, std::size_t cluster_size, int* perm);
-  template HSS::HSSPartitionTree recursive_pca
+  template structured::ClusterTree recursive_pca
   (DenseMatrix<double>& p, std::size_t cluster_size, int* perm);
 
 } // end namespace strumpack

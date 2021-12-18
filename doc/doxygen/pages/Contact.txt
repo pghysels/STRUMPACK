@@ -1,0 +1,23 @@
+/*! \page contact Contact the Developers
+
+
+## Current developers - Lawrence Berkeley National Laboratory
+ - Pieter Ghysels - pghysels@lbl.gov
+ - Xiaoye S. Li - xsli@lbl.gov
+ - Yang Liu - liuyangzhuan@lbl.gov
+ - Lisa Claus - LClaus@lbl.gov
+
+Check the STRUMPACK github page for the latest development version of
+the code, and the website for more information:
+- https://github.com/pghysels/STRUMPACK
+- http://portal.nersc.gov/project/sparse/strumpack/
+
+For comments, feature requests or bug reports, open an issue on github:
+- https://github.com/pghysels/STRUMPACK/issues
+
+
+The HODLR and Butterfly functionality in STRUMPACK is implemented
+through interfaces to the ButterflyPACK package:
+- https://github.com/liuyangzhuan/ButterflyPACK
+
+*/

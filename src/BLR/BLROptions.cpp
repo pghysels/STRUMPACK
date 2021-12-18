@@ -36,39 +36,48 @@
 #include "misc/Tools.hpp"
 
 namespace strumpack {
+
   namespace BLR {
 
     std::string get_name(LowRankAlgorithm a) {
       switch (a) {
-      case LowRankAlgorithm::RRQR: return "RRQR"; break;
-      case LowRankAlgorithm::ACA: return "ACA"; break;
-      case LowRankAlgorithm::BACA: return "BACA"; break;
+      case LowRankAlgorithm::RRQR: return "RRQR";
+      case LowRankAlgorithm::ACA: return "ACA";
+      case LowRankAlgorithm::BACA: return "BACA";
       default: return "unknown";
       }
     }
 
     std::string get_name(Admissibility a) {
       switch (a) {
-      case Admissibility::STRONG: return "strong"; break;
-      case Admissibility::WEAK: return "weak"; break;
+      case Admissibility::STRONG: return "strong";
+      case Admissibility::WEAK: return "weak";
       default: return "unknown";
       }
     }
 
     std::string get_name(BLRFactorAlgorithm a) {
       switch (a) {
-      case BLRFactorAlgorithm::RL: return "RL"; break;
-      case BLRFactorAlgorithm::LL: return "LL"; break;
-      case BLRFactorAlgorithm::COMB: return "Comb"; break;
-      case BLRFactorAlgorithm::STAR: return "Star"; break;
+      case BLRFactorAlgorithm::RL: return "RL";
+      case BLRFactorAlgorithm::LL: return "LL";
+      case BLRFactorAlgorithm::COMB: return "Comb";
+      case BLRFactorAlgorithm::STAR: return "Star";
+      default: return "unknown";
+      }
+    }
+
+    std::string get_name(CBConstruction a) {
+      switch (a) {
+      case CBConstruction::COLWISE: return "COLWISE";
+      case CBConstruction::DENSE: return "DENSE";
       default: return "unknown";
       }
     }
 
     std::string get_name(CompressionKernel a) {
       switch (a) {
-      case CompressionKernel::FULL: return "full"; break;
-      case CompressionKernel::HALF: return "half"; break;
+      case CompressionKernel::FULL: return "full";
+      case CompressionKernel::HALF: return "half";
       default: return "unknown";
       }
     }
@@ -94,6 +103,7 @@ namespace strumpack {
          {"blr_BACA_blocksize",        required_argument, 0, 7},
          {"blr_factor_algorithm",      required_argument, 0, 8},
          {"blr_compression_kernel",    required_argument, 0, 9},
+         {"blr_cb_construction",       required_argument, 0, 10},
          {"blr_verbose",               no_argument, 0, 'v'},
          {"blr_quiet",                 no_argument, 0, 'q'},
          {"help",                      no_argument, 0, 'h'},
@@ -106,21 +116,23 @@ namespace strumpack {
         switch (c) {
         case 1: {
           std::istringstream iss(optarg);
-          iss >> rel_tol_; set_rel_tol(rel_tol_);
+          iss >> this->rel_tol_;
+          this->set_rel_tol(this->rel_tol_);
         } break;
         case 2: {
           std::istringstream iss(optarg);
-          iss >> abs_tol_; set_abs_tol(abs_tol_);
+          iss >> this->abs_tol_;
+          this->set_abs_tol(this->abs_tol_);
         } break;
         case 3: {
           std::istringstream iss(optarg);
-          iss >> leaf_size_;
-          set_leaf_size(leaf_size_);
+          iss >> this->leaf_size_;
+          this->set_leaf_size(this->leaf_size_);
         } break;
         case 4: {
           std::istringstream iss(optarg);
-          iss >> max_rank_;
-          set_max_rank(max_rank_);
+          iss >> this->max_rank_;
+          this->set_max_rank(this->max_rank_);
         } break;
         case 5: {
           std::istringstream iss(optarg);
@@ -181,9 +193,20 @@ namespace strumpack {
                       << " recognized, use 'full' or 'half'."
                       << std::endl;
         } break;
-
-        case 'v': set_verbose(true); break;
-        case 'q': set_verbose(false); break;
+        case 10: {
+          std::istringstream iss(optarg);
+          std::string s; iss >> s;
+          if (s == "COLWISE")
+            set_CB_construction(CBConstruction::COLWISE);
+          else if (s == "DENSE")
+            set_CB_construction(CBConstruction::DENSE);
+          else
+            std::cerr << "# WARNING: BLR CB not"
+                      << " recognized, use 'COLWISE' or 'DENSE'."
+                      << std::endl;
+        } break;
+        case 'v': this->set_verbose(true); break;
+        case 'q': this->set_verbose(false); break;
         case 'h': describe_options(); break;
         }
       }
@@ -199,13 +222,13 @@ namespace strumpack {
       if (!mpi_root()) return;
       std::cout << "# BLR Options:" << std::endl
                 << "#   --blr_rel_tol real_t (default "
-                << rel_tol() << ")" << std::endl
+                << this->rel_tol() << ")" << std::endl
                 << "#   --blr_abs_tol real_t (default "
-                << abs_tol() << ")" << std::endl
+                << this->abs_tol() << ")" << std::endl
                 << "#   --blr_leaf_size int (default "
-                << leaf_size() << ")" << std::endl
+                << this->leaf_size() << ")" << std::endl
                 << "#   --blr_max_rank int (default "
-                << max_rank() << ")" << std::endl
+                << this->max_rank() << ")" << std::endl
                 << "#   --blr_low_rank_algorithm (default "
                 << get_name(lr_algo_) << ")" << std::endl
                 << "#      should be [RRQR|ACA|BACA]" << std::endl
@@ -218,12 +241,15 @@ namespace strumpack {
                 << "#   --blr_compression_kernel (default "
                 << get_name(crn_krnl_) << ")" << std::endl
                 << "#      should be [full|half]" << std::endl
+                << "#   --blr_cb_construction (default "
+                << get_name(cb_construction_) << ")" << std::endl
+                << "#      should be [COLWISE|DENSE]" << std::endl
                 << "#   --blr_BACA_blocksize int (default "
                 << BACA_blocksize() << ")" << std::endl
                 << "#   --blr_verbose or -v (default "
-                << verbose() << ")" << std::endl
+                << this->verbose() << ")" << std::endl
                 << "#   --blr_quiet or -q (default "
-                << !verbose() << ")" << std::endl
+                << !this->verbose() << ")" << std::endl
                 << "#   --help or -h" << std::endl << std::endl;
 #endif
     }

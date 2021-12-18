@@ -37,7 +37,7 @@ namespace strumpack {
   template<> inline zfp_type get_zfp_type<double>() { return zfp_type_double; }
 
   template<typename T> LossyMatrix<T>::LossyMatrix
-  (const DenseMatrix<T>& F, uint prec)
+  (const DenseMatrix<T>& F, int prec)
     : rows_(F.rows()), cols_(F.cols()), prec_(prec) {
     if (!rows_ || !cols_) return;
     zfp_field* f = zfp_field_2d
@@ -66,7 +66,8 @@ namespace strumpack {
     zfp_field* f = zfp_field_2d
       (static_cast<void*>(F.data()), get_zfp_type<T>(), rows_, cols_);
     zfp_stream* destream = zfp_stream_open(NULL);
-    zfp_stream_set_precision(destream, prec_);
+    if (prec_ <= 0) zfp_stream_set_reversible(destream);
+    else zfp_stream_set_precision(destream, prec_);
     bitstream* bstream = stream_open
       (static_cast<void*>
        (const_cast<uchar*>(buffer_.data())), buffer_.size());
@@ -80,7 +81,7 @@ namespace strumpack {
   }
 
   template<typename T> LossyMatrix<std::complex<T>>::LossyMatrix
-  (const DenseMatrix<std::complex<T>>& F, uint prec) {
+  (const DenseMatrix<std::complex<T>>& F, int prec) {
     int rows = F.rows(), cols = F.cols();
     DenseMatrix<T> Freal(rows, cols), Fimag(rows, cols);
     for (int j=0; j<cols; j++)
@@ -124,7 +125,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixLossy<scalar_t,integer_t>::compress(const Opts_t& opts) {
-    uint prec = opts.lossy_precision();
+    int prec = opts.lossy_precision();
     F11c_ = LossyMatrix<scalar_t>(this->F11_, prec);
     F12c_ = LossyMatrix<scalar_t>(this->F12_, prec);
     F21c_ = LossyMatrix<scalar_t>(this->F21_, prec);
@@ -142,9 +143,10 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    FD_t::multifrontal_factorization(A, opts, etree_level, task_depth);
+  FrontalMatrixLossy<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
+   int etree_level, int task_depth) {
+    FD_t::factor(A, opts, workspace, etree_level, task_depth);
     compress(opts);
   }
 
@@ -153,7 +155,6 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
-    //FD_t::fwd_solve_phase2(b, bupd, etree_level, task_depth);
     if (this->dim_sep()) {
       DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin_, 0);
       bloc.laswp(this->piv, true);
@@ -177,7 +178,6 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
-    // FD_t::bwd_solve_phase1(y, yupd, etree_level, task_depth);
     if (this->dim_sep()) {
       DenseMW_t yloc(this->dim_sep(), y.cols(), y, this->sep_begin_, 0);
       if (y.cols() == 1) {

@@ -28,7 +28,7 @@
 #include "StrumpackSparseSolverMPIDist.hpp"
 #include "misc/TaskTimer.hpp"
 #include "sparse/EliminationTreeMPIDist.hpp"
-#include "sparse/iterative/IterativeSolversMPI.hpp"
+#include "iterative/IterativeSolversMPI.hpp"
 #include "sparse/ordering/MatrixReorderingMPI.hpp"
 #include "sparse/Redistribute.hpp"
 
@@ -176,7 +176,7 @@ namespace strumpack {
       matrix()->apply_matching(this->matching_);
       matrix()->equilibrate(this->equil_);
       matrix()->symmetrize_sparsity();
-      setup_tree();
+      tree_mpi_dist_->update_values(opts_, *mat_mpi_, *nd_mpi_);
       if (opts_.compression() != CompressionType::NONE)
         separator_reordering();
     }
@@ -209,6 +209,20 @@ namespace strumpack {
     tree_mpi_dist_.reset
       (new EliminationTreeMPIDist<scalar_t,integer_t>
        (opts_, *mat_mpi_, *nd_mpi_, comm_));
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverMPIDist<scalar_t,integer_t>::solve_internal
+  (int nrhs, const scalar_t* b, int ldb,
+   scalar_t* x, int ldx, bool use_initial_guess) {
+    if (!nrhs) return ReturnCode::SUCCESS;
+    auto N = mat_mpi_->local_rows();
+    assert(ldb >= N);
+    assert(ldx >= N);
+    assert(nrhs >= 1);
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMW_t X(N, nrhs, x, N);
+    return this->solve(*B, X, use_initial_guess);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode

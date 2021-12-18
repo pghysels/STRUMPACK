@@ -38,6 +38,7 @@
 #include "misc/TaskTimer.hpp"
 #include "dense/DenseMatrix.hpp"
 #include "sparse/CompressedSparseMatrix.hpp"
+#include "BLR/BLRMatrix.hpp"
 #if defined(_OPENMP)
 #include "omp.h"
 #endif
@@ -71,6 +72,7 @@ namespace strumpack {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
+    using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
@@ -96,15 +98,39 @@ namespace strumpack {
     void find_upd_indices(const std::vector<std::size_t>& I,
                           std::vector<std::size_t>& lI,
                           std::vector<std::size_t>& oI) const;
+
+    void upd_to_parent(const F_t* pa, std::size_t& upd2sep,
+                       std::size_t* I) const;
+    void upd_to_parent(const F_t* pa, std::size_t* I) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa,
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
+
+    virtual void barrier_world() const {
+#if defined(STRUMPACK_USE_MPI)
+      MPIComm c;
+      c.barrier();
+      auto pmax = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MAX);
+      auto pmin = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MIN);
+      if (c.is_root())
+        std::cout << "# peak memory after sequential tree traversal: "
+                  << " pmin: " << pmin << " pmax: " << pmax
+                  << " imbalance: " << pmax/pmin
+                  << std::endl;
+#endif
+    }
 
     virtual void release_work_memory() = 0;
 
     virtual void
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
                                int etree_level=0, int task_depth=0) = 0;
+
+    virtual void factor(const SpMat_t& A, const Opts_t& opts,
+                        VectorPool<scalar_t>& workspace,
+                        int etree_level=0, int task_depth=0) {
+      multifrontal_factorization(A, opts, etree_level, task_depth);
+    };
 
     virtual std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const
     { return nullptr; }
@@ -136,13 +162,36 @@ namespace strumpack {
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
                         const FrontalMatrix<scalar_t,integer_t>* p,
-                        int task_depth) {}
+                        int task_depth) {
+      assert(false);
+    }
+    virtual void
+    extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                        DenseM_t& paF21, DenseM_t& paF22,
+                        const FrontalMatrix<scalar_t,integer_t>* p,
+                        VectorPool<scalar_t>& workspace,
+                        int task_depth) {
+      extend_add_to_dense(paF11, paF12, paF21, paF22, p, task_depth);
+    }
+
+    virtual void
+    extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
+                      BLRM_t& paF21, BLRM_t& paF22,
+                      const FrontalMatrix<scalar_t,integer_t>* p,
+                      int task_depth, const Opts_t& opts) {}
+    virtual void
+    extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,
+                          BLRM_t& paF21, BLRM_t& paF22,
+                          const FrontalMatrix<scalar_t,integer_t>* p,
+                          integer_t begin_col, integer_t end_col,
+                          int task_depth, const Opts_t& opts) {}
 
     virtual int random_samples() const { return 0; }
 
     // TODO why not const? HSS problem?
     virtual void
-    sample_CB(const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr, DenseM_t& Sc,
+    sample_CB(const Opts_t& opts, const DenseM_t& R,
+              DenseM_t& Sr, DenseM_t& Sc,
               F_t* parent, int task_depth=0) { assert(false); }
     virtual void
     sample_CB(Trans op, const DenseM_t& R, DenseM_t& S, F_t* parent,
@@ -261,9 +310,22 @@ namespace strumpack {
                 << std::endl;
       abort();
     }
+    virtual void extadd_blr_copy_to_buffers_col
+    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
+     integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
+      std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers_col"
+                << " not implemented for this front type: "
+                << typeid(*this).name()
+                << std::endl;
+      abort();
+    }
     virtual void extadd_blr_copy_from_buffers
     (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
      scalar_t** pbuf, const FBLRMPI_t* pa) const;
+
+    virtual void extadd_blr_copy_from_buffers_col
+    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+     scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const;
 
     virtual void extend_add_column_copy_to_buffers
     (const DistM_t& CB, const DenseM_t& seqCB,

@@ -63,3 +63,6 @@ add_subdirectory(HSS)
 add_subdirectory(HODLR)
 add_subdirectory(BLR)
 add_subdirectory(fortran)
+add_subdirectory(structured)
+add_subdirectory(iterative)
+

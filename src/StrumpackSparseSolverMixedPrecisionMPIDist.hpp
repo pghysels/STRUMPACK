@@ -38,7 +38,7 @@
 #include <vector>
 #include <string>
 
-#include "sparse/iterative/IterativeSolvers.hpp"
+#include "iterative/IterativeSolvers.hpp"
 #include "StrumpackOptions.hpp"
 #include "StrumpackSparseSolverMPIDist.hpp"
 

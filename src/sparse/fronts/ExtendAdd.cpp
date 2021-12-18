@@ -865,7 +865,9 @@ namespace strumpack {
       auto pc = nprows * B.colg2p_fixed(oJ[c]);
       for (std::size_t r=0; r<I.size(); r++)
         if (lr[r] != -1)
-          sbuf[pr[r]+pc].push_back(F.ltile_dense(tr[r],tc).D()(lr[r],lc));
+          //sbuf[pr[r]+pc].push_back(F.ltile_dense(tr[r],tc).D()(lr[r],lc));
+          sbuf[pr[r]+pc].push_back(
+            const_cast<BLRMPI_t&>(F).get_element_and_decompress_HODBF(tr[r],tc,lr[r],lc));
     }
   }
 

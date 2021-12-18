@@ -37,7 +37,7 @@
 #include "StrumpackOptions.hpp"
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
-#include "sparse/iterative/IterativeSolversMPI.hpp"
+#include "iterative/IterativeSolversMPI.hpp"
 
 namespace strumpack {
 
@@ -135,7 +135,7 @@ namespace strumpack {
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
   solve(const refine_t* b, refine_t* x, bool use_initial_guess) {
-    auto N = mat_.size();
+    auto N = mat_.local_rows();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
     DenseMatrixWrapper<refine_t> X(N, 1, x, N);
     return solve(*B, X, use_initial_guess);

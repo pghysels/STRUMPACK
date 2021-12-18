@@ -1,5 +1,10 @@
 /*! \page hss_matrices HSS Approximation of Dense Matrices
 
+We recommend to use the strumpack::structured::StructuredMatrix
+interface instead of directly using the HSS classes. See \link dense
+Dense Solvers \endlink.
+
+
 \image html SPOptions_Interface.png width=23%
 
 __Figure 3__: Illustration of a Hierarchically Semi-Separable (HSS)
@@ -14,7 +19,7 @@ strumpack::HSS::HSSMatrix, while the distributed memory HSS class is
 strumpack::HSS::HSSMatrixMPI. For examples of the usage of these
 classes, see the test code in __test/test_HSS_seq.cpp__ and
 __test/test_HSS_mpi.cpp__ respectively. There is also one sequential
-example in __examples/KernelRegression.cpp__, which uses HSS
+example in __examples/dense/KernelRegression.cpp__, which uses HSS
 compression for kernel matrices as used in certain machine learning
 applications, see below, and see for instance \ref References "[2]".
 
@@ -63,35 +68,35 @@ matrix representation for those cases, see \link hodlr_matrices HODLR
 \endlink.
 
 
-# The HSS Partition Tree
+# The HSS Cluster Tree
 
-The clustering of the HSS matrix is defined by an
-strumpack::HSS::HSSPartitionTree. The strumpack::HSS::HSSPartitionTree
-uses a recursive representation, a child in the tree is also a
-strumpack::HSS::HSSPartitionTree. A node in this tree should always
-have 0 or 2 children, and the size of the tree should always be the
-sum of the sizes of its children. To build a whole tree use the simple
-constructor to specify the size n of the corresponding HSS matrix,
-then refine it.
+The clustering of the HSS matrix is defined by a
+strumpack::structured::ClusterTree. The
+strumpack::structured::ClusterTree uses a recursive representation, a
+child in the tree is also a strumpack::structured::ClusterTree. A node
+in this tree should always have 0 or 2 children, and the size of the
+tree should always be the sum of the sizes of its children. To build a
+whole tree use the simple constructor to specify the size n of the
+corresponding HSS matrix, then refine it.
 
 To refine uniformly to a given leaf size is reached use:
 
 \code {.cpp}
-void strumpack::HSS::HSSPartitionTree::refine(int leaf_size);
+void strumpack::structured::ClusterTree::refine(int leaf_size);
 \endcode
 
 or refine it manualy by adding nodes to the child vector
-strumpack::HSS::HSSPartitionTree::c:
+strumpack::structured::ClusterTree::c:
 
 \code {.cpp}
 // construct a basic, empty, 1 level tree
-strumpack::HSS::HSSPartitionTree t(N);
+strumpack::structured::ClusterTree t(N);
 // uniformly refine the tree to a given leaf size
 t.refine(leaf_size)
 
 
 // OR manually define the tree
-strumpack::HSS::HSSPartitionTree t(N);
+strumpack::structured::ClusterTree t(N);
 // each node should have either 0 or 2 childeren
 t.c.emplace_back(N/2);
 t.c.emplace_back(N-N/2);
@@ -191,7 +196,7 @@ auto Aelem = [&](const std::vector<std::size_t>& I,
 
 strumpack::HSS::HSSOptions<double> opts;
 opts.set_from_command_line(argc, argv);
-strumpack::HSS::HSSPartitionTree t(N);
+strumpack::structured::ClusterTree t(N);
 t.refine(opt.leaf_size());
 strumpack::HSS::HSSMatrix<double> H(t, opts)
 H.compress(Amult, Aelem, opts);
@@ -227,7 +232,7 @@ strumpack::kernel::Kernel::predict(const strumpack::DenseMatrix<scalar_t>& test,
 There is also a Python interface to these Kernel regression routines,
 compatibile with scikit-learn, see
 __install/python/STRUMPACKKernel.py__ and
-__examples/KernelRegression.py__.
+__examples/dense/KernelRegression.py__.
 
 
 

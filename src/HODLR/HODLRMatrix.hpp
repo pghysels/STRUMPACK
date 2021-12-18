@@ -36,11 +36,11 @@
 #include <cassert>
 #include <functional>
 
-#include "HSS/HSSPartitionTree.hpp"
 #include "kernel/Kernel.hpp"
 #include "dense/DistributedMatrix.hpp"
 #include "HODLROptions.hpp"
 #include "sparse/CSRGraph.hpp"
+#include "structured/StructuredMatrix.hpp"
 
 namespace strumpack {
 
@@ -75,7 +75,8 @@ namespace strumpack {
      *
      * \see HSS::HSSMatrix
      */
-    template<typename scalar_t> class HODLRMatrix {
+    template<typename scalar_t> class HODLRMatrix
+      : public structured::StructuredMatrix<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -89,8 +90,6 @@ namespace strumpack {
       using real_t = typename RealType<scalar_t>::value_type;
       using mult_t = typename std::function
         <void(Trans, const DenseM_t&, DenseM_t&)>;
-      using elem_t = typename std::function
-        <scalar_t(std::size_t i, std::size_t j)>;
       using delem_blocks_t = typename std::function
         <void(VecVec_t& I, VecVec_t& J, std::vector<DistMW_t>& B,
               ExtractionMeta&)>;
@@ -134,7 +133,7 @@ namespace strumpack {
        * evaluates/returns the matrix element A(i,j)
        * \param opts object containing a number of HODLR options
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const std::function<scalar_t(int i, int j)>& Aelem,
                   const opts_t& opts);
 
@@ -159,7 +158,7 @@ namespace strumpack {
        * The ExtractionMeta object can be ignored.
        * \param opts object containing a number of HODLR options
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const elem_blocks_t& Aelem, const opts_t& opts);
 
 
@@ -172,7 +171,7 @@ namespace strumpack {
        * \param t tree specifying the HODLR matrix partitioning
        * \param Amult Routine for the matrix-vector product. Trans op
        * argument will be N, T or C for none, transpose or complex
-       * conjugate. The const DenseM_t& argument is the the random
+       * conjugate. The const DenseM_t& argument is the random
        * matrix R, and the final DenseM_t& argument S is what the user
        * routine should compute as A*R, A^t*R or A^c*R. S will already
        * be allocated.
@@ -180,9 +179,9 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const std::function<
-                  void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
+                  void(Trans op, const DenseM_t& R, DenseM_t& S)>& Amult,
                   const opts_t& opts);
 
       /**
@@ -197,7 +196,7 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const opts_t& opts);
 
       /**
@@ -214,7 +213,7 @@ namespace strumpack {
        * \see compress, HODLROptions
        */
       template<typename integer_t>
-      HODLRMatrix(const MPIComm& c, const HSS::HSSPartitionTree& tree,
+      HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
                   const CSRGraph<integer_t>& graph, const opts_t& opts);
 
       /**
@@ -248,27 +247,40 @@ namespace strumpack {
        * Return the number of rows in the matrix.
        * \return Global number of rows in the matrix.
        */
-      std::size_t rows() const { return rows_; }
+      std::size_t rows() const override { return rows_; }
       /**
        * Return the number of columns in the matrix.
        * \return Global number of columns in the matrix.
        */
-      std::size_t cols() const { return cols_; }
+      std::size_t cols() const override { return cols_; }
       /**
        * Return the number of local rows, owned by this process.
        * \return Number of local rows.
        */
       std::size_t lrows() const { return lrows_; }
       /**
+       * Return the number of local rows, owned by this process.
+       * \return Number of local rows.
+       */
+      std::size_t local_rows() const override { return lrows(); }
+      /**
        * Return the first row of the local rows owned by this process.
        * \return Return first local row
        */
-      std::size_t begin_row() const { return dist_[c_->rank()]; }
+      std::size_t begin_row() const override { return dist_[c_->rank()]; }
       /**
        * Return last row (+1) of the local rows (begin_rows()+lrows())
        * \return Final local row (+1).
        */
-      std::size_t end_row() const { return dist_[c_->rank()+1]; }
+      std::size_t end_row() const override { return dist_[c_->rank()+1]; }
+      /**
+       * Return vector describing the 1d block row
+       * distribution. dist()[rank]==begin_row() and
+       * dist()[rank+1]==end_row()
+       * \return 1D block row distribution
+       */
+      const std::vector<int>& dist() const override { return dist_; }
+
       /**
        * Return MPI communicator wrapper object.
        */
@@ -278,8 +290,12 @@ namespace strumpack {
        * Return the memory for this HODLR matrix, on this rank, in
        * bytes.
        */
-      std::size_t memory() const {
+      std::size_t memory() const override {
         return get_stat("Mem_Fill") * 1024 * 1024;
+      }
+
+      std::size_t nonzeros() const override {
+        return memory() / sizeof(scalar_t);
       }
 
       /**
@@ -314,7 +330,7 @@ namespace strumpack {
       /**
        * Return the maximal rank encountered in this HODLR matrix.
        */
-      std::size_t rank() const { return get_stat("Rank_max"); }
+      std::size_t rank() const override { return get_stat("Rank_max"); }
 
       /**
        * Return the maximal rank encountered in this HODLR matrix,
@@ -349,8 +365,9 @@ namespace strumpack {
        * routine should compute as A*R, A^t*R or A^c*R. S will already
        * be allocated.
        */
-      void compress
-      (const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult);
+      void compress(const std::function
+                    <void(Trans op, const DenseM_t& R,
+                          DenseM_t& S)>& Amult);
 
       /**
        * Construct the compressed HODLR representation of the matrix,
@@ -364,9 +381,10 @@ namespace strumpack {
        * be allocated.
        * \param rank_guess Initial guess for the rank
        */
-      void compress
-      (const std::function<void(Trans op,const DenseM_t& R,DenseM_t& S)>& Amult,
-       int rank_guess);
+      void compress(const std::function
+                    <void(Trans op, const DenseM_t& R,
+                          DenseM_t& S)>& Amult,
+                    int rank_guess);
 
       /**
        * Construct the compressed HODLR representation of the matrix,
@@ -400,7 +418,7 @@ namespace strumpack {
        * this.lrows()
        * \see lrows, begin_row, end_row, mult
        */
-      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const;
+      void mult(Trans op, const DenseM_t& X, DenseM_t& Y) const override;
 
       /**
        * Multiply this HODLR matrix with a dense matrix: Y =
@@ -414,7 +432,7 @@ namespace strumpack {
        * this.rows()
        * \see mult
        */
-      void mult(Trans op, const DistM_t& X, DistM_t& Y) const;
+      void mult(Trans op, const DistM_t& X, DistM_t& Y) const override;
 
       /**
        * Compute the factorization of this HODLR matrix. The matrix
@@ -422,11 +440,12 @@ namespace strumpack {
        *
        * \see solve, inv_mult
        */
-      void factor();
+      void factor() override;
 
       /**
        * Solve a system of linear equations A*X=B, with possibly
-       * multiple right-hand sides.
+       * multiple right-hand sides. X and B are distributed using 1D
+       * block row distribution.
        *
        * \param B Right hand side. This is the local part of
        * the distributed matrix B. Should be B.rows() == this.lrows().
@@ -439,6 +458,20 @@ namespace strumpack {
 
       /**
        * Solve a system of linear equations A*X=B, with possibly
+       * multiple right-hand sides. X and B are distributed using 1D
+       * block row distribution. The solution X will overwrite the
+       * right-hand side vector B.
+       *
+       * \param B Right hand side. This is the local part of the
+       * distributed matrix B. Should be B.rows() == this.lrows(). Wil
+       * lbe overwritten with the solution.
+       *
+       * \see factor, lrows, begin_row, end_row, inv_mult
+       */
+      void solve(DenseM_t& B) const override;
+
+      /**
+       * Solve a system of linear equations A*X=B, with possibly
        * multiple right-hand sides. X and B are in 2D block cyclic
        * distribution.
        *
@@ -447,9 +480,24 @@ namespace strumpack {
        * \param X Result, should be X.cols() == B.cols(), X.rows() ==
        * this.rows(). X should be allocated.
        * \return number of flops
-       * \see factor, lrows, begin_row, end_row, inv_mult
+       *
+       * \see factor, inv_mult
        */
       long long int solve(const DistM_t& B, DistM_t& X) const;
+
+      /**
+       * Solve a system of linear equations A*X=B, with possibly
+       * multiple right-hand sides. X and B are in 2D block cyclic
+       * distribution. The solution X will overwrite the righ-hand
+       * side B.
+       *
+       * \param B Right hand side. This is the local part of the
+       * distributed matrix B. Should be B.rows() == this.rows(). Will
+       * be overwritten by the solution.
+       *
+       * \see factor, inv_mult, solve
+       */
+      void solve(DistM_t& B) const override;
 
       /**
        * Solve a system of linear equations op(A)*X=B, with possibly
@@ -501,9 +549,9 @@ namespace strumpack {
       void redistribute_2D_to_1D(const DistM_t& R2D, DenseM_t& R1D) const;
       void redistribute_1D_to_2D(const DenseM_t& S1D, DistM_t& S2D) const;
 
-      DenseMatrix<scalar_t> gather_from_1D(const DenseM_t& A) const;
-      DenseMatrix<scalar_t> all_gather_from_1D(const DenseM_t& A) const;
-      DenseMatrix<scalar_t> scatter_to_1D(const DenseM_t& A) const;
+      DenseM_t gather_from_1D(const DenseM_t& A) const;
+      DenseM_t all_gather_from_1D(const DenseM_t& A) const;
+      DenseM_t scatter_to_1D(const DenseM_t& A) const;
 
       /**
        * The permutation for the matrix, which is applied to both rows

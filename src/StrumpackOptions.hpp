@@ -42,6 +42,17 @@
 namespace strumpack {
 
   /**
+   * Enumeration of strategies for proportional mapping of the
+   * multifrontal tree.
+   * \ingroup Enumerations
+   */
+  enum class ProportionalMapping {
+    FLOPS,          /*!< Balance flops, optimze runtime                 */
+    FACTOR_MEMORY,  /*!< Balance final memory for LU factors            */
+    PEAK_MEMORY     /*!< Balance peak memory usage during factorization */
+  };
+
+  /**
    * Enumeration of possible sparse fill-reducing orderings.
    * \ingroup Enumerations
    */
@@ -78,6 +89,10 @@ namespace strumpack {
     HODLR,     /*!< Hierarchically Off-diagonal Low-Rank
                     compression of frontal matrices       */
     BLR_HODLR, /*!< Block low-rank compression of medium
+                    fronts and Hierarchically Off-diagonal
+                    Low-Rank compression of large fronts  */
+    ZFP_BLR_HODLR, /*!< ZFP compression for small fronts,
+                    Block low-rank compression of medium
                     fronts and Hierarchically Off-diagonal
                     Low-Rank compression of large fronts  */
     LOSSLESS,  /*!< Lossless cmpresssion                  */
@@ -731,7 +746,12 @@ namespace strumpack {
      * Print statistics, about ranks, memory etc, for the root front
      * only.
      */
-    void set_print_root_front_stats(bool b) { print_root_front_stats_ = b; }
+    void set_print_compressed_front_stats(bool b) { print_comp_front_stats_ = b; }
+
+    /**
+     * Set the type of proportional mapping.
+     */
+    void set_proportional_mapping(ProportionalMapping pmap) { prop_map_ = pmap; }
 
     /**
      * Check if verbose output is enabled.
@@ -888,6 +908,9 @@ namespace strumpack {
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_opts_.rel_tol();
         else return blr_opts_.rel_tol();
+      case CompressionType::ZFP_BLR_HODLR:
+        if (l==0) return hodlr_opts_.rel_tol();
+        else return blr_opts_.rel_tol();
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
       case CompressionType::NONE:
@@ -912,6 +935,9 @@ namespace strumpack {
       case CompressionType::HODLR:
         return hodlr_opts_.abs_tol();
       case CompressionType::BLR_HODLR:
+        if (l==0) return hodlr_opts_.abs_tol();
+        else return blr_opts_.abs_tol();
+      case CompressionType::ZFP_BLR_HODLR:
         if (l==0) return hodlr_opts_.abs_tol();
         else return blr_opts_.abs_tol();
       case CompressionType::LOSSY:
@@ -939,6 +965,10 @@ namespace strumpack {
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_min_sep_size_;
         else return blr_min_sep_size_;
+      case CompressionType::ZFP_BLR_HODLR:
+        if (l==0) return hodlr_min_sep_size_;
+        else if (l==1) return blr_min_sep_size_;
+        else return lossy_min_sep_size_;
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
         return lossy_min_sep_size_;
@@ -978,6 +1008,10 @@ namespace strumpack {
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_min_front_size_;
         else return blr_min_front_size_;
+      case CompressionType::ZFP_BLR_HODLR:
+        if (l==0) return hodlr_min_front_size_;
+        else if (l==1) return blr_min_front_size_;
+        else return lossy_min_front_size_;
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
         return lossy_min_front_size_;
@@ -1018,6 +1052,10 @@ namespace strumpack {
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_opts_.leaf_size();
         else return blr_opts_.leaf_size();
+      case CompressionType::ZFP_BLR_HODLR:
+        if (l==0) return hodlr_opts_.leaf_size();
+        else if (l==1) return blr_opts_.leaf_size();
+        else return 4;
       case CompressionType::LOSSY:
       case CompressionType::LOSSLESS:
         return 4;
@@ -1074,13 +1112,21 @@ namespace strumpack {
     /**
      * Returns the precision for lossy compression.
      */
-    int lossy_precision() const { return lossy_precision_; }
+    int lossy_precision() const {
+      return (compression() == CompressionType::LOSSLESS) ?
+        -1 : lossy_precision_;
+    }
 
     /**
      * Info about the stats of the root front will be printed to
      * std::cout
      */
-    bool print_root_front_stats() const { return print_root_front_stats_; }
+    bool print_compressed_front_stats() const { return print_comp_front_stats_; }
+
+    /**
+     * Get the type of proportional mapping to be used.
+     */
+    ProportionalMapping proportional_mapping() const { return prop_map_; }
 
     /**
      * Get a (const) reference to an object holding various options
@@ -1171,17 +1217,22 @@ namespace strumpack {
     bool replace_tiny_pivots_ = false;
     real_t pivot_ = std::sqrt(blas::lamch<real_t>('E'));
     bool write_root_front_ = false;
-    bool print_root_front_stats_ = false;
+    bool print_comp_front_stats_ = false;
+    ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
 
     /** GPU options */
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     bool use_gpu_ = true;
+#else
+    bool use_gpu_ = false;
+#endif
     int gpu_streams_ = default_gpu_streams();
 
     /** compression options */
     CompressionType comp_ = CompressionType::NONE;
 
     /** HSS options */
-    int hss_min_front_size_ = 5000;
+    int hss_min_front_size_ = 100000;
     int hss_min_sep_size_ = 1000;
     int sep_order_level_ = 1;
     bool indirect_sampling_ = false;
@@ -1189,16 +1240,16 @@ namespace strumpack {
 
     /** BLR options */
     BLR::BLROptions<scalar_t> blr_opts_;
-    int blr_min_front_size_ = 1000;
-    int blr_min_sep_size_ = 256;
+    int blr_min_front_size_ = 100000;
+    int blr_min_sep_size_ = 512;
 
     /** HODLR options */
     HODLR::HODLROptions<scalar_t> hodlr_opts_;
-    int hodlr_min_front_size_ = 10000;
+    int hodlr_min_front_size_ = 100000;
     int hodlr_min_sep_size_ = 5000;
 
     /** LOSSY/LOSSLESS options */
-    int lossy_min_front_size_ = 16;
+    int lossy_min_front_size_ = 100000;
     int lossy_min_sep_size_ = 8;
     int lossy_precision_ = 16;
 

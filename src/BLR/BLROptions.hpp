@@ -26,7 +26,7 @@
  *             Division).
  */
 /*! \file BLROptions.hpp
- * \brief For Pieter to complete
+ * \brief Contains class holding BLROptions
  */
 #ifndef BLR_OPTIONS_HPP
 #define BLR_OPTIONS_HPP
@@ -35,8 +35,10 @@
 #include <cassert>
 
 #include "dense/BLASLAPACKWrapper.hpp"
+#include "structured/StructuredOptions.hpp"
 
 namespace strumpack {
+
 
   /*! BLR namespace. */
   namespace BLR {
@@ -63,47 +65,47 @@ namespace strumpack {
     enum class BLRFactorAlgorithm { RL, LL, COMB, STAR };
     std::string get_name(BLRFactorAlgorithm a);
 
+    enum class CBConstruction { COLWISE, DENSE };
+    std::string get_name(CBConstruction a);
+
     enum class CompressionKernel { HALF, FULL };
     std::string get_name(CompressionKernel a);
 
-    template<typename scalar_t> class BLROptions {
-      using real_t = typename RealType<scalar_t>::value_type;
 
-    private:
-      real_t rel_tol_ = default_BLR_rel_tol<real_t>();
-      real_t abs_tol_ = default_BLR_abs_tol<real_t>();
-      int leaf_size_ = 128;
-      int max_rank_ = 5000;
-      bool verbose_ = true;
-      LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
-      int BACA_blocksize_ = 4;
-      Admissibility adm_ = Admissibility::STRONG;
-      BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::STAR;
-      CompressionKernel crn_krnl_ = CompressionKernel::HALF;
-
+    /**
+     * \class BLROptions
+     * \brief Class containing several options for the BLR code and
+     * data-structures
+     *
+     * \tparam scalar_t scalar type, can be float, double,
+     * std::complex<float> or std::complex<double>. This is used here
+     * mainly because tolerances might depend on the precision.
+     */
+    template<typename scalar_t> class BLROptions
+      : public structured::StructuredOptions<scalar_t> {
 
     public:
-      void set_rel_tol(real_t rel_tol) {
-        assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
-        rel_tol_ = rel_tol;
+
+      /**
+       * real_t is the real type corresponding to the (possibly
+       * complex) scalar_t template parameter
+       */
+      using real_t = typename RealType<scalar_t>::value_type;
+
+      BLROptions() :
+        structured::StructuredOptions<scalar_t>(structured::Type::BLR) {
+        set_defaults();
       }
-      void set_abs_tol(real_t abs_tol) {
-        assert(abs_tol >= real_t(0.));
-        abs_tol_ = abs_tol;
+
+      BLROptions(const structured::StructuredOptions<scalar_t>& sopts)
+        : structured::StructuredOptions<scalar_t>(sopts) {
+        this->type_ = structured::Type::BLR;
       }
-      void set_leaf_size(int leaf_size) {
-        assert(leaf_size_ > 0);
-        leaf_size_ = leaf_size;
-      }
-      void set_max_rank(int max_rank) {
-        assert(max_rank > 0);
-        max_rank_ = max_rank;
-      }
+
       void set_low_rank_algorithm(LowRankAlgorithm a) {
         lr_algo_ = a;
       }
       void set_admissibility(Admissibility adm) { adm_ = adm; }
-      void set_verbose(bool verbose) { verbose_ = verbose; }
       void set_BACA_blocksize(int B) {
         assert(B > 0);
         BACA_blocksize_ = B;
@@ -111,24 +113,40 @@ namespace strumpack {
       void set_BLR_factor_algorithm(BLRFactorAlgorithm a) {
         blr_algo_ = a;
       }
+      void set_CB_construction(CBConstruction a) {
+        cb_construction_ = a;
+      }
       void set_compression_kernel(CompressionKernel a) {
         crn_krnl_ = a;
       }
 
-      real_t rel_tol() const { return rel_tol_; }
-      real_t abs_tol() const { return abs_tol_; }
-      int leaf_size() const { return leaf_size_; }
-      int max_rank() const { return max_rank_; }
       LowRankAlgorithm low_rank_algorithm() const { return lr_algo_; }
       Admissibility admissibility() const { return adm_; }
-      bool verbose() const { return verbose_; }
       int BACA_blocksize() const { return BACA_blocksize_; }
       BLRFactorAlgorithm BLR_factor_algorithm() const { return blr_algo_; }
+      CBConstruction CB_construction() const { return cb_construction_; }
       CompressionKernel compression_kernel() const { return crn_krnl_; }
 
-      void set_from_command_line(int argc, const char* const* cargv);
+      void set_from_command_line(int argc, const char* const* cargv) override;
 
-      void describe_options() const;
+      void describe_options() const override;
+
+    private:
+      bool verbose_ = true;
+      LowRankAlgorithm lr_algo_ = LowRankAlgorithm::RRQR;
+      int BACA_blocksize_ = 4;
+      Admissibility adm_ = Admissibility::WEAK;
+      BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::RL;
+      CompressionKernel crn_krnl_ = CompressionKernel::HALF;
+      CBConstruction cb_construction_ = CBConstruction::DENSE;
+
+      void set_defaults() {
+        this->rel_tol_ = default_BLR_rel_tol<real_t>();
+        this->abs_tol_ = default_BLR_abs_tol<real_t>();
+        this->leaf_size_ = 256;
+        this->max_rank_ = 5000;
+      }
+
     };
 
   } // end namespace BLR

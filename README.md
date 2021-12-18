@@ -1,15 +1,13 @@
 # STRUMPACK
-STRUMPACK -- STRUctured Matrix PACKage, Copyright (c) 2014-2020, The
+STRUMPACK -- STRUctured Matrix PACKage, Copyright (c) 2014-2021, The
 Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
 
-[![Build Status](https://travis-ci.org/pghysels/STRUMPACK.svg?branch=master)](https://travis-ci.org/pghysels/STRUMPACK)
-
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)
 
-   [http://portal.nersc.gov/project/sparse/strumpack/v5.1.0/](http://portal.nersc.gov/project/sparse/strumpack/v5.1.0/)
+   [http://portal.nersc.gov/project/sparse/strumpack/v6.1.0/](http://portal.nersc.gov/project/sparse/strumpack/v6.1.0/)
 
 
 ## Website
@@ -21,7 +19,7 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
- - Michael Neuder - Harvard
+
 
 ## Past contributors
  - Lucy Guo
@@ -31,6 +29,8 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Theo Mary - University of Manchester
  - Christopher Gorman - UC Santa Barbara
  - Jonas Actor - Rice University
+ - Michael Neuder - Harvard
+
 
 ## Overview
 

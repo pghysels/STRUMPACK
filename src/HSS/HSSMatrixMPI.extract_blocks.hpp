@@ -146,14 +146,14 @@ namespace strumpack {
       if (this->leaf()) {
         for (std::size_t k=0; k<nb; k++) {
           if (odiag[k])
-            w.y[k] = _V.extract_rows(w.J[k]).transpose();
+            w.y[k] = V_.extract_rows(w.J[k]).transpose();
           else w.ycols[k].clear();
         }
       } else {
-        w.split_extraction_sets(this->_ch[0]->dims());
+        w.split_extraction_sets(child(0)->dims());
         for (std::size_t k=0; k<nb; k++)
           for (std::size_t c=0; c<w.J[k].size(); c++)
-            if (w.J[k][c] < this->_ch[0]->cols())
+            if (w.J[k][c] < child(0)->cols())
               w.c[0].ycols[k].push_back(w.ycols[k][c]);
             else w.c[1].ycols[k].push_back(w.ycols[k][c]);
         {
@@ -162,8 +162,8 @@ namespace strumpack {
             odiag0[k] = odiag[k] || !w.c[1].I[k].empty();
             odiag1[k] = odiag[k] || !w.c[0].I[k].empty();
           }
-          this->_ch[0]->extract_fwd(w.c[0], lg, odiag0);
-          this->_ch[1]->extract_fwd(w.c[1], lg, odiag1);
+          child(0)->extract_fwd(w.c[0], lg, odiag0);
+          child(1)->extract_fwd(w.c[1], lg, odiag1);
         }
         w.communicate_child_ycols(comm(), Pl());
         w.combine_child_ycols(odiag);
@@ -174,15 +174,15 @@ namespace strumpack {
             y01.zero();
             assert(w.c[0].ycols.size() > k);
             assert(w.c[0].y.size() > k);
-            copy(this->_ch[0]->V_rank(), w.c[0].ycols[k].size(),
+            copy(child(0)->V_rank(), w.c[0].ycols[k].size(),
                  w.c[0].y[k], 0, 0, y01, 0, 0, grid()->ctxt_all());
-            copy(this->_ch[1]->V_rank(), w.c[1].ycols[k].size(),
+            copy(child(1)->V_rank(), w.c[1].ycols[k].size(),
                  w.c[1].y[k], 0, 0, y01,
-                 this->_ch[0]->V_rank(), w.c[0].ycols[k].size(),
+                 child(0)->V_rank(), w.c[0].ycols[k].size(),
                  grid()->ctxt_all());
-            w.y[k] = _V.applyC(y01);
+            w.y[k] = V_.applyC(y01);
             STRUMPACK_EXTRACTION_FLOPS
-              (_V.applyC_flops(y01.cols()));
+              (V_.applyC_flops(y01.cols()));
           }
         } else {
           for (std::size_t k=0; k<nb; k++) {
@@ -200,17 +200,17 @@ namespace strumpack {
       const auto nb = w.I.size();
       if (this->leaf()) {
         for (std::size_t k=0; k<nb; k++) {
-          if (_D.active())
+          if (D_.active())
             for (std::size_t c=0; c<w.J[k].size(); c++)
               for (std::size_t r=0; r<w.I[k].size(); r++)
-                if (_D.is_local(w.I[k][r], w.J[k][c]))
+                if (D_.is_local(w.I[k][r], w.J[k][c]))
                   triplets[k].emplace_back
                     (w.rl2g[k][r], w.cl2g[k][c],
-                     _D.global(w.I[k][r],w.J[k][c]));
-          if (w.z[k].cols() && _U.cols()) {
+                     D_.global(w.I[k][r],w.J[k][c]));
+          if (w.z[k].cols() && U_.cols()) {
             DistM_t tmp(grid(), w.I[k].size(), w.z[k].cols());
             {
-              auto Uex = _U.extract_rows(w.I[k]);
+              auto Uex = U_.extract_rows(w.I[k]);
               gemm(Trans::N, Trans::N, scalar_t(1),
                    Uex, w.z[k], scalar_t(0.), tmp);
               STRUMPACK_EXTRACTION_FLOPS
@@ -226,40 +226,40 @@ namespace strumpack {
           }
         }
       } else {
-        w.split_extraction_sets(this->_ch[0]->dims());
+        w.split_extraction_sets(child(0)->dims());
         for (std::size_t k=0; k<nb; k++) {
           w.c[0].rl2g[k].reserve(w.c[0].I[k].size());
           w.c[1].rl2g[k].reserve(w.c[1].I[k].size());
           for (std::size_t r=0; r<w.I[k].size(); r++) {
-            if (w.I[k][r] < this->_ch[0]->rows())
+            if (w.I[k][r] < child(0)->rows())
               w.c[0].rl2g[k].push_back(w.rl2g[k][r]);
             else w.c[1].rl2g[k].push_back(w.rl2g[k][r]);
           }
           w.c[0].cl2g[k].reserve(w.c[0].J[k].size());
           w.c[1].cl2g[k].reserve(w.c[1].J[k].size());
           for (std::size_t c=0; c<w.J[k].size(); c++) {
-            if (w.J[k][c] < this->_ch[0]->cols())
+            if (w.J[k][c] < child(0)->cols())
               w.c[0].cl2g[k].push_back(w.cl2g[k][c]);
             else w.c[1].cl2g[k].push_back(w.cl2g[k][c]);
           }
         }
-        auto U = _U.dense();
+        auto U = U_.dense();
 
         // TODO split this into comm - comp - comm phases
         for (std::size_t k=0; k<nb; k++) {
           if (!w.c[0].I[k].empty()) {
             auto z0cols = w.c[1].ycols[k].size() + w.z[k].cols();
-            auto z0rows = _B01.rows();
-            w.c[0].z[k] = DistM_t(this->_ch[0]->grid(lg), z0rows, z0cols);
+            auto z0rows = B01_.rows();
+            w.c[0].z[k] = DistM_t(child(0)->grid(lg), z0rows, z0cols);
             if (!w.c[1].ycols[k].empty()) {
               DistM_t z00(grid(), z0rows, w.c[1].ycols[k].size());
-              DistM_t wc1y(grid(), _B01.cols(), w.c[1].ycols[k].size());
-              copy(_B01.cols(), w.c[1].ycols[k].size(),
+              DistM_t wc1y(grid(), B01_.cols(), w.c[1].ycols[k].size());
+              copy(B01_.cols(), w.c[1].ycols[k].size(),
                    w.c[1].y[k], 0, 0, wc1y, 0, 0, grid()->ctxt_all());
-              gemm(Trans::N, Trans::N, scalar_t(1.), _B01, wc1y,
+              gemm(Trans::N, Trans::N, scalar_t(1.), B01_, wc1y,
                    scalar_t(0.), z00);
               STRUMPACK_EXTRACTION_FLOPS
-                (gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B01, wc1y,
+                (gemm_flops(Trans::N, Trans::N, scalar_t(1.), B01_, wc1y,
                             scalar_t(0.)));
               copy(z0rows, w.c[1].ycols[k].size(),
                    z00, 0, 0, w.c[0].z[k], 0, 0, grid()->ctxt_all());
@@ -285,24 +285,24 @@ namespace strumpack {
           }
           if (!w.c[1].I[k].empty()) {
             auto z1cols = w.c[0].ycols[k].size() + w.z[k].cols();
-            auto z1rows = _B10.rows();
-            w.c[1].z[k] = DistM_t(this->_ch[1]->grid(lg), z1rows, z1cols);
+            auto z1rows = B10_.rows();
+            w.c[1].z[k] = DistM_t(child(1)->grid(lg), z1rows, z1cols);
             if (!w.c[0].ycols[k].empty()) {
               DistM_t z10(grid(), z1rows, w.c[0].ycols[k].size());
-              DistM_t wc0y(grid(), _B10.cols(), w.c[0].ycols[k].size());
-              copy(_B10.cols(), w.c[0].ycols[k].size(),
+              DistM_t wc0y(grid(), B10_.cols(), w.c[0].ycols[k].size());
+              copy(B10_.cols(), w.c[0].ycols[k].size(),
                    w.c[0].y[k], 0, 0, wc0y, 0, 0, grid()->ctxt_all());
-              gemm(Trans::N, Trans::N, scalar_t(1.), _B10, wc0y,
+              gemm(Trans::N, Trans::N, scalar_t(1.), B10_, wc0y,
                    scalar_t(0.), z10);
               STRUMPACK_EXTRACTION_FLOPS
-                (gemm_flops(Trans::N, Trans::N, scalar_t(1.), _B10, wc0y,
+                (gemm_flops(Trans::N, Trans::N, scalar_t(1.), B10_, wc0y,
                             scalar_t(0.)));
               copy(z1rows, w.c[0].ycols[k].size(),
                    z10, 0, 0, w.c[1].z[k], 0, 0, grid()->ctxt_all());
             }
             if (this->U_rank()) {
               DistM_t z11(grid(), z1rows, w.z[k].cols());
-              DistMW_t U1(z1rows, this->U_rank(), U, this->_ch[0]->U_rank(), 0);
+              DistMW_t U1(z1rows, this->U_rank(), U, child(0)->U_rank(), 0);
               gemm(Trans::N, Trans::N, scalar_t(1.), U1, w.z[k], scalar_t(0.), z11);
               STRUMPACK_EXTRACTION_FLOPS
                 (gemm_flops(Trans::N, Trans::N, scalar_t(1.),
@@ -319,8 +319,8 @@ namespace strumpack {
             for (auto c : w.zcols[k]) w.c[1].zcols[k].push_back(c);
           }
         }
-        this->_ch[0]->extract_bwd(triplets, lg, w.c[0]);
-        this->_ch[1]->extract_bwd(triplets, lg, w.c[1]);
+        child(0)->extract_bwd(triplets, lg, w.c[0]);
+        child(1)->extract_bwd(triplets, lg, w.c[1]);
       }
     }
 

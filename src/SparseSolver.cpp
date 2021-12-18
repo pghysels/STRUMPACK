@@ -37,7 +37,7 @@
 #include "StrumpackOptions.hpp"
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
-#include "sparse/iterative/IterativeSolvers.hpp"
+#include "iterative/IterativeSolvers.hpp"
 
 namespace strumpack {
 

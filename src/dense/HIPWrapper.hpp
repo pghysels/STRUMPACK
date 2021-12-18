@@ -44,7 +44,7 @@
 namespace strumpack {
   namespace gpu {
 
-#define gpu_check(err) {                                               \
+#define gpu_check(err) {                                              \
       strumpack::gpu::hip_assert((err), __FILE__, __LINE__);          \
     }
     void hip_assert(hipError_t code, const char *file, int line,
@@ -54,10 +54,7 @@ namespace strumpack {
     void hip_assert(hipblasStatus_t code, const char *file, int line,
                     bool abort=true);
 
-    inline void init() {
-      std::cout << "# Initializing HIP" << std::endl;
-      gpu_check(hipFree(0));
-    }
+    void init();
 
     inline void synchronize() {
       gpu_check(hipDeviceSynchronize());
@@ -65,10 +62,14 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() { gpu_check(hipStreamCreate(&s_)); }
+      Stream() {
+        gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
+        //gpu_check(hipStreamCreate(&s_));
+      }
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
+      void synchronize() { hipStreamSynchronize(s_); }
     private:
       hipStream_t s_;
     };
@@ -84,7 +85,6 @@ namespace strumpack {
       hipblasHandle_t h_;
     };
 
-
     // TODO there is no such thing as hipSOLVER yet :(
     class SOLVERHandle {
     public:
@@ -97,8 +97,20 @@ namespace strumpack {
       rocblas_handle h_;
     };
 
+    class Event {
+    public:
+      Event() { gpu_check(hipEventCreateWithFlags
+                          (&e_, hipEventDisableTiming)); }
+      ~Event() { gpu_check(hipEventDestroy(e_)); }
+      void record() { gpu_check(hipEventRecord(e_)); }
+      void record(Stream& s) { gpu_check(hipEventRecord(e_, s)); }
+      void wait(Stream& s) { gpu_check(hipStreamWaitEvent(s, e_, 0)); }
+    private:
+      hipEvent_t e_;
+    };
+
     template<typename T> void memset
-    (T* dptr, int value, std::size_t count) {
+    (void* dptr, int value, std::size_t count) {
       gpu_check(hipMemset(dptr, value, count*sizeof(T)));
     }
 
@@ -210,6 +222,7 @@ namespace strumpack {
         return *this;
       }
       ~DeviceMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
@@ -268,6 +281,7 @@ namespace strumpack {
         return *this;
       }
       ~HostMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }

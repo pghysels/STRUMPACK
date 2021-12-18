@@ -31,7 +31,6 @@
 #include <algorithm>
 
 #include "CSRGraph.hpp"
-#include "HSS/HSSPartitionTree.hpp"
 #include "ordering/MetisReordering.hpp"
 
 namespace strumpack {
@@ -184,12 +183,12 @@ namespace strumpack {
     std::swap(ind_, ind);
   }
 
-  template<typename integer_t> HSS::HSSPartitionTree
+  template<typename integer_t> structured::ClusterTree
   CSRGraph<integer_t>::recursive_bisection
   (int leaf, int conn_level, integer_t* order, integer_t* iorder,
    integer_t lo, integer_t sep_begin, integer_t sep_end) const {
     integer_t dim_sep = sep_end - sep_begin;
-    HSS::HSSPartitionTree tree(dim_sep);
+    structured::ClusterTree tree(dim_sep);
     if (dim_sep > 2 * leaf) {
       std::fill(order+sep_begin, order+sep_end, integer_t(0));
       integer_t parts = 0;
@@ -216,7 +215,7 @@ namespace strumpack {
   template<typename integer_t> void CSRGraph<integer_t>::split_recursive
   (int leaf, int conn_level, integer_t lo,
    integer_t sep_begin, integer_t sep_end, integer_t* order,
-   HSS::HSSPartitionTree& tree, integer_t& parts, integer_t part,
+   structured::ClusterTree& tree, integer_t& parts, integer_t part,
    integer_t count, const Length2Edges& l2) const {
     auto sg = extract_subgraph
       (conn_level, lo, sep_begin, sep_end, part, order+sep_begin, l2);

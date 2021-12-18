@@ -58,10 +58,10 @@ For comments, feature requests or bug reports, open an issue on github:
 # Table of Contents
 
 + \link installation Installation and Requirements \endlink
++ \link GPU_Support GPU Support \endlink
 + \link sparse Sparse Direct Solver \endlink
     - \link algorithm Algorithm Overview \endlink
     - \link sparse_example_usage Example Usage \endlink
-    - \link GPU_Support GPU Support \endlink
 + \link prec Precontioning \endlink
     - \link BLR_Preconditioning BLR Preconditioning \endlink
     - \link HOD_Preconditioning HODLR & HODBF Preconditioning \endlink
@@ -74,6 +74,7 @@ For comments, feature requests or bug reports, open an issue on github:
 + \link examples Examples \endlink
 + \link C_Interface C and Fortran Interfaces \endlink
 + \link FAQ FAQ \endlink
++ \link contact Contact Authors \endlink
 + \link acknowledgements Acknowledgements \endlink
 + \link copyright Copyright Notice and License Agreement \endlink
 + \link References References\endlink

@@ -54,6 +54,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
+  (std::size_t m, std::size_t n,
+   const std::function<scalar_t(std::size_t,std::size_t)>& A)
+    : DenseMatrix<scalar_t>(m, n) {
+    fill(A);
+  }
+
+  template<typename scalar_t> DenseMatrix<scalar_t>::DenseMatrix
   (std::size_t m, std::size_t n, const scalar_t* D, std::size_t ld)
     : data_(new scalar_t[m*n]), rows_(m), cols_(n),
       ld_(std::max(std::size_t(1), m)) {
@@ -193,6 +200,13 @@ namespace strumpack {
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
         operator()(i,j) = v;
+  }
+
+  template<typename scalar_t> void DenseMatrix<scalar_t>::fill
+  (const std::function<scalar_t(std::size_t,std::size_t)>& A) {
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i,j) = A(i, j);
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::eye() {
@@ -1252,185 +1266,189 @@ namespace strumpack {
   template void DenseMatrix<std::size_t>::print(std::string, bool, int) const;
   template void DenseMatrix<bool>::print(std::string, bool, int) const;
 
-  template void gemm
-  (Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
-   const DenseMatrix<float>& b, float beta,
-   DenseMatrix<float>& c, int depth);
-  template void gemm
-  (Trans ta, Trans tb, double alpha, const DenseMatrix<double>& a,
-   const DenseMatrix<double>& b, double beta,
-   DenseMatrix<double>& c, int depth);
-  template void gemm
-  (Trans ta, Trans tb, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const DenseMatrix<std::complex<float>>& b, std::complex<float> beta,
-   DenseMatrix<std::complex<float>>& c, int depth);
-  template void gemm
-  (Trans ta, Trans tb, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
-   DenseMatrix<std::complex<double>>& c, int depth);
+  // DenseMatrix<long double> only supports a few operations
 
-  template void gemm
-  (Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
-   const float* b, int ldb, float beta,
-   DenseMatrix<float>& c, int depth);
-  template void gemm
-  (Trans ta, Trans tb, double alpha, const DenseMatrix<double>& a,
-   const double* b, int ldb, double beta,
-   DenseMatrix<double>& c, int depth);
-  template void gemm
-  (Trans ta, Trans tb, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const std::complex<float>* b, int ldb, std::complex<float> beta,
-   DenseMatrix<std::complex<float>>& c, int depth);
-  template void gemm
-  (Trans ta, Trans tb, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const std::complex<double>* b, int ldb, std::complex<double> beta,
-   DenseMatrix<std::complex<double>>& c, int depth);
 
-  template void gemm
-  (Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
-   const DenseMatrix<float>& b, float beta,
-   float* c, int ldc, int depth);
-  template void gemm
-  (Trans ta, Trans tb, double alpha, const DenseMatrix<double>& a,
-   const DenseMatrix<double>& b, double beta,
-   double* c, int ldc, int depth);
-  template void gemm
-  (Trans ta, Trans tb, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const DenseMatrix<std::complex<float>>& b, std::complex<float> beta,
-   std::complex<float>* c, int ldc, int depth);
-  template void gemm
-  (Trans ta, Trans tb, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
-   std::complex<double>* c, int ldc, int depth);
 
-  template void trmm
-  (Side s, UpLo ul, Trans ta, Diag d, float alpha,
-   const DenseMatrix<float>& a, DenseMatrix<float>& b,
-   int depth);
-  template void trmm
-  (Side s, UpLo ul, Trans ta, Diag d, double alpha,
-   const DenseMatrix<double>& a, DenseMatrix<double>& b,
-   int depth);
-  template void trmm
-  (Side s, UpLo ul, Trans ta, Diag d, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   DenseMatrix<std::complex<float>>& b, int depth);
-  template void trmm
-  (Side s, UpLo ul, Trans ta, Diag d, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   DenseMatrix<std::complex<double>>& b, int depth);
+  template void
+  gemm(Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
+       const DenseMatrix<float>& b, float beta,
+       DenseMatrix<float>& c, int depth);
+  template void
+  gemm(Trans ta, Trans tb, double alpha, const DenseMatrix<double>& a,
+       const DenseMatrix<double>& b, double beta,
+       DenseMatrix<double>& c, int depth);
+  template void
+  gemm(Trans ta, Trans tb, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       const DenseMatrix<std::complex<float>>& b, std::complex<float> beta,
+       DenseMatrix<std::complex<float>>& c, int depth);
+  template void
+  gemm(Trans ta, Trans tb, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
+       DenseMatrix<std::complex<double>>& c, int depth);
 
-  template void trsm
-  (Side s, UpLo ul, Trans ta, Diag d, float alpha,
-   const DenseMatrix<float>& a, DenseMatrix<float>& b,
-   int depth);
-  template void trsm
-  (Side s, UpLo ul, Trans ta, Diag d, double alpha,
-   const DenseMatrix<double>& a, DenseMatrix<double>& b,
-   int depth);
-  template void trsm
-  (Side s, UpLo ul, Trans ta, Diag d, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   DenseMatrix<std::complex<float>>& b, int depth);
-  template void trsm
-  (Side s, UpLo ul, Trans ta, Diag d, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   DenseMatrix<std::complex<double>>& b, int depth);
+  template void
+  gemm(Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
+       const float* b, int ldb, float beta,
+       DenseMatrix<float>& c, int depth);
+  template void
+  gemm(Trans ta, Trans tb, double alpha, const DenseMatrix<double>& a,
+       const double* b, int ldb, double beta,
+       DenseMatrix<double>& c, int depth);
+  template void
+  gemm(Trans ta, Trans tb, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       const std::complex<float>* b, int ldb, std::complex<float> beta,
+       DenseMatrix<std::complex<float>>& c, int depth);
+  template void
+  gemm(Trans ta, Trans tb, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       const std::complex<double>* b, int ldb, std::complex<double> beta,
+       DenseMatrix<std::complex<double>>& c, int depth);
 
-  template void trsv
-  (UpLo ul, Trans ta, Diag d, const DenseMatrix<float>& a,
-   DenseMatrix<float>& b, int depth);
-  template void trsv
-  (UpLo ul, Trans ta, Diag d, const DenseMatrix<double>& a,
-   DenseMatrix<double>& b, int depth);
-  template void trsv
-  (UpLo ul, Trans ta, Diag d, const DenseMatrix<std::complex<float>>& a,
-   DenseMatrix<std::complex<float>>& b, int depth);
-  template void trsv
-  (UpLo ul, Trans ta, Diag d, const DenseMatrix<std::complex<double>>& a,
-   DenseMatrix<std::complex<double>>& b, int depth);
+  template void
+  gemm(Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
+       const DenseMatrix<float>& b, float beta,
+       float* c, int ldc, int depth);
+  template void
+  gemm(Trans ta, Trans tb, double alpha, const DenseMatrix<double>& a,
+       const DenseMatrix<double>& b, double beta,
+       double* c, int ldc, int depth);
+  template void
+  gemm(Trans ta, Trans tb, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       const DenseMatrix<std::complex<float>>& b, std::complex<float> beta,
+       std::complex<float>* c, int ldc, int depth);
+  template void
+  gemm(Trans ta, Trans tb, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       const DenseMatrix<std::complex<double>>& b, std::complex<double> beta,
+       std::complex<double>* c, int ldc, int depth);
 
-  template void gemv
-  (Trans ta, float alpha, const DenseMatrix<float>& a,
-   const DenseMatrix<float>& x, float beta,
-   DenseMatrix<float>& y, int depth);
-  template void gemv
-  (Trans ta, double alpha, const DenseMatrix<double>& a,
-   const DenseMatrix<double>& x, double beta,
-   DenseMatrix<double>& y, int depth);
-  template void gemv
-  (Trans ta, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const DenseMatrix<std::complex<float>>& x, std::complex<float> beta,
-   DenseMatrix<std::complex<float>>& y, int depth);
-  template void gemv
-  (Trans ta, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const DenseMatrix<std::complex<double>>& x, std::complex<double> beta,
-   DenseMatrix<std::complex<double>>& y, int depth);
+  template void
+  trmm(Side s, UpLo ul, Trans ta, Diag d, float alpha,
+       const DenseMatrix<float>& a, DenseMatrix<float>& b,
+       int depth);
+  template void
+  trmm(Side s, UpLo ul, Trans ta, Diag d, double alpha,
+       const DenseMatrix<double>& a, DenseMatrix<double>& b,
+       int depth);
+  template void
+  trmm(Side s, UpLo ul, Trans ta, Diag d, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       DenseMatrix<std::complex<float>>& b, int depth);
+  template void
+  trmm(Side s, UpLo ul, Trans ta, Diag d, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       DenseMatrix<std::complex<double>>& b, int depth);
 
-  template void gemv
-  (Trans ta, float alpha, const DenseMatrix<float>& a,
-   const float* x, int incx, float beta,
-   DenseMatrix<float>& y, int depth);
-  template void gemv
-  (Trans ta, double alpha, const DenseMatrix<double>& a,
-   const double* x, int incx, double beta,
-   DenseMatrix<double>& y, int depth);
-  template void gemv
-  (Trans ta, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const std::complex<float>* x, int incx, std::complex<float> beta,
-   DenseMatrix<std::complex<float>>& y, int depth);
-  template void gemv
-  (Trans ta, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const std::complex<double>* x, int incx, std::complex<double> beta,
-   DenseMatrix<std::complex<double>>& y, int depth);
+  template void
+  trsm(Side s, UpLo ul, Trans ta, Diag d, float alpha,
+       const DenseMatrix<float>& a, DenseMatrix<float>& b,
+       int depth);
+  template void
+  trsm(Side s, UpLo ul, Trans ta, Diag d, double alpha,
+       const DenseMatrix<double>& a, DenseMatrix<double>& b,
+       int depth);
+  template void
+  trsm(Side s, UpLo ul, Trans ta, Diag d, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       DenseMatrix<std::complex<float>>& b, int depth);
+  template void
+  trsm(Side s, UpLo ul, Trans ta, Diag d, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       DenseMatrix<std::complex<double>>& b, int depth);
 
-  template void gemv
-  (Trans ta, float alpha, const DenseMatrix<float>& a,
-   const DenseMatrix<float>& x, float beta,
-   float* y, int incy, int depth);
-  template void gemv
-  (Trans ta, double alpha, const DenseMatrix<double>& a,
-   const DenseMatrix<double>& x, double beta,
-   double* y, int incy, int depth);
-  template void gemv
-  (Trans ta, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const DenseMatrix<std::complex<float>>& x, std::complex<float> beta,
-   std::complex<float>* y, int incy, int depth);
-  template void gemv
-  (Trans ta, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const DenseMatrix<std::complex<double>>& x, std::complex<double> beta,
-   std::complex<double>* y, int incy, int depth);
+  template void
+  trsv(UpLo ul, Trans ta, Diag d, const DenseMatrix<float>& a,
+       DenseMatrix<float>& b, int depth);
+  template void
+  trsv(UpLo ul, Trans ta, Diag d, const DenseMatrix<double>& a,
+       DenseMatrix<double>& b, int depth);
+  template void
+  trsv(UpLo ul, Trans ta, Diag d, const DenseMatrix<std::complex<float>>& a,
+       DenseMatrix<std::complex<float>>& b, int depth);
+  template void
+  trsv(UpLo ul, Trans ta, Diag d, const DenseMatrix<std::complex<double>>& a,
+       DenseMatrix<std::complex<double>>& b, int depth);
 
-  template void gemv
-  (Trans ta, float alpha, const DenseMatrix<float>& a,
-   const float* x, int incx, float beta,
-   float* y, int incy, int depth);
-  template void gemv
-  (Trans ta, double alpha, const DenseMatrix<double>& a,
-   const double* x, int incx, double beta,
-   double* y, int incy, int depth);
-  template void gemv
-  (Trans ta, std::complex<float> alpha,
-   const DenseMatrix<std::complex<float>>& a,
-   const std::complex<float>* x, int incx, std::complex<float> beta,
-   std::complex<float>* y, int incy, int depth);
-  template void gemv
-  (Trans ta, std::complex<double> alpha,
-   const DenseMatrix<std::complex<double>>& a,
-   const std::complex<double>* x, int incx, std::complex<double> beta,
-   std::complex<double>* y, int incy, int depth);
+  template void
+  gemv(Trans ta, float alpha, const DenseMatrix<float>& a,
+       const DenseMatrix<float>& x, float beta,
+       DenseMatrix<float>& y, int depth);
+  template void
+  gemv(Trans ta, double alpha, const DenseMatrix<double>& a,
+       const DenseMatrix<double>& x, double beta,
+       DenseMatrix<double>& y, int depth);
+  template void
+  gemv(Trans ta, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       const DenseMatrix<std::complex<float>>& x, std::complex<float> beta,
+       DenseMatrix<std::complex<float>>& y, int depth);
+  template void
+  gemv(Trans ta, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       const DenseMatrix<std::complex<double>>& x, std::complex<double> beta,
+       DenseMatrix<std::complex<double>>& y, int depth);
+
+  template void
+  gemv(Trans ta, float alpha, const DenseMatrix<float>& a,
+       const float* x, int incx, float beta,
+       DenseMatrix<float>& y, int depth);
+  template void
+  gemv(Trans ta, double alpha, const DenseMatrix<double>& a,
+       const double* x, int incx, double beta,
+       DenseMatrix<double>& y, int depth);
+  template void
+  gemv(Trans ta, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       const std::complex<float>* x, int incx, std::complex<float> beta,
+       DenseMatrix<std::complex<float>>& y, int depth);
+  template void
+  gemv(Trans ta, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       const std::complex<double>* x, int incx, std::complex<double> beta,
+       DenseMatrix<std::complex<double>>& y, int depth);
+
+  template void
+  gemv(Trans ta, float alpha, const DenseMatrix<float>& a,
+       const DenseMatrix<float>& x, float beta,
+       float* y, int incy, int depth);
+  template void
+  gemv(Trans ta, double alpha, const DenseMatrix<double>& a,
+       const DenseMatrix<double>& x, double beta,
+       double* y, int incy, int depth);
+  template void
+  gemv(Trans ta, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       const DenseMatrix<std::complex<float>>& x, std::complex<float> beta,
+       std::complex<float>* y, int incy, int depth);
+  template void
+  gemv(Trans ta, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       const DenseMatrix<std::complex<double>>& x, std::complex<double> beta,
+       std::complex<double>* y, int incy, int depth);
+
+  template void
+  gemv(Trans ta, float alpha, const DenseMatrix<float>& a,
+       const float* x, int incx, float beta,
+       float* y, int incy, int depth);
+  template void
+  gemv(Trans ta, double alpha, const DenseMatrix<double>& a,
+       const double* x, int incx, double beta,
+       double* y, int incy, int depth);
+  template void
+  gemv(Trans ta, std::complex<float> alpha,
+       const DenseMatrix<std::complex<float>>& a,
+       const std::complex<float>* x, int incx, std::complex<float> beta,
+       std::complex<float>* y, int incy, int depth);
+  template void
+  gemv(Trans ta, std::complex<double> alpha,
+       const DenseMatrix<std::complex<double>>& a,
+       const std::complex<double>* x, int incx, std::complex<double> beta,
+       std::complex<double>* y, int incy, int depth);
 
   template DenseMatrix<float>
   cast_matrix<double,float>(const DenseMatrix<double>& mat);

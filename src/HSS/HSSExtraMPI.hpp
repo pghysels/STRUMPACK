@@ -134,26 +134,26 @@ namespace strumpack {
     class TreeLocalRanges {
     public:
       TreeLocalRanges() {}
-      TreeLocalRanges(int P) : _ranges(5*P) {}
+      TreeLocalRanges(int P) : ranges_(5*P) {}
       void print() const {
         std::cout << "ranges=[";
-        for (std::size_t p=0; p<_ranges.size()/5; p++)
+        for (std::size_t p=0; p<ranges_.size()/5; p++)
           std::cout << rlo(p) << "," << rhi(p) << "/"
                     << clo(p) << "," << chi(p) << "/" << leaf_procs(p) << " ";
         std::cout << "];" << std::endl;
       }
-      int rlo(int p) const { return _ranges[5*p+0]; }
-      int rhi(int p) const { return _ranges[5*p+1]; }
-      int clo(int p) const { return _ranges[5*p+2]; }
-      int chi(int p) const { return _ranges[5*p+3]; }
-      int leaf_procs(int p) const { return _ranges[5*p+4]; }
-      int& rlo(int p) { return _ranges[5*p+0]; }
-      int& rhi(int p) { return _ranges[5*p+1]; }
-      int& clo(int p) { return _ranges[5*p+2]; }
-      int& chi(int p) { return _ranges[5*p+3]; }
-      int& leaf_procs(int p) { return _ranges[5*p+4]; }
+      int rlo(int p) const { return ranges_[5*p+0]; }
+      int rhi(int p) const { return ranges_[5*p+1]; }
+      int clo(int p) const { return ranges_[5*p+2]; }
+      int chi(int p) const { return ranges_[5*p+3]; }
+      int leaf_procs(int p) const { return ranges_[5*p+4]; }
+      int& rlo(int p) { return ranges_[5*p+0]; }
+      int& rhi(int p) { return ranges_[5*p+1]; }
+      int& clo(int p) { return ranges_[5*p+2]; }
+      int& chi(int p) { return ranges_[5*p+3]; }
+      int& leaf_procs(int p) { return ranges_[5*p+4]; }
     private:
-      std::vector<int> _ranges; // rlo, rhi, clo, chi, leaf_procs
+      std::vector<int> ranges_; // rlo, rhi, clo, chi, leaf_procs
     };
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
@@ -195,12 +195,9 @@ namespace strumpack {
        * solve.
        */
       std::size_t memory() {
-        std::size_t mem = sizeof(*this) + L_.memory() + Vt0_.memory()
+        return sizeof(*this) + L_.memory() + Vt0_.memory()
           + W1_.memory() + Q_.memory() + D_.memory()
           + sizeof(int)*piv_.size();
-        for (auto& c : ch_) mem += c.memory();
-        if (factors_seq_) mem += factors_seq_->memory();
-        return mem;
       }
 
       /**
@@ -211,34 +208,8 @@ namespace strumpack {
        * solve.
        */
       std::size_t nonzeros() const {
-        std::size_t nnz = L_.nonzeros() + Vt0_.nonzeros() + W1_.nonzeros()
+        return L_.nonzeros() + Vt0_.nonzeros() + W1_.nonzeros()
           + Q_.nonzeros() + D_.nonzeros();
-        for (auto& c : ch_) nnz += c.nonzeros();
-        if (factors_seq_) nnz += factors_seq_->nonzeros();
-        return nnz;
-      }
-
-      /**
-       * Get the total amount of memory over all ranks, used to store
-       * this data (excluding any metadata). To get the memory for the
-       * entire factorization, you should also count the memory of the
-       * original HSS matrix, as that is still required to perform a
-       * solve. __This is collective over all the communicator c.__
-       */
-      std::size_t total_memory(const MPIComm& c) {
-        return c.all_reduce(memory(), MPI_SUM);
-      }
-
-
-      /**
-       * Get the total number of nonzeros over all ranks in this
-       * data. To get the total number of nonzeros for the entire
-       * factorization, you should also count the nonzeros of the
-       * original HSS matrix, as that is still required to perform a
-       * solve. __This is collective over all the communicator c.__
-       */
-      std::size_t total_nonzeros(const MPIComm& c) {
-        return c.all_reduce(nonzeros(), MPI_SUM);
       }
 
       /**
@@ -252,9 +223,6 @@ namespace strumpack {
       DistributedMatrix<scalar_t>& Vhat() { return Vt0_; }
 
     private:
-      std::vector<HSSFactorsMPI<scalar_t>> ch_;
-      std::unique_ptr<HSSFactors<scalar_t>> factors_seq_;
-
       // (U.rows-U.cols x U.rows-U.cols), empty at the root
       DistributedMatrix<scalar_t> L_;
 

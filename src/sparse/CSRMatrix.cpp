@@ -465,6 +465,43 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::set_front_elements
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   Triplet<scalar_t>* e11, Triplet<scalar_t>* e12,
+   Triplet<scalar_t>* e21) const {
+    integer_t ds = shi - slo, du = upd.size();
+    for (integer_t row=0; row<ds; row++) { // separator rows
+      integer_t upd_ptr = 0;
+      const auto hij = ptr_[row+slo+1];
+      for (integer_t j=ptr_[row+slo]; j<hij; j++) {
+        integer_t col = ind_[j];
+        if (col >= slo) {
+          if (col < shi)
+            *e11++ = Triplet<scalar_t>(row, col-slo, val_[j]);
+          else {
+            while (upd_ptr<du && upd[upd_ptr]<col) upd_ptr++;
+            if (upd_ptr == du) break;
+            if (upd[upd_ptr] == col)
+              *e12++ = Triplet<scalar_t>(row, upd_ptr, val_[j]);
+          }
+        }
+      }
+    }
+    for (integer_t i=0; i<du; i++) { // update rows
+      auto row = upd[i];
+      const auto hij = ptr_[row+1];
+      for (integer_t j=ptr_[row]; j<hij; j++) {
+        integer_t col = ind_[j];
+        if (col >= slo) {
+          if (col < shi)
+            *e21++ = Triplet<scalar_t>(i, col-slo, val_[j]);
+          else break;
+        }
+      }
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::count_front_elements
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    std::size_t& e11, std::size_t& e12, std::size_t& e21) const {
@@ -1210,6 +1247,7 @@ namespace strumpack {
   template class CSRMatrix<std::complex<double>,long long int>;
 
 
+
   template<typename scalar_t, typename integer_t, typename cast_t>
   CSRMatrix<cast_t,integer_t>
   cast_matrix(const CSRMatrix<scalar_t,integer_t>& mat) {
@@ -1218,10 +1256,40 @@ namespace strumpack {
       (mat.size(), mat.ptr(), mat.ind(), new_val.data(), mat.symm_sparse());
   }
 
+  // explicit template instantiations
   template CSRMatrix<float,int>
   cast_matrix<double,int,float>(const CSRMatrix<double,int>& mat);
+  template CSRMatrix<double,int>
+  cast_matrix<float,int,double>(const CSRMatrix<float,int>& mat);
   template CSRMatrix<std::complex<float>,int>
   cast_matrix<std::complex<double>,int,std::complex<float>>
   (const CSRMatrix<std::complex<double>,int>& mat);
+  template CSRMatrix<std::complex<double>,int>
+  cast_matrix<std::complex<float>,int,std::complex<double>>
+  (const CSRMatrix<std::complex<float>,int>& mat);
+
+  template CSRMatrix<float,long int>
+  cast_matrix<double,long int,float>(const CSRMatrix<double,long int>& mat);
+  template CSRMatrix<double,long int>
+  cast_matrix<float,long int,double>(const CSRMatrix<float,long int>& mat);
+  template CSRMatrix<std::complex<float>,long int>
+  cast_matrix<std::complex<double>,long int,std::complex<float>>
+  (const CSRMatrix<std::complex<double>,long int>& mat);
+  template CSRMatrix<std::complex<double>,long int>
+  cast_matrix<std::complex<float>,long int,std::complex<double>>
+  (const CSRMatrix<std::complex<float>,long int>& mat);
+
+  template CSRMatrix<float,long long int>
+  cast_matrix<double,long long int,float>
+  (const CSRMatrix<double,long long int>& mat);
+  template CSRMatrix<double,long long int>
+  cast_matrix<float,long long int,double>
+  (const CSRMatrix<float,long long int>& mat);
+  template CSRMatrix<std::complex<float>,long long int>
+  cast_matrix<std::complex<double>,long long int,std::complex<float>>
+  (const CSRMatrix<std::complex<double>,long long int>& mat);
+  template CSRMatrix<std::complex<double>,long long int>
+  cast_matrix<std::complex<float>,long long int,std::complex<double>>
+  (const CSRMatrix<std::complex<float>,long long int>& mat);
 
 } // end namespace strumpack

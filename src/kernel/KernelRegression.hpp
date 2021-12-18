@@ -78,7 +78,7 @@ namespace strumpack {
                   << "# factorization start" << std::endl;
       }
       timer.start();
-      auto ULV = H.factor();
+      H.factor();
       if (opts.verbose())
         std::cout << "# factorization time = "
                   << timer.elapsed() << std::endl
@@ -86,7 +86,7 @@ namespace strumpack {
 #if defined(ITERATIVE_REFINEMENT)
       DenseMW_t rhs(n(), 1, labels.data(), n());
       DenseM_t weights(rhs), residual(n(), 1);
-      H.solve(ULV, weights);
+      H.solve(weights);
       auto rhs_normF = rhs.normF();
       using real_t = typename RealType<scalar_t>::value_type;
       for (int ref=0; ref<3; ref++) {
@@ -97,12 +97,12 @@ namespace strumpack {
           std::cout << "||H*weights - labels||_2/||labels||_2 = "
                     << rres << std::endl;
         if (rres < 10*blas::lamch<real_t>('E')) break;
-        H.solve(ULV, residual);
+        H.solve(residual);
         weights.scaled_add(scalar_t(-1.), residual);
       }
 #else // no iterative refinement
       DenseM_t weights(n(), 1, labels.data(), n());
-      H.solve(ULV, weights);
+      H.solve(weights);
 #endif
       if (opts.verbose())
         std::cout << "# solve time = " << timer.elapsed() << std::endl;
@@ -157,7 +157,7 @@ namespace strumpack {
         }
       }
       timer.start();
-      auto ULV = H.factor();
+      H.factor();
       if (verb)
         std::cout << "# factorization time = "
                   << timer.elapsed() << std::endl
@@ -167,7 +167,7 @@ namespace strumpack {
       weights.scatter(cB);
 #if defined(ITERATIVE_REFINEMENT)
       DistM_t rhs(weights), residual(&grid, n(), 1);
-      H.solve(ULV, weights);
+      H.solve(weights);
       auto rhs_normF = rhs.normF();
       using real_t = typename RealType<scalar_t>::value_type;
       for (int ref=0; ref<3; ref++) {
@@ -178,11 +178,11 @@ namespace strumpack {
           std::cout << "||H*weights - labels||_2/||labels||_2 = "
                     << rres << std::endl;
         if (rres < 10*blas::lamch<real_t>('E')) break;
-        H.solve(ULV, residual);
+        H.solve(residual);
         weights.scaled_add(scalar_t(-1.), residual);
       }
 #else // no iterative refinement
-      H.solve(ULV, weights);
+      H.solve(weights);
 #endif
       if (verb)
         std::cout << "# solve time = " << timer.elapsed() << std::endl;

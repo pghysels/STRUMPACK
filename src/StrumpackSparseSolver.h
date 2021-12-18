@@ -77,8 +77,9 @@ typedef enum
    STRUMPACK_BLR=2,
    STRUMPACK_HODLR=3,
    STRUMPACK_BLR_HODLR=4,
-   STRUMPACK_LOSSLESS=5,
-   STRUMPACK_LOSSY=6
+   STRUMPACK_ZFP_BLR_HODLR=5,
+   STRUMPACK_LOSSLESS=6,
+   STRUMPACK_LOSSY=7
   } STRUMPACK_COMPRESSION_TYPE;
 
 typedef enum
@@ -192,12 +193,16 @@ extern "C" {
   STRUMPACK_RETURN_CODE STRUMPACK_solve
   (STRUMPACK_SparseSolver S, const void* b, void* x, int use_initial_guess);
 
+  STRUMPACK_RETURN_CODE STRUMPACK_matsolve
+  (STRUMPACK_SparseSolver S, int nrhs, const void* b, int ldb,
+   void* x, int ldx, int use_initial_guess);
+
   void STRUMPACK_set_from_options(STRUMPACK_SparseSolver S);
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder(STRUMPACK_SparseSolver S);
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular
-  (STRUMPACK_SparseSolver S, int nx, int ny, int nz);
+  (STRUMPACK_SparseSolver S, int nx, int ny, int nz, int components, int width);
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S);
 
@@ -207,11 +212,6 @@ extern "C" {
 
   void STRUMPACK_delete_factors(STRUMPACK_SparseSolver S);
 
-  /*
-    TODO add
-    - routines to update the matrix values!!!!!
-    - solve with multiple rhs??!!!
-  */
 
   /*************************************************************
    ** Set options **********************************************
@@ -223,6 +223,13 @@ extern "C" {
   void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol);
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param);
   void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m);
+  void STRUMPACK_enable_METIS_NodeNDP(STRUMPACK_SparseSolver S);
+  void STRUMPACK_disable_METIS_NodeNDP(STRUMPACK_SparseSolver S);
+  void STRUMPACK_set_nx(STRUMPACK_SparseSolver S, int nx);
+  void STRUMPACK_set_ny(STRUMPACK_SparseSolver S, int ny);
+  void STRUMPACK_set_nz(STRUMPACK_SparseSolver S, int nz);
+  void STRUMPACK_set_components(STRUMPACK_SparseSolver S, int nc);
+  void STRUMPACK_set_separator_width(STRUMPACK_SparseSolver S, int w);
   void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t);
   void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, STRUMPACK_MATCHING_JOB job);
   void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type);
@@ -235,6 +242,7 @@ extern "C" {
   void STRUMPACK_set_compression_rel_tol(STRUMPACK_SparseSolver S, double rctol);
   void STRUMPACK_set_compression_abs_tol(STRUMPACK_SparseSolver S, double actol);
   void STRUMPACK_set_compression_butterfly_levels(STRUMPACK_SparseSolver S, int l);
+  void STRUMPACK_set_compression_lossy_precision(STRUMPACK_SparseSolver S, int p);
 
   /*************************************************************
    ** Get options **********************************************
@@ -246,8 +254,9 @@ extern "C" {
   double STRUMPACK_abs_tol(STRUMPACK_SparseSolver S);
   int STRUMPACK_nd_param(STRUMPACK_SparseSolver S);
   STRUMPACK_REORDERING_STRATEGY STRUMPACK_reordering_method(STRUMPACK_SparseSolver S);
-  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S);
+  int STRUMPACK_use_METIS_NodeNDP(STRUMPACK_SparseSolver S);
   STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S);
+  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S);
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S);
   int STRUMPACK_use_gpu(STRUMPACK_SparseSolver S);
   STRUMPACK_COMPRESSION_TYPE STRUMPACK_compression(STRUMPACK_SparseSolver S);
@@ -257,6 +266,7 @@ extern "C" {
   double STRUMPACK_compression_rel_tol(STRUMPACK_SparseSolver S);
   double STRUMPACK_compression_abs_tol(STRUMPACK_SparseSolver S);
   int STRUMPACK_compression_butterfly_levels(STRUMPACK_SparseSolver S);
+  int STRUMPACK_compression_lossy_precision(STRUMPACK_SparseSolver S);
 
   /*************************************************************
    ** Get solve statistics *************************************

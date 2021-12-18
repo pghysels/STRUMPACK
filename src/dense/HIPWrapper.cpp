@@ -30,6 +30,9 @@
 
 #include <hip/hip_runtime.h>
 #include "HIPWrapper.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
 
 namespace strumpack {
   namespace gpu {
@@ -83,6 +86,19 @@ namespace strumpack {
       }
     }
 
+    void init() {
+#if defined(STRUMPACK_USE_MPI)
+      int devs;
+      hipGetDeviceCount(&devs);
+      if (devs > 1) {
+        MPIComm c;
+        hipSetDevice(c.rank() % devs);
+      }
+#endif
+      gpu_check(hipFree(0));
+      gpu::BLASHandle hb;
+      gpu::SOLVERHandle hs;
+    }
 
     void gemm(BLASHandle& handle, hipblasOperation_t transa,
               hipblasOperation_t transb, int m, int n, int k,

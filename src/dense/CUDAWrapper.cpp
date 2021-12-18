@@ -29,6 +29,9 @@
 #include <stdlib.h>
 
 #include "CUDAWrapper.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
 
 namespace strumpack {
   namespace gpu {
@@ -99,6 +102,19 @@ namespace strumpack {
       }
     }
 
+    void init() {
+#if defined(STRUMPACK_USE_MPI)
+      int devs;
+      cudaGetDeviceCount(&devs);
+      if (devs > 1) {
+        MPIComm c;
+        cudaSetDevice(c.rank() % devs);
+      }
+#endif
+      gpu_check(cudaFree(0));
+      gpu::BLASHandle hb;
+      gpu::SOLVERHandle hs;
+    }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,
               cublasOperation_t transb, int m, int n, int k,

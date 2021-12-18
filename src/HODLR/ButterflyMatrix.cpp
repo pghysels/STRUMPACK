@@ -35,8 +35,15 @@
 #include "HODLRWrapper.hpp"
 
 namespace strumpack {
-
   namespace HODLR {
+
+    template<typename scalar_t> ButterflyMatrix<scalar_t>::ButterflyMatrix
+    (const MPIComm& comm, const structured::ClusterTree& row_tree,
+     const structured::ClusterTree& col_tree, const opts_t& opts)
+      : ButterflyMatrix<scalar_t>
+      (HODLRMatrix<scalar_t>(comm, row_tree, opts),
+       HODLRMatrix<scalar_t>(comm, col_tree, opts)) {
+    }
 
     template<typename scalar_t> ButterflyMatrix<scalar_t>::ButterflyMatrix
     (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B)
@@ -77,6 +84,45 @@ namespace strumpack {
       std::pair<std::vector<int>,std::vector<int>> rmaps, cmaps;
       const DenseMatrix<bool>* adm;
     };
+
+    template<typename scalar_t> void
+    ButterflyMatrix<scalar_t>::options_init(const opts_t& opts) {
+      auto P = c_->size();
+      std::vector<int> groups(P);
+      std::iota(groups.begin(), groups.end(), 0);
+
+      // create hodlr data structures
+      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
+      HODLR_createoptions<scalar_t>(options_);
+      HODLR_createstats<scalar_t>(stats_);
+
+      // set hodlr options
+      HODLR_set_I_option<scalar_t>(options_, "verbosity", opts.verbose() ? 2 : -2);
+      // HODLR_set_I_option<scalar_t>(options_, "Nbundle", 8);
+      // HODLR_set_I_option<scalar_t>(options_, "rmax", 10000);
+      HODLR_set_I_option<scalar_t>(options_, "nogeo", 1);
+      HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", rows_);
+      // set RecLR_leaf to 2 for RRQR at bottom level of Hierarchical BACA
+      HODLR_set_I_option<scalar_t>(options_, "RecLR_leaf", opts.lr_leaf()); // 5 = new version of BACA
+      HODLR_set_I_option<scalar_t>(options_, "BACA_Batch", opts.BACA_block_size());
+      HODLR_set_I_option<scalar_t>(options_, "xyzsort", 0);
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // block extraction
+      // set ErrFillFull to 1 to check acc for extraction code
+      //HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", opts.verbose() ? 1 : 0);
+      HODLR_set_I_option<scalar_t>(options_, "ErrFillFull", 0);
+      HODLR_set_I_option<scalar_t>(options_, "rank0", opts.rank_guess());
+      HODLR_set_I_option<scalar_t>(options_, "less_adapt", opts.less_adapt()); // 0 or 1
+      HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", opts.BF_entry_n15()); // 0 or 1
+      HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
+      HODLR_set_D_option<scalar_t>(options_, "sample_para", opts.BF_sampling_parameter());
+      HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", opts.BF_sampling_parameter());
+      HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
+      if (opts.butterfly_levels() > 0)
+        HODLR_set_I_option<scalar_t>(options_, "LRlevel", opts.butterfly_levels());
+      HODLR_set_D_option<scalar_t>(options_, "tol_comp", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_rand", opts.rel_tol());
+      HODLR_set_D_option<scalar_t>(options_, "tol_Rdetect", 0.1*opts.rel_tol());
+    }
 
     /**
      * This is not used now, but could be useful for the H format.

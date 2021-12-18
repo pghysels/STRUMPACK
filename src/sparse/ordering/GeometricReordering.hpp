@@ -33,7 +33,6 @@
 #include <memory>
 
 #include "StrumpackOptions.hpp"
-#include "HSS/HSSPartitionTree.hpp"
 #include "sparse/SeparatorTree.hpp"
 #include "sparse/CSRMatrix.hpp"
 

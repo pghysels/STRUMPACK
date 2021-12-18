@@ -42,7 +42,6 @@ endif()
 
 # TODO AWPMCombBLAS.hpp
 
-add_subdirectory(iterative)
 add_subdirectory(fronts)
 add_subdirectory(ordering)
 add_subdirectory(MUMPS)

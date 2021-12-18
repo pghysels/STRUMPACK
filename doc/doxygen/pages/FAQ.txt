@@ -1,6 +1,14 @@
 /*! \page FAQ FAQ
 
 
+### "Library not loaded" error at runtime
+
+  On MAC you probably need to set
+  \code{.bash}
+export DYLD_LIBRARY_PATH=PATH-TO-STRUMPACK-LIB/:$DYLD_LIBRARY_PATH
+export LD_LIBRARY_PATH=PATH-TO-STRUMPACK-LIB/:$LD_LIBRARY_PATH
+  \endcode
+
 ### The code crashes with a segmentation fault whenever I use more than one MPI rank!?
 
   This is most likely due to an incorrect library being linked.  When
@@ -40,9 +48,6 @@
   processes. If you have less than 19 cores in your system, and the
   mpi environment does not allow oversubscription, those tests will
   fail.
-
-  The test executables are not build by default, but can be build
-  using \code{.bash} make tests \endcode
 
 
 ### Does the code keep track of the number of floating point operations performed?

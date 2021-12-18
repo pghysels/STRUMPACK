@@ -1,4 +1,4 @@
-/*! \page prec Sparse Preconditioners
+/*! \page prec Preconditioners
 
 - \subpage BLR_Preconditioning "Block Low Rank (BLR) Preconditioning"
 - \subpage HOD_Preconditioning "HODLR & Butterfly Preconditioning"

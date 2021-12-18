@@ -267,14 +267,14 @@ int run(int argc, char* argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (!mpi_rank()) cout << "# computing ULV factorization of HSS matrix .. ";
-  auto ULV = H.factor();
+  H.factor();
   if (!mpi_rank()) cout << "Done!" << endl;
 
   if (!mpi_rank()) cout << "# solving linear system .." << endl;
   DistributedMatrix<double> B(&grid, m, n);
   B.random();
   DistributedMatrix<double> C(B);
-  H.solve(ULV, C);
+  H.solve(C);
 
   DistributedMatrix<double> Bcheck(&grid, m, n);
   apply_HSS(Trans::N, H, C, 0., Bcheck);

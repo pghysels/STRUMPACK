@@ -45,57 +45,52 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontalMatrixHSSMPI
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd, const MPIComm& comm, int _total_procs);
+    FrontalMatrixHSSMPI(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                        std::vector<integer_t>& upd, const MPIComm& comm,
+                        int _total_procs);
     FrontalMatrixHSSMPI(const FrontalMatrixHSSMPI&) = delete;
     FrontalMatrixHSSMPI& operator=(FrontalMatrixHSSMPI const&) = delete;
 
     void release_work_memory() override;
 
-    void random_sampling
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-     const DistM_t& R, DistM_t& Sr, DistM_t& Sc);
-    void sample_CB
-    (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const override;
-    void sample_children_CB
-    (const SPOptions<scalar_t>& opts, const DistM_t& R,
-     DistM_t& Sr, DistM_t& Sc);
+    void random_sampling(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                         const DistM_t& R, DistM_t& Sr, DistM_t& Sc);
+    void sample_CB(const DistM_t& R, DistM_t& Sr,
+                   DistM_t& Sc, F_t* pa) const override;
+    void sample_children_CB(const SPOptions<scalar_t>& opts, const DistM_t& R,
+                            DistM_t& Sr, DistM_t& Sc);
 
-    void multifrontal_factorization
-    (const SpMat_t& A, const Opts_t& opts, int etree_level=0,
-     int task_depth=0) override;
+    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                    int etree_level=0,
+                                    int task_depth=0) override;
 
-    void forward_multifrontal_solve
-    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
-     int etree_level=0) const override;
-    void backward_multifrontal_solve
-    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
-     int etree_level=0) const override;
+    void forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,
+                                    DistM_t& bupd, DenseM_t& seqbupd,
+                                    int etree_level=0) const override;
+    void backward_multifrontal_solve(DenseM_t& yloc, DistM_t* ydist,
+                                     DistM_t& yupd, DenseM_t& seqyupd,
+                                     int etree_level=0) const override;
 
-    void element_extraction
-    (const SpMat_t& A,
-     const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DistMW_t>& B) const;
+    void element_extraction(const SpMat_t& A,
+                            const std::vector<std::vector<std::size_t>>& I,
+                            const std::vector<std::vector<std::size_t>>& J,
+                            std::vector<DistMW_t>& B) const;
 
-    void extract_CB_sub_matrix_2d
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DistM_t>& B) const override;
+    void
+    extract_CB_sub_matrix_2d(const std::vector<std::vector<std::size_t>>& I,
+                             const std::vector<std::vector<std::size_t>>& J,
+                             std::vector<DistM_t>& B) const override;
 
     long long node_factor_nonzeros() const override;
     integer_t front_rank(int task_depth=0) const override;
     bool isHSS() const override { return true; };
     std::string type() const override { return "FrontalMatrixHSSMPI"; }
 
-    void partition
-    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
-     bool is_root=true, int task_depth=0) override;
+    void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+                   bool is_root=true, int task_depth=0) override;
 
   private:
     std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>> H_;
-    HSS::HSSFactorsMPI<scalar_t> ULV_;
 
     // TODO get rid of this!!!
     mutable std::unique_ptr<HSS::WorkSolveMPI<scalar_t>> ULVwork_;

@@ -1,3 +1,49 @@
+Version 6.2.1 Released November 2021
+====================================
+- HIP compilation fix
+- Change default minimum front size for compression to very large
+  values, use minimum separator size instead.
+
+
+Version 6.2.0 Released November 2021
+====================================
+Bugfix release, with some changes in the C interface.
+- Additions to the C interface for the sparse solver:
+  . Solve with multiple RHS
+  . Specify grid dimensions, stencil, for geometric ordering
+  . Fix typo in GPU enabling routine
+  . Set lossy precision
+- Bugfix in passing grid via options object
+- Bugfix in LOSSY/LOSSLESS compression using ZFP
+- Compilation fix for nvcc not finding MPI when the CXX/C
+  compilers are set to the MPI wrappers
+- Fix Fortran module case in CMake when using CCE
+- Disable GPU if CUDA/HIP are not enabled
+
+
+Version 6.1.0 Released October 2021
+===================================
+- Change default BLR blocksize, and in the BLR preconditioner use
+  right-looking algorithm as the default. This has higher peak
+  memory usage, but is much faster and more robust.
+- Fixes in printing of compression statistics.
+- Always build the test when doing 'make', you no longer have to
+  run 'make tests'.
+- Setup CI at github and gitlab, remove Travis testing.
+
+
+Version 6.0.0 Released September 2021
+=====================================
+- Block Low-Rank compression is now supported in the sparse
+  solver, resulting in an efficient, scalable and robust
+  precoditioner.
+- Improved GPU performance for the sparse direct solver
+- Add the StructuredMatrix class, for a general interface to
+  different rank structured formats. This also comes with a C and a
+  Fortran interface.
+- Several performance improvements
+
+
 Version 5.1.1 Released January 22, 2021
 =======================================
 - Small change in the build script for using HIP/ROCm. See

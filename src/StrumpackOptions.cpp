@@ -40,26 +40,26 @@ namespace strumpack {
 
   std::string get_name(ReorderingStrategy method) {
     switch (method) {
-    case ReorderingStrategy::NATURAL: return "Natural"; break;
-    case ReorderingStrategy::METIS: return "Metis"; break;
-    case ReorderingStrategy::SCOTCH: return "Scotch"; break;
-    case ReorderingStrategy::GEOMETRIC: return "Geometric"; break;
-    case ReorderingStrategy::PARMETIS: return "ParMetis"; break;
-    case ReorderingStrategy::PTSCOTCH: return "PTScotch"; break;
-    case ReorderingStrategy::RCM: return "RCM"; break;
+    case ReorderingStrategy::NATURAL: return "Natural";
+    case ReorderingStrategy::METIS: return "Metis";
+    case ReorderingStrategy::SCOTCH: return "Scotch";
+    case ReorderingStrategy::GEOMETRIC: return "Geometric";
+    case ReorderingStrategy::PARMETIS: return "ParMetis";
+    case ReorderingStrategy::PTSCOTCH: return "PTScotch";
+    case ReorderingStrategy::RCM: return "RCM";
     }
     return "UNKNOWN";
   }
 
   bool is_parallel(ReorderingStrategy method) {
     switch (method) {
-    case ReorderingStrategy::NATURAL: return false; break;
-    case ReorderingStrategy::METIS: return false; break;
-    case ReorderingStrategy::SCOTCH: return false; break;
-    case ReorderingStrategy::GEOMETRIC: return true; break;
-    case ReorderingStrategy::PARMETIS: return true; break;
-    case ReorderingStrategy::PTSCOTCH: return true; break;
-    case ReorderingStrategy::RCM: return false; break;
+    case ReorderingStrategy::NATURAL: return false;
+    case ReorderingStrategy::METIS: return false;
+    case ReorderingStrategy::SCOTCH: return false;
+    case ReorderingStrategy::GEOMETRIC: return true;
+    case ReorderingStrategy::PARMETIS: return true;
+    case ReorderingStrategy::PTSCOTCH: return true;
+    case ReorderingStrategy::RCM: return false;
     }
     return false;
   }
@@ -71,6 +71,7 @@ namespace strumpack {
     case CompressionType::BLR: return "blr";
     case CompressionType::HODLR: return "hodlr";
     case CompressionType::BLR_HODLR: return "blr_hodlr";
+    case CompressionType::ZFP_BLR_HODLR: return "zfp_blr_hodlr";
     case CompressionType::LOSSY: return "lossy";
     case CompressionType::LOSSLESS: return "lossless";
     }
@@ -102,6 +103,14 @@ namespace strumpack {
     return "UNKNOWN";
   }
 
+  std::string get_name(ProportionalMapping pmap) {
+    switch (pmap) {
+    case ProportionalMapping::FLOPS: return "FLOPS";
+    case ProportionalMapping::FACTOR_MEMORY: return "FACTOR_MEMORY";
+    case ProportionalMapping::PEAK_MEMORY: return "PEAK_MEMORY";
+    }
+    return "UNKNOWN";
+  }
 
   template<typename scalar_t> void SPOptions<scalar_t>::set_from_command_line
   (int argc, const char* const* cargv) {
@@ -148,7 +157,7 @@ namespace strumpack {
        {"sp_components",                required_argument, 0, 32},
        {"sp_separator_width",           required_argument, 0, 33},
        {"sp_write_root_front",          no_argument, 0, 34},
-       {"sp_print_root_front_stats",    no_argument, 0, 35},
+       {"sp_print_compressed_front_stats", no_argument, 0, 35},
        {"sp_enable_gpu",                no_argument, 0, 36},
        {"sp_disable_gpu",               no_argument, 0, 37},
        {"sp_gpu_streams",               required_argument, 0, 38},
@@ -162,6 +171,7 @@ namespace strumpack {
        {"sp_lossy_min_sep_size",        required_argument, 0, 46},
        {"sp_lossy_min_front_size",      required_argument, 0, 47},
        {"sp_nd_planar_levels",          required_argument, 0, 48},
+       {"sp_proportional_mapping",      required_argument, 0, 49},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -256,11 +266,12 @@ namespace strumpack {
         else if (s == "BLR") set_compression(CompressionType::BLR);
         else if (s == "HODLR") set_compression(CompressionType::HODLR);
         else if (s == "BLR_HODLR") set_compression(CompressionType::BLR_HODLR);
+        else if (s == "ZFP_BLR_HODLR") set_compression(CompressionType::ZFP_BLR_HODLR);
         else if (s == "LOSSY") set_compression(CompressionType::LOSSY);
         else if (s == "LOSSLESS") set_compression(CompressionType::LOSSLESS);
         else std::cerr << "# WARNING: compression type not"
                " recognized, use 'none', 'hss', 'blr', 'hodlr',"
-               " 'blr_hodlr', 'lossy' or 'lossless'" << std::endl;
+               " 'blr_hodlr', 'zfp_blr_hodlr', 'lossy' or 'lossless'" << std::endl;
       } break;
       case 21: {
         std::istringstream iss(optarg);
@@ -315,7 +326,7 @@ namespace strumpack {
         set_separator_width(separator_width_);
       } break;
       case 34: set_write_root_front(true); break;
-      case 35: set_print_root_front_stats(true); break;
+      case 35: set_print_compressed_front_stats(true); break;
       case 36: enable_gpu(); break;
       case 37: disable_gpu(); break;
       case 38: {
@@ -381,6 +392,16 @@ namespace strumpack {
         iss >> nd_planar_levels_;
         set_nd_planar_levels(nd_planar_levels_);
       } break;
+      case 49: {
+        std::string s; std::istringstream iss(optarg); iss >> s;
+        for (auto& c : s) c = std::toupper(c);
+        if (s == "FLOPS") set_proportional_mapping(ProportionalMapping::FLOPS);
+        else if (s == "FACTOR_MEMORY") set_proportional_mapping(ProportionalMapping::FACTOR_MEMORY);
+        else if (s == "PEAK_MEMORY") set_proportional_mapping(ProportionalMapping::PEAK_MEMORY);
+        else std::cerr << "# WARNING: proportional-mapping type not"
+               " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
+                       << std::endl;
+      } break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -421,8 +442,8 @@ namespace strumpack {
               << " stopping tolerance" << std::endl;
     std::cout << "#   --sp_Krylov_solver [auto|direct|refinement|pgmres|"
               << "gmres|pbicgstab|bicgstab]" << std::endl;
-    std::cout << "#          default: auto (refinement when no HSS, pgmres"
-              << " (preconditioned) with HSS compression)" << std::endl;
+    std::cout << "#          default: auto (refinement when using compression, pgmres"
+              << " (preconditioned) with compression)" << std::endl;
     std::cout << "#   --sp_gmres_restart int (default " << gmres_restart()
               << ")" << std::endl;
     std::cout << "#          gmres restart length" << std::endl;
@@ -478,7 +499,9 @@ namespace strumpack {
     for (int i=0; i<7; i++)
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
-    std::cout << "#   --sp_compression [none|hss|blr|hodlr|lossy|blr_hodlr]" << std::endl
+    std::cout << "#   --sp_compression (default "
+              << get_name(comp_) << ")" << std::endl 
+              << "#          should be [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;
     std::cout << "#   --sp_compression_min_sep_size (default "
@@ -500,7 +523,12 @@ namespace strumpack {
     std::cout << "#   --sp_enable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_disable_replace_tiny_pivots" << std::endl;
     std::cout << "#   --sp_write_root_front" << std::endl;
-    std::cout << "#   --sp_print_root_front_stats" << std::endl;
+    std::cout << "#   --sp_print_compressed_front_stats" << std::endl;
+    std::cout << "#   --sp_proportional_mapping (default "
+              << get_name(prop_map_) << ")" << std::endl
+              << "#          should be [FLOPS|FACTOR_MEMORY|PEAK_MEMORY]" << std::endl
+              << "#          type of proportional mapping"
+              << std::endl;
     std::cout << "#   --sp_enable_gpu" << std::endl;
     std::cout << "#   --sp_disable_gpu" << std::endl;
     std::cout << "#   --sp_gpu_streams (default "

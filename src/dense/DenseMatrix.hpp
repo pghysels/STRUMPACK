@@ -36,6 +36,7 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 
 #include "misc/RandomWrapper.hpp"
 #include "BLASLAPACKWrapper.hpp"
@@ -159,6 +160,17 @@ namespace strumpack {
      * \param n Number of columns in the constructed matrix.
      */
     DenseMatrix(std::size_t m, std::size_t n);
+
+    /**
+     * Constructs, and allocates, an m x n dense matrix, using column
+     * major storage. The leading dimension will be max(1, m).
+     *
+     * \param m Number of rows in the constructed matrix.
+     * \param n Number of columns in the constructed matrix.
+     * \param A routine to compute each element
+     */
+    DenseMatrix(std::size_t m, std::size_t n,
+                const std::function<scalar_t(std::size_t,std::size_t)>& A);
 
     /**
      * Construct/allocate a dense m x n matrix, and initialize it by
@@ -341,8 +353,20 @@ namespace strumpack {
     void random(random::RandomGeneratorBase<typename RealType<scalar_t>::
                 value_type>& rgen);
 
-    /** Fill matrix with a constant value */
+    /**
+     * Fill matrix with a constant value
+     *
+     * \param v value to set
+     */
     void fill(scalar_t v);
+
+    /**
+     * Fill matrix using a routine to compute values
+     *
+     * \param A routine, can be lambda, functor or function
+     * pointer. Takes row i, column j and should return value at i, j.
+     */
+    void fill(const std::function<scalar_t(std::size_t,std::size_t)>& A);
 
     /** Set all matrix elements to zero */
     void zero();

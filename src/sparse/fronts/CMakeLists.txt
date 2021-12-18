@@ -6,6 +6,7 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDense.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHSS.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHSS.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixBLR.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixBLR.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontFactory.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrix.hpp)

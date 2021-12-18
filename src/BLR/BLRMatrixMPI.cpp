@@ -78,6 +78,18 @@ namespace strumpack {
           }
     }
 
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, std::size_t k, std::size_t CP) {
+      std::size_t j_end = std::min(k + CP, colblocks());
+      for (std::size_t i=0; i<brows_; i++)
+        for (std::size_t j=k; j<j_end; j++)
+          if (grid_->is_local(i, j)) {
+            block(i, j).reset
+              (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
+            block(i, j)->D().fill(v);
+          }
+    }
+
     template<typename scalar_t> std::size_t
     BLRMatrixMPI<scalar_t>::memory() const {
       std::size_t mem = 0;
@@ -101,7 +113,7 @@ namespace strumpack {
 
     template<typename scalar_t> std::size_t
     BLRMatrixMPI<scalar_t>::total_memory() const {
-        return Comm().all_reduce(memory(), MPI_SUM);
+      return Comm().all_reduce(memory(), MPI_SUM);
     }
     template<typename scalar_t> std::size_t
     BLRMatrixMPI<scalar_t>::total_nonzeros() const {
@@ -165,13 +177,43 @@ namespace strumpack {
       return cl2g_[j];
     }
 
-    template<typename scalar_t> const scalar_t&
+    template<typename scalar_t> scalar_t
     BLRMatrixMPI<scalar_t>::operator()(std::size_t i, std::size_t j) const {
       return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
     }
     template<typename scalar_t> scalar_t&
     BLRMatrixMPI<scalar_t>::operator()(std::size_t i, std::size_t j) {
       return ltile_dense(rl2t_[i], cl2t_[j]).D()(rl2l_[i], cl2l_[j]);
+    }
+
+    template<typename scalar_t> scalar_t
+    BLRMatrixMPI<scalar_t>::get_element_and_decompress_HODBF
+    (int tr, int tc, int lr, int lc) {
+      if (ltile(tr, tc).is_low_rank())
+        lblock(tr, tc).reset(new DenseTile<scalar_t>(ltile(tr, tc).dense()));
+      return ltile_dense(tr,tc).D()(lr,lc);
+    }
+
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::remove_tiles_before_local_column
+    (int c_min, int c_max) {
+      auto ltc_max = cl2t_[c_max-1];
+      auto ltr_max = rowblockslocal();
+      for (std::size_t c=cl2t_[c_min]; c<ltc_max; c++)
+        for (std::size_t r=0; r<ltr_max; r++)
+          lblock(r, c) = nullptr;
+    }
+
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::decompress_local_columns(int c_min, int c_max) {
+      auto ltc_max = cl2t_[c_max-1];
+      auto ltr_max = rowblockslocal();
+      for (std::size_t c=cl2t_[c_min]; c<=ltc_max; c++)
+        for (std::size_t r=0; r<ltr_max; r++) {
+          auto& b = lblock(r, c);
+          if (b && b->is_low_rank())
+            b.reset(new DenseTile<scalar_t>(b->dense()));
+        }
     }
 
     template<typename scalar_t> const scalar_t&
@@ -387,6 +429,1038 @@ namespace strumpack {
       return Tij;
     }
 
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_row
+    (std::size_t i0, std::size_t k, std::size_t j0, std::size_t j1) const {
+      std::size_t msg_size = 0, nr_tiles=0;
+      std::vector<std::int64_t> ranks;
+      if (j0 > 0) {
+        //CASE 1: broadcast tile (k,j0) to column j0 (col_comm)
+        if (grid()->is_local_col(j0)) {
+          if (grid()->is_local_row(k)) {
+            msg_size += tile(k, j0).nonzeros();
+            ranks.push_back(tile(k, j0).is_low_rank() ?
+                            tile(k, j0).rank() : -1);
+            nr_tiles++;
+          } else {
+            nr_tiles++;
+            ranks.resize(nr_tiles);
+          }
+        }
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      //CASE 1: broadcast tile (k,j0) to all processes in col j0
+      std::vector<scalar_t> buf;
+      //CASE 1
+      if (j0 > 0) {
+        if (grid()->is_local_col(j0)) {
+          ranks.push_back(msg_size);
+          int src = k % grid()->nprows();
+          grid()->col_comm().broadcast_from(ranks, src);
+          msg_size = ranks.back();
+          buf.resize(msg_size);
+          auto ptr = buf.data();
+          if (grid()->is_local_row(k)) {
+            auto& t = tile(k, j0);
+            if (t.is_low_rank()) {
+              std::copy(t.U().data(), t.U().end(), ptr);
+              ptr += t.U().rows()*t.U().cols();
+              std::copy(t.V().data(), t.V().end(), ptr);
+              ptr += t.V().rows()*t.V().cols();
+            } else {
+              std::copy(t.D().data(), t.D().end(), ptr);
+              ptr += t.D().rows()*t.D().cols();
+            }
+          }
+          grid()->col_comm().broadcast_from(buf, src);
+        }
+      }
+      //CASE 2: cols j0+1:end, send from k to i0
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      std::size_t col_cnt=0;
+      if (grid()->is_local_row(k)) {
+        for (std::size_t j=j0; j<j1; j++) {
+          if ((j == 0 && j0 == j) || (j0 != j)) {
+            if (grid()->is_local_col(j)) {
+              msg_size2 += tile(k, j).nonzeros();
+              ranks2.push_back(tile(k, j).is_low_rank() ?
+                               tile(k, j).rank() : -1);
+              col_cnt++;
+            }
+          }
+        }
+      } else if (grid()->is_local_row(i0)) {
+        for (std::size_t j=j0; j<j1; j++) {
+          if ((j == 0 && j0 == j) || (j0 != j)) {
+            if (grid()->is_local_col(j))
+              col_cnt++;
+          }
+        }
+        ranks2.resize(col_cnt);
+      }
+      std::vector<scalar_t> buf2;
+      //CASE 2: cols j0+1:end, send from k to i0
+      if (col_cnt != 0) {
+        MPI_Request sreq;
+        int ddest = i0 % grid()->nprows();
+        int ssend = k % grid()->nprows();
+        ranks2.push_back(msg_size2);
+        if (grid()->is_local_row(k))
+          grid()->col_comm().isend
+            (ranks2.data(), ranks2.size(), ddest, 0, &sreq);
+        if (grid()->is_local_row(i0))
+          grid()->col_comm().irecv
+            (ranks2.data(), ranks2.size(), ssend, 0, &sreq);
+        if (grid()->is_local_row(i0) || grid()->is_local_row(k))
+          MPI_Wait(&sreq, MPI_STATUS_IGNORE);
+        if (grid()->is_local_row(k)) {
+          buf2.resize(msg_size2);
+          auto ptr = buf2.data();
+          for (std::size_t j=j0; j<j1; j++) {
+            if ((j == 0 && j0 == j) || (j0 != j)) {
+              if (grid()->is_local_col(j)) {
+                auto& t = tile(k, j);
+                if (t.is_low_rank()) {
+                  std::copy(t.U().data(), t.U().end(), ptr);
+                  ptr += t.U().rows()*t.U().cols();
+                  std::copy(t.V().data(), t.V().end(), ptr);
+                  ptr += t.V().rows()*t.V().cols();
+                } else {
+                  std::copy(t.D().data(), t.D().end(), ptr);
+                  ptr += t.D().rows()*t.D().cols();
+                }
+              }
+            }
+          }
+          grid()->col_comm().isend(buf2.data(), buf2.size(), ddest, 1, &sreq);
+        }
+        if (grid()->is_local_row(i0)) {
+          msg_size2 = ranks2.back();
+          buf2.resize(msg_size2);
+          grid()->col_comm().irecv(buf2.data(), buf2.size(), ssend, 1, &sreq);
+          //buf2 = grid()->col_comm().template recv<scalar_t>(ssend, 0);
+          nr_tiles += col_cnt;
+        }
+        if (grid()->is_local_row(i0) || grid()->is_local_row(k))
+          MPI_Wait(&sreq, MPI_STATUS_IGNORE);
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      //CASE 1
+      if (j0 > 0) {
+        if (grid()->is_local_col(j0)) {
+          auto ptr = buf.data();
+          auto n = tilecols(j0);
+          auto m = tilerows(k);
+          auto r = ranks[0];
+          if (r != -1) {
+            auto t = new LRTile<scalar_t>(m, n, r);
+            std::copy(ptr, ptr+m*r, t->U().data());  ptr += m*r;
+            std::copy(ptr, ptr+r*n, t->V().data());  ptr += r*n;
+            Tij.emplace_back(t);
+          } else {
+            auto t = new DenseTile<scalar_t>(m, n);
+            std::copy(ptr, ptr+m*n, t->D().data());  ptr += m*n;
+            Tij.emplace_back(t);
+          }
+        }
+      }
+      //CASE 2
+      if (grid()->is_local_row(i0)) {
+        if (col_cnt != 0) {
+          auto ptr = buf2.data();
+          auto m = tilerows(k);
+          for (std::size_t j=j0, cntr=0; j<j1; j++) {
+            if ((j == 0 && j0 == j) || (j0 != j)) {
+              if (grid()->is_local_col(j)) {
+                auto n = tilecols(j);
+                auto r = ranks2[cntr];
+                if (r != -1) {
+                  auto t = new LRTile<scalar_t>(m, n, r);
+                  std::copy(ptr, ptr+m*r, t->U().data());  ptr += m*r;
+                  std::copy(ptr, ptr+r*n, t->V().data());  ptr += r*n;
+                  Tij.emplace_back(t);
+                } else {
+                  auto t = new DenseTile<scalar_t>(m, n);
+                  std::copy(ptr, ptr+m*n, t->D().data());  ptr += m*n;
+                  Tij.emplace_back(t);
+                }
+                cntr++;
+              }
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_rows
+    (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
+      //TODO: avoid resending, instead gather and forward tiles after update step
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      if (j0 > 0) {
+        //CASE 1: allgather tiles in rows 0:i0-1 of col j0 into column j0
+        if (grid()->is_local_col(j0)) {
+          for (std::size_t i=0; i<i0; i++) {
+            if (grid()->is_local_row(i)) {
+              msg_size += tile(i, j0).nonzeros();
+              ranks.push_back(tile(i, j0).is_low_rank() ?
+                              tile(i, j0).rank() : -1);
+            }
+          }
+        }
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      //CASE 1: send tiles of row 0:i0-1 to all processes in col j0
+      std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts, tile_displs, displs;
+      if (j0 > 0) {
+        if (grid()->is_local_col(j0)) {
+          ranks.push_back(msg_size);
+          rcnts.resize(grid()->nprows());
+          rcnts[grid()->prow()]=ranks.size();
+          grid()->col_comm().all_gather(rcnts.data(), 1);
+          displs.resize(grid()->nprows());
+          for (std::size_t i=1; i<rcnts.size(); i++) {
+            displs[i]=displs[i-1]+rcnts[i-1];
+          }
+          all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
+          nr_tiles=all_ranks.size()-rcnts.size();
+          std::copy(ranks.begin(), ranks.end(),
+                    all_ranks.begin()+displs[grid()->prow()]);
+          grid()->col_comm().all_gather_v
+            (all_ranks.data(), rcnts.data(), displs.data());
+          std::size_t total_msg_size = 0;
+          for (std::size_t i=0; i<rcnts.size(); i++) {
+            total_msg_size += all_ranks[displs[i]+rcnts[i]-1];
+          }
+          buf.resize(total_msg_size);
+          std::vector<int> tile_rcnts(grid()->nprows());
+          for (int i=0; i<grid()->nprows(); i++)
+            tile_rcnts[i] = all_ranks[displs[i]+rcnts[i]-1];
+          tile_displs.resize(grid()->nprows());
+          for (std::size_t i=1; i<tile_rcnts.size(); i++) {
+            tile_displs[i]=tile_displs[i-1]+tile_rcnts[i-1];
+          }
+          auto ptr = buf.data() + tile_displs[grid()->prow()];
+          for (std::size_t i=0; i<i0; i++) {
+            if (grid()->is_local_row(i)) {
+              auto& t = tile(i, j0);
+              if (tile(i, j0).is_low_rank()) {
+                std::copy(t.U().data(), t.U().end(), ptr);
+                ptr += t.U().rows()*t.U().cols();
+                std::copy(t.V().data(), t.V().end(), ptr);
+                ptr += t.V().rows()*t.V().cols();
+              } else {
+                std::copy(t.D().data(), t.D().end(), ptr);
+                ptr += t.D().rows()*t.D().cols();
+              }
+            }
+          }
+          grid()->col_comm().all_gather_v
+            (buf.data(), tile_rcnts.data(), tile_displs.data());
+        }
+      }
+      //CASE 2: cols j0+1:end, gather in proc in row i0
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      for (std::size_t j=j0; j<j1; j++) {
+        if ((j == 0 && j0 == j) || (j0 != j)) {
+          if (grid()->is_local_col(j)) {
+            for (std::size_t i=0; i<i0; i++) {
+              if (grid()->is_local_row(i)) {
+                msg_size2 += tile(i, j).nonzeros();
+                ranks2.push_back(tile(i, j).is_low_rank() ?
+                                 tile(i, j).rank() : -1);
+              }
+            }
+          }
+        }
+      }
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts2, tile_displs2, displs2;
+      std::size_t rcnts_empty=0;
+      std::size_t col_cnt=0;
+      //CASE 2: cols j0+1:end, gather in proc in row i0
+      for (int j=0; j<grid()->npcols(); j++) {
+        if (grid()->pcol() == j % grid()->npcols()) {
+          for (std::size_t k=j0; k<j1; k++) {
+            if ((k == 0 && j0 == k) || (j0 != k)) {
+              if (grid()->is_local_col(k))
+                col_cnt++;
+            }
+          }
+          if (col_cnt!=0) {
+            int src = i0 % grid()->nprows();
+            if (!(ranks2.empty())) ranks2.push_back(msg_size2);
+            if (grid()->prow() == src && ranks2.empty())
+              ranks2.push_back(msg_size2);
+            int scnt=0;
+            if (grid()->prow() == src) {
+              rcnts2.resize(grid()->nprows());
+              rcnts2[grid()->prow()]=ranks2.size();
+              scnt=ranks2.size();
+            } else
+              scnt=ranks2.size();
+            grid()->col_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
+            if (grid()->prow() == src) {
+              displs2.resize(grid()->nprows());
+              displs2[0]=0;
+              for (std::size_t i=1; i<rcnts2.size(); i++)
+                displs2[i]=displs2[i-1]+rcnts2[i-1];
+              all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
+              std::copy(ranks2.begin(), ranks2.end(),
+                        all_ranks2.begin()+displs2[grid()->prow()]); //?? works if ranks empty??
+              for (std::size_t i=0; i<rcnts2.size(); i++) {
+                if (rcnts2[i]==0) rcnts_empty++;
+              }
+              nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+            }
+            grid()->col_comm().gather_v
+              (ranks2.data(), scnt, all_ranks2.data(),
+               rcnts2.data(), displs2.data(), src);
+            std::vector<int> tile_rcnts;
+            if (grid()->prow() == src) {
+              std::size_t total_msg_size = 0;
+              for (std::size_t i=0; i<rcnts2.size(); i++) {
+                if (rcnts2[i] == 0)
+                  total_msg_size += 0;
+                else
+                  total_msg_size += all_ranks2[displs2[i]+rcnts2[i]-1];
+              }
+              buf2.resize(total_msg_size);
+              tile_rcnts.resize(grid()->nprows());
+              for (int i=0; i<grid()->nprows(); i++) {
+                if (rcnts2[i] == 0)
+                  tile_rcnts[i] = 0;
+                else
+                  tile_rcnts[i] = all_ranks2[displs2[i]+rcnts2[i]-1];
+              }
+              tile_displs2.resize(grid()->nprows());
+              tile_displs2[0] = 0;
+              for (std::size_t i=1; i<tile_rcnts.size(); i++)
+                tile_displs2[i] = tile_displs2[i-1]+tile_rcnts[i-1];
+            }
+            std::vector<scalar_t> sbuf(msg_size2);
+            auto ptr = sbuf.data();
+            for (std::size_t k=j0; k<j1; k++) {
+              if ((k == 0 && j0 == k) || (j0 != k)) {
+                if (grid()->is_local_col(k)) {
+                  for (std::size_t i=0; i<i0; i++) {
+                    if (grid()->is_local_row(i)) {
+                      auto& t = tile(i, k);
+                      if (tile(i, k).is_low_rank()) {
+                        std::copy(t.U().data(), t.U().end(), ptr);
+                        ptr += t.U().rows()*t.U().cols();
+                        std::copy(t.V().data(), t.V().end(), ptr);
+                        ptr += t.V().rows()*t.V().cols();
+                      } else {
+                        std::copy(t.D().data(), t.D().end(), ptr);
+                        ptr += t.D().rows()*t.D().cols();
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            grid()->col_comm().gather_v
+              (sbuf.data(), msg_size2, buf2.data(),
+               tile_rcnts.data(), tile_displs2.data(), src);
+          }
+        }
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      //CASE 1
+      if (j0 > 0) {
+        if (grid()->is_local_col(j0)) {
+          std::vector<scalar_t*> ptr(grid()->col_comm().size());
+          std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++) {
+            ptr[p] = buf.data() + tile_displs[p];
+            i_ranks[p] = displs[p];
+          }
+          auto n = tilecols(j0);
+          for (std::size_t i=0; i<i0; i++) {
+            int sender=grid()->rg2p(i);
+            auto m = tilerows(i);
+            auto r = all_ranks[i_ranks[sender]];
+            if (r != -1) {
+              auto t = new LRTile<scalar_t>(m, n, r);
+              std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+              std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+              Tij.emplace_back(t);
+            } else {
+              auto t = new DenseTile<scalar_t>(m, n);
+              std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+              Tij.emplace_back(t);
+            }
+            i_ranks[sender]++;
+          }
+        }
+      }
+      //CASE 2
+      if (grid()->is_local_row(i0)) {
+        if (col_cnt!=0) {
+          std::vector<scalar_t*> ptr(grid()->col_comm().size());
+          std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++) {
+            ptr[p] = buf2.data() + tile_displs2[p];
+            i_ranks[p] = displs2[p];
+          }
+          for (std::size_t j=j0; j<j1; j++) {
+            if ((j == 0 && j0 == j) || (j0 != j)) {
+              if (grid()->is_local_col(j)) {
+                auto n = tilecols(j);
+                for (std::size_t i=0; i<i0; i++) {
+                  int sender = grid()->rg2p(i);
+                  auto m = tilerows(i);
+                  auto r = all_ranks2[i_ranks[sender]];
+                  if (r != -1) {
+                    auto t = new LRTile<scalar_t>(m, n, r);
+                    std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                    std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                    Tij.emplace_back(t);
+                  } else {
+                    auto t = new DenseTile<scalar_t>(m, n);
+                    std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                    Tij.emplace_back(t);
+                  }
+                  i_ranks[sender]++;
+                }
+              }
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_col
+    (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t k) const {
+      std::size_t msg_size = 0, nr_tiles=0;
+      std::vector<std::int64_t> ranks;
+      if (i0 > 0) {
+        //CASE 1: broadcast tile (i0,k) to all processes in row i0
+        if (grid()->is_local_row(i0)) {
+          if (grid()->is_local_col(k)) {
+            msg_size += tile(i0, k).nonzeros();
+            ranks.push_back(tile(i0, k).is_low_rank() ?
+                            tile(i0, k).rank() : -1);
+            nr_tiles++;
+          } else {
+            nr_tiles++;
+            ranks.resize(nr_tiles);
+          }
+        }
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      //CASE 1: send tile (i0,k) to all processes in row i0
+      std::vector<scalar_t> buf;
+      if (i0 > 0) {
+        if (grid()->is_local_row(i0)) {
+          ranks.push_back(msg_size);
+          int src = k % grid()->npcols();
+          grid()->row_comm().broadcast_from(ranks, src);
+          msg_size = ranks.back();
+          buf.resize(msg_size);
+          auto ptr = buf.data();
+          if (grid()->is_local_col(k)) {
+            auto& t = tile(i0, k);
+            if (t.is_low_rank()) {
+              std::copy(t.U().data(), t.U().end(), ptr);
+              ptr += t.U().rows()*t.U().cols();
+              std::copy(t.V().data(), t.V().end(), ptr);
+              ptr += t.V().rows()*t.V().cols();
+            } else {
+              std::copy(t.D().data(), t.D().end(), ptr);
+              ptr += t.D().rows()*t.D().cols();
+            }
+          }
+          grid()->row_comm().broadcast_from(buf, src);
+        }
+      }
+      //CASE 2: rows i0+1:end, send from k to j0
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      std::size_t row_cnt=0;
+      if (grid()->is_local_col(k)) {
+        for (std::size_t i=i0; i<i1; i++) {
+          if ((i == 0 && i0 == i) || (i0 != i)) {
+            if (grid()->is_local_row(i)) {
+              msg_size2 += tile(i, k).nonzeros();
+              ranks2.push_back(tile(i, k).is_low_rank() ?
+                               tile(i, k).rank() : -1);
+              row_cnt++;
+            }
+          }
+        }
+      } else if (grid()->is_local_col(j0)) {
+        for (std::size_t i=i0; i<i1; i++) {
+          if ((i == 0 && i0 == i) || (i0 != i))
+            if (grid()->is_local_row(i))
+              row_cnt++;
+        }
+        ranks2.resize(row_cnt);
+      }
+      //CASE 2: rows i0+1:end, send from k to j0
+      std::vector<scalar_t> buf2;
+      if (row_cnt != 0) {
+        MPI_Request sreq;
+        int ddest = j0 % grid()->npcols();
+        int ssend = k % grid()->npcols();
+        ranks2.push_back(msg_size2);
+        if (grid()->is_local_col(k))
+          grid()->row_comm().isend(ranks2.data(), ranks2.size(), ddest, 0, &sreq);
+        if (grid()->is_local_col(j0))
+          grid()->row_comm().irecv(ranks2.data(), ranks2.size(), ssend, 0, &sreq);
+        if (grid()->is_local_col(j0) || grid()->is_local_col(k)) {
+          MPI_Wait(&sreq, MPI_STATUS_IGNORE);
+        }
+        if (grid()->is_local_col(k)) {
+          buf2.resize(msg_size2);
+          auto ptr = buf2.data();
+          for (std::size_t i=i0; i<i1; i++) {
+            if ((i == 0 && i0 == i) || (i0 != i)) {
+              if (grid()->is_local_row(i)) {
+                auto& t = tile(i, k);
+                if (t.is_low_rank()) {
+                  std::copy(t.U().data(), t.U().end(), ptr);
+                  ptr += t.U().rows()*t.U().cols();
+                  std::copy(t.V().data(), t.V().end(), ptr);
+                  ptr += t.V().rows()*t.V().cols();
+                } else {
+                  std::copy(t.D().data(), t.D().end(), ptr);
+                  ptr += t.D().rows()*t.D().cols();
+                }
+              }
+            }
+          }
+          grid()->row_comm().isend(buf2.data(), buf2.size(), ddest, 1, &sreq);
+        }
+        if (grid()->is_local_col(j0)) {
+          msg_size2 = ranks2.back();
+          buf2.resize(msg_size2);
+          grid()->row_comm().irecv(buf2.data(), buf2.size(), ssend, 1, &sreq);
+          //buf2 = grid()->row_comm().template recv<scalar_t>(ssend, 0);
+          nr_tiles += row_cnt;
+        }
+        if (grid()->is_local_col(j0) || grid()->is_local_col(k)) {
+          MPI_Wait(&sreq, MPI_STATUS_IGNORE);
+        }
+      }
+      if (nr_tiles == 0) return Tij;
+      Tij.reserve(nr_tiles);
+      // CASE 1
+      if (i0 > 0) {
+        if (grid()->is_local_row(i0)) {
+          auto ptr = buf.data();
+          auto m = tilerows(i0);
+          auto n = tilecols(k);
+          auto r = ranks[0];
+          if (r != -1) {
+            auto t = new LRTile<scalar_t>(m, n, r);
+            std::copy(ptr, ptr+m*r, t->U().data());  ptr += m*r;
+            std::copy(ptr, ptr+r*n, t->V().data());  ptr += r*n;
+            Tij.emplace_back(t);
+          } else {
+            auto t = new DenseTile<scalar_t>(m, n);
+            std::copy(ptr, ptr+m*n, t->D().data());  ptr += m*n;
+            Tij.emplace_back(t);
+          }
+        }
+      }
+      // CASE 2
+      if (grid()->is_local_col(j0)) {
+        if (row_cnt!=0) {
+          auto ptr = buf2.data();
+          auto n = tilecols(k);
+          for (std::size_t i=i0, cntr=0; i<i1; i++) {
+            if ((i == 0 && i0 == i) || (i0 != i)) {
+              if (grid()->is_local_row(i)) {
+                auto m = tilerows(i);
+                auto r = ranks2[cntr];
+                if (r != -1) {
+                  auto t = new LRTile<scalar_t>(m, n, r);
+                  std::copy(ptr, ptr+m*r, t->U().data());  ptr += m*r;
+                  std::copy(ptr, ptr+r*n, t->V().data());  ptr += r*n;
+                  Tij.emplace_back(t);
+                } else {
+                  auto t = new DenseTile<scalar_t>(m, n);
+                  std::copy(ptr, ptr+m*n, t->D().data());  ptr += m*n;
+                  Tij.emplace_back(t);
+                }
+                cntr++;
+              }
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_cols
+    (std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1) const {
+      //TODO: avoid resending, instead gather and forward tiles after update step
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      if (i0 > 0) {
+        //CASE 1: send tiles of col 0:j0-1 of row i0 to all processes in row i0
+        if (grid()->is_local_row(i0)) {
+          for (std::size_t j=0; j<j0; j++) {
+            if (grid()->is_local_col(j)) {
+              msg_size += tile(i0, j).nonzeros();
+              ranks.push_back(tile(i0, j).is_low_rank() ?
+                              tile(i0, j).rank() : -1);
+            }
+          }
+        }
+      }
+      //CASE 2: rows i0+1:end, gather in proc in col j0
+      std::size_t msg_size2 = 0;
+      std::vector<std::int64_t> ranks2;
+      for (std::size_t i=i0; i<i1; i++) {
+        if ((i == 0 && i0 == i) || (i0 != i)) {
+          if (grid()->is_local_row(i)) {
+            for (std::size_t j=0; j<j0; j++) {
+              if (grid()->is_local_col(j)) {
+                msg_size2 += tile(i, j).nonzeros();
+                ranks2.push_back(tile(i, j).is_low_rank() ?
+                                 tile(i, j).rank() : -1);
+              }
+            }
+          }
+        }
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      //CASE 1: row i0, send to all processes in row
+      std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts, tile_displs, displs;
+      if (i0 > 0) {
+        if (grid()->is_local_row(i0)) {
+          ranks.push_back(msg_size);
+          rcnts.resize(grid()->npcols());
+          rcnts[grid()->pcol()]=ranks.size();
+          grid()->row_comm().all_gather(rcnts.data(), 1);
+          displs.resize(grid()->npcols());
+          for (std::size_t j=1; j<rcnts.size(); j++) {
+            displs[j]=displs[j-1]+rcnts[j-1];
+          }
+          all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
+          nr_tiles=all_ranks.size()-rcnts.size();
+          std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->pcol()]);
+          grid()->row_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
+          std::size_t total_msg_size = 0;
+          for (std::size_t j=0; j<rcnts.size(); j++) {
+            total_msg_size += all_ranks[displs[j]+rcnts[j]-1];
+          }
+          buf.resize(total_msg_size);
+          std::vector<int> tile_rcnts(grid()->npcols());
+          for (int j=0; j<grid()->npcols(); j++)
+            tile_rcnts[j] = all_ranks[displs[j]+rcnts[j]-1];
+          tile_displs.resize(grid()->npcols());
+          for (std::size_t j=1; j<tile_rcnts.size(); j++) {
+            tile_displs[j]=tile_displs[j-1]+tile_rcnts[j-1];
+          }
+          auto ptr = buf.data() + tile_displs[grid()->pcol()];
+          for (std::size_t j=0; j<j0; j++) {
+            if (grid()->is_local_col(j)) {
+              auto& t = tile(i0, j);
+              if (tile(i0, j).is_low_rank()) {
+                std::copy(t.U().data(), t.U().end(), ptr);
+                ptr += t.U().rows()*t.U().cols();
+                std::copy(t.V().data(), t.V().end(), ptr);
+                ptr += t.V().rows()*t.V().cols();
+              } else {
+                std::copy(t.D().data(), t.D().end(), ptr);
+                ptr += t.D().rows()*t.D().cols();
+              }
+            }
+          }
+          grid()->row_comm().all_gather_v
+            (buf.data(), tile_rcnts.data(), tile_displs.data());
+        }
+      }
+      //CASE 2: rows i0+1:end, gather in proc in col j0
+      std::vector<scalar_t> buf2;
+      std::vector<std::int64_t> all_ranks2;
+      std::vector<int> rcnts2, displs2, tile_displs2;
+      std::size_t rcnts_empty=0;
+      std::size_t row_cnt=0;
+      for (int i=0; i<grid()->nprows(); i++) {
+        if (grid()->prow() == i % grid()->nprows()) {
+          //TODO: easier way to check if processor owns rows
+          for (std::size_t k=i0; k<i1; k++) {
+            if ((k == 0 && i0 == k) || (i0 != k)) {
+              if (grid()->is_local_row(k))
+                row_cnt++;
+            }
+          }
+          if (row_cnt!=0) {
+            int src = j0 % grid()->npcols();
+            if (!(ranks2.empty())) ranks2.push_back(msg_size2);
+            if (grid()->pcol() == src && ranks2.empty()) ranks2.push_back(msg_size2);
+            int scnt=0;
+            if (grid()->pcol() == src) {
+              rcnts2.resize(grid()->npcols());
+              rcnts2[grid()->pcol()]=ranks2.size();
+              scnt=ranks2.size();
+            } else scnt=ranks2.size();
+            grid()->row_comm().gather(&scnt, 1, rcnts2.data(), 1, src);
+            if (grid()->pcol() == src) {
+              displs2.resize(grid()->npcols());
+              displs2[0]=0;
+              for (std::size_t j=1; j<rcnts2.size(); j++)
+                displs2[j]=displs2[j-1]+rcnts2[j-1];
+              all_ranks2.resize(std::accumulate(rcnts2.begin(),rcnts2.end(),0));
+              std::copy(ranks2.begin(), ranks2.end(),
+                        all_ranks2.begin()+displs2[grid()->pcol()]);//?? works if ranks empty??
+              for (std::size_t j=0; j<rcnts2.size(); j++)
+                if (rcnts2[j]==0) rcnts_empty++;
+              nr_tiles+=all_ranks2.size()-rcnts2.size()+rcnts_empty;
+            }
+            grid()->row_comm().gather_v
+              (ranks2.data(), scnt, all_ranks2.data(), rcnts2.data(), displs2.data(), src);
+            std::vector<int> tile_rcnts;
+            if (grid()->pcol() == src) {
+              std::size_t total_msg_size = 0;
+              for (std::size_t j=0; j<rcnts2.size(); j++) {
+                if (rcnts2[j] == 0) total_msg_size += 0;
+                else total_msg_size += all_ranks2[displs2[j]+rcnts2[j]-1];
+              }
+              buf2.resize(total_msg_size);
+              tile_rcnts.resize(grid()->npcols());
+              for (int j=0; j<grid()->npcols(); j++) {
+                if (rcnts2[j] == 0) tile_rcnts[j] = 0;
+                else tile_rcnts[j] = all_ranks2[displs2[j]+rcnts2[j]-1];
+              }
+              tile_displs2.resize(grid()->npcols());
+              tile_displs2[0]=0;
+              for (std::size_t j=1; j<tile_rcnts.size(); j++) {
+                tile_displs2[j]=tile_displs2[j-1]+tile_rcnts[j-1];
+              }
+            }
+            std::vector<scalar_t> sbuf(msg_size2);
+            auto ptr = sbuf.data();
+            for (std::size_t k=i0; k<i1; k++) {
+              if ((k == 0 && i0 == k) || (i0 != k)) {
+                if (grid()->is_local_row(k)) {
+                  for (std::size_t j=0; j<j0; j++) {
+                    if (grid()->is_local_col(j)) {
+                      auto& t = tile(k, j);
+                      if (tile(k, j).is_low_rank()) {
+                        std::copy(t.U().data(), t.U().end(), ptr);
+                        ptr += t.U().rows()*t.U().cols();
+                        std::copy(t.V().data(), t.V().end(), ptr);
+                        ptr += t.V().rows()*t.V().cols();
+                      } else {
+                        std::copy(t.D().data(), t.D().end(), ptr);
+                        ptr += t.D().rows()*t.D().cols();
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            grid()->row_comm().gather_v
+              (sbuf.data(), msg_size2, buf2.data(),
+               tile_rcnts.data(), tile_displs2.data(), src);
+          }
+        }
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (i0 > 0) {
+        if (grid()->is_local_row(i0)) {
+          std::vector<scalar_t*> ptr(grid()->row_comm().size());
+          std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++) {
+            ptr[p] = buf.data() + tile_displs[p];
+            j_ranks[p] = displs[p];
+          }
+          auto m = tilerows(i0);
+          for (std::size_t j=0; j<j0; j++) {
+            int sender = grid()->cg2p(j);
+            auto n = tilecols(j);
+            auto r = all_ranks[j_ranks[sender]];
+            if (r != -1) {
+              auto t = new LRTile<scalar_t>(m, n, r);
+              std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+              std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+              Tij.emplace_back(t);
+            } else {
+              auto t = new DenseTile<scalar_t>(m, n);
+              std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+              Tij.emplace_back(t);
+            }
+            j_ranks[sender]++;
+          }
+        }
+      }
+      if (grid()->is_local_col(j0)) {
+        if (row_cnt!=0) {
+          std::vector<scalar_t*> ptr(grid()->row_comm().size());
+          std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
+          for (std::size_t p=0; p<ptr.size(); p++) {
+            ptr[p] = buf2.data() + tile_displs2[p];
+            j_ranks[p] = displs2[p];
+          }
+          for (std::size_t i=i0; i<i1; i++) {
+            if ((i == 0 && i0 == i) || (i0 != i)) {
+              if (grid()->is_local_row(i)) {
+                auto m = tilerows(i);
+                for (std::size_t j=0; j<j0; j++) {
+                  int sender = grid()->cg2p(j);
+                  auto n = tilecols(j);
+                  auto r = all_ranks2[j_ranks[sender]];
+                  if (r != -1) {
+                    auto t = new LRTile<scalar_t>(m, n, r);
+                    std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                    std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                    Tij.emplace_back(t);
+                  } else {
+                    auto t = new DenseTile<scalar_t>(m, n);
+                    std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                    Tij.emplace_back(t);
+                  }
+                  j_ranks[sender]++;
+                }
+              }
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_rows_A22
+    (std::size_t i1, std::size_t j1) const {
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      for (std::size_t j=0; j<j1; j++) {
+        if (grid()->is_local_col(j)) {
+          for (std::size_t i=0; i<i1; i++) {
+            if (grid()->is_local_row(i)) {
+              msg_size += tile(i, j).nonzeros();
+              ranks.push_back(tile(i, j).is_low_rank() ?
+                              tile(i, j).rank() : -1);
+            }
+          }
+        }
+      }
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts, tile_displs, displs;
+      std::size_t col_cnt=0, nr_tiles=0;
+      for (std::size_t k=0; k<j1; k++) {
+        if (grid()->is_local_col(k)) {
+          col_cnt++;
+        }
+      }
+      if (col_cnt!=0) {
+        if (!(ranks.empty())) ranks.push_back(msg_size);
+        rcnts.resize(grid()->nprows());
+        rcnts[grid()->prow()]=ranks.size();
+        grid()->col_comm().all_gather(rcnts.data(), 1);
+        displs.resize(grid()->nprows());
+        for (std::size_t i=1; i<rcnts.size(); i++) {
+          displs[i]=displs[i-1]+rcnts[i-1];
+        }
+        all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
+        nr_tiles=all_ranks.size()-rcnts.size();
+        std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->prow()]);
+        grid()->col_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
+        std::size_t total_msg_size = 0;
+        for (std::size_t i=0; i<rcnts.size(); i++) {
+          total_msg_size += all_ranks[displs[i]+rcnts[i]-1];
+        }
+        buf.resize(total_msg_size);
+        std::vector<int> tile_rcnts(grid()->nprows());
+        for (int i=0; i<grid()->nprows(); i++)
+          tile_rcnts[i] = all_ranks[displs[i]+rcnts[i]-1];
+        tile_displs.resize(grid()->nprows());
+        for (std::size_t i=1; i<tile_rcnts.size(); i++) {
+          tile_displs[i]=tile_displs[i-1]+tile_rcnts[i-1];
+        }
+        auto ptr = buf.data() + tile_displs[grid()->prow()];
+        for (std::size_t k=0; k<j1; k++) {
+          if (grid()->is_local_col(k)) {
+            for (std::size_t i=0; i<i1; i++) {
+              if (grid()->is_local_row(i)) {
+                auto& t = tile(i, k);
+                if (tile(i, k).is_low_rank()) {
+                  std::copy(t.U().data(), t.U().end(), ptr);
+                  ptr += t.U().rows()*t.U().cols();
+                  std::copy(t.V().data(), t.V().end(), ptr);
+                  ptr += t.V().rows()*t.V().cols();
+                } else {
+                  std::copy(t.D().data(), t.D().end(), ptr);
+                  ptr += t.D().rows()*t.D().cols();
+                }
+              }
+            }
+          }
+        }
+        grid()->col_comm().all_gather_v
+          (buf.data(), tile_rcnts.data(), tile_displs.data());
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (col_cnt!=0) {
+        std::vector<scalar_t*> ptr(grid()->col_comm().size());
+        std::vector<std::int64_t> i_ranks(grid()->col_comm().size());
+        for (std::size_t p=0; p<ptr.size(); p++) {
+          ptr[p] = buf.data() + tile_displs[p];
+          i_ranks[p] = displs[p];
+        }
+        for (std::size_t j=0; j<j1; j++) {
+          if (grid()->is_local_col(j)) {
+            auto n = tilecols(j);
+            for (std::size_t i=0; i<i1; i++) {
+              int sender=grid()->rg2p(i);
+              auto m = tilerows(i);
+              auto r = all_ranks[i_ranks[sender]];
+              if (r != -1) {
+                auto t = new LRTile<scalar_t>(m, n, r);
+                std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                Tij.emplace_back(t);
+              } else {
+                auto t = new DenseTile<scalar_t>(m, n);
+                std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                Tij.emplace_back(t);
+              }
+              i_ranks[sender]++;
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
+    template<typename scalar_t>
+    std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+    BLRMatrixMPI<scalar_t>::gather_cols_A22
+    (std::size_t i1, std::size_t j1) const {
+      std::size_t msg_size = 0;
+      std::vector<std::int64_t> ranks;
+      for (std::size_t i=0; i<j1; i++) {
+        if (grid()->is_local_row(i)) {
+          for (std::size_t j=0; j<i1; j++) {
+            if (grid()->is_local_col(j)) {
+              msg_size += tile(i, j).nonzeros();
+              ranks.push_back(tile(i, j).is_low_rank() ?
+                              tile(i, j).rank() : -1);
+            }
+          }
+        }
+      }
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> Tij;
+      std::size_t nr_tiles=0;
+      std::vector<scalar_t> buf;
+      std::vector<std::int64_t> all_ranks;
+      std::vector<int> rcnts, tile_displs, displs;
+      std::size_t row_cnt=0;
+      for (std::size_t k=0; k<j1; k++) {
+        if (grid()->is_local_row(k)) row_cnt++;
+      }
+      if (row_cnt!=0) {
+        if (!(ranks.empty())) ranks.push_back(msg_size);
+        rcnts.resize(grid()->npcols());
+        rcnts[grid()->pcol()]=ranks.size();
+        grid()->row_comm().all_gather(rcnts.data(), 1);
+        displs.resize(grid()->npcols());
+        for (std::size_t j=1; j<rcnts.size(); j++) {
+          displs[j]=displs[j-1]+rcnts[j-1];
+        }
+        all_ranks.resize(std::accumulate(rcnts.begin(),rcnts.end(),0));
+        nr_tiles=all_ranks.size()-rcnts.size();
+        std::copy(ranks.begin(), ranks.end(), all_ranks.begin()+displs[grid()->pcol()]);
+        grid()->row_comm().all_gather_v(all_ranks.data(), rcnts.data(), displs.data());
+        std::size_t total_msg_size = 0;
+        for (std::size_t j=0; j<rcnts.size(); j++) {
+          total_msg_size += all_ranks[displs[j]+rcnts[j]-1];
+        }
+        buf.resize(total_msg_size);
+        std::vector<int> tile_rcnts(grid()->npcols());
+        for (int j=0; j<grid()->npcols(); j++)
+          tile_rcnts[j] = all_ranks[displs[j]+rcnts[j]-1];
+        tile_displs.resize(grid()->npcols());
+        for (std::size_t j=1; j<tile_rcnts.size(); j++) {
+          tile_displs[j]=tile_displs[j-1]+tile_rcnts[j-1];
+        }
+        auto ptr = buf.data() + tile_displs[grid()->pcol()];
+        for (std::size_t k=0; k<j1; k++) {
+          if (grid()->is_local_row(k)) {
+            for (std::size_t j=0; j<i1; j++) {
+              if (grid()->is_local_col(j)) {
+                auto& t = tile(k, j);
+                if (tile(k, j).is_low_rank()) {
+                  std::copy(t.U().data(), t.U().end(), ptr);
+                  ptr += t.U().rows()*t.U().cols();
+                  std::copy(t.V().data(), t.V().end(), ptr);
+                  ptr += t.V().rows()*t.V().cols();
+                } else {
+                  std::copy(t.D().data(), t.D().end(), ptr);
+                  ptr += t.D().rows()*t.D().cols();
+                }
+              }
+            }
+          }
+        }
+        grid()->row_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
+      }
+      if (nr_tiles==0) return Tij;
+      Tij.reserve(nr_tiles);
+      if (row_cnt!=0) {
+        std::vector<scalar_t*> ptr(grid()->row_comm().size());
+        std::vector<std::int64_t> j_ranks(grid()->row_comm().size());
+        for (std::size_t p=0; p<ptr.size(); p++) {
+          ptr[p] = buf.data() + tile_displs[p];
+          j_ranks[p] = displs[p];
+        }
+        for (std::size_t i=0; i<j1; i++) {
+          if (grid()->is_local_row(i)) {
+            auto m = tilerows(i);
+            for (std::size_t j=0; j<i1; j++) {
+              int sender = grid()->cg2p(j);
+              auto n = tilecols(j);
+              auto r = all_ranks[j_ranks[sender]];
+              if (r != -1) {
+                auto t = new LRTile<scalar_t>(m, n, r);
+                std::copy(ptr[sender], ptr[sender]+m*r, t->U().data());  ptr[sender] += m*r;
+                std::copy(ptr[sender], ptr[sender]+r*n, t->V().data());  ptr[sender] += r*n;
+                Tij.emplace_back(t);
+              } else {
+                auto t = new DenseTile<scalar_t>(m, n);
+                std::copy(ptr[sender], ptr[sender]+m*n, t->D().data());  ptr[sender] += m*n;
+                Tij.emplace_back(t);
+              }
+              j_ranks[sender]++;
+            }
+          }
+        }
+      }
+      return Tij;
+    }
+
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::compress_tile
     (std::size_t i, std::size_t j, const Opts_t& opts) {
@@ -421,7 +1495,7 @@ namespace strumpack {
               int r0 = tileroff(i);
               std::transform
                 (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
-                [r0](int p) -> int { return p + r0; });
+                 [r0](int p) -> int { return p + r0; });
               Tii = bcast_dense_tile_along_row(i, i);
             }
             if (grid()->is_local_col(i))
@@ -448,13 +1522,13 @@ namespace strumpack {
           }
         }
 #pragma omp parallel
-#pragma omp single
+#pragma omp single nowait
         {
           if (grid()->is_local_row(i)) {
             for (std::size_t j=i+1; j<colblocks(); j++) {
               if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j)
-                { 
+                {
                   tile(i, j).laswp(piv_tile, true);
                   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                       scalar_t(1.), Tii, tile(i, j));
@@ -465,30 +1539,96 @@ namespace strumpack {
           if (grid()->is_local_col(i)) {
             for (std::size_t j=i+1; j<rowblocks(); j++) {
               if (grid()->is_local_row(j)) {
-#pragma omp task default(shared) firstprivate(i,j)                
+#pragma omp task default(shared) firstprivate(i,j)
                 trsm(Side::R, UpLo::U, Trans::N, Diag::N,
                     scalar_t(1.), Tii, tile(j, i));
               }
             }
           }
         }
-        auto Tij = bcast_row_of_tiles_along_cols(i, i+1, rowblocks());
-        auto Tki = bcast_col_of_tiles_along_rows(i+1, rowblocks(), i);
+        if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL) {
+          auto Tij = bcast_row_of_tiles_along_cols(i, i+1, rowblocks());
+          auto Tki = bcast_col_of_tiles_along_rows(i+1, rowblocks(), i);
 #pragma omp parallel
-#pragma omp single
-        {        
-          for (std::size_t k=i+1, lk=0; k<rowblocks(); k++) {
-            if (grid()->is_local_row(k)) {
-              for (std::size_t j=i+1, lj=0; j<colblocks(); j++) {
-                if (grid()->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)                  
-                  // this uses .D, assuming tile(k, j) is dense
-                  gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tki[lk]),
-                      *(Tij[lj]), scalar_t(1.), tile_dense(k, j).D());
-                  lj++;
+#pragma omp single nowait
+          {
+            for (std::size_t k=i+1, lk=0; k<rowblocks(); k++) {
+              if (grid()->is_local_row(k)) {
+                for (std::size_t j=i+1, lj=0; j<colblocks(); j++) {
+                  if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+                    // this uses .D, assuming tile(k, j) is dense
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tki[lk]),
+                        *(Tij[lj]), scalar_t(1.), tile_dense(k, j).D());
+                    lj++;
+                  }
+                }
+                lk++;
+              }
+            }
+          }
+        } else { //LL, Comb, Star -Update
+          if (i+1 < rowblocks()) {
+            if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
+              for (std::size_t k=0; k<i+1; k++) {
+                auto Tik = gather_row(i+1, k, i+1, colblocks());
+                auto Tkj = gather_col(i+1, rowblocks(), i+1, k);
+#pragma omp parallel
+#pragma omp single nowait
+                {
+                  if (grid()->is_local_row(i+1)) {
+                    std::size_t lk=0;
+                    for (std::size_t j=i+1; j<rowblocks(); j++) {
+                      if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk)
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[0]),
+                            *(Tik[lk]), scalar_t(1.), tile_dense(i+1, j).D());
+                        lk++;
+                      }
+                    }
+                  }
+                  if (grid()->is_local_col(i+1)) {
+                    std::size_t lj=0;
+                    if (grid()->is_local_row(i+1)) lj=1;
+                    for (std::size_t j=i+2; j<rowblocks(); j++) {
+                      if (grid()->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lj)
+                        gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkj[lj]),
+                            *(Tik[0]), scalar_t(1.), tile_dense(j, i+1).D());
+                        lj++;
+                      }
+                    }
+                  }
                 }
               }
-              lk++;
+            } else { //LUAR-Update Star or Comb
+              auto Tik = gather_rows(i+1, rowblocks(), i+1, colblocks());
+              auto Tkj = gather_cols(i+1, rowblocks(), i+1, colblocks());
+#pragma omp parallel
+#pragma omp single nowait
+              {
+                if (grid()->is_local_row(i+1)) {
+                  std::size_t lk=0;
+                  for (std::size_t j=i+1; j<rowblocks(); j++) {
+                    if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,lk)
+                      LUAR(i+1, lk, Tkj, Tik, tile_dense(i+1, j).D(), opts, 0); //on one MPI rank only
+                      lk+=i+1;
+                    }
+                  }
+                }
+                if (grid()->is_local_col(i+1)) {
+                  std::size_t lj=0;
+                  if (grid()->is_local_row(i+1)) lj=i+1;
+                  for (std::size_t j=i+2; j<rowblocks(); j++) {
+                    if (grid()->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,j,lj)
+                      LUAR(i+1, lj, Tik, Tkj, tile_dense(j, i+1).D(), opts, 1);
+                      lj+=i+1;
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -496,6 +1636,446 @@ namespace strumpack {
       return piv;
     }
 
+
+    template<typename scalar_t> std::vector<int>
+    BLRMatrixMPI<scalar_t>::factor_col
+    (const adm_t& adm, const Opts_t& opts,
+     const std::function<void(int, bool, std::size_t)>& blockcol) {
+      std::vector<int> piv, piv_tile;
+      std::vector<std::vector<int> > piv_tile_global;
+      DenseTile<scalar_t> Tcc;
+      std::vector<DenseTile<scalar_t> > Tcc_vec;
+      auto CP = grid()->npcols();
+      for (std::size_t i=0; i<colblocks(); i+=CP) {
+        //construct the (i/CP+1) CP block-columns as dense tiles
+        fill_col(0., i, CP);
+        blockcol(i, true, CP);
+        for (std::size_t k=0; k<i; k++) {
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (grid()->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k)
+                  if (adm(k, j)) compress_tile(k, j, opts);
+                }
+              }
+            }
+          }
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (grid()->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k)
+                  {
+                    tile(k, j).laswp(piv_tile_global[k/grid()->nprows()], true);
+                    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                         scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
+                  }
+                }
+              }
+            }
+          }
+          auto Tkc = bcast_col_of_tiles_along_rows(k+1, rowblocks(), k);
+          auto Tcj = bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, colblocks()));
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            for (std::size_t lk=k+1, c=0; lk<rowblocks(); lk++) {
+              if (grid()->is_local_row(lk)) {
+                for (std::size_t lj=i, r=0; lj<std::min(i+CP, colblocks()); lj++) {
+                  if (grid()->is_local_col(lj)) {
+#pragma omp task default(shared) firstprivate(i,k,lk,lj,c,r)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
+                         *(Tcj[r]), scalar_t(1.), tile_dense(lk, lj).D());
+                    r++;
+                  }
+                }
+                c++;
+              }
+            }
+          }
+        }
+        for (std::size_t c=i; c<std::min(i+CP,colblocks()); c++) {
+#pragma omp parallel
+          {
+#pragma omp master
+            {
+              // LU factorization of diagonal tile
+              if (grid()->is_local_row(c)) {
+                if (grid()->is_local_col(c))
+                  piv_tile=tile(c, c).LU();
+                else piv_tile.resize(tilerows(c));
+                grid()->row_comm().broadcast_from(piv_tile, c % grid()->npcols());
+                piv_tile_global.push_back(piv_tile);
+                int r0 = tileroff(c);
+                std::transform
+                  (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
+                   [r0](int p) -> int { return p + r0; });
+                Tcc = bcast_dense_tile_along_row(c, c);
+                Tcc_vec.push_back(Tcc);
+              }
+              if (grid()->is_local_col(c))
+                Tcc = bcast_dense_tile_along_col(c, c);
+            }
+#pragma omp single
+            {
+              if (grid()->is_local_row(c)) {
+                for (std::size_t j=c+1; j<std::min(i+CP,colblocks()); j++) {
+                  if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                    if (adm(c, j)) compress_tile(c, j, opts);
+                  }
+                }
+              }
+              if (grid()->is_local_col(c)) {
+                for (std::size_t j=c+1; j<rowblocks(); j++) {
+                  if (grid()->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                    if (adm(j, c)) compress_tile(j, c, opts);
+                  }
+                }
+              }
+            }
+          }
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (grid()->is_local_row(c)) {
+              for (std::size_t j=c+1; j<std::min(i+CP,colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,c)
+                  {
+                    tile(c, j).laswp(piv_tile, true);
+                    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                         scalar_t(1.), Tcc, tile(c, j));
+                  }
+                }
+              }
+            }
+            if (grid()->is_local_col(c)) {
+              for (std::size_t j=c+1; j<rowblocks(); j++) {
+                if (grid()->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                  trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                       scalar_t(1.), Tcc, tile(j, c));
+                }
+              }
+            }
+          }
+          if (c != i+CP-1) {
+            auto Tcj = bcast_row_of_tiles_along_cols(c, c+1, std::min(i+CP,colblocks()));
+            auto Tkc = bcast_col_of_tiles_along_rows(c+1, rowblocks(), c);
+#pragma omp parallel
+#pragma omp single nowait
+            {
+              for (std::size_t j=c+1, lj=0; j<std::min(i+CP,colblocks()); j++) {
+                if (grid()->is_local_col(j)) {
+                  for (std::size_t k=c+1, lk=0; k<rowblocks(); k++) {
+                    if (grid()->is_local_row(k)) {
+#pragma omp task default(shared) firstprivate(i,c,j,k,lk,lj)
+                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk]),
+                           *(Tcj[lj]), scalar_t(1.), tile_dense(k, j).D());
+                      lk++;
+                    }
+                  }
+                  lj++;
+                }
+              }
+            }
+          }
+        }
+      }
+      return piv;
+    }
+
+    template<typename scalar_t> std::vector<int>
+    BLRMatrixMPI<scalar_t>::partial_factor_col
+    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+     const adm_t& adm, const Opts_t& opts,
+     const std::function<void(int, bool, std::size_t)>& blockcol) {
+      auto B1_r = F11.rowblocks();
+      auto B1_c = F11.colblocks();
+      auto B2_r = F22.rowblocks();
+      auto B2_c = F22.colblocks();
+      auto g = F11.grid();
+      std::vector<int> piv;
+      std::vector<std::vector<int> > piv_tile_global;
+      std::vector<int> piv_tile;
+      DenseTile<scalar_t> Tcc;
+      std::vector<DenseTile<scalar_t> > Tcc_vec;
+      auto CP = g->npcols();
+      for (std::size_t i=0; i<B1_c; i+=CP) { //F11 and F21
+        //construct the (i/CP+1) CP block-columns as dense tiles
+        F11.fill_col(0., i, CP);
+        F21.fill_col(0., i, CP);
+        blockcol(i, true, CP);
+        for (std::size_t k=0; k<i; k++) {
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (g->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, B1_c); j++) {
+                if (g->is_local_col(j) && (adm(k, j))) {
+#pragma omp task default(shared) firstprivate(i,k,j)
+                  F11.compress_tile(k, j, opts);
+                }
+              }
+            }
+          }
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (g->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, B1_c); j++) {
+                if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,k,j)
+                  F11.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
+                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                       scalar_t(1.), Tcc_vec[k/g->nprows()], F11.tile(k, j));
+                }
+              }
+            }
+          }
+          auto Tkc = F11.bcast_col_of_tiles_along_rows(k+1, B1_r, k);
+          auto Tcj = F11.bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, B1_c));
+          auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, k);
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            for (std::size_t lk=k+1, c=0; lk<B1_r; lk++) {
+              if (g->is_local_row(lk)) {
+                for (std::size_t lj=i, r=0; lj<std::min(i+CP, B1_c); lj++) {
+                  if (g->is_local_col(lj)) {
+#pragma omp task default(shared) firstprivate(i,k,lk,lj,c,r)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
+                         *(Tcj[r]), scalar_t(1.), F11.tile_dense(lk, lj).D());
+                    r++;
+                  }
+                }
+                c++;
+              }
+            }
+            for (std::size_t lk=0, c=0; lk<B2_r; lk++) {
+              if (g->is_local_row(lk)) {
+                for (std::size_t lj=i, r=0; lj<std::min(i+CP,B1_c); lj++) {
+                  if (g->is_local_col(lj)) {
+#pragma omp task default(shared) firstprivate(i,k,lk,lj,c,r)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tk2c[c]),
+                         *(Tcj[r]), scalar_t(1.), F21.tile_dense(lk, lj).D());
+                    r++;
+                  }
+                }
+                c++;
+              }
+            }
+          }
+        }
+        for (std::size_t c=i; c<std::min(i+CP,B1_c); c++) {
+#pragma omp parallel
+          {
+#pragma omp master
+            {
+              // LU factorization of diagonal tile
+              if (g->is_local_row(c)) {
+                if (g->is_local_col(c))
+                  piv_tile = F11.tile(c, c).LU();
+                else piv_tile.resize(F11.tilerows(c));
+              }
+              if (g->is_local_row(c)) {
+                g->row_comm().broadcast_from(piv_tile, c % g->npcols());
+                piv_tile_global.push_back(piv_tile);
+                int r0 = F11.tileroff(c);
+                std::transform
+                  (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
+                   [r0](int p) -> int { return p + r0; });
+                Tcc = F11.bcast_dense_tile_along_row(c, c);
+                Tcc_vec.push_back(Tcc);
+              }
+              if (g->is_local_col(c))
+                Tcc = F11.bcast_dense_tile_along_col(c, c);
+            }
+#pragma omp single
+            {
+              if (g->is_local_row(c)) {
+                for (std::size_t j=c+1; j<std::min(i+CP,B1_c); j++) {
+                  if (g->is_local_col(j) && adm(c, j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                    F11.compress_tile(c, j, opts);
+                  }
+                }
+              }
+              if (g->is_local_col(c)) {
+                for (std::size_t j=c+1; j<B1_r; j++) {
+                  if (g->is_local_row(j) && adm(j, c)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                    F11.compress_tile(j, c, opts);
+                  }
+                }
+                for (std::size_t j=0; j<B2_r; j++) {
+                  if (g->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                    F21.compress_tile(j, c, opts);
+                  }
+                }
+              }
+            }
+          }
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (g->is_local_row(c)) {
+              for (std::size_t j=c+1; j<std::min(i+CP,B1_c); j++) {
+                if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                  {
+                    F11.tile(c, j).laswp(piv_tile, true);
+                    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                         scalar_t(1.), Tcc, F11.tile(c, j));
+                  }
+                }
+              }
+            }
+            if (g->is_local_col(c)) {
+              for (std::size_t j=c+1; j<B1_r; j++) {
+                if (g->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                  trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                       scalar_t(1.), Tcc, F11.tile(j, c));
+                }
+              }
+              for (std::size_t j=0; j<B2_r; j++) {
+                if (g->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,c,j)
+                  trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                       scalar_t(1.), Tcc, F21.tile(j, c));
+                }
+              }
+            }
+          }
+          if (c != i+CP-1) {
+            auto Tcj = F11.bcast_row_of_tiles_along_cols(c, c+1, std::min(i+CP,B1_c));
+            auto Tkc = F11.bcast_col_of_tiles_along_rows(c+1, B1_r, c);
+            auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, c);
+#pragma omp parallel
+#pragma omp single nowait
+            {
+              for (std::size_t j=c+1, lj=0; j<std::min(i+CP,B1_c); j++) {
+                if (g->is_local_col(j)) {
+                  for (std::size_t k=c+1, lk=0; k<B1_r; k++) {
+                    if (g->is_local_row(k)) {
+#pragma omp task default(shared) firstprivate(i,c,j,k,lk,lj)
+                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[lk]),
+                           *(Tcj[lj]), scalar_t(1.), F11.tile_dense(k, j).D());
+                      lk++;
+                    }
+                  }
+                  lj++;
+                }
+              }
+              for (std::size_t j=c+1, lj=0; j<std::min(i+CP,B1_c); j++) {
+                if (g->is_local_col(j)) {
+                  for (std::size_t k=0, lk=0; k<B2_r; k++) {
+                    if (g->is_local_row(k)) {
+#pragma omp task default(shared) firstprivate(i,c,j,k,lk,lj)
+                      gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tk2c[lk]),
+                           *(Tcj[lj]), scalar_t(1.), F21.tile_dense(k, j).D());
+                      lk++;
+                    }
+                  }
+                  lj++;
+                }
+              }
+            }
+          }
+        }
+      }
+      for (std::size_t i=0; i<B2_c; i+=CP) { // F12 and F22
+        // construct the B2_c CP block-columns as dense tiles
+        F12.fill_col(0., i, CP);
+        F22.fill_col(0., i, CP);
+        blockcol(i, false, CP);
+        for (std::size_t k=0; k<B1_r; k++) {
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (g->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, B2_c); j++) {
+                if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,k,j)
+                  F12.compress_tile(k, j, opts);
+                }
+              }
+            }
+          }
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (g->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, B2_c); j++) {
+                if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,k,j)
+                  F12.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
+                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                       scalar_t(1.), Tcc_vec[k/g->nprows()], F12.tile(k, j));
+                }
+              }
+            }
+          }
+          auto Tkc = F11.bcast_col_of_tiles_along_rows(k+1, B1_r, k);
+          auto Tcj = F12.bcast_row_of_tiles_along_cols(k, i, std::min(i+CP, B2_c));
+          auto Tk2c = F21.bcast_col_of_tiles_along_rows(0, B2_r, k);
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            for (std::size_t lk=k+1, c=0; lk<B1_r; lk++) {
+              if (g->is_local_row(lk)) {
+                for (std::size_t lj=i, r=0; lj<std::min(i+CP, B2_c); lj++) {
+                  if (g->is_local_col(lj)) {
+#pragma omp task default(shared) firstprivate(i,k,lk,lj,c,r)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tkc[c]),
+                         *(Tcj[r]), scalar_t(1.), F12.tile_dense(lk, lj).D());
+                    r++;
+                  }
+                }
+                c++;
+              }
+            }
+            for (std::size_t lk=0, c=0; lk<B2_r; lk++) {
+              if (g->is_local_row(lk)) {
+                for (std::size_t lj=i, r=0; lj<std::min(i+CP, B2_c); lj++) {
+                  if (g->is_local_col(lj)) {
+#pragma omp task default(shared) firstprivate(i,k,lk,lj,c,r)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.), *(Tk2c[c]),
+                         *(Tcj[r]), scalar_t(1.), F22.tile_dense(lk, lj).D());
+                    r++;
+                  }
+                }
+                c++;
+              }
+            }
+          }
+        }
+        for (std::size_t k=0; k<B2_r; k++) {
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            if (g->is_local_row(k)) {
+              for (std::size_t j=i; j<std::min(i+CP, B2_c); j++) {
+                if (g->is_local_col(j) && j!=k) {
+#pragma omp task default(shared) firstprivate(i,k,j)
+                  F22.compress_tile(k, j, opts);
+                }
+              }
+            }
+          }
+        }
+      }
+      return piv;
+    }
 
     template<typename scalar_t> std::vector<int>
     BLRMatrixMPI<scalar_t>::partial_factor(BLRMPI_t& A11, BLRMPI_t& A12,
@@ -570,7 +2150,7 @@ namespace strumpack {
           }
         }
 #pragma omp parallel
-#pragma omp single
+#pragma omp single nowait
         {
           if (g->is_local_row(i)) {
             for (std::size_t j=i+1; j<B1; j++) {
@@ -611,73 +2191,481 @@ namespace strumpack {
             }
           }
         }
-        auto Tij = A11.bcast_row_of_tiles_along_cols(i, i+1, B1);
-        auto Tij2 = A12.bcast_row_of_tiles_along_cols(i, 0, B2);
-        auto Tki = A11.bcast_col_of_tiles_along_rows(i+1, B1, i);
-        auto Tk2i = A21.bcast_col_of_tiles_along_rows(0, B2, i);
+        if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL) {
+          auto Tij = A11.bcast_row_of_tiles_along_cols(i, i+1, B1);
+          auto Tij2 = A12.bcast_row_of_tiles_along_cols(i, 0, B2);
+          auto Tki = A11.bcast_col_of_tiles_along_rows(i+1, B1, i);
+          auto Tk2i = A21.bcast_col_of_tiles_along_rows(0, B2, i);
 #pragma omp parallel
-#pragma omp single
-        {
-          for (std::size_t k=i+1, lk=0; k<B1; k++) {
-            if (g->is_local_row(k)) {
-              for (std::size_t j=i+1, lj=0; j<B1; j++) {
-                if (g->is_local_col(j)) {
+#pragma omp single nowait
+          {
+            for (std::size_t k=i+1, lk=0; k<B1; k++) {
+              if (g->is_local_row(k)) {
+                for (std::size_t j=i+1, lj=0; j<B1; j++) {
+                  if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
-                  gemm(Trans::N, Trans::N, scalar_t(-1.),
-                       *(Tki[lk]), *(Tij[lj]), scalar_t(1.),
-                       A11.tile_dense(k, j).D());
-                  lj++;
+                    gemm(Trans::N, Trans::N, scalar_t(-1.),
+                         *(Tki[lk]), *(Tij[lj]), scalar_t(1.),
+                         A11.tile_dense(k, j).D());
+                    lj++;
+                  }
                 }
+                lk++;
               }
-              lk++;
+            }
+            for (std::size_t k=0, lk=0; k<B2; k++) {
+              if (g->is_local_row(k)) {
+                for (std::size_t j=i+1, lj=0; j<B1; j++) {
+                  if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.),
+                         *(Tk2i[lk]), *(Tij[lj]), scalar_t(1.),
+                         A21.tile_dense(k, j).D());
+                    lj++;
+                  }
+                }
+                lk++;
+              }
+            }
+            for (std::size_t k=i+1, lk=0; k<B1; k++) {
+              if (g->is_local_row(k)) {
+                for (std::size_t j=0, lj=0; j<B2; j++) {
+                  if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.),
+                         *(Tki[lk]), *(Tij2[lj]), scalar_t(1.),
+                         A12.tile_dense(k, j).D());
+                    lj++;
+                  }
+                }
+                lk++;
+              }
+            }
+            for (std::size_t k=0, lk=0; k<B2; k++) {
+              if (g->is_local_row(k)) {
+                for (std::size_t j=0, lj=0; j<B2; j++) {
+                  if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+                    gemm(Trans::N, Trans::N, scalar_t(-1.),
+                         *(Tk2i[lk]), *(Tij2[lj]), scalar_t(1.),
+                         A22.tile_dense(k, j).D());
+                    lj++;
+                  }
+                }
+                lk++;
+              }
             }
           }
-          for (std::size_t k=0, lk=0; k<B2; k++) {
-            if (g->is_local_row(k)) {
-              for (std::size_t j=i+1, lj=0; j<B1; j++) {
-                if (g->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
-                  gemm(Trans::N, Trans::N, scalar_t(-1.),
-                       *(Tk2i[lk]), *(Tij[lj]), scalar_t(1.),
-                       A21.tile_dense(k, j).D());
-                  lj++;
+        } else { //LL and LUAR Update
+          if (i+1 < B1) {
+            if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
+              for (std::size_t k=0; k<i+1; k++) {
+                auto Tik = A11.gather_row(i+1, k, i+1, B1);
+                auto Tkj = A11.gather_col(i+1, B1, i+1, k);
+                auto Tik2 = A12.gather_row(i+1, k, 0, B2);
+                auto Tk2j = A21.gather_col(0, B2, i+1, k);
+#pragma omp parallel
+#pragma omp single nowait
+                {
+                  if (g->is_local_row(i+1)) {
+                    std::size_t lk=0;
+                    for (std::size_t j=i+1; j<B1; j++) {
+                      if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk)
+                        gemm(Trans::N, Trans::N, scalar_t(-1.),
+                             *(Tkj[0]), *(Tik[lk]), scalar_t(1.),
+                             A11.tile_dense(i+1, j).D());
+                        lk++;
+                      }
+                    }
+                  }
+                  if (g->is_local_col(i+1)) {
+                    std::size_t lj=0;
+                    if (g->is_local_row(i+1)) lj=1;
+                    for (std::size_t j=i+2; j<B1; j++) {
+                      if (g->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,j,k,lj)
+                        gemm(Trans::N, Trans::N, scalar_t(-1.),
+                             *(Tkj[lj]), *(Tik[0]), scalar_t(1.),
+                             A11.tile_dense(j, i+1).D());
+                        lj++;
+                      }
+                    }
+                  }
+                  if (g->is_local_row(i+1)) {
+                    std::size_t lk=0;
+                    for (std::size_t j=0; j<B2; j++) {
+                      if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,k,j,lk) 
+                        gemm(Trans::N, Trans::N, scalar_t(-1.),
+                             *(Tkj[0]), *(Tik2[lk]), scalar_t(1.),
+                             A12.tile_dense(i+1, j).D());
+                        lk++;
+                      }
+                    }
+                  }
+                  if (g->is_local_col(i+1)) {
+                    std::size_t lj=0;
+                    for (std::size_t j=0; j<B2; j++) {
+                      if (g->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,k,j,lj)
+                        gemm(Trans::N, Trans::N, scalar_t(-1.),
+                             *(Tk2j[lj]), *(Tik[0]), scalar_t(1.),
+                             A21.tile_dense(j, i+1).D());
+                        lj++;
+                      }
+                    }
+                  }
                 }
               }
-              lk++;
+            } else { //LUAR - STAR or Comb
+              auto Tik = A11.gather_rows(i+1, B1, i+1, B1);
+              auto Tkj = A11.gather_cols(i+1, B1, i+1, B1);
+              auto Tik2 = A12.gather_rows(i+1, B1, 0, B2);
+              auto Tk2j = A21.gather_cols(0, B2, i+1, B1);
+#pragma omp parallel
+#pragma omp single nowait
+              {
+                if (g->is_local_row(i+1)) {
+                  std::size_t lk=0;
+                  for (std::size_t j=i+1; j<B1; j++) {
+                    if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                      LUAR(i+1, lk, Tkj, Tik, A11.tile_dense(i+1, j).D(), opts, 0); //*(Tkj[lj]), *(Tik[lk])
+                      lk+=i+1;
+                    }
+                  }
+                }
+                if (g->is_local_col(i+1)) {
+                  std::size_t lj=0;
+                  if (g->is_local_row(i+1)) lj=i+1;
+                  for (std::size_t j=i+2; j<B1; j++) {
+                    if (g->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                      LUAR(i+1, lj, Tik, Tkj, A11.tile_dense(j, i+1).D(), opts, 1);
+                      lj+=i+1;
+                    }
+                  }
+                }
+                if (g->is_local_row(i+1)) {
+                  std::size_t lk=0;
+                  for (std::size_t j=0; j<B2; j++) {
+                    if (g->is_local_col(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                      LUAR(i+1, lk, Tkj, Tik2, A12.tile_dense(i+1, j).D(), opts, 0);
+                      lk+=i+1;
+                    }
+                  }
+                }
+                if (g->is_local_col(i+1)) {
+                  std::size_t lj=0;
+                  for (std::size_t j=0; j<B2; j++) {
+                    if (g->is_local_row(j)) {
+#pragma omp task default(shared) firstprivate(i,j)
+                      LUAR(i+1, lj, Tik, Tk2j, A21.tile_dense(j, i+1).D(), opts, 1);
+                      lj+=i+1;
+                    }
+                  }
+                }
+              }
             }
           }
-          for (std::size_t k=i+1, lk=0; k<B1; k++) {
-            if (g->is_local_row(k)) {
-              for (std::size_t j=0, lj=0; j<B2; j++) {
-                if (g->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
-                  gemm(Trans::N, Trans::N, scalar_t(-1.),
-                       *(Tki[lk]), *(Tij2[lj]), scalar_t(1.),
-                       A12.tile_dense(k, j).D());
-                  lj++;
+        }
+      }
+      if (!(opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL)) { //LL and LUAR Update A22
+        auto Tik2 = A12.gather_rows_A22(B1, B2);
+        auto Tk2j = A21.gather_cols_A22(B1, B2);
+        if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            std::size_t lj=0;
+            for (std::size_t i=0, li=0; i<B2; i++) {
+              if (g->is_local_row(i)) {
+                for (std::size_t j=0, lk=0; j<B2; j++) {
+                  if (g->is_local_col(j)) {
+                    lj=li;
+                    for (std::size_t k=0; k<B1; k++) {
+#pragma omp task default(shared) firstprivate(i,j,k,lj,lk)
+                      gemm(Trans::N, Trans::N, scalar_t(-1.),
+                           *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.),
+                           A22.tile_dense(i, j).D());
+                      lj++;
+                      lk++;
+                    }
+                  }
                 }
+                li+=B1;
               }
-              lk++;
             }
           }
-          for (std::size_t k=0, lk=0; k<B2; k++) {
-            if (g->is_local_row(k)) {
-              for (std::size_t j=0, lj=0; j<B2; j++) {
-                if (g->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
-                  gemm(Trans::N, Trans::N, scalar_t(-1.),
-                       *(Tk2i[lk]), *(Tij2[lj]), scalar_t(1.),
-                       A22.tile_dense(k, j).D());
-                  lj++;
+        } else { //LUAR - Star or Comb
+#pragma omp parallel
+#pragma omp single nowait
+          {
+            std::size_t lj=0;
+            for (std::size_t i=0, li=0; i<B2; i++) {
+              if (g->is_local_row(i)) {
+                for (std::size_t j=0, lk=0; j<B2; j++) {
+                  if (g->is_local_col(j)) {
+                    lj=li;
+#pragma omp task default(shared) firstprivate(i,j)
+                    LUAR_A22(B1, lj, lk, Tk2j, Tik2, A22.tile_dense(i, j).D(), opts);
+                    lk+=B1;
+                  }
                 }
+                li+=B1;
               }
-              lk++;
             }
           }
         }
       }
       return piv;
     }
+
+    template<typename scalar_t> void
+    LUAR(std::size_t kmax, std::size_t lk,
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti,
+         std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj,
+         DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts,
+         std::size_t tmp) {
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::STAR) {
+        std::size_t rank_sum = 0;
+        std::size_t lk_tmp = lk;
+        for (std::size_t k=0, lj=0; k<kmax; k++) {
+          if (!(Ti[lj]->is_low_rank() || Tj[lk_tmp]->is_low_rank()))
+            if (tmp == 0)
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   *Ti[lj], *Tj[lk_tmp], scalar_t(1.), tij);
+            else
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   *Tj[lk_tmp], *Ti[lj], scalar_t(1.), tij);
+          else if (Ti[lj]->is_low_rank() && Tj[lk_tmp]->is_low_rank())
+            rank_sum += std::min(Ti[lj]->rank(), Tj[lk_tmp]->rank());
+          else if (Ti[lj]->is_low_rank())
+            rank_sum += Ti[lj]->rank();
+          else
+            rank_sum += Tj[lk_tmp]->rank();
+          lj++;
+          lk_tmp++;
+        }
+        if (rank_sum > 0) {
+          DenseMatrix<scalar_t> Uall(tij.rows(), rank_sum),
+            Vall(rank_sum, tij.cols());
+          std::size_t rank_tmp = 0;
+          for (std::size_t k=0, lj=0; k<kmax; k++) {
+            if (Ti[lj]->is_low_rank() || Tj[lk]->is_low_rank()) {
+              std::size_t minrank = 0;
+              if (Ti[lj]->is_low_rank() && Tj[lk]->is_low_rank())
+                minrank = std::min(Ti[lj]->rank(), Tj[lk]->rank());
+              else if (Ti[lj]->is_low_rank())
+                minrank = Ti[lj]->rank();
+              else if (Tj[lk]->is_low_rank())
+                minrank = Tj[lk]->rank();
+              DenseMatrixWrapper<scalar_t> t1(tij.rows(), minrank, Uall, 0, rank_tmp),
+                t2(minrank, tij.cols(), Vall, rank_tmp, 0);
+              if (tmp == 0) Ti[lj]->multiply(*Tj[lk], t1, t2);
+              else Tj[lk]->multiply(*Ti[lj], t1, t2);
+              rank_tmp += minrank;
+            }
+            lj++;
+            lk++;
+          }
+          if (opts.compression_kernel() == CompressionKernel::FULL) {
+            // recompress Uall and Vall
+            LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                 Uall_lr, Vall_lr, scalar_t(1.), tij);
+          } else { // recompress Uall OR Vall
+            if (Uall.rows() > Vall.cols()) // (Uall * Vall_lr.U) *Vall_lr.V
+              gemm(Trans::N, Trans::N, scalar_t(-1.), Uall,
+                   LRTile<scalar_t>(Vall, opts), scalar_t(1.), tij,
+                   params::task_recursion_cutoff_level);
+            else // Uall_lr.U * (Uall_lr.V * Vall)
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   LRTile<scalar_t>(Uall, opts), Vall, scalar_t(1.), tij,
+                   params::task_recursion_cutoff_level);
+          }
+        }
+      } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB) {
+        DenseMatrix<scalar_t> tmpU(tij.rows(), tij.cols()),
+          tmpV(tij.rows(), tij.cols());
+        std::size_t rank_tmp = 0, cnt = 0, rk=0;
+        for (std::size_t k=0, lj=0; k<kmax; k++) {
+          if (!(Ti[lj]->is_low_rank() || Tj[lk]->is_low_rank())) {
+            // both tiles are DenseTiles
+            if (tmp == 0)
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   *Ti[lj], *Tj[lk], scalar_t(1.), tij);
+            else
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   *Tj[lk], *Ti[lj], scalar_t(1.), tij);
+          } else {
+            if (Ti[lj]->is_low_rank() && Tj[lk]->is_low_rank())
+              rk = std::min(Ti[lj]->rank(), Tj[lk]->rank());
+            else if (Ti[lj]->is_low_rank()) rk = Ti[lj]->rank();
+            else rk = Tj[lk]->rank();
+            DenseMW_t t1(tij.rows(), rk, tmpU, 0, rank_tmp),
+              t2(rk, tij.cols(), tmpV, rank_tmp, 0);
+            if (tmp == 0) Ti[lj]->multiply(*Tj[lk], t1, t2);
+            else Tj[lk]->multiply(*Ti[lj], t1, t2);
+            rank_tmp+=rk;
+            if (cnt > 0) {
+              DenseMW_t Uall(tij.rows(), rank_tmp, tmpU, 0, 0),
+                Vall(rank_tmp, tij.cols(), tmpV, 0, 0);
+              //if (opts.compression_kernel() == CompressionKernel::FULL) {
+              // recompress Uall and Vall
+              LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
+              rank_tmp = std::min(Uall_lr.rank(), Vall_lr.rank());
+              DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+                t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+              Uall_lr.multiply(Vall_lr, t1, t2);
+              //} else { // recompress Uall OR Vall
+              // if (Uall.rows() > Vall.cols()) { // (Uall * Vall_lr.U) *Vall_lr.V
+              //   LRTile<scalar_t> Vall_lr(Vall, opts);
+              //   rank_tmp = Vall_lr.rank();
+              //   DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+              //     t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+              //   Uall.multiply(Vall_lr, t1, t2);
+              // } else{ // Uall_lr.U * (Uall_lr.V * Vall)
+              //   LRTile<scalar_t> Uall_lr(Uall, opts);
+              //   rank_tmp = Uall_lr.rank();
+              //   DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+              //     t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+              //   Uall_lr.multiply(Vall, t1, t2);
+              // }
+              //}
+            }
+            cnt++;
+          }
+          if ((k == kmax - 1) && (cnt > 0)) {
+            DenseMW_t t1(tij.rows(), rank_tmp, tmpU, 0, 0),
+              t2(rank_tmp, tij.cols(), tmpV, 0, 0);
+            gemm(Trans::N, Trans::N, scalar_t(-1.), t1, t2,
+                 scalar_t(1.), tij);
+          }
+          lj++;
+          lk++;
+        }
+      }
+    }
+
+    template<typename scalar_t> void
+    LUAR_A22(std::size_t kmax, std::size_t lj, std::size_t lk,
+             std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Ti,
+             std::vector<std::unique_ptr<BLRTile<scalar_t>>>& Tj,
+             DenseMatrix<scalar_t>& tij, const BLROptions<scalar_t>& opts) {
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::STAR) {
+        std::size_t rank_sum = 0;
+        std::size_t lk_tmp = lk, lj_tmp = lj;
+        for (std::size_t k=0; k<kmax; k++) {
+          if (!(Ti[lj_tmp]->is_low_rank() || Tj[lk_tmp]->is_low_rank()))
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                 *Ti[lj_tmp], *Tj[lk_tmp], scalar_t(1.), tij);
+          else if (Ti[lj_tmp]->is_low_rank() && Tj[lk_tmp]->is_low_rank())
+            rank_sum += std::min(Ti[lj_tmp]->rank(), Tj[lk_tmp]->rank());
+          else if (Ti[lj_tmp]->is_low_rank()) rank_sum += Ti[lj_tmp]->rank();
+          else rank_sum += Tj[lk_tmp]->rank();
+          lj_tmp++;
+          lk_tmp++;
+        }
+        if (rank_sum > 0) {
+          DenseMatrix<scalar_t> Uall(tij.rows(), rank_sum),
+            Vall(rank_sum, tij.cols());
+          std::size_t rank_tmp = 0;
+          for (std::size_t k=0; k<kmax; k++) {
+            if (Ti[lj]->is_low_rank() || Tj[lk]->is_low_rank()) {
+              std::size_t minrank = 0;
+              if (Ti[lj]->is_low_rank() && Tj[lk]->is_low_rank())
+                minrank = std::min(Ti[lj]->rank(), Tj[lk]->rank());
+              else if (Ti[lj]->is_low_rank())
+                minrank = Ti[lj]->rank();
+              else if (Tj[lk]->is_low_rank())
+                minrank = Tj[lk]->rank();
+              DenseMatrixWrapper<scalar_t> t1(tij.rows(), minrank, Uall, 0, rank_tmp),
+                t2(minrank, tij.cols(), Vall, rank_tmp, 0);
+              Ti[lj]->multiply(*Tj[lk], t1, t2);
+              rank_tmp += minrank;
+            }
+            lj++;
+            lk++;
+          }
+          if (opts.compression_kernel() == CompressionKernel::FULL) {
+            // recompress Uall and Vall
+            LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                 Uall_lr, Vall_lr, scalar_t(1.), tij);
+          } else { // recompress Uall OR Vall
+            if (Uall.rows() > Vall.cols()) { // (Uall * Vall_lr.U) *Vall_lr.V
+              gemm(Trans::N, Trans::N, scalar_t(-1.), Uall,
+                   LRTile<scalar_t>(Vall, opts), scalar_t(1.), tij,
+                   params::task_recursion_cutoff_level);
+            } else{ // Uall_lr.U * (Uall_lr.V * Vall)
+              gemm(Trans::N, Trans::N, scalar_t(-1.),
+                   LRTile<scalar_t>(Uall, opts), Vall, scalar_t(1.), tij,
+                   params::task_recursion_cutoff_level);
+            }
+          }
+        }
+      } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::COMB) {
+        DenseMatrix<scalar_t> tmpU(tij.rows(), tij.cols()), tmpV(tij.rows(), tij.cols());
+        std::size_t rank_tmp = 0, cnt = 0, rk=0;
+        for (std::size_t k=0; k<kmax; k++) {
+          if (!(Ti[lj]->is_low_rank() || Tj[lk]->is_low_rank()))
+            // both tiles are DenseTiles
+            gemm(Trans::N, Trans::N, scalar_t(-1.),
+                 *Ti[lj], *Tj[lk], scalar_t(1.), tij);
+          else {
+            if (Ti[lj]->is_low_rank() && Tj[lk]->is_low_rank())
+              rk = std::min(Ti[lj]->rank(), Tj[lk]->rank());
+            else if (Ti[lj]->is_low_rank()) rk = Ti[lj]->rank();
+            else rk = Tj[lk]->rank();
+            DenseMW_t t1(tij.rows(), rk, tmpU, 0, rank_tmp),
+              t2(rk, tij.cols(), tmpV, rank_tmp, 0);
+            Ti[lj]->multiply(*Tj[lk], t1, t2);
+            rank_tmp+=rk;
+            if (cnt > 0) {
+              DenseMW_t Uall(tij.rows(), rank_tmp, tmpU, 0, 0),
+                Vall(rank_tmp, tij.cols(), tmpV, 0, 0);
+              //if (opts.compression_kernel() == CompressionKernel::FULL) {
+              // recompress Uall and Vall
+              LRTile<scalar_t> Uall_lr(Uall, opts), Vall_lr(Vall, opts);
+              rank_tmp = std::min(Uall_lr.rank(), Vall_lr.rank());
+              DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+                t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+              Uall_lr.multiply(Vall_lr, t1, t2);
+              /*} else { // recompress Uall OR Vall
+                if (Uall.rows() > Vall.cols()) { // (Uall * Vall_lr.U) *Vall_lr.V
+                LRTile<scalar_t> Vall_lr(Vall, opts);
+                rank_tmp = Vall_lr.rank();
+                DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+                t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+                Uall.multiply(Vall_lr, t1, t2);
+                } else{ // Uall_lr.U * (Uall_lr.V * Vall)
+                LRTile<scalar_t> Uall_lr(Uall, opts);
+                rank_tmp = Uall_lr.rank();
+                DenseMW_t t1(tmpU.rows(), rank_tmp, tmpU, 0, 0),
+                t2(rank_tmp, tmpV.cols(), tmpV, 0, 0);
+                Uall_lr.multiply(Vall, t1, t2);
+                }
+                }*/
+            }
+            cnt++;
+          }
+          if ((k == kmax - 1) && (cnt > 0)) {
+            DenseMW_t t1(tij.rows(), rank_tmp, tmpU, 0, 0),
+              t2(rank_tmp, tij.cols(), tmpV, 0, 0);
+            gemm(Trans::N, Trans::N, scalar_t(-1.), t1, t2,
+                 scalar_t(1.), tij);
+          }
+          lj++;
+          lk++;
+        }
+      }
+    }
+
 
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
@@ -1099,10 +3087,12 @@ namespace strumpack {
             auto Aii = a.bcast_dense_tile_along_row(i, i);
 #pragma omp parallel
 #pragma omp single
-            for (std::size_t k=0; k<b.colblocks(); k++)
-              if (b.grid()->is_local_col(k))
+            for (std::size_t k=0; k<b.colblocks(); k++) {
+              if (b.grid()->is_local_col(k)) {
 #pragma omp task default(shared) firstprivate(i,k)
                 trsm(s, ul, ta, d, alpha, Aii, b.tile(i, k));
+              }
+            }
           }
           auto Aji = a.bcast_col_of_tiles_along_rows(i+1, a.rowblocks(), i);
           auto Bik = b.bcast_row_of_tiles_along_cols(i, 0, b.colblocks());

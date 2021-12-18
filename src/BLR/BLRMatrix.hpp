@@ -39,25 +39,42 @@
 
 #include "BLROptions.hpp"
 #include "BLRTileBLAS.hpp" // TODO remove
+#include "structured/StructuredMatrix.hpp"
 
 namespace strumpack {
   namespace BLR {
 
     // forward declarations
     template<typename scalar> class BLRTile;
+    template<typename scalar_t,typename integer_t> class BLRExtendAdd;
 
 
     template<typename T>
-    using extract_t = std::function<void(const std::vector<std::size_t>&,
-                                         const std::vector<std::size_t>&,
-                                         DenseMatrix<T>&)>;
+    using extract_t =
+      std::function<void(const std::vector<std::size_t>&,
+                         const std::vector<std::size_t>&,
+                         DenseMatrix<T>&)>;
     using adm_t = DenseMatrix<bool>;
 
-    template<typename scalar_t> class BLRMatrix {
+    /**
+     * \class BLRMatrix
+     *
+     * \brief Class to represent a block low-rank matrix.
+     *
+     * This is for non-symmetric matrices, but can be used with
+     * symmetric matrices as well. This class inherits from
+     * StructuredMatrix.
+     *
+     * \tparam scalar_t Can be float, double, std:complex<float> or
+     * std::complex<double>.
+     *
+     * \see structured::StructuredMatrix, BLRMatrixMPI
+     */
+    template<typename scalar_t> class BLRMatrix
+      : public structured::StructuredMatrix<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
-      // using elem_t = std::function<scalar_t(std::size_t,std::size_t)>;
 
     public:
       BLRMatrix() = default;
@@ -76,12 +93,15 @@ namespace strumpack {
                 const adm_t& admissible, std::vector<int>& piv,
                 const Opts_t& opts);
 
-      std::size_t rows() const { return m_; }
-      std::size_t cols() const { return n_; }
+      BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
+                std::size_t n, const std::vector<std::size_t>& coltiles);
 
-      std::size_t memory() const;
-      std::size_t nonzeros() const;
-      std::size_t maximum_rank() const;
+      std::size_t rows() const override { return m_; }
+      std::size_t cols() const override { return n_; }
+
+      std::size_t memory() const override;
+      std::size_t nonzeros() const override;
+      std::size_t rank() const override;
 
       DenseM_t dense() const;
       void dense(DenseM_t& A) const;
@@ -98,9 +118,30 @@ namespace strumpack {
         trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), *this, x, 0);
       }
 
+      /**
+       * Multiply this BLR matrix with a dense matrix (vector), ie,
+       * compute y = op(this) * x. Overrides from the StructuredMatrix
+       * class method.
+       *
+       * \param op Transpose or complex conjugate
+       * \param x right hand side matrix to multiply with, from the
+       * left, rows(x) == cols(op(this))
+       * \param y result of op(this) * b, cols(y) == cols(x), rows(r)
+       * = rows(op(this))
+       */
+      void mult(Trans op, const DenseM_t& x, DenseM_t& y) const override;
+
+      std::size_t rg2t(std::size_t i) const;
+      std::size_t cg2t(std::size_t j) const;
+
       scalar_t operator()(std::size_t i, std::size_t j) const;
+      scalar_t& operator()(std::size_t i, std::size_t j);
       DenseM_t extract(const std::vector<std::size_t>& I,
                        const std::vector<std::size_t>& J) const;
+
+      void decompress();
+      void decompress_local_columns(int c_min, int c_max);
+      void remove_tiles_before_local_column(int c_min, int c_max);
 
       std::size_t rowblocks() const { return nbrows_; }
       std::size_t colblocks() const { return nbcols_; }
@@ -113,6 +154,12 @@ namespace strumpack {
       const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const;
       std::unique_ptr<BLRTile<scalar_t>>& block(std::size_t i, std::size_t j);
       DenseMW_t tile(DenseM_t& A, std::size_t i, std::size_t j) const;
+      DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j);
+      const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
+
+      void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
+      void fill(scalar_t v);
+      void fill_col(scalar_t v, std::size_t k, std::size_t CP);
 
       static void
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
@@ -125,6 +172,30 @@ namespace strumpack {
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const Opts_t& opts);
+
+      static void
+      construct_and_partial_factor(BLRMatrix<scalar_t>& B11,
+                                   BLRMatrix<scalar_t>& B12,
+                                   BLRMatrix<scalar_t>& B21,
+                                   BLRMatrix<scalar_t>& B22,
+                                   std::vector<int>& piv,
+                                   const std::vector<std::size_t>& tiles1,
+                                   const std::vector<std::size_t>& tiles2,
+                                   const adm_t& admissible,
+                                   const Opts_t& opts);
+
+      static void
+      construct_and_partial_factor_col(BLRMatrix<scalar_t>& B11,
+                                       BLRMatrix<scalar_t>& B12,
+                                       BLRMatrix<scalar_t>& B21,
+                                       BLRMatrix<scalar_t>& B22,
+                                       std::vector<int>& piv,
+                                       const std::vector<std::size_t>& tiles1,
+                                       const std::vector<std::size_t>& tiles2,
+                                       const adm_t& admissible,
+                                       const Opts_t& opts,
+                                       const std::function<void
+                                       (int, bool, std::size_t)>& blockcol);
 
       static void
       construct_and_partial_factor(std::size_t n1, std::size_t n2,
@@ -154,11 +225,8 @@ namespace strumpack {
 
     private:
       std::size_t m_ = 0, n_ = 0, nbrows_ = 0, nbcols_ = 0;
-      std::vector<std::size_t> roff_, coff_;
+      std::vector<std::size_t> roff_, coff_, cl2l_, rl2l_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
-
-      BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
-                std::size_t n, const std::vector<std::size_t>& coltiles);
 
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile(std::size_t i, std::size_t j,
@@ -194,6 +262,7 @@ namespace strumpack {
 
       template<typename T> friend
       void draw(const BLRMatrix<T>& H, const std::string& name);
+      template<typename T,typename I> friend class BLRExtendAdd;
     };
 
     template<typename scalar_t> void

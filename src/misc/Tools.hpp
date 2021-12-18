@@ -60,6 +60,39 @@ namespace strumpack {
       ::new(p) U(std::forward<Args>(args)...);
     }
   };
+  template <class T, class U> bool operator==
+  (const NoInit<T>&, const NoInit<U>&) { return true; }
+  template <class T, class U> bool operator!=
+  (const NoInit<T>&, const NoInit<U>&) { return false; }
+
+
+  template<typename scalar_t> class VectorPool {
+  public:
+#if defined(STRUMPACK_COUNT_FLOPS)
+    ~VectorPool() {
+      for (auto& v : data_) {
+        STRUMPACK_SUB_MEMORY(v.size()*sizeof(scalar_t));
+      }
+    }
+#endif
+    std::vector<scalar_t,NoInit<scalar_t>> get() {
+      std::vector<scalar_t,NoInit<scalar_t>> v;
+#pragma omp critical
+      {
+        if (!data_.empty()) {
+          v = std::move(data_.back());
+          data_.pop_back();
+        }
+      }
+      return v;
+    }
+    void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
+#pragma omp critical
+      data_.push_back(std::move(v));
+    }
+  private:
+    std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
+  };
 
 
   // this sorts both indices and values at the same time

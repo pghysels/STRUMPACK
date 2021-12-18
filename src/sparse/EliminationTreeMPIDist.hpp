@@ -57,19 +57,24 @@ namespace strumpack {
     using Reord_t = MatrixReorderingMPI<scalar_t,integer_t>;
 
   public:
-    EliminationTreeMPIDist
-    (const Opts_t& opts, const CSRMPI_t& A, Reord_t& nd, const MPIComm& comm);
+    EliminationTreeMPIDist(const Opts_t& opts, const CSRMPI_t& A,
+                           Reord_t& nd, const MPIComm& comm);
+
+    void update_values(const Opts_t& opts, const CSRMPI_t& A,
+                       Reord_t& nd);
 
     void multifrontal_factorization
     (const CompressedSparseMatrix<scalar_t,integer_t>& A,
      const Opts_t& opts) override;
 
-    void multifrontal_solve_dist
-    (DenseM_t& x, const std::vector<integer_t>& dist) override;
+    void multifrontal_solve_dist(DenseM_t& x,
+                                 const std::vector<integer_t>& dist) override;
 
-    std::tuple<int,int,int> get_sparse_mapped_destination
-    (const CSRMPI_t& A, integer_t oi, integer_t oj,
-     integer_t i, integer_t j, bool duplicate_fronts) const;
+    std::tuple<int,int,int>
+    get_sparse_mapped_destination(const CSRMPI_t& A,
+                                  integer_t oi, integer_t oj,
+                                  integer_t i, integer_t j,
+                                  bool duplicate_fronts) const;
 
     void separator_reordering(const Opts_t& opts, const CSRMPI_t& A);
 
@@ -82,6 +87,7 @@ namespace strumpack {
 
     Reord_t& nd_;
     PropMapSparseMatrix<scalar_t,integer_t> Aprop_;
+    ProportionalMapping prop_map_;
 
     /**
      * vector with A.local_rows() elements, storing for each row
@@ -141,7 +147,7 @@ namespace strumpack {
      std::vector<integer_t>& dsep_upd, float& dsep_work,
      std::vector<integer_t>& dleaf_upd, float& dleaf_work);
 
-    void symbolic_factorization_local
+    float symbolic_factorization_local
     (integer_t sep, std::vector<std::vector<integer_t>>& upd,
      std::vector<float>& subtree_work, int depth);
 
@@ -163,9 +169,6 @@ namespace strumpack {
      integer_t& dsep_begin, integer_t& dsep_end,
      std::vector<integer_t>& dupd_recv, int P0, int P,
      int P0_sibling, int P_sibling, int owner);
-
-    template<typename It> void merge_if_larger
-    (const It u0, const It u1, std::vector<integer_t>& out, integer_t s) const;
   };
 
 } // end namespace strumpack

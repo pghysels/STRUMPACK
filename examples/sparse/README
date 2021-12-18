@@ -1,0 +1,79 @@
+This folder contains a number of examples showing how to use the
+sparse solvers in STRUMPACK.
+
+When running, also make sure to set the number of OpenMP threads
+correctly! For instance on bash, to run with 4 MPI processes and 6
+threads per MPI process:
+      export OMP_NUM_THREADS=6
+      mpirun -n 4 ./exe args
+
+Check the documentation of your MPI environment for the correct
+arguments to mpirun (or the alternative command). For instance on
+NERSC Cray machines, the aprun command is used instead and the number
+of threads needs to be specified to the aprun command as well being
+set via the OMP_NUM_THREADS variable. Also experiment with OpenMP
+thread affinity and thread pinning to get good and consistent
+performance.
+
+
+The examples include:
+=====================
+
+- testPoisson2d/testPoisson3d: A double precision C++ example, solving
+    the 2D/3D Poisson problem with the sequential or multithreaded
+    solver.  Run as follows, for a 1000x1000 Poisson problem with
+    Dirichlet BCs:
+
+      ./testPoisson2d 1000
+      ./testPoisson3d 100
+
+- testPoisson2dMPIDist/testPoisson3dMPIDist: A double precision C++
+    example, solving the 2D/3D Poisson problem with the fully
+    distributed MPI solver.  Run as follows, for a 1000x1000 Poisson
+    problem with Dirichlet BCs:
+
+      mpirun -n 4 ./testPoisson2dMPIDist 1000
+      mpirun -n 4 ./testPoisson3dMPIDist 100
+
+- testMMdouble: A double precision C++ example, solving a linear
+    system with a matrix given in a file in the matrix-market format,
+    using the sequential or multithreaded solver. Run as follows with
+    a matrix specified in the file data/pde900.mtx (provided):
+
+      ./testMMdouble data/pde900.mtx
+
+- testMMdoubleMPIDist: A double precision C++ example, solving a
+    linear system with a matrix given in a file in the matrix-market
+    format, using the fully distributed MPI solver. Run as follows
+    with a matrix specified in the file pde900.mtx:
+
+      mpirun -n 4 ./testMMdoubleMPIDist m data/pde900.mtx
+      mpirun -n 4 ./testMMdoubleMPIDist b data/pde900.bin # see mtx2bin
+
+
+
+- sexample:
+- dexample:
+- cexample:
+- zexample:
+
+    These four examples use the C interface for real single precision
+    (sexample), real double precision (dexample), complex single
+    precision (cexample) and complex double precision (zexample). They
+    all solve the same problem as the testPoisson2d C++ example with
+    the sequential/multithreaded interface. These examples also show
+    how to enable compression. dexample.c also shows how to update the
+    matrix values, to solve two systems with two matrices with
+    different values but the same sparsity pattern.
+
+      OMP_NUM_THREADS=1 ./sexample 1000 --help
+      ./dexample 1000
+
+
+- fexample: A Fortran 90 example, solving the same sparse problem as
+    the C examples. We currently do not have any Fortran interfaces
+    for the dense matrix solvers. This also shows how to enable
+    compression. This example does not parse any command line
+    arguments.
+
+      OMP_NUM_THREADS=1 ./fexample

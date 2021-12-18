@@ -1,0 +1,101 @@
+This folder contains a number of examples showing how to use the dense
+matrix solvers in STRUMPACK. We recommend using the general
+structured::StructuredMatrix class interface to the different formats,
+see testStructured and testStructuredMPI. There are also C and Fortran
+interfaces, see dstructured.d dstructured_mpi.c and fstructured.f90.
+
+To build all examples, run:
+      make examples
+in the build directory.
+
+
+When running, make sure to set the number of OpenMP threads
+correctly! For instance on bash, to run with 4 MPI processes and 6
+threads per MPI process:
+      export OMP_NUM_THREADS=6
+      mpirun -n 4 ./exe args
+
+Check the documentation of your MPI environment for the correct
+arguments to mpirun (or the alternative command). For instance on
+NERSC Cray machines, the aprun command is used instead and the number
+of threads needs to be specified to the aprun command as well being
+set via the OMP_NUM_THREADS variable. Also experiment with OpenMP
+thread affinity and thread pinning to get good and consistent
+performance.
+
+
+The examples include:
+=====================
+
+- testStructured: Example usage of the StructuredMatrix class
+    (sequential or threaded). This illustrates several uses of the
+    StructuredMatrix class, including construction of the matrix,
+    matrix-vector product, linear solve and preconditioning. Note that
+    the HODLR, HODBF, BUTTERFLY and LR formats require MPI
+    support. For these, see testStructuredMPI. Run with for instance:
+
+      OMP_NUM_THREADS=4 ./testStructured 1000 --help
+
+- testStructuredMPI: Example usage of the StructuredMatrix class,
+    using MPI. This illustrates several uses of the StructuredMatrix
+    class using MPI, including construction of the matrix,
+    matrix-vector product, linear solve and preconditioning.
+
+      OMP_NUM_THREADS=4 mpirun -n 4 ./testStructuredMPI 1000 --help
+
+
+- test_HODLR_HODBF: similar to testStructured, but simplified to show
+    just the use for the Hierarchically Off-Diagonal Low Rank and
+    Hierarchically Off-Diagonal Butterfly formats. This illustrates
+    construction from individual matrix elements (using a routine to
+    compute matrix elements), and construction using a matrix vector
+    product (which can be distributed using either a 2d block cyclic
+    distribution or a 1d block row distribution). It also show the
+    solution of a linear system, and use as a preconditioner.
+
+
+- dstructured.c: Example usage of the C interface for structured
+    matrices (sequential or threaded).
+
+      OMP_NUM_THREADS=4 ./dstructured 1000
+
+- dstructured_mpi.c: Example usage of the C interface for structured
+    matrices using MPI.
+
+      OMP_NUM_THREADS=1 mpirun -n 4 ./dstructured_mpi 1000
+
+
+- fstructured.f90: Example usage of the C interface for structured
+    matrices using MPI.
+
+      OMP_NUM_THREADS=1 mpirun -n 4 ./dstructured_mpi 1000
+
+
+
+
+== older examples ==================================================
+
+
+
+- KernelRegression: an example on how to use HSS for kernel matrices
+    as used in certain machine learning applications. This requires 4
+    input files, the training and testing data (of dimension d), and
+    the corresponding labels. See the data/susy_10Kn* files for an
+    example.
+
+    OMP_NUM_THREADS=4 ./KernelRegression data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
+
+- KernelRegressionMPI: an MPI version of KernelRegression. This also
+  runs HODLR compression of the kernel matrix, if STRUMPACK was
+  configured with HODLR support:
+
+    OMP_NUM_THREADS=1 mpirun -n 4 ./KernelRegressionMPI data/susy_10Kn 8 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2
+
+- KernelRegression.py: an example showing the use of the Python,
+  scikit-learn compatible interface for the kernel ridge regression
+  functionality. This requires you build strumpack as a shared
+  library.
+
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${STRUMPACKROOT}/lib/
+    export PYTHONPATH=$PYTHONPATH:${STRUMPACKROOT}/include/python/
+    OMP_NUM_THREADS=1 python KernelRegression.py data/susy_10Kn 1.3 3.11 1 Gauss test --hss_rel_tol 1e-2

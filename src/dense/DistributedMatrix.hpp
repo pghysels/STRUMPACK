@@ -31,6 +31,7 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <functional>
 
 #include "misc/MPIWrapper.hpp"
 #include "misc/RandomWrapper.hpp"
@@ -60,13 +61,16 @@ namespace strumpack {
 
   public:
     DistributedMatrix();
+    DistributedMatrix(const BLACSGrid* g, int M, int N);
+    DistributedMatrix(const BLACSGrid* g, int M, int N,
+                      const std::function<scalar_t(std::size_t,
+                                                   std::size_t)>& A);
     DistributedMatrix(const BLACSGrid* g, const DenseMatrix<scalar_t>& m);
     DistributedMatrix(const BLACSGrid* g, DenseMatrix<scalar_t>&& m);
     DistributedMatrix(const BLACSGrid* g, DenseMatrixWrapper<scalar_t>&& m);
     DistributedMatrix(const BLACSGrid* g, int M, int N,
                       const DistributedMatrix<scalar_t>& m,
                       int context_all);
-    DistributedMatrix(const BLACSGrid* g, int M, int N);
     DistributedMatrix(const BLACSGrid* g, int M, int N, int MB, int NB);
     DistributedMatrix(const BLACSGrid* g, int desc[9]);
 
@@ -80,58 +84,59 @@ namespace strumpack {
     operator=(DistributedMatrix<scalar_t>&& m);
 
 
-    inline const int* desc() const { return desc_; }
-    inline int* desc() { return desc_; }
-    inline bool active() const { return grid() && grid()->active(); }
+    const int* desc() const { return desc_; }
+    int* desc() { return desc_; }
+    bool active() const { return grid() && grid()->active(); }
 
-    inline const BLACSGrid* grid() const { return grid_; }
-    inline const MPIComm& Comm() const { return grid()->Comm(); }
-    inline MPI_Comm comm() const { return Comm().comm(); }
+    const BLACSGrid* grid() const { return grid_; }
+    const MPIComm& Comm() const { return grid()->Comm(); }
+    MPI_Comm comm() const { return Comm().comm(); }
 
-    inline int ctxt() const { return grid() ? grid()->ctxt() : -1; }
-    inline int ctxt_all() const { return grid() ? grid()->ctxt_all() : -1; }
+    int ctxt() const { return grid() ? grid()->ctxt() : -1; }
+    int ctxt_all() const { return grid() ? grid()->ctxt_all() : -1; }
 
     virtual int rows() const { return desc_[2]; }
     virtual int cols() const { return desc_[3]; }
-    inline int lrows() const { return lrows_; }
-    inline int lcols() const { return lcols_; }
-    inline int ld() const { return lrows_; }
-    inline int MB() const { return desc_[4]; }
-    inline int NB() const { return desc_[5]; }
-    inline int rowblocks() const { return std::ceil(float(lrows()) / MB()); }
-    inline int colblocks() const { return std::ceil(float(lcols()) / NB()); }
+    int lrows() const { return lrows_; }
+    int lcols() const { return lcols_; }
+    int ld() const { return lrows_; }
+    int MB() const { return desc_[4]; }
+    int NB() const { return desc_[5]; }
+    int rowblocks() const { return std::ceil(float(lrows()) / MB()); }
+    int colblocks() const { return std::ceil(float(lcols()) / NB()); }
 
     virtual int I() const { return 1; }
     virtual int J() const { return 1; }
     virtual void lranges(int& rlo, int& rhi, int& clo, int& chi) const;
 
-    inline const scalar_t* data() const { return data_; }
-    inline scalar_t* data() { return data_; }
-    inline const scalar_t& operator()(int r, int c) const
+    const scalar_t* data() const { return data_; }
+    scalar_t* data() { return data_; }
+    const scalar_t& operator()(int r, int c) const
     { return data_[r+ld()*c]; }
-    inline scalar_t& operator()(int r, int c) { return data_[r+ld()*c]; }
+    scalar_t& operator()(int r, int c) { return data_[r+ld()*c]; }
 
-    inline int prow() const { assert(grid()); return grid()->prow(); }
-    inline int pcol() const { assert(grid()); return grid()->pcol(); }
-    inline int nprows() const { assert(grid()); return grid()->nprows(); }
-    inline int npcols() const { assert(grid()); return grid()->npcols(); }
+    int prow() const { assert(grid()); return grid()->prow(); }
+    int pcol() const { assert(grid()); return grid()->pcol(); }
+    int nprows() const { assert(grid()); return grid()->nprows(); }
+    int npcols() const { assert(grid()); return grid()->npcols(); }
+    int npactives() const { assert(grid()); return grid()->npactives(); }
 
-    inline bool is_master() const { return grid() && prow() == 0 && pcol() == 0; }
-    inline int rowl2g(int row) const { assert(grid());
+    bool is_master() const { return grid() && prow() == 0 && pcol() == 0; }
+    int rowl2g(int row) const { assert(grid());
       return indxl2g(row+1, MB(), prow(), 0, nprows()) - I(); }
-    inline int coll2g(int col) const { assert(grid());
+    int coll2g(int col) const { assert(grid());
       return indxl2g(col+1, NB(), pcol(), 0, npcols()) - J(); }
-    inline int rowg2l(int row) const { assert(grid());
+    int rowg2l(int row) const { assert(grid());
       return indxg2l(row+I(), MB(), prow(), 0, nprows()) - 1; }
-    inline int colg2l(int col) const { assert(grid());
+    int colg2l(int col) const { assert(grid());
       return indxg2l(col+J(), NB(), pcol(), 0, npcols()) - 1; }
-    inline int rowg2p(int row) const { assert(grid());
+    int rowg2p(int row) const { assert(grid());
       return indxg2p(row+I(), MB(), prow(), 0, nprows()); }
-    inline int colg2p(int col) const { assert(grid());
+    int colg2p(int col) const { assert(grid());
       return indxg2p(col+J(), NB(), pcol(), 0, npcols()); }
-    inline int rank(int r, int c) const {
+    int rank(int r, int c) const {
       return rowg2p(r) + colg2p(c) * nprows(); }
-    inline bool is_local(int r, int c) const { assert(grid());
+    bool is_local(int r, int c) const { assert(grid());
       return rowg2p(r) == prow() && colg2p(c) == pcol();
     }
 
@@ -182,12 +187,17 @@ namespace strumpack {
                 value_type>& rgen);
     void zero();
     void fill(scalar_t a);
+    void fill(const std::function<scalar_t(std::size_t,
+                                           std::size_t)>& A);
     void eye();
     void shift(scalar_t sigma);
     void clear();
     virtual void resize(std::size_t m, std::size_t n);
     virtual void hconcat(const DistributedMatrix<scalar_t>& b);
     DistributedMatrix<scalar_t> transpose() const;
+
+    void mult(Trans op, const DistributedMatrix<scalar_t>& X,
+              DistributedMatrix<scalar_t>& Y) const;
 
     void laswp(const std::vector<int>& P, bool fwd);
 
@@ -202,6 +212,8 @@ namespace strumpack {
     DistributedMatrix<scalar_t>& add(const DistributedMatrix<scalar_t>& B);
     DistributedMatrix<scalar_t>&
     scaled_add(scalar_t alpha, const DistributedMatrix<scalar_t>& B);
+    DistributedMatrix<scalar_t>&
+    scale_and_add(scalar_t alpha, const DistributedMatrix<scalar_t>& B);
 
     real_t norm() const;
     real_t normF() const;
@@ -252,21 +264,21 @@ namespace strumpack {
    * copy submatrix of a DistM_t at ia,ja of size m,n into a DenseM_t
    * b at proc dest
    */
-  template<typename scalar_t> void copy
-  (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
-   std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
-   int dest, int context_all);
+  template<typename scalar_t> void
+  copy(std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
+       std::size_t ia, std::size_t ja, DenseMatrix<scalar_t>& b,
+       int dest, int context_all);
 
-  template<typename scalar_t> void copy
-  (std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a, int src,
-   DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb,
-   int context_all);
+  template<typename scalar_t> void
+  copy(std::size_t m, std::size_t n, const DenseMatrix<scalar_t>& a, int src,
+       DistributedMatrix<scalar_t>& b, std::size_t ib, std::size_t jb,
+       int context_all);
 
   /** copy submatrix of a at ia,ja of size m,n into b at position ib,jb */
-  template<typename scalar_t> void copy
-  (std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
-   std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
-   std::size_t ib, std::size_t jb, int context_all);
+  template<typename scalar_t> void
+  copy(std::size_t m, std::size_t n, const DistributedMatrix<scalar_t>& a,
+       std::size_t ia, std::size_t ja, DistributedMatrix<scalar_t>& b,
+       std::size_t ib, std::size_t jb, int context_all);
 
   /**
    * Wrapper class does exactly the same as a regular DistributedMatrix,
@@ -327,75 +339,83 @@ namespace strumpack {
 
   template<typename scalar_t> long long int
   LU_flops(const DistributedMatrix<scalar_t>& a) {
-    if (!a.is_master()) return 0;
+    if (!a.active()) return 0;
     return (is_complex<scalar_t>() ? 4:1) *
-      blas::getrf_flops(a.rows(), a.cols());
+      blas::getrf_flops(a.rows(), a.cols()) /
+      a.npactives();
   }
 
   template<typename scalar_t> long long int
   solve_flops(const DistributedMatrix<scalar_t>& b) {
-    if (!b.is_master()) return 0;
+    if (!b.active()) return 0;
     return (is_complex<scalar_t>() ? 4:1) *
-      blas::getrs_flops(b.rows(), b.cols());
+      blas::getrs_flops(b.rows(), b.cols()) /
+      b.npactives();
   }
 
   template<typename scalar_t> long long int
   LQ_flops(const DistributedMatrix<scalar_t>& a) {
-    if (!a.is_master()) return 0;
+    if (!a.active()) return 0;
     auto minrc = std::min(a.rows(), a.cols());
     return (is_complex<scalar_t>() ? 4:1) *
       (blas::gelqf_flops(a.rows(), a.cols()) +
-       blas::xxglq_flops(a.cols(), a.cols(), minrc));
+       blas::xxglq_flops(a.cols(), a.cols(), minrc)) /
+      a.npactives();
   }
 
   template<typename scalar_t> long long int
   ID_row_flops(const DistributedMatrix<scalar_t>& a, int rank) {
-    if (!a.is_master()) return 0;
+    if (!a.active()) return 0;
     return (is_complex<scalar_t>() ? 4:1) *
       (blas::geqp3_flops(a.cols(), a.rows())
-       + blas::trsm_flops(rank, a.cols() - rank, scalar_t(1.), 'L'));
+       + blas::trsm_flops(rank, a.cols() - rank, scalar_t(1.), 'L')) /
+      a.npactives();
   }
 
   template<typename scalar_t> long long int
   trsm_flops(Side s, scalar_t alpha, const DistributedMatrix<scalar_t>& a,
              const DistributedMatrix<scalar_t>& b) {
-    if (!a.is_master()) return 0;
+    if (!a.active()) return 0;
     return (is_complex<scalar_t>() ? 4:1) *
-      blas::trsm_flops(b.rows(), b.cols(), alpha, char(s));
+      blas::trsm_flops(b.rows(), b.cols(), alpha, char(s)) /
+      a.npactives();
   }
 
   template<typename scalar_t> long long int
   gemm_flops(Trans ta, Trans tb, scalar_t alpha,
              const DistributedMatrix<scalar_t>& a,
              const DistributedMatrix<scalar_t>& b, scalar_t beta) {
-    if (!a.is_master()) return 0;
+    if (!a.active()) return 0;
     return (is_complex<scalar_t>() ? 4:1) *
       blas::gemm_flops
       ((ta==Trans::N) ? a.rows() : a.cols(),
        (tb==Trans::N) ? b.cols() : b.rows(),
-       (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta);
+       (ta==Trans::N) ? a.cols() : a.rows(), alpha, beta) /
+      a.npactives();
   }
 
   template<typename scalar_t> long long int
   gemv_flops(Trans ta, const DistributedMatrix<scalar_t>& a,
              scalar_t alpha, scalar_t beta) {
-    if (!a.is_master()) return 0;
+    if (!a.active()) return 0;
     auto m = (ta==Trans::N) ? a.rows() : a.cols();
     auto n = (ta==Trans::N) ? a.cols() : a.rows();
     return (is_complex<scalar_t>() ? 4:1) *
       ((alpha != scalar_t(0.)) * m * (n * 2 - 1) +
        (alpha != scalar_t(1.) && alpha != scalar_t(0.)) * m +
        (beta != scalar_t(0.) && beta != scalar_t(1.)) * m +
-       (alpha != scalar_t(0.) && beta != scalar_t(0.)) * m);
+       (alpha != scalar_t(0.) && beta != scalar_t(0.)) * m) /
+      a.npactives();
   }
 
   template<typename scalar_t> long long int
   orthogonalize_flops(const DistributedMatrix<scalar_t>& a) {
-    if (!a.is_master()) return 0;
+    if (!a.active()) return 0;
     auto minrc = std::min(a.rows(), a.cols());
     return (is_complex<scalar_t>() ? 4:1) *
       (blas::geqrf_flops(a.rows(), minrc) +
-       blas::xxgqr_flops(a.rows(), minrc, minrc));
+       blas::xxgqr_flops(a.rows(), minrc, minrc)) /
+      a.npactives();
   }
 
 

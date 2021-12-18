@@ -1,5 +1,10 @@
 /*! \page blr_matrices BLR Approximation of Dense Matrices
 
+We recommend to use the strumpack::structured::StructuredMatrix
+interface instead of directly using the BLR classes. See \link dense
+Dense Solvers \endlink.
+
+
 The BLR code can be found in the src/BLR/ subdirectory. All BLR code
 is in a namespace called \link strumpack::BLR BLR\endlink.
 

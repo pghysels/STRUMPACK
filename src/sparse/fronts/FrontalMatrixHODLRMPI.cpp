@@ -167,7 +167,7 @@ namespace strumpack {
       rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (!dim_blk()) return;
     TaskTimer t("FrontalMatrixHODLRMPI_factor");
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) t.start();
+    if (opts.print_compressed_front_stats()) t.start();
     construct_hierarchy(A, opts);
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
@@ -191,7 +191,7 @@ namespace strumpack {
     if (F22_) HOD_mem += F22_->get_stat("Mem_Fill");
     STRUMPACK_ADD_MEMORY(HOD_mem*1.e6);
 #endif
-    if (/*etree_level == 0 && */opts.print_root_front_stats()) {
+    if (opts.print_compressed_front_stats()) {
       auto time = t.elapsed();
       float perbyte = 1.0e6 / sizeof(scalar_t);
       float tmp[5];
@@ -213,9 +213,10 @@ namespace strumpack {
         F22nnzH = F22_->get_stat("Mem_Fill") * perbyte;
       } else F22nnzH = 0.;
       Comm().reduce(tmp, 5, MPI_SUM);
-      if (Comm().is_root())
+      if (Comm().is_root()) {
         std::cout << "#   - HODLRMPI front: Nsep= " << dim_sep()
-                  << " , Nupd= " << dim_upd() << "\n#       "
+                  << " , Nupd= " << dim_upd()
+                  << " level= " << etree_level << "\n#       "
                   << " nnz(F11)= " << F11nnzH << " , nnz(factor(F11))= "
                   << F11nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
                   << " nnz(F12)= " << F12nnzH << " , rank(F12)= " << F12rank << " , "
@@ -225,6 +226,14 @@ namespace strumpack {
                       / (float(dim_blk())*dim_blk()) * 100.)
                   << " %compression, time= " << time
                   << " sec" << std::endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+        std::cout << "#        total memory: "
+                  << double(strumpack::params::memory) / 1.0e6 << " MB"
+                  << ",   peak memory: "
+                  << double(strumpack::params::peak_memory) / 1.0e6
+                  << " MB" << std::endl;;
+#endif
+      }
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
@@ -272,7 +281,6 @@ namespace strumpack {
           this->extract_2d(A, I, J, B);
         };
       { TIMER_TIME(TaskType::LRBF_COMPRESS, 0, t_lrbf_compress);
-        
         // int bsize = std::min(64.0,ceil(F11_.get_stat("Rank_max")/2.0));
         // F12_.set_BACA_block(bsize);
         F12_.compress(extract_F12);
@@ -632,7 +640,7 @@ namespace strumpack {
         g12.permute_cols(CB_perm_.data());
         g21.permute_rows(CB_iperm_.data());
 #else
-        HSS::HSSPartitionTree CB_tree(dim_upd());
+        structured::ClusterTree CB_tree(dim_upd());
         CB_tree.refine(opts.HODLR_options().leaf_size());
 #endif
         TIMER_STOP(t_graph_22);
@@ -647,7 +655,7 @@ namespace strumpack {
         F21_ = HODLR::ButterflyMatrix<scalar_t>
           (*F22_, F11_, nns21, nns12, opts.HODLR_options());
       } else {
-        HSS::HSSPartitionTree CB_tree(dim_upd());
+        structured::ClusterTree CB_tree(dim_upd());
         CB_tree.refine(opts.HODLR_options().leaf_size());
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>
