@@ -52,10 +52,15 @@ namespace strumpack {
         if (T.rows() == 0 || T.cols() == 0) {
           U_.reset(new DenseM_t(T.rows(), 0));
           V_.reset(new DenseM_t(0, T.cols()));
-        } else
+        } else {
+          V_.reset(new DenseM_t());
+          U_.reset(new DenseM_t());
           T.low_rank(U(), V(), opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
                      params::task_recursion_cutoff_level);
+        }
       } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
+        V_.reset(new DenseM_t());
+        U_.reset(new DenseM_t());
         adaptive_cross_approximation<scalar_t>
           (U(), V(), T.rows(), T.cols(),
            [&](std::size_t i, std::size_t j) -> scalar_t {
@@ -147,6 +152,8 @@ namespace strumpack {
      const std::function<void(std::size_t,scalar_t*)>& Trow,
      const std::function<void(std::size_t,scalar_t*)>& Tcol,
      const Opts_t& opts) {
+      V_.reset(new DenseM_t());
+      U_.reset(new DenseM_t());
       adaptive_cross_approximation<scalar_t>
         (U(), V(), m, n, Trow, Tcol, opts.rel_tol(), opts.abs_tol(),
          opts.max_rank());
@@ -163,6 +170,8 @@ namespace strumpack {
      const std::function<void(const std::vector<std::size_t>&,
                               DenseMatrix<scalar_t>&)>& Tcol,
      const Opts_t& opts) {
+      V_.reset(new DenseM_t());
+      U_.reset(new DenseM_t());
       //blocked_adaptive_cross_approximation_nodups<scalar_t>
       blocked_adaptive_cross_approximation<scalar_t>
         (U(), V(), m, n, Trow, Tcol, opts.BACA_blocksize(),
