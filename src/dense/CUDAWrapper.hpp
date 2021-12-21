@@ -370,11 +370,11 @@ namespace strumpack {
          const DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
 
     template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type>
-    int gesvdj_buffersize(SOLVERHandle& handle, int m, int n, 
+    int gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n, 
                           real_t* S, int Lwork, gesvdjInfo_t params);
 
     template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type> void
-    gesvdj(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, 
+    gesvdj(SOLVERHandle& handle, Jobz jobz, DenseMatrix<scalar_t>& A, 
            real_t* d_S, DenseMatrix<scalar_t>& U, 
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
            int Lwork, int* devInfo, gesvdjInfo_t params);
@@ -385,7 +385,7 @@ namespace strumpack {
          DenseMatrix<scalar_t>& C);
     
     template<typename scalar_t> void
-    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A, scalar_t* x, 
+    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A, const scalar_t* x, 
          DenseMatrix<scalar_t>& C);
 
     template<typename scalar_t> void
