@@ -170,13 +170,13 @@ namespace strumpack {
       gpu::DeviceMemory<real_t> d_S(minmn);
       real_t* dS = d_S;
       real_t* S = nullptr;
-      int Lwork = 0, rank = 0;
+      int rank = 0;
       const double tol = opts.rel_tol();
       gesvdjInfo_t params = nullptr;
       cusolverDnCreateGesvdjInfo(&params);
       cusolverDnXgesvdjSetTolerance(params, tol);
       int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
-         (handle, Jobz::V, tilerows(i), tilecols(j), dS, Lwork, params);
+         (handle, Jobz::V, tilerows(i), tilecols(j), dS, params);
       gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
       scalar_t* gesvd_work_ = gesvd_work;
       DenseMW_t Aij = tile(A, i, j);//needs to be on GPU
@@ -381,7 +381,7 @@ namespace strumpack {
               B11.compress_tile_gpu(solvehandles[s], handles[s], i, j, B11.tile_dense(i, j).D(),
                                     dAijU, dAijV, dpiv+dsep, opts);
 #if defined(STRUMPACK_USE_MAGMA)
-              gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
+              gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
                                 q, 1, B11.tilerows(i), 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
@@ -391,7 +391,7 @@ namespace strumpack {
 #endif
             } else {
 #if defined(STRUMPACK_USE_MAGMA)
-              gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
+              gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
                                 q, 1, B11.tilerows(i), 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
@@ -427,7 +427,7 @@ namespace strumpack {
             B12.compress_tile_gpu(solvehandles[s], handles[s], i, j, B12.tile_dense(i, j).D(), 
                                   dAijU, dAijV, dpiv+dsep, opts);
 #if defined(STRUMPACK_USE_MAGMA)
-            gpu::magma::laswp(B12.tile(i, j).D(), dpiv+B11.tileroff(i), 
+            gpu::magma::laswpx(B12.tile(i, j).D(), dpiv+B11.tileroff(i), 
                               q, 1, B12.tilerows(i), 1);
             gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                       scalar_t(1.), B11.tile(i, i).D(), B12.tile(i, j).U());
@@ -677,7 +677,7 @@ namespace strumpack {
                                       dAijU, dAijV, dpiv+dsep, opts);
               }
 #if defined(STRUMPACK_USE_MAGMA)
-              gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
+              gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
                                 q, 1, B11.tilerows(i), 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
@@ -693,7 +693,7 @@ namespace strumpack {
                 dA11 += B11.tilerows(i) * B11.tilecols(j);
               }
 #if defined(STRUMPACK_USE_MAGMA)
-              gpu::magma::laswp(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
+              gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
                                 q, 1, B11.tilerows(i), 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
@@ -735,7 +735,7 @@ namespace strumpack {
             B12.create_LR_gpu_tile(solvehandles[s], handles[s], i, j, A12, 
                                    dAijU, dAijV, dA12, dpiv+dsep, opts);
 #if defined(STRUMPACK_USE_MAGMA)
-            gpu::magma::laswp(B12.tile(i, j).D(), dpiv+B11.tileroff(i), 
+            gpu::magma::laswpx(B12.tile(i, j).D(), dpiv+B11.tileroff(i), 
                               q, 1, B12.tilerows(i), 1);
             gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                       scalar_t(1.), B11.tile(i, i).D(), B12.tile(i, j).U());
@@ -997,7 +997,7 @@ namespace strumpack {
                 std::vector<int> tpiv
                   (piv.begin()+B11.tileroff(i),
                    piv.begin()+B11.tileroff(i+1));
-                B11.tile(i, j).laswp(tpiv, true);
+                B11.tile(i, j).laswpx(tpiv, true);
                 trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                      scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
               }
@@ -1027,7 +1027,7 @@ namespace strumpack {
                 std::vector<int> tpiv
                   (piv.begin()+B11.tileroff(i),
                    piv.begin()+B11.tileroff(i+1));
-                B12.tile(i, j).laswp(tpiv, true);
+                B12.tile(i, j).laswpx(tpiv, true);
                 trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                      scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
               }
