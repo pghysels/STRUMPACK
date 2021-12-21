@@ -517,16 +517,16 @@ namespace strumpack {
     }
 
     template int gesvdj_buffersize<float, float>
-      (SOLVERHandle&, Jobz, int, int, float*, int, gesvdjInfo_t);
+      (SOLVERHandle&, Jobz, int, int, float*, gesvdjInfo_t);
       
     template int gesvdj_buffersize<double, double>
-      (SOLVERHandle&, Jobz, int, int, double*, int, gesvdjInfo_t);
+      (SOLVERHandle&, Jobz, int, int, double*, gesvdjInfo_t);
 
     template int gesvdj_buffersize<std::complex<float>, float>
-      (SOLVERHandle&, Jobz, int, int, float*, int, gesvdjInfo_t);
+      (SOLVERHandle&, Jobz, int, int, float*, gesvdjInfo_t);
       
     template int gesvdj_buffersize<std::complex<double>, double>
-      (SOLVERHandle&, Jobz, int, int, double*, int, gesvdjInfo_t);
+      (SOLVERHandle&, Jobz, int, int, double*, gesvdjInfo_t);
     
     void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, 
                 int m, int n, float* A, int lda, float* S, float* U, int ldu, 
