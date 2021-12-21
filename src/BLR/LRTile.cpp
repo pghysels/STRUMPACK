@@ -40,6 +40,11 @@
 namespace strumpack {
   namespace BLR {
 
+    template<typename scalar_t> LRTile<scalar_t>::LRTile() {
+      U_.reset(new DenseM_t());
+      V_.reset(new DenseM_t());
+    }
+
     template<typename scalar_t> LRTile<scalar_t>::LRTile
     (std::size_t m, std::size_t n, std::size_t r) {
       U_.reset(new DenseM_t(m, r));
@@ -47,20 +52,16 @@ namespace strumpack {
     }
 
     template<typename scalar_t> LRTile<scalar_t>::LRTile
-    (const DenseM_t& T, const Opts_t& opts) {
+    (const DenseM_t& T, const Opts_t& opts):LRTile<scalar_t>() {
       if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
         if (T.rows() == 0 || T.cols() == 0) {
           U_.reset(new DenseM_t(T.rows(), 0));
           V_.reset(new DenseM_t(0, T.cols()));
         } else {
-          V_.reset(new DenseM_t());
-          U_.reset(new DenseM_t());
           T.low_rank(U(), V(), opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
                      params::task_recursion_cutoff_level);
         }
       } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
-        V_.reset(new DenseM_t());
-        U_.reset(new DenseM_t());
         adaptive_cross_approximation<scalar_t>
           (U(), V(), T.rows(), T.cols(),
            [&](std::size_t i, std::size_t j) -> scalar_t {

@@ -228,13 +228,13 @@ namespace strumpack {
       std::vector<real_t> S_tmp;
       S_tmp.resize(minmn);
       S = S_tmp.data();
-      int Lwork = 0, rank = 0;
+      int rank = 0;
       const double tol = opts.rel_tol();
       gesvdjInfo_t params = nullptr;
       cusolverDnCreateGesvdjInfo(&params);
       cusolverDnXgesvdjSetTolerance(params, tol);
       int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
-         (handle, Jobz::V, tilerows(i), tilecols(j), dS, Lwork, params);
+         (handle, Jobz::V, tilerows(i), tilecols(j), dS, params);
       gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
       scalar_t* gesvd_work_ = gesvd_work;
       gpu::gesvdj<scalar_t>(handle, Jobz::V, A, dS, dU, dV, 

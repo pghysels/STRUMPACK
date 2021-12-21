@@ -504,9 +504,10 @@ namespace strumpack {
     }
 
     template<typename scalar_t, typename real_t> int gesvdj_buffersize
-    (SOLVERHandle& handle, Jobz jobz, int m, int n, real_t* S, int Lwork, 
+    (SOLVERHandle& handle, Jobz jobz, int m, int n, real_t* S, 
      gesvdjInfo_t params) {
       int econ = 1;
+      int Lwork;
       gesvdj_info_create(&params);
       gesvdj_buffersize
         (handle, E2cuOp(jobz), econ, m, n, static_cast<scalar_t*>(nullptr), n,
