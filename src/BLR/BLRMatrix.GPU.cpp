@@ -289,9 +289,11 @@ namespace strumpack {
         auto dsep = A11.rows();
         auto d2 = A22.rows();
         int nr_streams = 4;
-        std::vector<gpu::Stream> streams(nr_streams), comp_stream;
+        std::vector<gpu::Stream> streams(nr_streams);
+        gpu::Stream comp_stream;
         std::vector<gpu::SOLVERHandle> solvehandles(nr_streams);
         std::vector<gpu::BLASHandle> handles(nr_streams);
+        gpu::BLASHandle handle(comp_stream);
         for (int i=0; i<nr_streams; i++) {
           solvehandles[i].set_stream(streams[i]);
           handles[i].set_stream(streams[i]);
@@ -404,7 +406,7 @@ namespace strumpack {
               std::size_t minmn = std::min(B11.tilerows(j), B11.tilecols(i));
               DenseMW_t dAijU(B11.tilerows(j), minmn, dU, B11.tilerows(j));
               DenseMW_t dAijV(B11.tilecols(i), minmn, dV, B11.tilecols(i));
-              B11.compress_tile_gpu(solvehandles[s], handles[s], j, i, B11.tile_dense(j, i).D(),, 
+              B11.compress_tile_gpu(solvehandles[s], handles[s], j, i, B11.tile_dense(j, i).D(), 
                                     dAijU, dAijV, dpiv+dsep, opts);
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,

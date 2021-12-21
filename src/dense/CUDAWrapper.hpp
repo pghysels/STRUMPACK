@@ -366,7 +366,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     trsm(BLASHandle& handle, Side side, UpLo uplo,
-         Trans trans, Diag diag, const scalar_t* alpha,
+         Trans trans, Diag diag, const scalar_t alpha,
          const DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
 
     template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type>
