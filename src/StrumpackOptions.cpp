@@ -42,11 +42,16 @@ namespace strumpack {
     switch (method) {
     case ReorderingStrategy::NATURAL: return "Natural";
     case ReorderingStrategy::METIS: return "Metis";
-    case ReorderingStrategy::SCOTCH: return "Scotch";
-    case ReorderingStrategy::GEOMETRIC: return "Geometric";
     case ReorderingStrategy::PARMETIS: return "ParMetis";
+    case ReorderingStrategy::SCOTCH: return "Scotch";
     case ReorderingStrategy::PTSCOTCH: return "PTScotch";
     case ReorderingStrategy::RCM: return "RCM";
+    case ReorderingStrategy::GEOMETRIC: return "Geometric";
+    case ReorderingStrategy::AMD: return "AMD";
+    case ReorderingStrategy::MMD: return "MMD";
+    case ReorderingStrategy::MLF: return "MLF";
+    case ReorderingStrategy::AND: return "AND";
+    case ReorderingStrategy::SPECTRAL: return "Spectral";
     }
     return "UNKNOWN";
   }
@@ -55,11 +60,16 @@ namespace strumpack {
     switch (method) {
     case ReorderingStrategy::NATURAL: return false;
     case ReorderingStrategy::METIS: return false;
-    case ReorderingStrategy::SCOTCH: return false;
-    case ReorderingStrategy::GEOMETRIC: return true;
     case ReorderingStrategy::PARMETIS: return true;
+    case ReorderingStrategy::SCOTCH: return false;
     case ReorderingStrategy::PTSCOTCH: return true;
     case ReorderingStrategy::RCM: return false;
+    case ReorderingStrategy::GEOMETRIC: return true;
+    case ReorderingStrategy::AMD: return false;
+    case ReorderingStrategy::MMD: return false;
+    case ReorderingStrategy::MLF: return false;
+    case ReorderingStrategy::AND: return false;
+    case ReorderingStrategy::SPECTRAL: return false;
     }
     return false;
   }
@@ -232,11 +242,17 @@ namespace strumpack {
         else if (s == "parmetis") set_reordering_method(ReorderingStrategy::PARMETIS);
         else if (s == "scotch") set_reordering_method(ReorderingStrategy::SCOTCH);
         else if (s == "ptscotch") set_reordering_method(ReorderingStrategy::PTSCOTCH);
-        else if (s == "geometric") set_reordering_method(ReorderingStrategy::GEOMETRIC);
         else if (s == "rcm") set_reordering_method(ReorderingStrategy::RCM);
+        else if (s == "geometric") set_reordering_method(ReorderingStrategy::GEOMETRIC);
+        else if (s == "amd") set_reordering_method(ReorderingStrategy::AMD);
+        else if (s == "mmd") set_reordering_method(ReorderingStrategy::MMD);
+        else if (s == "mlf") set_reordering_method(ReorderingStrategy::MLF);
+        else if (s == "and") set_reordering_method(ReorderingStrategy::AND);
+        else if (s == "spectral") set_reordering_method(ReorderingStrategy::SPECTRAL);
         else std::cerr << "# WARNING: matrix reordering strategy not"
                " recognized, use 'metis', 'parmetis', 'scotch', 'ptscotch',"
-               " 'geometric' or 'rcm'" << std::endl;
+               " 'rcm', 'geometric', 'amd', 'mmd', 'mlf', 'and' or 'spectral'"
+                       << std::endl;
       } break;
       case 8: {
         std::istringstream iss(optarg);
@@ -418,6 +434,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_BPACK)
     HODLR_options().set_from_command_line(argc, cargv);
 #endif
+    ND_options().set_from_command_line(argc, cargv);
 #else
     std::cerr << "WARNING: no support for getopt.h, "
       "not parsing command line options." << std::endl;
@@ -451,8 +468,8 @@ namespace strumpack {
               << std::endl;
     std::cout << "#          Gram-Schmidt type for GMRES" << std::endl;
     std::cout << "#   --sp_reordering_method [natural|metis|scotch|parmetis|"
-              << "ptscotch|rcm|geometric]" << std::endl;
-    std::cout << "#          Code for nested dissection." << std::endl;
+              << "ptscotch|rcm|geometric|amd|mmd|mlf|and|spectral]" << std::endl;
+    std::cout << "#          Select a fill-reducing ordering algorithm." << std::endl;
     std::cout << "#          Geometric only works on regular meshes and you"
               << " need to provide the sizes." << std::endl;
     std::cout << "#   --sp_nd_param int (default " << nd_param() << ")"
@@ -500,7 +517,7 @@ namespace strumpack {
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
     std::cout << "#   --sp_compression (default "
-              << get_name(comp_) << ")" << std::endl 
+              << get_name(comp_) << ")" << std::endl
               << "#          should be [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;

@@ -74,7 +74,9 @@ namespace strumpack {
     if (e==0)
       if (mpi_root())
         std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-    WRAPPER_rcm(xadj, adjncy, perm);
+    WRAPPER_rcm(xadj, adjncy, iperm);
+    for (integer_t i=0; i<n; i++)
+      perm[iperm[i]] = i;
     return build_sep_tree_from_perm(ptr, ind, perm, iperm);
   }
 

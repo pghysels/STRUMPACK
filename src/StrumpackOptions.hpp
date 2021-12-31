@@ -38,6 +38,7 @@
 #include "HSS/HSSOptions.hpp"
 #include "BLR/BLROptions.hpp"
 #include "HODLR/HODLROptions.hpp"
+#include "sparse/ordering/spectral/NDOptions.hpp"
 
 namespace strumpack {
 
@@ -63,8 +64,13 @@ namespace strumpack {
     SCOTCH,     /*!< Use Scotch nested-dissection reordering        */
     PTSCOTCH,   /*!< Use PT-Scotch nested-dissection reordering     */
     RCM,        /*!< Use RCM reordering                             */
-    GEOMETRIC   /*!< A simple geometric nested dissection code that
+    GEOMETRIC,  /*!< A simple geometric nested dissection code that
                   only works for regular meshes. (see Sp::reorder)  */
+    AMD,        /*!< Approximate minimum degree                     */
+    MMD,        /*!< Multiple minimum degree                        */
+    MLF,        /*!< Minimum local fill                             */
+    AND,        /*!< Nested dissection                              */
+    SPECTRAL    /*!< Spectral nested dissection                     */
   };
 
   /**
@@ -236,6 +242,7 @@ namespace strumpack {
       hss_opts_.set_verbose(false);
       blr_opts_.set_verbose(false);
       hodlr_opts_.set_verbose(false);
+      nd_opts_.set_verbose(false);
     }
 
     /**
@@ -1165,6 +1172,18 @@ namespace strumpack {
     HODLR::HODLROptions<scalar_t>& HODLR_options() { return hodlr_opts_; }
 
     /**
+     * Get a (const) reference to an object holding various options
+     * pertaining to the spectral nested dissection code.
+     */
+    const ordering::NDOptions& ND_options() const { return nd_opts_; }
+
+    /**
+     * Get a reference to an object holding various options pertaining
+     * to the spectral nested dissection code.
+     */
+    ordering::NDOptions& ND_options() { return nd_opts_; }
+
+    /**
      * Parse the command line options that were passed to this object
      * in the constructor. Run the code with -h or --help and call
      * this routine to see a list of supported options.
@@ -1252,6 +1271,8 @@ namespace strumpack {
     int lossy_min_front_size_ = 100000;
     int lossy_min_sep_size_ = 8;
     int lossy_precision_ = 16;
+
+    ordering::NDOptions nd_opts_;
 
     int argc_ = 0;
     const char* const* argv_ = nullptr;

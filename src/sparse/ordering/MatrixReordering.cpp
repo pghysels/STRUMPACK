@@ -53,7 +53,11 @@
 #include "ParMetisReordering.hpp"
 #endif
 #include "RCMReordering.hpp"
+#include "ANDSparspak.hpp"
 #include "GeometricReordering.hpp"
+#include "minimum_degree/AMDReordering.hpp"
+#include "minimum_degree/MMDReordering.hpp"
+#include "spectral/SpectralReordering.hpp"
 
 namespace strumpack {
 
@@ -97,6 +101,27 @@ namespace strumpack {
     }
     case ReorderingStrategy::RCM: {
       sep_tree_ = rcm_reordering(A, perm_, iperm_);
+      break;
+    }
+    case ReorderingStrategy::AMD: {
+      sep_tree_ = ordering::amd_reordering(A, perm_, iperm_);
+      break;
+    }
+    case ReorderingStrategy::MMD: {
+      sep_tree_ = ordering::mmd_reordering(A, perm_, iperm_);
+      break;
+    }
+    case ReorderingStrategy::AND: {
+      sep_tree_ = ordering::and_reordering(A, perm_, iperm_);
+      break;
+    }
+    case ReorderingStrategy::MLF: {
+      std::cerr << "# ERROR: MLF ordering not supported." << std::endl;
+      return 1;
+    }
+    case ReorderingStrategy::SPECTRAL: {
+      sep_tree_ = ordering::spectral_nd
+        (A, perm_, iperm_, opts.ND_options());
       break;
     }
     default:
