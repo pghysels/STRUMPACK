@@ -287,7 +287,7 @@ namespace strumpack {
       DenseTile<scalar_t> t(tilerows(i), tilecols(j));
       int src = j % grid()->npcols();
       auto& c = grid()->row_comm();
-      if (c.rank() == src) t = tile_dense(i, j);
+      if (c.rank() == src) t = tile(i, j).D();
       c.broadcast_from(t.D().data(), t.rows()*t.cols(), src);
       return t;
     }
@@ -297,7 +297,7 @@ namespace strumpack {
       DenseTile<scalar_t> t(tilerows(i), tilecols(j));
       int src = i % grid()->nprows();
       auto& c = grid()->col_comm();
-      if (c.rank() == src) t = tile_dense(i, j);
+      if (c.rank() == src) t = tile(i, j).D();
       c.broadcast_from(t.D().data(), t.rows()*t.cols(), src);
       return t;
     }
@@ -1718,7 +1718,7 @@ namespace strumpack {
                   (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
                    [r0](int p) -> int { return p + r0; });
                 Tcc = bcast_dense_tile_along_row(c, c);
-                Tcc_vec.push_back(Tcc);
+                Tcc_vec.push_back(Tcc.D());
               }
               if (grid()->is_local_col(c))
                 Tcc = bcast_dense_tile_along_col(c, c);
@@ -1893,7 +1893,7 @@ namespace strumpack {
                   (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
                    [r0](int p) -> int { return p + r0; });
                 Tcc = F11.bcast_dense_tile_along_row(c, c);
-                Tcc_vec.push_back(Tcc);
+                Tcc_vec.push_back(Tcc.D());
               }
               if (g->is_local_col(c))
                 Tcc = F11.bcast_dense_tile_along_col(c, c);
