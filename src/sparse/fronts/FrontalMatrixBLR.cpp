@@ -542,7 +542,7 @@ namespace strumpack {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       bloc.laswp(piv_, true);
-#if defined(STRUMPACK_USE_MAGMA)
+#if (defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)) && !defined(STRUMPACK_USE_MAGMA)
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
         trsv(UpLo::U, Trans::N, Diag::N, F11blr_, bloc, task_depth);
