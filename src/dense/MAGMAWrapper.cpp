@@ -71,30 +71,30 @@ namespace strumpack {
         return info;
       }
 
-      void laswpx(DenseMatrix<float>& A, int* dpiv, magma_queue_t queue, int k1, int k2, int inci) {
-        std::vector<int> piv(A.rows());	
-        magmablas_slaswpx(A.cols(), A.data(), 1, A.ld(), k1, k2, piv.data(), inci, queue);
-        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+      void laswpx(DenseMatrix<float>& A, int* dpiv, magma_queue_t queue, int inci) {
+        std::vector<int> tpiv(A.rows());
+        gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
+        magmablas_slaswpx(A.cols(), A.data(), 1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
       }
 
-      void laswpx(DenseMatrix<double>& A, int* dpiv, magma_queue_t queue, int k1, int k2, int inci) {
-        std::vector<int> piv(A.rows());	
-        magmablas_dlaswpx(A.cols(), A.data(), 1, A.ld(), k1, k2, piv.data(), inci, queue);
-        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+      void laswpx(DenseMatrix<double>& A, int* dpiv, magma_queue_t queue, int inci) {
+        std::vector<int> tpiv(A.rows());
+        gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
+        magmablas_dlaswpx(A.cols(), A.data(), 1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
       }
 
-      void laswpx(DenseMatrix<std::complex<float>>& A, int* dpiv, magma_queue_t queue, int k1, int k2, int inci) {
-        std::vector<int> piv(A.rows());
+      void laswpx(DenseMatrix<std::complex<float>>& A, int* dpiv, magma_queue_t queue, int inci) {
+        std::vector<int> tpiv(A.rows());
+        gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
         magmablas_claswpx(A.cols(), reinterpret_cast<magmaFloatComplex*>(A.data()), 
-                          1, A.ld(), k1, k2, piv.data(), inci, queue);
-        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+                          1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
       }
 
-      void laswpx(DenseMatrix<std::complex<double>>& A, int* dpiv, magma_queue_t queue, int k1, int k2, int inci) {
-        std::vector<int> piv(A.rows());	
+      void laswpx(DenseMatrix<std::complex<double>>& A, int* dpiv, magma_queue_t queue, int inci) {
+        std::vector<int> tpiv(A.rows());
+        gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
         magmablas_zlaswpx(A.cols(), reinterpret_cast<magmaDoubleComplex*>(A.data()), 
-                          1, A.ld(), k1, k2, piv.data(), inci, queue);
-        gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
+                          1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
       }
 
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,

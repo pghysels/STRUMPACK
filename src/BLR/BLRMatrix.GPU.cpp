@@ -382,7 +382,7 @@ namespace strumpack {
                                     dAijU, dAijV, dpiv+dsep, opts);
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                                q, 1, B11.tilerows(i), 1);
+                                q, 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
 #else
@@ -392,7 +392,7 @@ namespace strumpack {
             } else {
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                                q, 1, B11.tilerows(i), 1);
+                                q, 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
 #else
@@ -428,7 +428,7 @@ namespace strumpack {
                                   dAijU, dAijV, dpiv+dsep, opts);
 #if defined(STRUMPACK_USE_MAGMA)
             gpu::magma::laswpx(B12.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                              q, 1, B12.tilerows(i), 1);
+                               q, 1);
             gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                       scalar_t(1.), B11.tile(i, i).D(), B12.tile(i, j).U());
 #else
@@ -678,7 +678,7 @@ namespace strumpack {
               }
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                                q, 1, B11.tilerows(i), 1);
+                                q, 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
 #else
@@ -694,7 +694,7 @@ namespace strumpack {
               }
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                                q, 1, B11.tilerows(i), 1);
+                                q, 1);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
 #else
@@ -736,7 +736,7 @@ namespace strumpack {
                                    dAijU, dAijV, dA12, dpiv+dsep, opts);
 #if defined(STRUMPACK_USE_MAGMA)
             gpu::magma::laswpx(B12.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                              q, 1, B12.tilerows(i), 1);
+                              q, 1);
             gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                       scalar_t(1.), B11.tile(i, i).D(), B12.tile(i, j).U());
 #else
