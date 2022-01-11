@@ -497,11 +497,6 @@ namespace strumpack {
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
                         scalar_t(1.), B11.tile(i, i).D(), B21.tile(j, i).D());
             }
-#else
-            if (B21.tile(j, i).is_low_rank()){
-              gpu::getrs(solvehandles[s], Trans::N, B11.tile(i, i).D(), 
-                         dpiv+B11.tileroff(i), B21.tile(j, i).V(), dpiv+dsep);
-            }
 #endif
           }
           //GEMM B11
