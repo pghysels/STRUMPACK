@@ -286,6 +286,9 @@ namespace strumpack {
                                        const BLRMatrix<scalar_t>& B12,
                                        const Opts_t& opts);
 
+      void move_dense_gpu_tile_to_cpu(std::size_t i, std::size_t j, DenseM_t& dD);
+      void move_LR_gpu_tile_to_cpu(std::size_t i, std::size_t j, DenseM_t& dU, DenseM_t& dV);
+
       void LUAR_B11(std::size_t i, std::size_t j, std::size_t kmax,
                     DenseM_t& A11, const Opts_t& opts, int* B);
       void LUAR_B12(std::size_t i, std::size_t j, std::size_t kmax,
