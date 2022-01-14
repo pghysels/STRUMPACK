@@ -165,7 +165,6 @@ namespace strumpack {
                    h.rows()*sizeof(T), h.cols(), cudaMemcpyHostToDevice));
       } else
         copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
-      copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device_async
     (DenseMatrix<T>& d, const DenseMatrix<T>& h, const Stream& s) {
