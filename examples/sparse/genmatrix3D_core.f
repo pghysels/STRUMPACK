@@ -38,17 +38,18 @@
 !     Then a call to GENMATRIX3D fills irn, jcn and A.
 !     
 !     #############################################################################
-      integer function kkindex(i1,i2,i3,n1,n2)
-      integer i1,i2,i3,n1,n2
+      integer*8 function kkindex(i1,i2,i3,n1,n2)
+      integer*8 i1,i2,i3,n1,n2
       kkindex=(i3-1)*n1*n2+(i2-1)*n1+i1
       return
       end
     
-      subroutine GENMATRIX3D_ANAL(n1,n2,n3,npml,nne,ne,FROMFILE
-     &     ,DATAFILE)
-      integer,intent(in):: n1,n2,n3,npml
-      integer,intent(out):: nne,ne
-      integer :: n1e,n2e,n3e
+      subroutine GENMATRIX3D_ANAL(n1,n2,n3,n3_loc,npml,nne,ne,FROMFILE
+     &     ,DATAFILE,rank)
+      integer*8,intent(in):: n1,n2,n3,n3_loc,npml
+      integer*8,intent(out):: nne,ne
+      integer*8 :: n1e,n2e,n3e
+      integer*8 rank
       LOGICAL,intent(in) :: FROMFILE
       CHARACTER(len=300),intent(in)::DATAFILE
 c     
@@ -59,16 +60,16 @@ c
       n2e=n2+2*npml
       n3e=n3+2*npml
       nne=n1e*n2e*n3e
-      ne=27*n1e*n2e*n3e         !estimation of the number of non zero coefficients in A
+      ne=27*n1e*n2e*n3_loc         !estimation of the number of non zero coefficients in A
 
-      write(*,*) "N = ", nne
-      write(*,*) "NNZ = ", ne, " estimated"
+      if(rank==0)write(*,*) "N = ", nne
+      if(rank==0)write(*,*) "NNZ = ", 27*n1e*n2e*n3e, " estimated"
 
       return
       end subroutine GENMATRIX3D_ANAL
       
-      SUBROUTINE GENMATRIX3D(irn,jcn,mat,n1,n2,n3,npml,nnz
-     &     ,FROMFILE,DATAFILE)
+      SUBROUTINE GENMATRIX3D(irn,jcn,mat,n1,n2,n3,low3,high3,npml,nnz
+     &     ,FROMFILE,DATAFILE,rank)
       
 ! #   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 ! #
@@ -140,8 +141,9 @@ c
       COMPLEX,ALLOCATABLE :: d1(:),d2(:),d3(:)
       COMPLEX,ALLOCATABLE :: d1b(:),d2b(:),d3b(:)
 
-      INTEGER :: nn,n1,n2,n3,nne,n1e,n2e,n3e,ne,npml,nnz,nne2
-      INTEGER :: ivel,irho,iqf
+      integer*8 :: nn,n1,n2,n3,nne,n1e,n2e,n3e,ne,npml,nnz,nne2
+      integer*8 :: low3,high3,rank
+      integer*8 :: ivel,irho,iqf
       REAL :: pi,dz,dz2,freq,omega,apml,vel0,rho0,qf0
       REAL ::  c,d,e,f,w1,w2,w3,wavelength
 
@@ -150,8 +152,8 @@ c
       CHARACTER(len=300),intent(in)::DATAFILE
       CHARACTER(LEN=160) :: namevel,namerho,nameqf
       
-      INTEGER :: irn(nnz)
-      INTEGER :: jcn(nnz)
+      integer*8 :: irn(nnz)
+      integer*8 :: jcn(nnz)
       COMPLEX :: mat(nnz)
 
 ! #####################################################################################
@@ -168,7 +170,7 @@ c
          iqf=-999
          vel0=1500.             !Vp
          rho0=1.                !rho
-         qf0=10000              !Q
+         qf0=1000              !Q
          freq=10.                !Frequency (Hz)
       ENDIF
 ! #####################################################################################
@@ -192,7 +194,7 @@ c
          dz=wavelength/15.
       ENDIF
 
-      WRITE(*,*) 'GRID INTERVAL (M) = ',dz
+      if(rank==0)WRITE(*,*) 'GRID INTERVAL (M) = ',dz
 
 !####################################################################
 !     SET CONSTANTS
@@ -215,15 +217,16 @@ c
       n2e=n2+2*npml
       n3e=n3+2*npml
       nne=n1e*n2e*n3e
-      nne2=(n1e+2)*(n2e+2)*(n3e+2)
+      nne2=(n1e+2)*(n2e+2)*(high3-low3+3)
       nn=n1*n2*n3
       ne=27*n1e*n2e*n3e         !estimation of the number of non zero coefficients in A
 
-      WRITE(*,*) "NUMBER OF UNKNOWNS IN THE INPUT"
+      if(rank==0)
+     & WRITE(*,*) "NUMBER OF UNKNOWNS IN THE INPUT" 
      &     //" GRID (nn = n1 x n2 x n3): ",nn
-      WRITE(*,*) "NUMBER OF UNKNOWNS IN THE AUGMENTED"
+      if(rank==0)WRITE(*,*) "NUMBER OF UNKNOWNS IN THE AUGMENTED"
      &     //"GRID WITH PML (nne = n1e x n2e x n3e): ",nne
-      WRITE(*,*) "N1E N2E N3E = ",n1e,n2e,n3e
+      if(rank==0)WRITE(*,*) "N1E N2E N3E = ",n1e,n2e,n3e
 
 !     NNE2 IS THE SIZE OF THE VECTOR BUFFER FOR RHO AND MU USED TO BUILD A (ONE EXTRA POINT
 !     IS ADDED AT EACH END OF EACH DIMENSION TO FACILITATE THE COMPUTATION OF THE DERIVATIVE
@@ -263,10 +266,11 @@ c
              
       CALL subevalmatrix0(omegac,mu,rho,ne,irn,
      &     jcn, mat,
-     &     n1e,n2e,n3e,d1,d2,d3,d1b,d2b,d3b,dz,c,d,e,f,w1,w2,w3,nnz)
+     &     n1e,n2e,n3e,d1,d2,d3,d1b,d2b,d3b,dz,c,d,e,f,w1,w2,w3,nnz,
+     &     low3,high3,rank)
 
 !     NNZ: REAL NUMBER OF NON ZERO COEFFICIENTS IN THE IMPEDANCE MATRIX
-      WRITE(*,*) 'NUMBER OF NON ZERO COEFFICIENTS IN A (NNZ) = ',nnz
+!      WRITE(*,*) 'NUMBER OF NON ZERO COEFFICIENTS IN A (NNZ) = ',nnz
 
       DEALLOCATE(mu)
       DEALLOCATE(rho)
@@ -277,14 +281,14 @@ c
       DEALLOCATE(d2b)
       DEALLOCATE(d3b)
 
-      WRITE(*,*) 'END OF GENMATRIX3D'
+      if(rank==0)WRITE(*,*) 'END OF GENMATRIX3D'
       
       END SUBROUTINE GENMATRIX3D
 c     
       subroutine subdamp(damp,dampb,n,npml,dz,a,omega)
       implicit none
       real :: pi,pi2,xpml,xmax,x,xb,eps,epsb,a,dz,omega
-      integer :: i,n,npml
+      integer*8 :: i,n,npml
       complex damp(0:n+1),dampb(0:n+1)
       complex ci
 
@@ -339,19 +343,19 @@ c
       
 
       subroutine subevalmatrix0(omegac,mu,rho,ne,irn,icn,mat,n1,n2,n3,
-     &     d1,d2,d3,d1b,d2b,d3b,h,c,d,e,f,w1,w2,w3,nnz)
+     &     d1,d2,d3,d1b,d2b,d3b,h,c,d,e,f,w1,w2,w3,nnz,low3,high3,rank)
       implicit none
 
       real c,d,e,f,w1,w2,w3
 
-      integer ne,i1,i2,i3,n1,n2,n3
-      integer l,l1,l2,l3,k,nn,nnz
-      integer irn(ne),icn(ne)
+      integer*8 ne,i1,i2,i3,n1,n2,n3
+      integer*8 l,l1,l2,l3,k,nn,nnz,low3,high3,rank
+      integer*8 irn(nnz),icn(nnz)
 
-      complex omegac,mu(0:n1+1,0:n2+1,0:n3+1)
-      complex mat(ne)
+      complex omegac,mu(0:n1+1,0:n2+1,low3-1:high3+1)
+      complex mat(nnz)
       
-      real rho(0:n1+1,0:n2+1,0:n3+1),omega2,h,h2
+      real rho(0:n1+1,0:n2+1,low3-1:high3+1),omega2,h,h2
       real rm0m,r0m0,r00m,r00p,r0pp,r0mm,r0pm,r0p0,r0mp
       real rm00,rpp0,rp00,rmm0,rm0p,rmpm
       real rmmm,rmp0,rmmp,rmpp
@@ -360,7 +364,7 @@ c
       complex d1b(0:n1+1),d2b(0:n2+1),d3b(0:n3+1)
 
       external kkindex
-      integer kkindex
+      integer*8 kkindex
 
       omega2=real(omegac)*real(omegac)
       h2=1./(h*h)
@@ -371,19 +375,19 @@ c
       icn(:)=0
       mat(:)=cmplx(0.,0.)
       
-      write(*,*) 'N1 N2 N3 = ',n1,n2,n3
-      write(*,*) 'c d e f w1 w2 w3 = ',c,d,e,f,w1,w2,w3
+      if(rank==0)write(*,*) 'N1 N2 N3 = ',n1,n2,n3
+      if(rank==0)write(*,*) 'c d e f w1 w2 w3 = ',c,d,e,f,w1,w2,w3
 
       w2u=w2/3.
       w3u=w3/4.
-      write(*,*) 'w2u w3u = ',w2u,w3u
+      if(rank==0)write(*,*) 'w2u w3u = ',w2u,w3u
 
       nnz=0
       nn=n1*n2*n3
 
 !     Loop over rows of impedance matrix
 
-      do i3=1,n3
+      do i3=low3,high3
          do i2=1,n2
             do i1=1,n1
 
@@ -1327,8 +1331,8 @@ c
          end do
       end do
       
-      write(*,*) 'NNZ = ' ,nnz
-      write(*,*) 'NE = ',ne
+      write(*,*) 'rank ',rank,' NNZ = ' ,nnz
+      if(rank==0)write(*,*) 'NE = ',ne
 
 
       return
@@ -1337,7 +1341,7 @@ c
 
       SUBROUTINE subreadpar3D1_0(n1,n2,n3,npml,DATAFILE)
       IMPLICIT NONE
-      INTEGER :: unitfwm,ivel,irho,iqf,n1,n2,n3,npml
+      integer*8 :: unitfwm,ivel,irho,iqf,n1,n2,n3,npml
       REAL :: dz
       CHARACTER(len=300)::DATAFILE
 
@@ -1356,7 +1360,7 @@ c
       SUBROUTINE subreadpar3D1_1(ivel,irho,iqf,n1,n2,n3,npml,dz,freq
      &     ,vel0,rho0,qf0,namevel,namerho,nameqf,DATAFILE)
       IMPLICIT NONE
-      INTEGER :: unitfwm,ivel,irho,iqf,n1,n2,n3,npml
+      integer*8 :: unitfwm,ivel,irho,iqf,n1,n2,n3,npml
       REAL :: dz,freq,vel0,rho0,qf0
       CHARACTER(LEN=160) :: namevel,namerho,nameqf
       CHARACTER(len=300)::DATAFILE
@@ -1396,8 +1400,8 @@ c
 
       CHARACTER(LEN=160) :: namevel,namerho,nameqf
       
-      INTEGER :: ivel,irho,iqf,nn,nne2,n1,n2,n3,npml
-      INTEGER :: unitvel,unitrho,unitqf
+      integer*8 :: ivel,irho,iqf,nn,nne2,n1,n2,n3,npml
+      integer*8 :: unitvel,unitrho,unitqf
       
       REAL :: vel0,rho0,qf0
 
@@ -1504,7 +1508,7 @@ c
 
       SUBROUTINE submu100(vel,rho0,qf0,nn,mu)
       IMPLICIT NONE
-      INTEGER :: nn
+      integer*8 :: nn
       REAL,DIMENSION(nn) :: vel
       REAL :: rho0,qf0
       COMPLEX,DIMENSION(nn) :: mu
@@ -1522,7 +1526,7 @@ c
 
       SUBROUTINE submu010(vel0,rho,qf0,nn,mu)
       IMPLICIT NONE
-      INTEGER :: nn
+      integer*8 :: nn
       REAL,DIMENSION(nn) :: rho
       REAL :: vel0,qf0
       COMPLEX,DIMENSION(nn) :: mu
@@ -1540,7 +1544,7 @@ c
 
       SUBROUTINE submu001(vel0,rho0,qf,nn,mu)
       IMPLICIT NONE
-      INTEGER :: nn
+      integer*8 :: nn
       REAL,DIMENSION(nn) :: qf
       REAL :: vel0,rho0
       COMPLEX,DIMENSION(nn) :: mu
@@ -1558,7 +1562,7 @@ c
 
       SUBROUTINE submu110(vel,rho,qf0,nn,mu)
       IMPLICIT NONE
-      INTEGER :: nn
+      integer*8 :: nn
       REAL,DIMENSION(nn) :: vel,rho
       REAL :: qf0
       COMPLEX,DIMENSION(nn) :: mu
@@ -1576,7 +1580,7 @@ c
 
       SUBROUTINE submu101(vel,rho0,qf,nn,mu)
       IMPLICIT NONE
-      INTEGER :: nn
+      integer*8 :: nn
       REAL,DIMENSION(nn) :: vel,qf
       REAL :: rho0
       COMPLEX,DIMENSION(nn) :: mu
@@ -1594,7 +1598,7 @@ c
       
       SUBROUTINE submu011(vel0,rho,qf,nn,mu)
       IMPLICIT NONE
-      INTEGER :: nn
+      integer*8 :: nn
       REAL,DIMENSION(nn) :: rho,qf
       REAL :: vel0
       COMPLEX,DIMENSION(nn) :: mu
@@ -1612,7 +1616,7 @@ c
 
       SUBROUTINE submu111(vel,rho,qf,nn,mu)
       IMPLICIT NONE
-      INTEGER :: nn
+      integer*8 :: nn
       REAL,DIMENSION(nn) :: vel,rho,qf
       COMPLEX,DIMENSION(nn) :: mu
       COMPLEX :: ci
@@ -1636,7 +1640,7 @@ c
 !     ------------------------------------------------------------------------------------------------
       subroutine subaugment(x,n1,n2,n3,npt1,npt2,npt3,x1)
 
-      integer :: n1,n2,n3,npt1,npt2,npt3,i1,i2,i3
+      integer*8 :: n1,n2,n3,npt1,npt2,npt3,i1,i2,i3
       real :: x(n1,n2,n3)
       real :: x1(-npt1+1:n1+npt1,-npt2+1:n2+npt2
      &     ,-npt3+1:n3+npt3)

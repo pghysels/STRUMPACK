@@ -161,6 +161,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+    double tol_used;
     if (visit(lchild_))
       lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
     if (visit(rchild_))
@@ -168,14 +169,38 @@ namespace strumpack {
     if (!dim_blk()) return;
     TaskTimer t("FrontalMatrixHODLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
-    construct_hierarchy(A, opts);
+    {
+        auto lopts = opts;
+        // int flag=0;
+        // if(lchild_){
+        //   if (lchild_->type() != "FrontalMatrixHODLRMPI" && lchild_->type() != "FrontalMatrixHODLR")
+        //     flag=1;        
+        // }
+        // if(rchild_){
+        //   if (rchild_->type() != "FrontalMatrixHODLRMPI" && rchild_->type() != "FrontalMatrixHODLR")
+        //     flag=1;        
+        // }
+        // if(etree_level>4){
+        //   lopts.HODLR_options().set_BF_entry_n15(true);
+        //   int knn=0;
+        //   lopts.HODLR_options().set_knn_hodlrbf(knn);
+        //   lopts.HODLR_options().set_knn_lrbf(knn);
+        // }      
+      tol_used=lopts.HODLR_options().rel_tol();
+      // if(etree_level>4){
+      //   tol_used/=(etree_level+1);
+      // }
+      lopts.HODLR_options().set_rel_tol
+        (tol_used);            
+      construct_hierarchy(A, lopts);
+    }
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
       compress_sampling(A, opts); break;
     case HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION: {
       auto lopts = opts;
       lopts.HODLR_options().set_rel_tol
-        (lopts.HODLR_options().rel_tol() / (etree_level+1));
+        (lopts.HODLR_options().rel_tol() / (etree_level+1));      
       compress_extraction(A, lopts);
     } break;
     }
@@ -225,7 +250,7 @@ namespace strumpack {
                   << (float(tmp[0]+tmp[1]+tmp[2]+tmp[3]+tmp[4])
                       / (float(dim_blk())*dim_blk()) * 100.)
                   << " %compression, time= " << time
-                  << " sec" << std::endl;
+                  << " sec" << " tol_used(F11/F22)= "<< tol_used << std::endl;
 #if defined(STRUMPACK_COUNT_FLOPS)
         std::cout << "#        total memory: "
                   << double(strumpack::params::memory) / 1.0e6 << " MB"

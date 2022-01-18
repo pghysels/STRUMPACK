@@ -86,8 +86,7 @@ namespace strumpack {
     return (opts.compression() == CompressionType::HODLR ||
             opts.compression() == CompressionType::BLR_HODLR ||
             opts.compression() == CompressionType::ZFP_BLR_HODLR) &&
-      (dsep >= opts.compression_min_sep_size(l) ||
-       dsep + dupd >= opts.compression_min_front_size(l));
+      (dsep >= opts.compression_min_sep_size(l));
 #else
     return false;
 #endif

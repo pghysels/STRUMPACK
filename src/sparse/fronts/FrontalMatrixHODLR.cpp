@@ -334,7 +334,28 @@ namespace strumpack {
     if (!this->dim_blk()) return;
     TaskTimer t("");
     if (opts.print_compressed_front_stats()) t.start();
-    construct_hierarchy(A, opts, task_depth);
+    {
+        auto lopts = opts;
+        // int flag=0;
+        // if(lchild_){
+        //   if (lchild_->type() != "FrontalMatrixHODLR")
+        //     flag=1;        
+        // }
+        // if(rchild_){
+        //   if (rchild_->type() != "FrontalMatrixHODLR")
+        //     flag=1;        
+        // }
+        // if(etree_level>4){
+        //   lopts.HODLR_options().set_BF_entry_n15(true);
+        //   int knn=0;
+        //   lopts.HODLR_options().set_knn_hodlrbf(knn);
+        //   lopts.HODLR_options().set_knn_lrbf(knn);
+        // }      
+      construct_hierarchy(A, lopts,task_depth);
+    }
+
+
+
     switch (opts.HODLR_options().compression_algorithm()) {
     case HODLR::CompressionAlgorithm::RANDOM_SAMPLING:
       compress_sampling(A, opts, task_depth); break;
