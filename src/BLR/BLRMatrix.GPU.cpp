@@ -280,7 +280,7 @@ namespace strumpack {
         scalar_t* dA = tile(i, j).D().data();
         DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
         dA += tilerows(i) * rank;
-        DenseMW_t dAijV(rank, tilecols(j), dA, tilecols(j));
+        DenseMW_t dAijV(rank, tilecols(j), dA, rank);
         dA += rank * tilecols(j);
         block(i, j) = std::unique_ptr<LRTile<scalar_t>>
          (new LRTile<scalar_t>(dAijU, dAijV));
@@ -533,12 +533,12 @@ namespace strumpack {
                             B11.tile_dense(k, j).D());
                 }
               } else { // Tki is dense
-                if (i == 0) {
+                /*if (i == 0) {
                   DenseMW_t dAkj(B11.tilerows(k), B11.tilecols(j), dA11,
                                  B11.tilerows(k));
                   B11.create_dense_gpu_tile(k, j, A11, dAkj);
                   dA11 += B11.tilerows(k) * B11.tilecols(j);
-                }
+                }*/
                 if (Tij.is_low_rank()) {
                   DenseMW_t VU(Tki.rows(), Tij.rank(), dVU, Tki.rows());
                   gpu::gemm(handles[s], Trans::N, Trans::N,
@@ -1080,7 +1080,7 @@ namespace strumpack {
                 std::vector<int> tpiv
                   (piv.begin()+B11.tileroff(i),
                    piv.begin()+B11.tileroff(i+1));
-                B11.tile(i, j).laswpx(tpiv, true);
+                B11.tile(i, j).laswp(tpiv, true);
                 trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                      scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
               }
@@ -1110,7 +1110,7 @@ namespace strumpack {
                 std::vector<int> tpiv
                   (piv.begin()+B11.tileroff(i),
                    piv.begin()+B11.tileroff(i+1));
-                B12.tile(i, j).laswpx(tpiv, true);
+                B12.tile(i, j).laswp(tpiv, true);
                 trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                      scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
               }
