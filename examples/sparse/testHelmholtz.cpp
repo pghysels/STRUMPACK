@@ -58,66 +58,53 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
   nx = std::max(std::int64_t(1), nx - 2 * npml);
   MPIComm c;
 
-
-    std::int64_t rank = c.rank(), P = c.size();
-    std::int64_t n_local = std::round(std::floor(float(nx_ex) / P));
-    std::int64_t remaindar = nx_ex%P;
-    std::int64_t low_f;
-    std::int64_t high_f;
-    if(rank+1<=remaindar){
-      high_f = (rank+1)*(n_local+1);
-      low_f = high_f - (n_local+1) + 1;
-    }else{
-      high_f = remaindar*(n_local+1)+(rank+1-remaindar)*n_local;
-      low_f = high_f - (n_local) + 1;
-    }
-    n_local = high_f - low_f+1;  
+  std::int64_t rank = c.rank(), P = c.size();
+  std::int64_t n_local = std::round(std::floor(float(nx_ex) / P));
+  std::int64_t remaindar = nx_ex%P;
+  std::int64_t low_f;
+  std::int64_t high_f;
+  if(rank+1<=remaindar){
+    high_f = (rank+1)*(n_local+1);
+    low_f = high_f - (n_local+1) + 1;
+  }else{
+    high_f = remaindar*(n_local+1)+(rank+1-remaindar)*n_local;
+    low_f = high_f - (n_local) + 1;
+  }
+  n_local = high_f - low_f+1;
 
   STRUMPACK_FC_GLOBAL(genmatrix3d_anal,GENMATRIX3D_ANAL)
     (&nx, &nx, &nx, &n_local, &npml, &n, &nnz, &fromfile, datafile, &rank);
-  std::vector<std::tuple<std::int64_t,std::int64_t,std::complex<realt>>> rc;
-  // {
-    std::vector<std::int64_t> rowind(nnz), colind(nnz);
-    std::vector<std::complex<float>> val(nnz);
-    STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
-      (rowind.data(), colind.data(), val.data(), &nx, &nx, &nx, &low_f, &high_f, &npml, &nnz,
-       &fromfile, datafile, &rank);
-    rc.resize(nnz);
-    for (std::int64_t i=0; i<nnz; i++)
-      rc[i] = std::tuple<std::int64_t,std::int64_t,std::complex<realt>>
-        (rowind[i], colind[i], val[i]);
-  // }
-  
-  // std::sort(rc.begin(), rc.end(),
-  //           [](const std::tuple<std::int64_t,std::int64_t,std::complex<realt>>& a,
-  //              const std::tuple<std::int64_t,std::int64_t,std::complex<realt>>& b) {
-  //             return std::get<0>(a) < std::get<0>(b); });
 
+  std::vector<std::int64_t> rowind(nnz), colind(nnz);
+  std::vector<std::complex<float>> val(nnz);
+  STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
+    (rowind.data(), colind.data(), val.data(), &nx, &nx, &nx,
+     &low_f, &high_f, &npml, &nnz, &fromfile, datafile, &rank);
 
-    std::int64_t is = std::get<0>(rc[0]), ie = std::get<0>(rc[nnz-1]);
-    // long int lrows = (nx+2*npml)*(nx+2*npml)*(nx+2*npml);
-    long int lrows = ie-is+1;
-    std::vector<std::int64_t> ind_loc(nnz), ptr_loc(lrows+1), dist(P+1);
-    std::vector<std::complex<float>> val_loc(nnz);
+  std::int64_t is = nnz ? rowind[0] : 0, ie = nnz ? rowind[nnz-1] : 0;
+  // long int lrows = (nx+2*npml)*(nx+2*npml)*(nx+2*npml);
+  long int lrows = nnz ? ie-is+1 : 0;
+  std::vector<std::int64_t> ind_loc(nnz), ptr_loc(lrows+1), dist(P+1);
+  std::vector<std::complex<float>> val_loc(nnz);
 
-    for (std::int64_t i=0; i<nnz; i++) {
-      ind_loc[i] = std::get<1>(rc[i]) - 1;
-      val_loc[i] = std::get<2>(rc[i]);
-    }
-    ptr_loc[0]=0;
-    for (std::int64_t i=0; i<nnz-1; i++)
-      if (std::get<0>(rc[i]) != std::get<0>(rc[i+1]))
-        ptr_loc[std::get<0>(rc[i])-is+1] = i + 1;
-    ptr_loc[lrows] = nnz;
+  for (std::int64_t i=0; i<nnz; i++) {
+    ind_loc[i] = colind[i] - 1;
+    val_loc[i] = val[i];
+  }
+  ptr_loc[0]=0;
+  for (std::int64_t i=0; i<nnz-1; i++)
+    if (rowind[i] != rowind[i+1])
+      ptr_loc[rowind[i]-is+1] = i + 1;
+  ptr_loc[lrows] = nnz;
 
-      dist[0]=0;
-      dist[rank+1] = lrows;
-      c.all_gather(dist.data()+1, 1);
-      for (int p=0; p<P; p++) dist[p+1] += dist[p];
+  dist[0]=0;
+  dist[rank+1] = lrows;
+  c.all_gather(dist.data()+1, 1);
+  for (int p=0; p<P; p++) dist[p+1] += dist[p];
 
-      
-      CSRMatrixMPI<std::complex<realt>,std::int64_t> A(lrows,ptr_loc.data(),ind_loc.data(),val_loc.data(),dist.data(),MPI_COMM_WORLD,false);
-
+  CSRMatrixMPI<std::complex<realt>,std::int64_t> A
+    (lrows, ptr_loc.data(), ind_loc.data(), val_loc.data(),
+     dist.data(), MPI_COMM_WORLD, false);
 
   return A;
 }
