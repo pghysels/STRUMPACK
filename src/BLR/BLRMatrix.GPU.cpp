@@ -308,7 +308,7 @@ namespace strumpack {
 #if 1 // B11, B12, B21, B22 on GPU
         auto dsep = A11.rows();
         auto d2 = A22.rows();
-        int nr_streams = 4;
+        int nr_streams = 1;
         std::vector<gpu::Stream> streams(nr_streams);
         gpu::Stream comp_stream;
         std::vector<gpu::SOLVERHandle> solvehandles(nr_streams);
@@ -729,9 +729,11 @@ namespace strumpack {
           }
         }
         A11.clear();
-        A12.clear();
-        A21.clear();
-        gpu::copy_device_to_host(A22, dA22);//A22 is DenseM_t
+        if(d2){
+          A12.clear();
+          A21.clear();
+          gpu::copy_device_to_host(A22, dA22);//A22 is DenseM_t
+        }
 
 #if defined(STRUMPACK_USE_MAGMA)
         magma_queue_destroy(q);

@@ -68,6 +68,9 @@ namespace strumpack {
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p, int task_depth) override;
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, VectorPool<scalar_t>& workspace,
                              int task_depth) override;
     void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,

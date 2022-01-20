@@ -151,6 +151,14 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
+   const F_t* p, int task_depth) {
+    VectorPool<scalar_t> workspace;
+    extend_add_to_dense(paF11, paF12, paF21, paF22, p, workspace, task_depth);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
+  (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
@@ -542,40 +550,47 @@ namespace strumpack {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       bloc.laswp(piv_, true);
-#if (defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)) && !defined(STRUMPACK_USE_MAGMA)
-      if (b.cols() == 1) {
-        trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
-        trsv(UpLo::U, Trans::N, Diag::N, F11blr_, bloc, task_depth);
-        if (dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F21blr_, bloc,
-               scalar_t(1.), bupd, task_depth);
-      } else {
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-             scalar_t(1.), F11blr_, bloc, task_depth);
-        trsm(Side::L, UpLo::U, Trans::N, Diag::N,
-             scalar_t(1.), F11blr_, bloc, task_depth);
-        if (dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, bloc,
-               scalar_t(1.), bupd, task_depth);
-      }
-#else
+       //if (opts.use_gpu()) {
 #if 1
-      BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
+#if defined(STRUMPACK_USE_MAGMA)
+        BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
 #else
-      if (b.cols() == 1) {
-        trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
-        if (dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F21blr_, bloc,
-               scalar_t(1.), bupd, task_depth);
-      } else {
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-             scalar_t(1.), F11blr_, bloc, task_depth);
-        if (dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, bloc,
-               scalar_t(1.), bupd, task_depth);
-      }
+        if (b.cols() == 1) {
+          trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
+          //trsv(UpLo::U, Trans::N, Diag::N, F11blr_, bloc, task_depth);
+          if (dim_upd())
+            gemv(Trans::N, scalar_t(-1.), F21blr_, bloc,
+                scalar_t(1.), bupd, task_depth);
+        } else {
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+              scalar_t(1.), F11blr_, bloc, task_depth);
+          //trsm(Side::L, UpLo::U, Trans::N, Diag::N,
+          //    scalar_t(1.), F11blr_, bloc, task_depth);
+          if (dim_upd())
+            gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, bloc,
+                scalar_t(1.), bupd, task_depth);
+        }
+#endif
+#else
+      //} else {
+#if 1
+        BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
+#else
+        if (b.cols() == 1) {
+          trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
+          if (dim_upd())
+            gemv(Trans::N, scalar_t(-1.), F21blr_, bloc,
+                scalar_t(1.), bupd, task_depth);
+        } else {
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+              scalar_t(1.), F11blr_, bloc, task_depth);
+          if (dim_upd())
+            gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, bloc,
+                scalar_t(1.), bupd, task_depth);
+        }
 #endif
 #endif
+      //}
     }
   }
 
