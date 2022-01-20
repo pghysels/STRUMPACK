@@ -551,10 +551,10 @@ namespace strumpack {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
       bloc.laswp(piv_, true);
        //if (opts.use_gpu()) {
-#if 1
-#if defined(STRUMPACK_USE_MAGMA)
-        BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
-#else
+//#if defined(STRUMPACK_USE_MAGMA)
+//        BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
+//#else
+#if 0 //GPU and no MAGMA
         if (b.cols() == 1) {
           trsv(UpLo::L, Trans::N, Diag::U, F11blr_, bloc, task_depth);
           //trsv(UpLo::U, Trans::N, Diag::N, F11blr_, bloc, task_depth);
@@ -570,9 +570,8 @@ namespace strumpack {
             gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, bloc,
                 scalar_t(1.), bupd, task_depth);
         }
-#endif
+//#endif
 #else
-      //} else {
 #if 1
         BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
 #else
@@ -617,22 +616,16 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
-#if 0
+#if 0 //GPU and no MAGMA
 //#if defined(STRUMPACK_USE_MAGMA)
       if (y.cols() == 1) {
         if (dim_upd())
           gemv(Trans::N, scalar_t(-1.), F12blr_, yupd,
                scalar_t(1.), yloc, task_depth);
-        trsv(UpLo::L, Trans::N, Diag::U, F11blr_, yloc, task_depth);
-        trsv(UpLo::U, Trans::N, Diag::N, F11blr_, yloc, task_depth);
       } else {
         if (dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), F12blr_, yupd,
                scalar_t(1.), yloc, task_depth);
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-             scalar_t(1.), F11blr_, yloc, task_depth);
-        trsm(Side::L, UpLo::U, Trans::N, Diag::N,
-             scalar_t(1.), F11blr_, yloc, task_depth);
       }
 #else
 #if 1
