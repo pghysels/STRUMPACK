@@ -701,6 +701,8 @@ namespace strumpack {
             }
           }
         }
+        int* d_piv = dpiv;
+        gpu::copy_device_to_host(piv.data(), d_piv, B11.rows());
         for (std::size_t i=0; i<rb; i++) {
           for (std::size_t j=0; j<rb; j++){
             if (B11.tile(i, j).is_low_rank()){
