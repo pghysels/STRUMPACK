@@ -349,12 +349,12 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MAGMA)
               if (B11.tile(i, j).is_low_rank()){
                 gpu::magma::laswpx(B11.tile(i, j).U(), dpiv+B11.tileroff(i), 
-                                   q, 1);
+                                   q, true);
                 gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                           scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).U());
               } else {
                 gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                                   q, 1);
+                                   q, true);
                 gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                           scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
               }
@@ -370,7 +370,7 @@ namespace strumpack {
             } else {
 #if defined(STRUMPACK_USE_MAGMA)
               gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                                 q, 1);
+                                 q, true);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
 #else
@@ -412,12 +412,12 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_MAGMA)
             if (B12.tile(i, j).is_low_rank()){
               gpu::magma::laswpx(B12.tile(i, j).U(), dpiv+B11.tileroff(i), 
-                                 q, 1);
+                                 q, true);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B12.tile(i, j).U());
             } else {
               gpu::magma::laswpx(B12.tile(i, j).D(), dpiv+B11.tileroff(i), 
-                                 q, 1);
+                                 q, true);
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B12.tile(i, j).D());
             }

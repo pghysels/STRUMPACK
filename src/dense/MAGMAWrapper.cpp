@@ -71,30 +71,34 @@ namespace strumpack {
         return info;
       }
 
-      void laswpx(DenseMatrix<float>& A, int* dpiv, magma_queue_t queue, int inci) {
+      void laswpx(DenseMatrix<float>& A, int* dpiv, magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
-        magmablas_slaswpx(A.cols(), A.data(), 1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
+        magmablas_slaswpx(A.cols(), A.data(), 1, A.ld(), 1, 
+                          A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
-      void laswpx(DenseMatrix<double>& A, int* dpiv, magma_queue_t queue, int inci) {
+      void laswpx(DenseMatrix<double>& A, int* dpiv, magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
-        magmablas_dlaswpx(A.cols(), A.data(), 1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
+        magmablas_dlaswpx(A.cols(), A.data(), 1, A.ld(), 1, 
+                          A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
-      void laswpx(DenseMatrix<std::complex<float>>& A, int* dpiv, magma_queue_t queue, int inci) {
+      void laswpx(DenseMatrix<std::complex<float>>& A, int* dpiv, 
+                  magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
         magmablas_claswpx(A.cols(), reinterpret_cast<magmaFloatComplex*>(A.data()), 
-                          1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
+                          1, A.ld(), 1, A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
-      void laswpx(DenseMatrix<std::complex<double>>& A, int* dpiv, magma_queue_t queue, int inci) {
+      void laswpx(DenseMatrix<std::complex<double>>& A, int* dpiv, 
+                  magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
         magmablas_zlaswpx(A.cols(), reinterpret_cast<magmaDoubleComplex*>(A.data()), 
-                          1, A.ld(), 1, A.rows(), tpiv.data(), inci, queue);
+                          1, A.ld(), 1, A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
