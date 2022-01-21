@@ -181,58 +181,57 @@ namespace strumpack {
     BLRMatrix<scalar_t>::compress_tile_gpu
     (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, 
      std::size_t j, DenseM_t& A, DenseM_t& dU, DenseM_t& dV, int* dpiv, const Opts_t& opts) {
-      if (dU.rows() == 0 || dV.rows() == 0) {
-        // TODO
-      }
-      using real_t = typename RealType<scalar_t>::value_type;
-      std::size_t minmn = std::min(dU.rows(), dV.rows());
-      gpu::DeviceMemory<real_t> d_S(minmn);
-      real_t* dS = d_S;
-      real_t* S = nullptr;
-      std::vector<real_t> S_tmp;
-      S_tmp.resize(minmn);
-      S = S_tmp.data();
-      int rank = 0;
-      const double tol = opts.rel_tol();
-      gesvdjInfo_t params = nullptr;
-      cusolverDnCreateGesvdjInfo(&params);
-      cusolverDnXgesvdjSetTolerance(params, tol);
-      int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
-         (handle, Jobz::V, tilerows(i), tilecols(j), dS, params);
-      gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
-      scalar_t* gesvd_work_ = gesvd_work;
-      gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
-      DenseMW_t d_A(A.rows(), A.cols(), dmemA, A.rows());
-      gpu::copy_device_to_device(d_A, A, A.rows()*A.cols());
-      gpu::gesvdj<scalar_t>(handle, Jobz::V, d_A, dS, dU, dV,
-                            gesvd_work_, gesvd_work_size, dpiv, params);
-      gpu::copy_device_to_host(S, dS, minmn);
-      while(S[rank] >= tol){
-        rank++;
-      }
-      if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
-        gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
-        scalar_t* d_V_T = d_V;
-        DenseMW_t dV_T(rank, dV.rows(), d_V_T, rank);
-        gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
-                            dV_T, dV_T);
-        gpu::DeviceMemory<scalar_t> d_x(rank);
-        scalar_t* dx = d_x;
-        gpu::copy_device_to_device(dx, reinterpret_cast<scalar_t*>(dS), rank);
-        gpu::DeviceMemory<scalar_t> d_V_new(rank*dV.rows());        
-        scalar_t* d_V_T_new = d_V_new;
-        DenseMW_t dV_T_new(rank, dV.rows(), d_V_T_new, rank);
-        gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
-                            dx, dV_T_new);
-        scalar_t* dA = tile(i, j).D().data();
-        DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
-        dA += tilerows(i) * rank;
-        DenseMW_t dAijV(rank, tilecols(j), dA, rank);
-        dA += rank * tilecols(j);
-        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-         (new LRTile<scalar_t>(dAijU, dAijV));
-        gpu::copy_device_to_device(tile(i, j).U(), dU, tilerows(i)*rank);
-        gpu::copy_device_to_device(tile(i, j).V(), dV_T_new, rank*tilecols(j));
+      if (dU.rows() != 0 && dV.rows() != 0) {
+        using real_t = typename RealType<scalar_t>::value_type;
+        std::size_t minmn = std::min(dU.rows(), dV.rows());
+        gpu::DeviceMemory<real_t> d_S(minmn);
+        real_t* dS = d_S;
+        real_t* S = nullptr;
+        std::vector<real_t> S_tmp;
+        S_tmp.resize(minmn);
+        S = S_tmp.data();
+        int rank = 0;
+        const double tol = opts.rel_tol();
+        gesvdjInfo_t params = nullptr;
+        cusolverDnCreateGesvdjInfo(&params);
+        cusolverDnXgesvdjSetTolerance(params, tol);
+        int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
+          (handle, Jobz::V, tilerows(i), tilecols(j), dS, params);
+        gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
+        scalar_t* gesvd_work_ = gesvd_work;
+        gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
+        DenseMW_t d_A(A.rows(), A.cols(), dmemA, A.rows());
+        gpu::copy_device_to_device(d_A, A, A.rows()*A.cols());
+        gpu::gesvdj<scalar_t>(handle, Jobz::V, d_A, dS, dU, dV,
+                              gesvd_work_, gesvd_work_size, dpiv, params);
+        gpu::copy_device_to_host(S, dS, minmn);
+        while(S[rank] >= tol){
+          rank++;
+        }
+        if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
+          gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
+          scalar_t* d_V_T = d_V;
+          DenseMW_t dV_T(rank, dV.rows(), d_V_T, rank);
+          gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
+                              dV_T, dV_T);
+          gpu::DeviceMemory<scalar_t> d_x(rank);
+          scalar_t* dx = d_x;
+          gpu::copy_device_to_device(dx, reinterpret_cast<scalar_t*>(dS), rank);
+          gpu::DeviceMemory<scalar_t> d_V_new(rank*dV.rows());        
+          scalar_t* d_V_T_new = d_V_new;
+          DenseMW_t dV_T_new(rank, dV.rows(), d_V_T_new, rank);
+          gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
+                              dx, dV_T_new);
+          scalar_t* dA = tile(i, j).D().data();
+          DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
+          dA += tilerows(i) * rank;
+          DenseMW_t dAijV(rank, tilecols(j), dA, rank);
+          dA += rank * tilecols(j);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(dAijU, dAijV));
+          gpu::copy_device_to_device(tile(i, j).U(), dU, tilerows(i)*rank);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_T_new, rank*tilecols(j));
+        }
       }
     }
 
