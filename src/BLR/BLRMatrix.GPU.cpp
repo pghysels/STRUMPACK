@@ -257,7 +257,10 @@ namespace strumpack {
          (handle, Jobz::V, tilerows(i), tilecols(j), dS, params);
       gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
       scalar_t* gesvd_work_ = gesvd_work;
-      gpu::gesvdj<scalar_t>(handle, Jobz::V, A, dS, dU, dV, 
+      gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
+      DenseMW_t d_A(A.rows(), A.cols(), dmemA, A.rows());
+      gpu::copy_device_to_device(d_A, A, A.rows()*A.cols());
+      gpu::gesvdj<scalar_t>(handle, Jobz::V, d_A, dS, dU, dV,
                             gesvd_work_, gesvd_work_size, dpiv, params);
       gpu::copy_device_to_host(S, dS, minmn);
       while(S[rank] >= tol){
