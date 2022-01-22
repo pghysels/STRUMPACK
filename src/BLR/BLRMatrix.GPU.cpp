@@ -201,7 +201,7 @@ namespace strumpack {
         scalar_t* gesvd_work_ = gesvd_work;
         gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
         DenseMW_t d_A(A.rows(), A.cols(), dmemA, A.rows());
-        gpu::copy_device_to_device(d_A, A, A.rows()*A.cols());
+        gpu::copy_device_to_device(d_A, A);
         gpu::gesvdj<scalar_t>(handle, Jobz::V, d_A, dS, dU, dV,
                               gesvd_work_, gesvd_work_size, dpiv, params);
         gpu::copy_device_to_host(S, dS, minmn);
@@ -209,6 +209,7 @@ namespace strumpack {
           rank++;
         }
         if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
+          DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
           gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
           scalar_t* d_V_T = d_V;
           DenseMW_t dV_T(rank, dV.rows(), d_V_T, rank);
@@ -229,8 +230,8 @@ namespace strumpack {
           dA += rank * tilecols(j);
           block(i, j) = std::unique_ptr<LRTile<scalar_t>>
           (new LRTile<scalar_t>(dAijU, dAijV));
-          gpu::copy_device_to_device(tile(i, j).U(), dU, tilerows(i)*rank);
-          gpu::copy_device_to_device(tile(i, j).V(), dV_T_new, rank*tilecols(j));
+          gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_T_new);
         }
       }
     }

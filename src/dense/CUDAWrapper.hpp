@@ -203,11 +203,6 @@ namespace strumpack {
     }
 
     template<typename T> void copy_device_to_device
-    (DenseMatrix<T>& d1, const DenseMatrix<T>& d2, std::size_t count) {
-      copy_device_to_device(d1.data(), d2.data(), count);
-    }
-
-    template<typename T> void copy_device_to_device
     (DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
       if (!d1.rows() || !d1.cols()) return;
       assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
