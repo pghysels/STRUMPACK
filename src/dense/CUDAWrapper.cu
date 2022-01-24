@@ -59,7 +59,7 @@ namespace strumpack {
       cudaStream_t streamId;
       cublasGetStream(handle, &streamId);
       laswp_kernel<scalar_t><<<grid, nt, 0, streamId>>>
-        (n, dA.data(), dA.ld(), k2-k1+1, dipiv+k1, inci);
+        (n, dA.data(), dA.ld(), k2-k1+1, dipiv+k1-1, inci);
     }
 
     // explicit template instantiations
