@@ -35,6 +35,7 @@ namespace strumpack {
       int getrf(DenseMatrix<float>& A, int* dpiv) {
         std::vector<int> piv(A.rows());
         int info = 0;
+        STRUMPACK_FLOPS(blas::getrf_flops(A.rows(),A.cols()));
         //magma_sgetrf_native
         magma_sgetrf_gpu
           (A.rows(), A.cols(), A.data(), A.ld(), piv.data(), &info);
@@ -44,6 +45,7 @@ namespace strumpack {
       int getrf(DenseMatrix<double>& A, int* dpiv) {
         std::vector<int> piv(A.rows());
         int info = 0;
+        STRUMPACK_FLOPS(blas::getrf_flops(A.rows(),A.cols()));
         //magma_dgetrf_native
         magma_dgetrf_gpu
           (A.rows(), A.cols(), A.data(), A.ld(), piv.data(), &info);
@@ -53,6 +55,7 @@ namespace strumpack {
       int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv) {
         std::vector<int> piv(A.rows());
         int info = 0;
+        STRUMPACK_FLOPS(4*blas::getrf_flops(A.rows(),A.cols()));
         //magma_cgetrf_native
         magma_cgetrf_gpu
           (A.rows(), A.cols(), reinterpret_cast<magmaFloatComplex*>(A.data()),
@@ -63,6 +66,7 @@ namespace strumpack {
       int getrf(DenseMatrix<std::complex<double>>& A, int* dpiv) {
         std::vector<int> piv(A.rows());
         int info = 0;
+        STRUMPACK_FLOPS(4*blas::getrf_flops(A.rows(),A.cols()));
         //magma_zgetrf_native
         magma_zgetrf_gpu
           (A.rows(), A.cols(), reinterpret_cast<magmaDoubleComplex*>(A.data()),
@@ -74,6 +78,7 @@ namespace strumpack {
       void laswpx(DenseMatrix<float>& A, int* dpiv, magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
+        STRUMPACK_BYTES(4*blas::laswp_moves(A.cols(), 1, A.rows()));
         magmablas_slaswpx(A.cols(), A.data(), 1, A.ld(), 1, 
                           A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
@@ -81,6 +86,7 @@ namespace strumpack {
       void laswpx(DenseMatrix<double>& A, int* dpiv, magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
+        STRUMPACK_BYTES(8*blas::laswp_moves(A.cols(), 1, A.rows()));
         magmablas_dlaswpx(A.cols(), A.data(), 1, A.ld(), 1, 
                           A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
@@ -89,6 +95,7 @@ namespace strumpack {
                   magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
+        STRUMPACK_BYTES(2*4*blas::laswp_moves(A.cols(), 1, A.rows()));
         magmablas_claswpx(A.cols(), reinterpret_cast<magmaFloatComplex*>(A.data()), 
                           1, A.ld(), 1, A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
@@ -97,6 +104,7 @@ namespace strumpack {
                   magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
+        STRUMPACK_BYTES(2*8*blas::laswp_moves(A.cols(), 1, A.rows()));
         magmablas_zlaswpx(A.cols(), reinterpret_cast<magmaDoubleComplex*>(A.data()), 
                           1, A.ld(), 1, A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }

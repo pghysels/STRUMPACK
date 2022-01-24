@@ -300,6 +300,17 @@ namespace strumpack {
               const std::complex<double>* y, int incy,
               std::complex<double>* a, int lda);
 
+    template<typename scalar_t> inline long long geam_flops
+    (long long m, long long n, scalar_t alpha, scalar_t beta) {
+      return (alpha != scalar_t(0) && beta != scalar_t(0)) * m * n +
+        (alpha != scalar_t(0) && alpha != scalar_t(1)) * m* n +
+        (beta != scalar_t(0) && beta != scalar_t(1)) * m * n;
+    }
+
+    inline long long dgmm_flops(long long m, long long n) {
+      return m * (n * 2 - 1);
+    }
+    
     void lacgv(int, float *, int );
     void lacgv(int, double *, int );
     void lacgv(int n, std::complex<float> *x, int incx);
@@ -848,6 +859,10 @@ namespace strumpack {
     double lange(char norm, int m, int n,
                  const std::complex<double> *a, int lda);
 
+    inline long long gesvd_flops(long long m, long long n) {
+      return 14*(m*n)*(m*n) + 8*n*n*n;
+    }
+    
     int gesvd(char jobu, char jobvt, int m, int n, float* a, int lda,
               float* s, float* u, int ldu, float* vt, int ldvt);
     int gesvd(char jobu, char jobvt, int m, int n, double* a, int lda,

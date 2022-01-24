@@ -389,7 +389,8 @@ namespace strumpack {
               cublasFillMode_t uplo, cublasOperation_t trans,
               cublasDiagType_t diag, int m, int n, const float* alpha,
               const float* A, int lda, float* B, int ldb) {
-      //STRUMPACK_FLOPS();
+      STRUMPACK_FLOPS(blas::trsm_flops(m, n, alpha, side));
+      STRUMPACK_BYTES(4*blas::trsm_moves(m, n));
       gpu_check(cublasStrsm(handle, side, uplo, trans, diag, m, 
                             n, alpha, A, lda, B, ldb));
     }
@@ -398,7 +399,8 @@ namespace strumpack {
               cublasFillMode_t uplo, cublasOperation_t trans,
               cublasDiagType_t diag, int m, int n, const double* alpha,
               const double* A, int lda, double* B, int ldb) {
-      //STRUMPACK_FLOPS();
+      STRUMPACK_FLOPS(blas::trsm_flops(m, n, alpha, side));
+      STRUMPACK_BYTES(8*blas::trsm_moves(m, n));
       gpu_check(cublasDtrsm(handle, side, uplo, trans, diag, m, 
                             n, alpha, A, lda, B, ldb));
     }
@@ -408,7 +410,8 @@ namespace strumpack {
               cublasDiagType_t diag, int m, int n, 
               const std::complex<float>* alpha, const std::complex<float>* A, 
               int lda, std::complex<float>* B, int ldb) {
-      //STRUMPACK_FLOPS();
+      STRUMPACK_FLOPS(4*blas::trsm_flops(m, n, alpha, side));
+      STRUMPACK_BYTES(2*4*blas::trsm_moves(m, n));
       gpu_check(cublasCtrsm(handle, side, uplo, trans, diag, m, n, 
                             reinterpret_cast<const cuComplex*>(alpha), 
                             reinterpret_cast<const cuComplex*>(A), lda, 
@@ -421,7 +424,8 @@ namespace strumpack {
               const std::complex<double>* alpha, 
               const std::complex<double>* A, 
               int lda, std::complex<double>* B, int ldb) {
-      //STRUMPACK_FLOPS();
+      STRUMPACK_FLOPS(4*blas::trsm_flops(m, n, alpha, side));
+      STRUMPACK_BYTES(2*8*blas::trsm_moves(m, n));
       gpu_check(cublasZtrsm(handle, side, uplo, trans, diag, m, n, 
                             reinterpret_cast<const cuDoubleComplex*>(alpha), 
                             reinterpret_cast<const cuDoubleComplex*>(A), lda, 
@@ -532,7 +536,7 @@ namespace strumpack {
                 int m, int n, float* A, int lda, float* S, float* U, int ldu, 
                 float* V, int ldv, float* Workspace, int lwork, int *info, 
                 gesvdjInfo_t params) {
-      //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
       gpu_check(cusolverDnSgesvdj
                 (handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, 
                  Workspace, lwork, info, params));
@@ -542,7 +546,7 @@ namespace strumpack {
                 int m, int n, double* A, int lda, double* S, double* U, 
                 int ldu, double* V, int ldv, double* Workspace, int lwork, 
                 int *info, gesvdjInfo_t params) {
-      //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
       gpu_check(cusolverDnDgesvdj
                 (handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, 
                  Workspace, lwork, info, params));
@@ -553,7 +557,7 @@ namespace strumpack {
                  std::complex<float>* U, int ldu, std::complex<float>* V, 
                  int ldv, std::complex<float>* Workspace, int lwork, 
                  int *info, gesvdjInfo_t params) {
-      //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
       gpu_check(cusolverDnCgesvdj
                 (handle, jobz, econ, m, n, reinterpret_cast<cuComplex*>(A), 
                  lda, S, reinterpret_cast<cuComplex*>(U), ldu,
@@ -566,7 +570,7 @@ namespace strumpack {
                  std::complex<double>* U, int ldu, std::complex<double>* V, 
                  int ldv, std::complex<double>* Workspace, int lwork, 
                  int *info, gesvdjInfo_t params) {
-      //STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
+      STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
       gpu_check(cusolverDnZgesvdj
                 (handle, jobz, econ, m, n, 
                  reinterpret_cast<cuDoubleComplex*>(A), lda, S, 
@@ -607,6 +611,7 @@ namespace strumpack {
     void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
               int m, int n, const float* alpha, const float* A, int lda, 
               const float* beta, const float* B, int ldb, float* C, int ldc){
+      STRUMPACK_FLOPS(blas::geam_flops(m, n, alpha, beta));
       gpu_check(cublasSgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, 
                             ldb, C, ldc));
     }
@@ -614,6 +619,7 @@ namespace strumpack {
     void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
               int m, int n, const double* alpha, const double* A, int lda, 
               const double* beta, const double* B, int ldb, double* C, int ldc){
+      STRUMPACK_FLOPS(blas::geam_flops(m, n, alpha, beta));
       gpu_check(cublasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, 
                             ldb, C, ldc));
     }
@@ -623,6 +629,7 @@ namespace strumpack {
               const std::complex<float>* A, int lda, 
               const std::complex<float>* beta, const std::complex<float>* B, int ldb, 
               std::complex<float>* C, int ldc){
+      STRUMPACK_FLOPS(4*blas::geam_flops(m, n, alpha, beta));
       gpu_check(cublasCgeam(handle, transa, transb, m, n, 
                             reinterpret_cast<const cuComplex*>(alpha), 
                             reinterpret_cast<const cuComplex*>(A), lda, 
@@ -636,6 +643,7 @@ namespace strumpack {
               const std::complex<double>* A, int lda, 
               const std::complex<double>* beta, const std::complex<double>* B, int ldb, 
               std::complex<double>* C, int ldc){
+      STRUMPACK_FLOPS(4*blas::geam_flops(m, n, alpha, beta));
       gpu_check(cublasZgeam(handle, transa, transb, m, n, 
                             reinterpret_cast<const cuDoubleComplex*>(alpha), 
                             reinterpret_cast<const cuDoubleComplex*>(A), lda, 
@@ -675,12 +683,14 @@ namespace strumpack {
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
               const float* A, int lda, const float* x, int incx, float* C, 
               int ldc){
+      STRUMPACK_FLOPS(blas::dgmm_flops(m, n));
       gpu_check(cublasSdgmm(handle, side, m, n, A, lda, x, incx, C, ldc));
     }
 
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
               const double* A, int lda, const double* x, int incx, double* C, 
               int ldc){
+      STRUMPACK_FLOPS(blas::dgmm_flops(m, n));
       gpu_check(cublasDdgmm(handle, side, m, n, A, lda, x, incx, C, ldc));
     }
 
@@ -688,6 +698,7 @@ namespace strumpack {
               const std::complex<float>* A, int lda, 
               const std::complex<float>* x, int incx, 
               std::complex<float>* C, int ldc){
+      STRUMPACK_FLOPS(4*blas::dgmm_flops(m, n));
       gpu_check(cublasCdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuComplex*>(A), lda, 
                             reinterpret_cast<const cuComplex*>(x), incx, 
@@ -698,6 +709,7 @@ namespace strumpack {
               const std::complex<double>* A, int lda, 
               const std::complex<double>* x, int incx, 
               std::complex<double>* C, int ldc){
+      STRUMPACK_FLOPS(4*blas::dgmm_flops(m, n));
       gpu_check(cublasZdgmm(handle, side, m, n, 
                             reinterpret_cast<const cuDoubleComplex*>(A), lda, 
                             reinterpret_cast<const cuDoubleComplex*>(x), incx, 
