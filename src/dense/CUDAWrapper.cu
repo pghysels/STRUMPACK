@@ -62,5 +62,11 @@ namespace strumpack {
         (n, dA.data(), dA.ld(), k2-k1+1, dipiv+k1, inci);
     }
 
+    // explicit template instantiations
+    template void laswp(BLASHandle& handle, DenseMatrix<float>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(BLASHandle& handle, DenseMatrix<double>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(BLASHandle& handle, DenseMatrix<std::complex<float>>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(BLASHandle& handle, DenseMatrix<std::complex<double>>& dA, int k1, int k2, int* dipiv, int inci);
+
   } // end namespace gpu
 } // end namespace strumpack
