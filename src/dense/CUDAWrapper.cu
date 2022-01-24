@@ -31,7 +31,7 @@
 namespace strumpack {
   namespace gpu {
 
-    template<typename scalar_t> __device__ void
+    template<typename scalar_t> __global__ void
     laswp_kernel(int n, scalar_t* dA, int lddA,
                  int npivots, int* dipiv, int inci) {
       int tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -58,7 +58,7 @@ namespace strumpack {
       // TODO use the Handle's stream?
       cudaStream_t streamId;
       cublasGetStream(handle, &streamId);
-      laswp_kernel<<<grid, nt, 0, streamId>>>
+      laswp_kernel<scalar_t><<<grid, nt, 0, streamId>>>
         (n, dA.data(), dA.ld(), k2-k1+1, dipiv+k1, inci);
     }
 
