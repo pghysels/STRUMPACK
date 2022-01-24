@@ -43,7 +43,6 @@
 
 
 namespace strumpack {
-
   namespace gpu {
 
 #define gpu_check(err) {                                               \
@@ -368,24 +367,26 @@ namespace strumpack {
          Trans trans, Diag diag, const scalar_t alpha,
          const DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
 
-    template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type>
-    int gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n, 
-                          real_t* S, gesvdjInfo_t params);
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type> int
+    gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n,
+                      real_t* S, gesvdjInfo_t params);
 
-    template<typename scalar_t, typename real_t= typename RealType<scalar_t>::value_type> void
-    gesvdj(SOLVERHandle& handle, Jobz jobz, DenseMatrix<scalar_t>& A, 
-           real_t* d_S, DenseMatrix<scalar_t>& U, 
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type> void
+    gesvdj(SOLVERHandle& handle, Jobz jobz, DenseMatrix<scalar_t>& A,
+           real_t* d_S, DenseMatrix<scalar_t>& U,
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
            int Lwork, int* devInfo, gesvdjInfo_t params);
 
     template<typename scalar_t> void
     geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
-         const DenseMatrix<scalar_t>& A, const scalar_t beta, const DenseMatrix<scalar_t>& B,
-         DenseMatrix<scalar_t>& C);
-    
+         const DenseMatrix<scalar_t>& A, const scalar_t beta,
+         const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C);
+
     template<typename scalar_t> void
-    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A, const scalar_t* x, 
-         DenseMatrix<scalar_t>& C);
+    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
+         const scalar_t* x, DenseMatrix<scalar_t>& C);
 
     template<typename scalar_t> void
     gemm(BLASHandle& handle, Trans ta, Trans tb,
@@ -398,6 +399,10 @@ namespace strumpack {
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& x, scalar_t beta,
          DenseMatrix<scalar_t>& y);
+
+    template<typename scalar_t> void
+    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
+          int k1, int k2, int* ipiv, int inc);
 
   } // end namespace gpu
 } // end namespace strumpack

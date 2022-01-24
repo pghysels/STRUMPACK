@@ -42,6 +42,7 @@ endif()
 
 if(STRUMPACK_USE_CUDA)
   target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cu
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.hpp)
   install(FILES CUDAWrapper.hpp DESTINATION include/dense)
