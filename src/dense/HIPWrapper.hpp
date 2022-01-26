@@ -69,7 +69,7 @@ namespace strumpack {
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
-      void synchronize() { hipStreamSynchronize(s_); }
+      void synchronize() { gpu_check(hipStreamSynchronize(s_)); }
     private:
       hipStream_t s_;
     };
@@ -200,7 +200,7 @@ namespace strumpack {
                       << hipGetErrorString(e) << std::endl;
             std::cerr << "#  Trying hipMallocManaged instead ..."
                       << std::endl;
-            hipGetLastError(); // reset to hipSuccess
+            gpu_check(hipGetLastError()); // reset to hipSuccess
             gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
@@ -260,7 +260,7 @@ namespace strumpack {
                       << hipGetErrorString(e) << std::endl;
             std::cerr << "#  Trying hipMallocManaged instead ..."
                       << std::endl;
-            hipGetLastError(); // reset to hipSuccess
+            gpu_check(hipGetLastError()); // reset to hipSuccess
             gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
