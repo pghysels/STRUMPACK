@@ -212,7 +212,7 @@ namespace strumpack {
           gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
                               dV_T, dV_T);
           gpu::DeviceMemory<scalar_t> d_x(rank);
-          gpu::copy_device_to_device(d_x, reinterpret_cast<scalar_t*>(dS), rank);
+          gpu::copy_device_to_device<scalar_t>(d_x, reinterpret_cast<scalar_t*>(dS), rank);
           gpu::DeviceMemory<scalar_t> d_V_new(rank*dV.rows());
           DenseMW_t dV_T_new(rank, dV.rows(), d_V_new, rank);
           gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
