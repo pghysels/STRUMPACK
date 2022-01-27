@@ -85,7 +85,7 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
   // long int lrows = (nx+2*npml)*(nx+2*npml)*(nx+2*npml);
   long int lrows = nnz ? ie-is+1 : 0;
   std::vector<std::int64_t> ind_loc(nnz), ptr_loc(lrows+1), dist(P+1);
-  std::vector<std::complex<float>> val_loc(nnz);
+  std::vector<std::complex<realt>> val_loc(nnz);
 
   for (std::int64_t i=0; i<nnz; i++) {
     ind_loc[i] = colind[i] - 1;
