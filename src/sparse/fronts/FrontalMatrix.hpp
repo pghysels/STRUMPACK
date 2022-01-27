@@ -160,6 +160,11 @@ namespace strumpack {
     void bwd_solve_phase2(DenseM_t& y, DenseM_t& yupd, DenseM_t* work,
                           int etree_level, int task_depth) const;
 
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    virtual scalar_t* copy_F22_to_gpu(gpu::DeviceMemory<scalar_t>& dmemF22){return nullptr;};
+    virtual scalar_t* getF22(gpu::DeviceMemory<scalar_t>& dmemF22){return copy_F22_to_gpu(dmemF22);}
+#endif
+    
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,

@@ -154,7 +154,7 @@ namespace strumpack {
     (std::size_t i, std::size_t j, DenseM_t& A, DenseMW_t& dB) {
       block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
         (new DenseTile<scalar_t>(dB));
-      gpu::copy_host_to_device(tile(i, j).D(), tile(A, i, j));
+      gpu::copy_device_to_device(tile(i, j).D(), tile(A, i, j));
     }
 
     template<typename scalar_t>
@@ -186,10 +186,8 @@ namespace strumpack {
         std::size_t minmn = std::min(dU.rows(), dV.rows());
         gpu::DeviceMemory<real_t> d_S(minmn);
         real_t* dS = d_S;
-        real_t* S = nullptr;
         std::vector<real_t> S_tmp;
         S_tmp.resize(minmn);
-        S = S_tmp.data();
         int rank = 0;
         const double tol = opts.rel_tol();
         gesvdjInfo_t params = nullptr;
@@ -198,31 +196,27 @@ namespace strumpack {
         int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
           (handle, Jobz::V, tilerows(i), tilecols(j), dS, params);
         gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
-        scalar_t* gesvd_work_ = gesvd_work;
         gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
         DenseMW_t d_A(A.rows(), A.cols(), dmemA, A.rows());
         gpu::copy_device_to_device(d_A, A);
         gpu::gesvdj<scalar_t>(handle, Jobz::V, d_A, dS, dU, dV,
-                              gesvd_work_, gesvd_work_size, dpiv, params);
-        gpu::copy_device_to_host(S, dS, minmn);
-        while(S[rank] >= tol){
+                              gesvd_work, gesvd_work_size, dpiv, params);
+        gpu::copy_device_to_host(S_tmp.data(), dS, minmn);
+        while(S_tmp[rank] >= tol){
           rank++;
         }
         if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
           gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
-          scalar_t* d_V_T = d_V;
-          DenseMW_t dV_T(rank, dV.rows(), d_V_T, rank);
+          DenseMW_t dV_T(rank, dV.rows(), d_V, rank);
           gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
                               dV_T, dV_T);
           gpu::DeviceMemory<scalar_t> d_x(rank);
-          scalar_t* dx = d_x;
-          gpu::copy_device_to_device(dx, reinterpret_cast<scalar_t*>(dS), rank);
-          gpu::DeviceMemory<scalar_t> d_V_new(rank*dV.rows());        
-          scalar_t* d_V_T_new = d_V_new;
-          DenseMW_t dV_T_new(rank, dV.rows(), d_V_T_new, rank);
+          gpu::copy_device_to_device(d_x, reinterpret_cast<scalar_t*>(dS), rank);
+          gpu::DeviceMemory<scalar_t> d_V_new(rank*dV.rows());
+          DenseMW_t dV_T_new(rank, dV.rows(), d_V_new, rank);
           gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
-                              dx, dV_T_new);
+                              d_x, dV_T_new);
           scalar_t* dA = tile(i, j).D().data();
           DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
           dA += tilerows(i) * rank;
@@ -311,9 +305,8 @@ namespace strumpack {
         scalar_t* dU12 = d_U12, *dV12 = d_V12,
                  *dU21 = d_U21, *dV21 = d_V21;
         scalar_t* dA11 = dmB11, *dA12 = dmB12, *dA21 = dmB21;
-        gpu::DeviceMemory<scalar_t> dmemA22(d2*d2+2*max_m21*max_n12);
-        DenseMW_t dA22(d2, d2, dmemA22, d2);
-        scalar_t* dVU22 = dmemA22 + d2*d2, *dUVU22 = dVU22 + max_m21*max_n12;
+        gpu::DeviceMemory<scalar_t> dmemA22(2*max_m21*max_n12);
+        scalar_t* dVU22 = dmemA22, *dUVU22 = dVU22 + max_m21*max_n12;
         for (std::size_t i=0; i<rb; i++) {
           for (std::size_t j=0; j<rb; j++){
             DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j), dA11, B11.tilerows(i));
@@ -593,13 +586,8 @@ namespace strumpack {
           for (std::size_t j=0; j<rb2; j++) {
             auto& Tij = B12.tile(i, j);
             for (std::size_t k=0; k<rb2; k++) {
-              DenseMW_t dAkj(B21.tilerows(k), B12.tilecols(j), dA22,
+              DenseMW_t dAkj(B21.tilerows(k), B12.tilecols(j), A22,
                              B21.tileroff(k), B12.tilecoff(j));
-              if (i == 0) {
-                DenseMW_t Akj(B21.tilerows(k), B12.tilecols(j), A22,
-                              B21.tileroff(k), B12.tilecoff(j));
-                gpu::copy_host_to_device(dAkj, Akj);
-              }
               auto& Tki = B21.tile(k, i);
               if (Tki.is_low_rank()) {
                 if (Tij.is_low_rank()) {
@@ -641,8 +629,7 @@ namespace strumpack {
             }
           }
         }
-        int* d_piv = dpiv;
-        gpu::copy_device_to_host(piv.data(), d_piv, B11.rows());
+        gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), B11.rows());
         for (std::size_t i=0; i<rb; i++)
           for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
             piv[l] += B11.tileroff(i);
@@ -677,7 +664,6 @@ namespace strumpack {
         if(d2){
           A12.clear();
           A21.clear();
-          gpu::copy_device_to_host(A22, dA22);//A22 is DenseM_t
         }
 
 #if defined(STRUMPACK_USE_MAGMA)

@@ -38,6 +38,9 @@
 #include "ExtendAdd.hpp"
 #include "BLR/BLRExtendAdd.hpp"
 #endif
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#include "FrontalMatrixGPUKernels.hpp"
+#endif
 
 namespace strumpack {
 
@@ -52,6 +55,7 @@ namespace strumpack {
   (VectorPool<scalar_t>& workspace) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     workspace.restore(CBpinned_);
+    CBdev_.release();
 #endif
     workspace.restore(CBstorage_);
     F22_.clear();
@@ -146,6 +150,11 @@ namespace strumpack {
            F22blr_.tilecoff(std::min(i + CP,F22blr_.colblocks())) + dim_sep(),
            task_depth, opts);
     }
+  }
+
+  template<typename scalar_t,typename integer_t> scalar_t*
+  FrontalMatrixBLR<scalar_t,integer_t>::getF22(gpu::DeviceMemory<scalar_t>&) {
+    return F22_.data();
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -378,24 +387,42 @@ namespace strumpack {
       } else if (opts.BLR_options().BLR_CB() == BLR::BLRCB::DENSE) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
         if (opts.use_gpu()) {
-          DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
-          F11.zero(); F12.zero(); F21.zero();
-          A.extract_front
-            (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
-          CBpinned_ = workspace.get_pinned(dupd*dupd);
-          F22_ = DenseMW_t(dupd, dupd, CBpinned_, dupd);
-          // CBstorage_ = workspace.get(dupd*dupd);
-          // F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
-          F22_.zero();
-          if (lchild_)
-            lchild_->extend_add_to_dense
-              (F11, F12, F21, F22_, this, workspace, task_depth);
-          if (rchild_)
-            rchild_->extend_add_to_dense
-              (F11, F12, F21, F22_, this, workspace, task_depth);
+          gpu::DeviceMemory<scalar_t> dmF11(dsep*dsep), dmF12(dsep*dupd), 
+                                      dmF21(dupd*dsep);
+          DenseMW_t dF11(dsep, dsep, dmF11, dsep), dF12(dsep, dupd, dmF12, dsep),
+                    dF21(dupd, dsep, dmF21, dupd);
+          CBdev_ = gpu::DeviceMemory<scalar_t>(dupd*dupd);
+          F22_ = DenseMW_t(dupd, dupd, CBdev_, dupd);
+          using Trip_t = Triplet<scalar_t>;
+          std::vector<Trip_t> e11, e12, e21;
+          A.push_front_elements
+            (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+          gpu::DeviceMemory<Trip_t> de11(e11.size()), de12(e12.size()), de21(e21.size());
+          gpu::copy_host_to_device<Trip_t>(de11, e11.data(), e11.size());
+          gpu::copy_host_to_device<Trip_t>(de12, e12.data(), e12.size());
+          gpu::copy_host_to_device<Trip_t>(de21, e21.data(), e21.size());
+          gpu::AssembleData<scalar_t> hasmbl(dsep, dupd, dF11.data(), dF12.data(), dF21.data(), F22_.data(),
+             e11.size(), e12.size(), e21.size(),
+             de11, de12, de21);
+          std::vector<std::size_t> Il, Ir;
+          if (this->lchild_)
+            Il = this->lchild_->upd_to_parent(this);
+          if (this->rchild_)
+            Ir = this->rchild_->upd_to_parent(this);
+          gpu::DeviceMemory<std::size_t> dIl(Il.size()), dIr(Ir.size());
+          gpu::copy_host_to_device<std::size_t>(dIl, Il.data(), Il.size());
+          gpu::copy_host_to_device<std::size_t>(dIr, Ir.data(), Ir.size());
+          gpu::DeviceMemory<scalar_t> CB_left, CB_right;
+          if (this->lchild_)
+            hasmbl.set_ext_add_left(this->lchild_->dim_upd(), this->lchild_->getF22(CB_left), dIl);
+          if (this->rchild_)
+            hasmbl.set_ext_add_right(this->rchild_->dim_upd(), this->rchild_->getF22(CB_right), dIr);
+          gpu::DeviceMemory<gpu::AssembleData<scalar_t>> dasmbl(1);
+          gpu::copy_host_to_device<gpu::AssembleData<scalar_t>>(dasmbl, &hasmbl, 1);
+          gpu::assemble<scalar_t>(1, &hasmbl, dasmbl);
           if (dsep)
               BLRM_t::construct_and_partial_factor_gpu
-                (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+                (dF11, dF12, dF21, F22_, F11blr_, piv_, F12blr_, F21blr_,
                  sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
         } else
 #endif

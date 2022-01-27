@@ -55,6 +55,15 @@ namespace strumpack {
     F22_.clear();
   }
 
+  template<typename scalar_t,typename integer_t> scalar_t* 
+  FrontalMatrixDense<scalar_t,integer_t>::copy_F22_to_gpu(gpu::DeviceMemory<scalar_t>& dmemF22) {
+    auto d2 = F22_.rows();
+    dmemF22 = gpu::DeviceMemory<scalar_t>(d2*d2);
+    DenseMW_t dF22(d2, d2, dmemF22, d2);
+    gpu::copy_host_to_device(dF22, F22_);
+    return dF22.data();
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,

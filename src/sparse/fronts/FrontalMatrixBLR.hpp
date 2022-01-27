@@ -66,6 +66,10 @@ namespace strumpack {
                           const std::vector<Triplet<scalar_t>>& e21,
                           int task_depth, const Opts_t& opts);
 
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    scalar_t* getF22(gpu::DeviceMemory<scalar_t>&) override;
+#endif
+    
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
@@ -130,6 +134,7 @@ namespace strumpack {
     DenseMW_t F22_;
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     gpu::HostMemory<scalar_t> CBpinned_;
+    gpu::DeviceMemory<scalar_t> CBdev_;
 #endif
     std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
     std::vector<int> piv_;

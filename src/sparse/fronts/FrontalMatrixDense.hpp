@@ -57,8 +57,11 @@ namespace strumpack {
     FrontalMatrixDense(integer_t sep, integer_t sep_begin, integer_t sep_end,
                        std::vector<integer_t>& upd);
 
-    // void release_work_memory() override;
     void release_work_memory(VectorPool<scalar_t>& workspace) override;
+
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    scalar_t* copy_F22_to_gpu(gpu::DeviceMemory<scalar_t>& dmemF22) override;
+#endif 
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,

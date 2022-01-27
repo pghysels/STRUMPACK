@@ -205,8 +205,12 @@ namespace strumpack {
     (DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
       if (!d1.rows() || !d1.cols()) return;
       assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
-      assert(d1.rows() == d1.ld() && d2.rows() == d2.ld());
-      copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
+      if (d1.rows() != d1.ld() || d2.rows() != d2.ld()) {
+        gpu_check(cudaMemcpy2D
+                  (d1.data(), d1.ld()*sizeof(T), d2.data(), d2.ld()*sizeof(T),
+                   d2.rows()*sizeof(T), d2.cols(), cudaMemcpyDeviceToDevice));
+      } else
+        copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
     }
 
 
