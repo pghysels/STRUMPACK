@@ -213,6 +213,12 @@ namespace strumpack {
         copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
     }
 
+    template<typename scalar_t, typename real_t = typename RealType<scalar_t>::value_type>
+    void copy_real_to_scalar(scalar_t* dest, const real_t* src, std::size_t size) {
+      gpu_check(cudaMemset(dest, 0, size*sizeof(scalar_t)));
+      gpu_check(cudaMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t), 
+                sizeof(real_t), size, cudaMemcpyDeviceToDevice));
+    }
 
     inline std::size_t available_memory() {
       std::size_t free_device_mem, total_device_mem;
