@@ -608,6 +608,43 @@ namespace strumpack {
                          DenseMatrix<std::complex<double>>&, 
                          std::complex<double>*, int, int*, gesvdjInfo_t);
 
+    template<typename scalar_t, typename real_t> void
+    gesvd(SOLVERHandle& handle, Jobz jobz, int m, int n, real_t* S, 
+          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
+          int* devInfo, const double tol) {
+      gesvdjInfo_t params = nullptr;
+      cusolverDnCreateGesvdjInfo(&params);
+      cusolverDnXgesvdjSetTolerance(params, tol);
+      int gesvd_work_size = gesvdj_buffersize<scalar_t>
+        (handle, jobz, m, n, S, params);
+      DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
+      DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
+      DenseMatrixWrapper<scalar_t> d_A(A.rows(), A.cols(), dmemA, A.rows());
+      copy_device_to_device(d_A, A);
+      gesvdj<scalar_t>(handle, jobz, d_A, S, U, V, gesvd_work, 
+                       gesvd_work_size, devInfo, params);
+    }
+
+    template void gesvd(SOLVERHandle&, Jobz, int, int, float*, DenseMatrix<float>&,
+                        DenseMatrix<float>&, DenseMatrix<float>&, 
+                        int*, const double);
+    
+    template void gesvd(SOLVERHandle&, Jobz, int, int, double*, DenseMatrix<double>&,
+                        DenseMatrix<double>&, DenseMatrix<double>&, 
+                        int*, const double);
+    
+    template void gesvd(SOLVERHandle&, Jobz, int, int, float*, 
+                        DenseMatrix<std::complex<float>>&,
+                        DenseMatrix<std::complex<float>>&, 
+                        DenseMatrix<std::complex<float>>&, 
+                        int*, const double);
+    
+    template void gesvd(SOLVERHandle&, Jobz, int, int, double*, 
+                        DenseMatrix<std::complex<double>>&,
+                        DenseMatrix<std::complex<double>>&, 
+                        DenseMatrix<std::complex<double>>&, 
+                        int*, const double);
+    
     void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
               int m, int n, const float* alpha, const float* A, int lda, 
               const float* beta, const float* B, int ldb, float* C, int ldc){

@@ -190,17 +190,8 @@ namespace strumpack {
         S_tmp.resize(minmn);
         int rank = 0;
         const double tol = opts.rel_tol();
-        gesvdjInfo_t params = nullptr;
-        cusolverDnCreateGesvdjInfo(&params);
-        cusolverDnXgesvdjSetTolerance(params, tol);
-        int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
-          (handle, Jobz::V, tilerows(i), tilecols(j), dS, params);
-        gpu::DeviceMemory<scalar_t> gesvd_work(gesvd_work_size);
-        gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
-        DenseMW_t d_A(A.rows(), A.cols(), dmemA, A.rows());
-        gpu::copy_device_to_device(d_A, A);
-        gpu::gesvdj<scalar_t>(handle, Jobz::V, d_A, dS, dU, dV,
-                              gesvd_work, gesvd_work_size, dpiv, params);
+        gpu::gesvd<scalar_t>(handle, Jobz::V, tilerows(i), 
+                             tilecols(j), dS, A, dU, dV, dpiv, tol);
         gpu::copy_device_to_host(S_tmp.data(), dS, minmn);
         while(S_tmp[rank] >= tol){
           rank++;
