@@ -170,9 +170,11 @@ namespace strumpack {
       const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void compress_tile_gpu(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
                              std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dU, 
                              DenseM_t& dV, int* dpiv, const Opts_t& opts);
+#endif
       void fill(scalar_t v);
       void fill_col(scalar_t v, std::size_t k, bool part, std::size_t CP);
 
@@ -188,8 +190,7 @@ namespace strumpack {
                                    const adm_t& admissible,
                                    const Opts_t& opts);
 
-      //#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       static void
       construct_and_partial_factor_gpu(DenseM_t& A11, DenseM_t& A12,
                                        DenseM_t& A21, DenseM_t& A22,
@@ -261,7 +262,9 @@ namespace strumpack {
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile(std::size_t i, std::size_t j,
                              const extract_t<scalar_t>& Aelem);
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void create_dense_gpu_tile(std::size_t i, std::size_t j, DenseM_t& A, DenseMW_t& dB);
+#endif
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
                                           const extract_t<scalar_t>& Aelem);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
@@ -271,10 +274,12 @@ namespace strumpack {
                                           const BLRMatrix<scalar_t>& B12);
       void create_LR_tile(std::size_t i, std::size_t j,
                           DenseM_t& A, const Opts_t& opts);
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void create_LR_gpu_tile(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, 
                               std::size_t i, std::size_t j, DenseM_t& A, 
                               DenseM_t& dU, DenseM_t& dV, scalar_t*& dA, int* dpiv,
                               const Opts_t& opts);
+#endif
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        const extract_t<scalar_t>& Aelem,
                                        const Opts_t& opts);
@@ -285,10 +290,10 @@ namespace strumpack {
                                        const BLRMatrix<scalar_t>& B21,
                                        const BLRMatrix<scalar_t>& B12,
                                        const Opts_t& opts);
-
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void move_dense_gpu_tile_to_cpu(std::size_t i, std::size_t j, DenseM_t& dD);
       void move_LR_gpu_tile_to_cpu(std::size_t i, std::size_t j, DenseM_t& dU, DenseM_t& dV);
-
+#endif
       void LUAR_B11(std::size_t i, std::size_t j, std::size_t kmax,
                     DenseM_t& A11, const Opts_t& opts, int* B);
       void LUAR_B12(std::size_t i, std::size_t j, std::size_t kmax,
