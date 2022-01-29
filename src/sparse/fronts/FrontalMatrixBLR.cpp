@@ -151,12 +151,12 @@ namespace strumpack {
            task_depth, opts);
     }
   }
-
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
   template<typename scalar_t,typename integer_t> scalar_t*
   FrontalMatrixBLR<scalar_t,integer_t>::getF22(gpu::DeviceMemory<scalar_t>&) {
     return F22_.data();
   }
-
+#endif
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
