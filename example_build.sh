@@ -89,6 +89,12 @@ if [[ $NERSC_HOST = "cori" ]]; then
           -DCMAKE_CXX_COMPILER=CC \
           -DCMAKE_C_COMPILER=cc \
           -DCMAKE_Fortran_COMPILER=ftn \
+	  -DMatlab_ROOT_DIR=/global/common/cori_cle7/software/matlab/R2016a/ \
+          -DBUILD_SHARED_LIBS=ON \
+	  -DTPL_ENABLE_MATLAB=ON \
+	  -DTPL_ENABLE_SLATE=OFF \
+	  -DTPL_ENABLE_BPACK=OFF \
+	  -DTPL_ENABLE_ZFP=OFF \
           -DTPL_SCALAPACK_LIBRARIES="$ScaLAPACKLIBS"
 fi
 
@@ -212,6 +218,6 @@ if ! $found_host; then
     #  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
-make install -j8
+make install -j8 VERBOSE=1
 make examples -j8
 # make test

@@ -16,6 +16,7 @@ option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
 option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
+option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
@@ -485,6 +486,14 @@ if(TPL_ENABLE_COMBBLAS)
   endif()
 endif()
 
+if(TPL_ENABLE_MATLAB)
+  find_package(Matlab REQUIRED COMPONENTS MEX_COMPILER)
+  if(Matlab_FOUND)
+    option(STRUMPACK_USE_MATLAB "" ON)
+  endif()
+endif()
+
+
 # TODO PIC
 # TODO libatomic?
 
@@ -653,6 +662,7 @@ add_subdirectory(examples)
 # testing
 include(CTest)
 add_subdirectory(test)
+
 
 # documentation
 find_package(Doxygen)
