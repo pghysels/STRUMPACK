@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.17)
 project(STRUMPACK VERSION 5.1.1 LANGUAGES CXX C Fortran)
 
 
