@@ -562,7 +562,7 @@ namespace strumpack {
                 (handle, jobz, econ, m, n, reinterpret_cast<cuComplex*>(A), 
                  lda, S, reinterpret_cast<cuComplex*>(U), ldu,
                  reinterpret_cast<cuComplex*>(V), ldv, 
-                 reinterpret_cast<cuComplex*>(Workspace),lwork, info, params));
+                 reinterpret_cast<cuComplex*>(Workspace), lwork, info, params));
     }
 
     void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 

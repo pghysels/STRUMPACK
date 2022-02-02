@@ -417,7 +417,7 @@ namespace strumpack {
          DenseMatrix<scalar_t>& y);
 
     template<typename scalar_t> void
-    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
+    laswp(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
           int k1, int k2, int* ipiv, int inc);
 
   } // end namespace gpu

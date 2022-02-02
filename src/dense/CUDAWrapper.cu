@@ -50,23 +50,23 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& dA,
+    laswp(SOLVERHandle& handle, DenseMatrix<scalar_t>& dA,
           int k1, int k2, int* dipiv, int inci) {
       int n = dA.cols();
       int nt = 256;
       int grid = (n + nt - 1) / nt;
       // TODO use the Handle's stream?
       cudaStream_t streamId;
-      cublasGetStream(handle, &streamId);
+      cusolverDnGetStream(handle, &streamId);
       laswp_kernel<scalar_t><<<grid, nt, 0, streamId>>>
         (n, dA.data(), dA.ld(), k2-k1+1, dipiv+k1-1, inci);
     }
 
     // explicit template instantiations
-    template void laswp(BLASHandle& handle, DenseMatrix<float>& dA, int k1, int k2, int* dipiv, int inci);
-    template void laswp(BLASHandle& handle, DenseMatrix<double>& dA, int k1, int k2, int* dipiv, int inci);
-    template void laswp(BLASHandle& handle, DenseMatrix<std::complex<float>>& dA, int k1, int k2, int* dipiv, int inci);
-    template void laswp(BLASHandle& handle, DenseMatrix<std::complex<double>>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(SOLVERHandle& handle, DenseMatrix<float>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(SOLVERHandle& handle, DenseMatrix<double>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<float>>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<double>>& dA, int k1, int k2, int* dipiv, int inci);
 
   } // end namespace gpu
 } // end namespace strumpack

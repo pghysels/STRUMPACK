@@ -54,7 +54,7 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory
   (VectorPool<scalar_t>& workspace) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    workspace.restore(CBpinned_);
+    //workspace.restore(CBpinned_);
     CBdev_.release();
 #endif
     workspace.restore(CBstorage_);
