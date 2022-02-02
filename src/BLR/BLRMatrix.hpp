@@ -175,6 +175,11 @@ namespace strumpack {
                              std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dU, 
                              DenseM_t& dV, int* dpiv, const Opts_t& opts);
 #endif
+#if defined(STRUMPACK_USE_HIP)
+      void compress_tile_gpu_hip(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
+                             std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dU, 
+                             DenseM_t& dV, int* dpiv, const Opts_t& opts);
+#endif
       void fill(scalar_t v);
       void fill_col(scalar_t v, std::size_t k, bool part, std::size_t CP);
 

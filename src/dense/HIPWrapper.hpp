@@ -37,12 +37,10 @@
 
 #include <hip/hip_runtime_api.h>
 #include <hipblas.h>
+#include <hipsolver.h>
 #include <rocsolver.h>
 
 #include "DenseMatrix.hpp"
-#if defined(STRUMPACK_USE_MPI)
-#include "misc/MPIWrapper.hpp"
-#endif
 
 namespace strumpack {
   namespace gpu {
@@ -57,17 +55,7 @@ namespace strumpack {
     void hip_assert(hipblasStatus_t code, const char *file, int line,
                     bool abort=true);
 
-    inline void init() {
-#if defined(STRUMPACK_USE_MPI)
-      int devs;
-      hipGetDeviceCount(&devs);
-      if (devs > 1 && MPIComm::initialized()) {
-        MPIComm c;
-        hipSetDevice(c.rank() % devs);
-      }
-#endif
-      gpu_check(hipFree(0));
-    }
+    void init();
 
     inline void synchronize() {
       gpu_check(hipDeviceSynchronize());
@@ -79,8 +67,7 @@ namespace strumpack {
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
-      void synchronize() { gpu_check(hipStreamSynchronize(s_)); }
-      private:
+    private:
       hipStream_t s_;
     };
 
@@ -145,8 +132,12 @@ namespace strumpack {
     (DenseMatrix<T>& h, const DenseMatrix<T>& d, const Stream& s) {
       if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_device_to_host_async(h.data(), d.data(), d.rows()*d.cols(), s);
+      if (d.rows() != d.ld() || h.rows() != h.ld()) {
+        gpu_check(hipMemcpy2DAsync
+                  (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
+                   h.rows()*sizeof(T), h.cols(), hipMemcpyDeviceToHost, s));
+      } else
+        copy_device_to_host_async(h.data(), d.data(), d.rows()*d.cols(), s);
     }
     template<typename T> void copy_device_to_host
     (DenseMatrix<T>& h, const T* d) {
@@ -164,17 +155,21 @@ namespace strumpack {
     (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
+      if (d.rows() != d.ld() || h.rows() != h.ld()) {
+        gpu_check(hipMemcpy2D
+                  (d.data(), d.ld()*sizeof(T), h.data(), h.ld()*sizeof(T),
+                   h.rows()*sizeof(T), h.cols(), hipMemcpyHostToDevice));
+      } else
+        copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
     }
     template<typename T> void copy_host_to_device_async
     (DenseMatrix<T>& d, const DenseMatrix<T>& h, const Stream& s) {
       if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(cudaMemcpy2DAsync
+        gpu_check(hipMemcpy2DAsync
                   (d.data(), d.ld()*sizeof(T), h.data(), h.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), cudaMemcpyHostToDevice, s));
+                   h.rows()*sizeof(T), h.cols(), hipMemcpyHostToDevice, s));
       } else
         copy_host_to_device_async(d.data(), h.data(), d.rows()*d.cols(), s);
     }
@@ -195,6 +190,31 @@ namespace strumpack {
       if (!h.rows() || !h.cols()) return;
       assert(h.rows() == h.ld());
       copy_host_to_device_async(d, h.data(), h.rows()*h.cols(), s);
+    }
+
+    template<typename T> void copy_device_to_device
+    (T* d1ptr, const T* d2ptr, std::size_t count) {
+      gpu_check(hipMemcpy(d1ptr, d2ptr, count*sizeof(T),
+                           hipMemcpyDeviceToDevice));
+    }
+
+    template<typename T> void copy_device_to_device
+    (DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
+      if (!d1.rows() || !d1.cols()) return;
+      assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
+      if (d1.rows() != d1.ld() || d2.rows() != d2.ld()) {
+        gpu_check(hipMemcpy2D
+                  (d1.data(), d1.ld()*sizeof(T), d2.data(), d2.ld()*sizeof(T),
+                   d2.rows()*sizeof(T), d2.cols(), hipMemcpyDeviceToDevice));
+      } else
+        copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
+    }
+
+    template<typename scalar_t, typename real_t = typename RealType<scalar_t>::value_type>
+    void copy_real_to_scalar(scalar_t* dest, const real_t* src, std::size_t size) {
+      gpu_check(hipMemset(dest, 0, size*sizeof(scalar_t)));
+      gpu_check(hipMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t), 
+                sizeof(real_t), size, hipMemcpyDeviceToDevice));
     }
 
 
@@ -347,6 +367,44 @@ namespace strumpack {
           DenseMatrix<scalar_t>& B, int *devInfo);
 
     template<typename scalar_t> void
+    trsm(BLASHandle& handle, Side side, UpLo uplo,
+         Trans trans, Diag diag, const scalar_t alpha,
+         DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
+    
+    /*template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type> int
+    gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n,
+                      real_t* S, hipsolverGesvdjInfo_t params);
+
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type> void
+    gesvdj(SOLVERHandle& handle, Jobz jobz, DenseMatrix<scalar_t>& A,
+           real_t* d_S, DenseMatrix<scalar_t>& U,
+           DenseMatrix<scalar_t>& V, scalar_t* Workspace,
+           int Lwork, int* devInfo, hipsolverGesvdjInfo_t params);*/
+    
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type> void
+    gesvd(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, real_t* d_S, 
+          DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
+          real_t* E, int* devInfo);
+    
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type> void
+    gesvd_hip(SOLVERHandle& handle, real_t* S, DenseMatrix<scalar_t>& A, 
+              DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
+              int* devInfo);
+    
+    template<typename scalar_t> void
+    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
+         const DenseMatrix<scalar_t>& A, const scalar_t beta,
+         const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C);
+
+    template<typename scalar_t> void
+    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
+         const scalar_t* x, DenseMatrix<scalar_t>& C);
+    
+    template<typename scalar_t> void
     gemm(BLASHandle& handle, Trans ta, Trans tb,
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& b, scalar_t beta,
@@ -357,6 +415,15 @@ namespace strumpack {
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& x, scalar_t beta,
          DenseMatrix<scalar_t>& y);
+
+    void laswp(SOLVERHandle& handle, DenseMatrix<float>& A,
+               int k1, int k2, int* ipiv, int inc);
+    void laswp(SOLVERHandle& handle, DenseMatrix<double>& A,
+               int k1, int k2, int* ipiv, int inc);
+    void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<float>>& A,
+               int k1, int k2, int* ipiv, int inc);
+    void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<double>>& A,
+               int k1, int k2, int* ipiv, int inc);
 
   } // end namespace gpu
 } // end namespace strumpack

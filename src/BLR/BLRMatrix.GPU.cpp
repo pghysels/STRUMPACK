@@ -176,7 +176,7 @@ namespace strumpack {
       block(i, j) = std::unique_ptr<LRTile<scalar_t>>
         (new LRTile<scalar_t>(hU, hV));
     }  
-
+#if defined(STRUMPACK_USE_CUDA)
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::compress_tile_gpu
     (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, 
@@ -204,10 +204,8 @@ namespace strumpack {
                               dV_T, dV_T);
           gpu::DeviceMemory<scalar_t> d_x(rank);
           gpu::copy_real_to_scalar<scalar_t>(d_x, dS, rank);
-          gpu::DeviceMemory<scalar_t> d_V_new(rank*dV.rows());
-          DenseMW_t dV_T_new(rank, dV.rows(), d_V_new, rank);
           gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
-                              d_x, dV_T_new);
+                              d_x, dV_T);
           scalar_t* dA = tile(i, j).D().data();
           DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
           dA += tilerows(i) * rank;
@@ -216,11 +214,51 @@ namespace strumpack {
           block(i, j) = std::unique_ptr<LRTile<scalar_t>>
           (new LRTile<scalar_t>(dAijU, dAijV));
           gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
-          gpu::copy_device_to_device(tile(i, j).V(), dV_T_new);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_T);
         }
       }
     }
-
+#endif
+#if defined(STRUMPACK_USE_HIP)
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress_tile_gpu_hip
+    (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, 
+     std::size_t j, DenseM_t& A, DenseM_t& dU, DenseM_t& dV, int* dpiv, const Opts_t& opts) {
+      if (dU.rows() != 0 && dV.cols() != 0) {
+        using real_t = typename RealType<scalar_t>::value_type;
+        std::size_t minmn = std::min(dU.rows(), dV.cols());
+        gpu::DeviceMemory<real_t> d_S(minmn);
+        real_t* dS = d_S;
+        std::vector<real_t> S_tmp;
+        S_tmp.resize(minmn);
+        int rank = 0;
+        const double tol = opts.rel_tol();
+        gpu::gesvd_hip<scalar_t>(handle, dS, A, dU, dV, dpiv);
+        gpu::copy_device_to_host(S_tmp.data(), dS, minmn);
+        while(S_tmp[rank] >= tol){
+          rank++;
+        }
+        if (rank*(dU.rows() + dV.cols()) < dU.rows()*dV.cols()){
+          DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
+          gpu::DeviceMemory<scalar_t> d_V(rank*dV.cols());
+          DenseMW_t dV_T(rank, dV.cols(), d_V, rank);
+          gpu::DeviceMemory<scalar_t> d_x(rank);
+          gpu::copy_real_to_scalar<scalar_t>(d_x, dS, rank);
+          gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
+                              d_x, dV_T);
+          scalar_t* dA = tile(i, j).D().data();
+          DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
+          dA += tilerows(i) * rank;
+          DenseMW_t dAijV(rank, tilecols(j), dA, rank);
+          dA += rank * tilecols(j);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(dAijU, dAijV));
+          gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_T);
+        }
+      }
+    }
+#endif
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor_gpu
     (DenseMatrix<scalar_t>& A11, DenseMatrix<scalar_t>& A12,
@@ -242,10 +280,8 @@ namespace strumpack {
         auto d2 = A22.rows();
         int nr_streams = 1;
         std::vector<gpu::Stream> streams(nr_streams);
-        gpu::Stream comp_stream;
         std::vector<gpu::SOLVERHandle> solvehandles(nr_streams);
         std::vector<gpu::BLASHandle> handles(nr_streams);
-        gpu::BLASHandle handle(comp_stream);
         for (int i=0; i<nr_streams; i++) {
           solvehandles[i].set_stream(streams[i]);
           handles[i].set_stream(streams[i]);
@@ -254,6 +290,8 @@ namespace strumpack {
         magma_init();
         magma_queue_t q;
 #if defined(STRUMPACK_USE_CUDA)
+        gpu::Stream comp_stream;
+        gpu::BLASHandle handle(comp_stream);
         magma_queue_create_from_cuda
           (0, comp_stream, handle, nullptr, &q);
 #else
@@ -327,9 +365,17 @@ namespace strumpack {
             if (admissible(i, j)) {
               std::size_t minmn = std::min(B11.tilerows(i), B11.tilecols(j));
               DenseMW_t dAijU(B11.tilerows(i), minmn, dU, B11.tilerows(i));
+#if defined(STRUMPACK_USE_CUDA)
               DenseMW_t dAijV(B11.tilecols(j), minmn, dV, B11.tilecols(j));
               B11.compress_tile_gpu(solvehandles[s], handles[s], i, j, B11.tile(i, j).D(),
                                     dAijU, dAijV, dpiv+dsep, opts);
+#else
+#if defined(STRUMPACK_USE_HIP)
+              DenseMW_t dAijV(minmn, B11.tilecols(j), dV, minmn);
+              B11.compress_tile_gpu_hip(solvehandles[s], handles[s], i, j, B11.tile(i, j).D(),
+                                    dAijU, dAijV, dpiv+dsep, opts);
+#endif
+#endif   
 #if defined(STRUMPACK_USE_MAGMA)
               if (B11.tile(i, j).is_low_rank()){
                 gpu::magma::laswpx(B11.tile(i, j).U(), dpiv+B11.tileroff(i), 
@@ -340,10 +386,10 @@ namespace strumpack {
               }
 #else
               if (B11.tile(i, j).is_low_rank()){
-                gpu::laswp(handles[s], B11.tile(i, j).U(), 1, 
+                gpu::laswp(solvehandles[s], B11.tile(i, j).U(), 1, 
                            B11.tile(i, j).U().rows(), dpiv+B11.tileroff(i), 1);
               } else{
-                gpu::laswp(handles[s], B11.tile(i, j).D(), 1, 
+                gpu::laswp(solvehandles[s], B11.tile(i, j).D(), 1, 
                            B11.tile(i, j).D().rows(), dpiv+B11.tileroff(i), 1);
               }
 #endif
@@ -359,7 +405,7 @@ namespace strumpack {
               gpu::magma::laswpx(B11.tile(i, j).D(), dpiv+B11.tileroff(i), 
                                  q, true);
 #else
-              gpu::laswp(handles[s], B11.tile(i, j).D(), 1, 
+              gpu::laswp(solvehandles[s], B11.tile(i, j).D(), 1, 
                          B11.tile(i, j).D().rows(), dpiv+B11.tileroff(i), 1);
 #endif
               gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
@@ -370,9 +416,17 @@ namespace strumpack {
             if (admissible(j, i)) {
               std::size_t minmn = std::min(B11.tilerows(j), B11.tilecols(i));
               DenseMW_t dAijU(B11.tilerows(j), minmn, dU, B11.tilerows(j));
+#if defined(STRUMPACK_USE_CUDA)
               DenseMW_t dAijV(B11.tilecols(i), minmn, dV, B11.tilecols(i));
               B11.compress_tile_gpu(solvehandles[s], handles[s], j, i, B11.tile(j, i).D(), 
                                     dAijU, dAijV, dpiv+dsep, opts);
+#else
+#if defined(STRUMPACK_USE_HIP)
+              DenseMW_t dAijV(minmn, B11.tilecols(i), dV, minmn);
+              B11.compress_tile_gpu_hip(solvehandles[s], handles[s], j, i, B11.tile(j, i).D(),
+                                        dAijU, dAijV, dpiv+dsep, opts);
+#endif
+#endif 
               if (B11.tile(j, i).is_low_rank()){
                 gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
                           scalar_t(1.), B11.tile(i, i).D(), B11.tile(j, i).V());
@@ -389,9 +443,17 @@ namespace strumpack {
           for (std::size_t j=0; j<rb2; j++) {
             std::size_t minmn = std::min(B12.tilerows(i), B12.tilecols(j));
             DenseMW_t dAijU(B12.tilerows(i), minmn, dU12, B12.tilerows(i));
+#if defined(STRUMPACK_USE_CUDA)
             DenseMW_t dAijV(B12.tilecols(j), minmn, dV12, B12.tilecols(j));
             B12.compress_tile_gpu(solvehandles[s], handles[s], i, j, B12.tile(i, j).D(), 
                                   dAijU, dAijV, dpiv+dsep, opts);
+#else
+#if defined(STRUMPACK_USE_HIP)
+            DenseMW_t dAijV(minmn, B12.tilecols(j), dV12, minmn);
+            B12.compress_tile_gpu_hip(solvehandles[s], handles[s], i, j, B12.tile(i, j).D(),
+                                      dAijU, dAijV, dpiv+dsep, opts);
+#endif
+#endif 
 #if defined(STRUMPACK_USE_MAGMA)
             if (B12.tile(i, j).is_low_rank()){
               gpu::magma::laswpx(B12.tile(i, j).U(), dpiv+B11.tileroff(i), 
@@ -402,10 +464,10 @@ namespace strumpack {
             }
 #else
             if (B12.tile(i, j).is_low_rank()){
-              gpu::laswp(handles[s], B12.tile(i, j).U(), 1, 
+              gpu::laswp(solvehandles[s], B12.tile(i, j).U(), 1, 
                          B12.tile(i, j).U().rows(), dpiv+B11.tileroff(i), 1);
             } else{
-              gpu::laswp(handles[s], B12.tile(i, j).D(), 1, 
+              gpu::laswp(solvehandles[s], B12.tile(i, j).D(), 1, 
                          B12.tile(i, j).D().rows(), dpiv+B11.tileroff(i), 1);
             }
 #endif
@@ -418,9 +480,17 @@ namespace strumpack {
             }
             minmn = std::min(B21.tilerows(j), B21.tilecols(i));
             DenseMW_t dAijU21(B21.tilerows(j), minmn, dU21, B21.tilerows(j));
+#if defined(STRUMPACK_USE_CUDA)
             DenseMW_t dAijV21(B21.tilecols(i), minmn, dV21, B21.tilecols(i));
             B21.compress_tile_gpu(solvehandles[s], handles[s], j, i, B21.tile(j, i).D(), 
                                   dAijU21, dAijV21, dpiv+dsep, opts);
+#else
+#if defined(STRUMPACK_USE_HIP)
+            DenseMW_t dAijV21(minmn, B21.tilecols(i), dV21, minmn);
+            B21.compress_tile_gpu_hip(solvehandles[s], handles[s], j, i, B21.tile(j, i).D(),
+                                      dAijU21, dAijV21, dpiv+dsep, opts);
+#endif
+#endif 
             if (B21.tile(j, i).is_low_rank()){
               gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
                         scalar_t(1.), B11.tile(i, i).D(), B21.tile(j, i).V());
