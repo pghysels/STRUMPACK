@@ -1,3 +1,18 @@
+Version 6.3.0 Released February 2022
+====================================
+- Change default sparsity reducing ordering to use METIS_NodeNDP
+  (from METIS_NodeND)
+- Significant performance improvements in the GPU code for the
+  direct solver, from the NERSC December 2021 Hackathon
+- Performance fix in symbolic phase
+  (affecting only some MPI implementations)
+- Bump minimum CMake version to 3.17
+- CMake fix for Perlmutter
+- Compilation fix for GCC 8
+- Add support for single precision HODLR/Butterfly
+  (now requiring ButterflyPACK >= 2.1.0)
+
+
 Version 6.2.1 Released November 2021
 ====================================
 - HIP compilation fix
