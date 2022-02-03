@@ -743,21 +743,32 @@ namespace strumpack {
     auto chl = tree.lchild[sep];
     auto chr = tree.rchild[sep];
     if (chl != -1 && chr != -1) {
-      auto wl = tree.work[chl];
-      auto wr = tree.work[chr];
-      int Pl = std::max
-        (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
-      int Pr = std::max(1, P - Pl);
       bool use_compression = is_compressed
         (dim_sep, dim_upd, parent_compression, opts);
-      front->set_lchild
-        (proportional_mapping_sub_graphs
-         (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
-          fcomm.sub(0, Pl), use_compression, level+1));
-      front->set_rchild
-        (proportional_mapping_sub_graphs
-         (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
-          fcomm.sub(P-Pr, Pr), use_compression, level+1));
+      if (P == 1) {
+        front->set_lchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chl, P0, 1, P0, 1,
+            fcomm, use_compression, level+1));
+        front->set_rchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chr, P0, 1, P0, 1,
+            fcomm, use_compression, level+1));
+      } else {
+        auto wl = tree.work[chl];
+        auto wr = tree.work[chr];
+        int Pl = std::max
+          (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
+        int Pr = std::max(1, P - Pl);
+        front->set_lchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
+            fcomm.sub(0, Pl), use_compression, level+1));
+        front->set_rchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
+            fcomm.sub(P-Pr, Pr), use_compression, level+1));
+      }
     }// else this->update_local_ranges(sep_begin, sep_end);
     return front;
   }
