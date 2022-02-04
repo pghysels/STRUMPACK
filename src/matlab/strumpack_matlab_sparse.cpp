@@ -53,7 +53,8 @@ void mexFunction
 
   // Read the Sparse Monitor Flag
   mxArray *Y, *X = mxCreateString("spumoni");
-  int mexerr = mexCallMATLAB(1, &Y, 1, &X, "sparsfun");
+  // int mexerr = mexCallMATLAB(1, &Y, 1, &X, "sparsfun");
+  int mexerr = mexCallMATLAB(1, &Y, 1, &X, "spparms");
   int SPUMONI = mxGetScalar(Y);
   mxDestroyArray(Y);
   mxDestroyArray(X);
@@ -67,11 +68,39 @@ void mexFunction
 
   if (verbose)
     mexPrintf("Call STRUMPACK SOLVE, use STRUMPACK to factor first ...\n");
-  // strumpack::StrumpackSparseSolver<mxDouble,mwIndex> sp;
-  // sp.set_csr_matrix(m, mxGetJc(A_in), mxGetIr(A_in), mxGetDoubles(A_in));
-  // if (sp.solve(mxGetDoubles(b_in), mxGetDoubles(x_out))
-  strumpack::StrumpackSparseSolver<double,mwIndex> sp(verbose);
-  sp.set_csr_matrix(m, mxGetJc(A_in), mxGetIr(A_in), mxGetPr(A_in));
+
+  // the input matrix uses UNSIGNED integers,
+  // strumpack needs SIGNED integers
+  mwIndex *m_rowind = mxGetIr(A_in);
+  mwIndex *m_colptr = mxGetJc(A_in);
+  auto nnz = m_colptr[n];
+
+  // the input matrix is compressed sparse COLUMN,
+  // strumpack needs compressed sparse ROW
+  int *rowptr = (int*)mxMalloc((n+1)*sizeof(int));
+  int *colind = (int*)mxMalloc(nnz*sizeof(int));
+  int *rowsums = (int*)mxMalloc(n*sizeof(int));
+  std::fill(rowsums, rowsums+n, 0);
+  for (mwIndex c=0; c<n; c++)
+    for (mwIndex i=m_colptr[c]; i<m_colptr[c+1]; i++)
+      rowsums[m_rowind[i]]++;
+  rowptr[0] = 0;
+  for (int r=0; r<n; r++)
+    rowptr[r+1] = rowptr[r] + rowsums[r];
+  std::fill(rowsums, rowsums+n, 0);
+  for (mwIndex c=0; c<n; c++)
+    for (mwIndex i=m_colptr[c]; i<m_colptr[c+1]; i++) {
+      mwIndex r = m_rowind[i];
+      colind[rowptr[r]+rowsums[r]] = c;
+      rowsums[r]++;
+    }
+
+  strumpack::StrumpackSparseSolver<double,int> sp(verbose);
+  sp.set_csr_matrix(m, rowptr, colind, mxGetPr(A_in));
+
+  // static int counter = 0;
+  // mexPrintf("Matrix set, static counter = %d ...\n", counter++);
+
   if (sp.solve(mxGetPr(b_in), mxGetPr(x_out))
       != strumpack::ReturnCode::SUCCESS) {
     std::cout << "Error during matrix factorization." << std::endl;
