@@ -620,7 +620,7 @@ namespace strumpack {
       cusolverDnCreateGesvdjInfo(&params);
       cusolverDnXgesvdjSetTolerance(params, tol);
       int gesvd_work_size = gesvdj_buffersize<scalar_t>
-        (handle, jobz, U.rows(), V.rows(), S, params);
+        (handle, jobz, U.rows(), V.rows(), params);
       auto svd_ptr = reinterpret_cast<scalar_t*>(svd_mem);
       svd_ptr += minmn;
       DenseMatrixWrapper<scalar_t> d_A(A.rows(), A.cols(), svd_ptr, A.rows());

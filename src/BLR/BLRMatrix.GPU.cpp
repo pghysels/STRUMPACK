@@ -331,7 +331,7 @@ namespace strumpack {
         using real_t = typename RealType<scalar_t>::value_type;
         gesvdjInfo_t params = nullptr;
         int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
-          (solvehandles[0], Jobz::V, maxm_all, maxm_all+1, static_cast<real_t*>(nullptr), params);
+          (solvehandles[0], Jobz::V, maxm_all, maxm_all+1, params);
         int svd_size = round_to_16(sizeof(scalar_t) * (2*maxm_all + maxmn_all + gesvd_work_size));
         gpu::DeviceMemory<char> svd_mem(svd_size);
 #endif
