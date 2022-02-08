@@ -611,7 +611,7 @@ namespace strumpack {
                          DenseMatrix<std::complex<double>>&, 
                          std::complex<double>*, int, int*, gesvdjInfo_t);
 
-    template<typename scalar_t, typename real_t> void
+    template<typename scalar_t, typename real_t> int
     gesvd(SOLVERHandle& handle, Jobz jobz, real_t* S, DenseMatrix<scalar_t>& A, 
           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
           int* devInfo, char* svd_mem, const double tol) {
