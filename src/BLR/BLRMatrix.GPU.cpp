@@ -199,7 +199,7 @@ namespace strumpack {
         if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
           auto d_V = reinterpret_cast<scalar_t*>(svd_mem);
-+         d_V += minmn + (A.rows() * A.cols()) + gesvd_work_size;
+          d_V += minmn + (A.rows() * A.cols()) + gesvd_work_size;
           DenseMW_t dV_T(rank, dV.rows(), d_V, rank);
           gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
                               dV_T, dV_T);
@@ -328,7 +328,6 @@ namespace strumpack {
         maxmn_all = std::max(maxmn_all, max_m21*max_n21);
         maxm_all = std::max(maxm_all, max_m21);
 #if defined(STRUMPACK_USE_CUDA)
-        using real_t = typename RealType<scalar_t>::value_type;
         gesvdjInfo_t params = nullptr;
         int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
           (solvehandles[0], Jobz::V, maxm_all, maxm_all+1, params);
