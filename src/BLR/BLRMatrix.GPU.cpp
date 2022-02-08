@@ -180,32 +180,33 @@ namespace strumpack {
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::compress_tile_gpu
     (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, 
-     std::size_t j, DenseM_t& A, DenseM_t& dU, DenseM_t& dV, int* dpiv, const Opts_t& opts) {
+     std::size_t j, DenseM_t& A, DenseM_t& dU, DenseM_t& dV, int* dpiv, 
+     char* svd_mem, const Opts_t& opts) {
       if (dU.rows() != 0 && dV.rows() != 0) {
         using real_t = typename RealType<scalar_t>::value_type;
         std::size_t minmn = std::min(dU.rows(), dV.rows());
-        gpu::DeviceMemory<real_t> d_S(minmn);
-        real_t* dS = d_S;
+        auto dS = reinterpret_cast<real_t*>(svd_mem);
         std::vector<real_t> S_tmp;
         S_tmp.resize(minmn);
         int rank = 0;
         const double tol = opts.rel_tol();
-        gpu::gesvd<scalar_t>(handle, Jobz::V, tilerows(i), 
-                             tilecols(j), dS, A, dU, dV, dpiv, tol);
+        int gesvd_work_size = gpu::gesvd<scalar_t>(handle, Jobz::V, dS, 
+                                A, dU, dV, dpiv, svd_mem, tol);
         gpu::copy_device_to_host(S_tmp.data(), dS, minmn);
         while(S_tmp[rank] >= tol){
           rank++;
         }
         if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
-          gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
+          auto d_V = reinterpret_cast<scalar_t*>(svd_mem);
++         d_V += minmn + (A.rows() * A.cols()) + gesvd_work_size;
           DenseMW_t dV_T(rank, dV.rows(), d_V, rank);
           gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
                               dV_T, dV_T);
-          gpu::DeviceMemory<scalar_t> d_x(rank);
-          gpu::copy_real_to_scalar<scalar_t>(d_x, dS, rank);
+          d_V += rank * dV.rows();
+          gpu::copy_real_to_scalar<scalar_t>(d_V, dS, rank);
           gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
-                              d_x, dV_T);
+                              d_V, dV_T);
           scalar_t* dA = tile(i, j).D().data();
           DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
           dA += tilerows(i) * rank;
@@ -304,10 +305,13 @@ namespace strumpack {
            (solvehandles[0], *std::max_element(tiles1.begin(), tiles1.end()));
         gpu::DeviceMemory<scalar_t> getrf_work(getrf_work_size);
         gpu::DeviceMemory<int> dpiv(dsep+1);
-        std::size_t max_m = 0, max_n = 0;
-        for (std::size_t k=0; k<rb; k++) {
-          max_m = std::max(max_m, B11.tilerows(k));
-          max_n = std::max(max_n, B11.tilecols(k));
+        std::size_t max_m = 0, max_mn = 0;
+        for (std::size_t k1=0; k1<rb; k1++) {
+          max_m = std::max(max_m, B11.tilerows(k1));
+          for (std::size_t k2 = 0; k2 < rb; k2++) {
+            if (k1 != k2) 
+              max_mn = std::max(max_mn, B11.tilerows(k1)*B11.tilecols(k2));
+          }
         }
         std::size_t max_m12 = 0, max_n12 = 0, 
                     max_m21 = 0, max_n21 = 0;
@@ -319,13 +323,25 @@ namespace strumpack {
           max_n12 = std::max(max_n12, B12.tilecols(k));
           max_m21 = std::max(max_m21, B21.tilerows(k));
         }
-        gpu::DeviceMemory<scalar_t> dVU_tmp(2*max_m*max_n), dVU12_tmp(2*max_m*max_n),
-                                    dVU21_tmp(2*max_m*max_n);
-        scalar_t* dVU = dVU_tmp, *dUVU = dVU + max_m12*max_n12, *dVU12 = dVU12_tmp, 
+        std::size_t maxmn_all = std::max(max_mn, max_m12*max_n12),
+                    maxm_all = std::max(max_m, max_m12);
+        maxmn_all = std::max(maxmn_all, max_m21*max_n21);
+        maxm_all = std::max(maxm_all, max_m21);
+#if defined(STRUMPACK_USE_CUDA)
+        using real_t = typename RealType<scalar_t>::value_type;
+        gesvdjInfo_t params = nullptr;
+        int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
+          (solvehandles[0], Jobz::V, maxm_all, maxm_all+1, static_cast<real_t*>(nullptr), params);
+        int svd_size = round_to_16(sizeof(scalar_t) * (2*maxm_all + maxmn_all + gesvd_work_size));
+        gpu::DeviceMemory<char> svd_mem(svd_size);
+#endif
+        gpu::DeviceMemory<scalar_t> dVU_tmp(2*max_mn), dVU12_tmp(2*max_m12*max_n12),
+                                    dVU21_tmp(2*max_m21*max_n21);
+        scalar_t* dVU = dVU_tmp, *dUVU = dVU + max_mn, *dVU12 = dVU12_tmp, 
                 *dUVU12 = dVU12 + max_m12*max_n12, *dVU21 = dVU21_tmp, 
                 *dUVU21 = dVU21 + max_m21*max_n21;
-        gpu::DeviceMemory<scalar_t> d_U(max_m*max_n);
-        gpu::DeviceMemory<scalar_t> d_V(max_m*max_n);
+        gpu::DeviceMemory<scalar_t> d_U(max_mn);
+        gpu::DeviceMemory<scalar_t> d_V(max_mn);
         gpu::DeviceMemory<scalar_t> d_U12(max_m12*max_n12);
         gpu::DeviceMemory<scalar_t> d_V12(max_m12*max_n12);
         gpu::DeviceMemory<scalar_t> d_U21(max_m21*max_n21);
@@ -368,7 +384,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA)
               DenseMW_t dAijV(B11.tilecols(j), minmn, dV, B11.tilecols(j));
               B11.compress_tile_gpu(solvehandles[s], handles[s], i, j, B11.tile(i, j).D(),
-                                    dAijU, dAijV, dpiv+dsep, opts);
+                                    dAijU, dAijV, dpiv+dsep, svd_mem, opts);
 #else
 #if defined(STRUMPACK_USE_HIP)
               DenseMW_t dAijV(minmn, B11.tilecols(j), dV, minmn);
@@ -419,7 +435,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA)
               DenseMW_t dAijV(B11.tilecols(i), minmn, dV, B11.tilecols(i));
               B11.compress_tile_gpu(solvehandles[s], handles[s], j, i, B11.tile(j, i).D(), 
-                                    dAijU, dAijV, dpiv+dsep, opts);
+                                    dAijU, dAijV, dpiv+dsep, svd_mem, opts);
 #else
 #if defined(STRUMPACK_USE_HIP)
               DenseMW_t dAijV(minmn, B11.tilecols(i), dV, minmn);
@@ -446,7 +462,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA)
             DenseMW_t dAijV(B12.tilecols(j), minmn, dV12, B12.tilecols(j));
             B12.compress_tile_gpu(solvehandles[s], handles[s], i, j, B12.tile(i, j).D(), 
-                                  dAijU, dAijV, dpiv+dsep, opts);
+                                  dAijU, dAijV, dpiv+dsep, svd_mem, opts);
 #else
 #if defined(STRUMPACK_USE_HIP)
             DenseMW_t dAijV(minmn, B12.tilecols(j), dV12, minmn);
@@ -483,7 +499,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA)
             DenseMW_t dAijV21(B21.tilecols(i), minmn, dV21, B21.tilecols(i));
             B21.compress_tile_gpu(solvehandles[s], handles[s], j, i, B21.tile(j, i).D(), 
-                                  dAijU21, dAijV21, dpiv+dsep, opts);
+                                  dAijU21, dAijV21, dpiv+dsep, svd_mem, opts);
 #else
 #if defined(STRUMPACK_USE_HIP)
             DenseMW_t dAijV21(minmn, B21.tilecols(i), dV21, minmn);

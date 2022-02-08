@@ -173,7 +173,8 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void compress_tile_gpu(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
                              std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dU, 
-                             DenseM_t& dV, int* dpiv, const Opts_t& opts);
+                             DenseM_t& dV, int* dpiv, char* gesvd_mem,
+                             const Opts_t& opts);
 #endif
 #if defined(STRUMPACK_USE_HIP)
       void compress_tile_gpu_hip(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,

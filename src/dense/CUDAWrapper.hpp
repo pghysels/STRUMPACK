@@ -380,7 +380,7 @@ namespace strumpack {
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> int
     gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n,
-                      real_t* S, gesvdjInfo_t params);
+                      gesvdjInfo_t params);
 
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> void
@@ -390,10 +390,10 @@ namespace strumpack {
            int Lwork, int* devInfo, gesvdjInfo_t params);
 
     template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type> void
-    gesvd(SOLVERHandle& handle, Jobz jobz, int m, int n, real_t* S, 
-          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
-          int* devInfo, const double tol);
+             typename real_t=typename RealType<scalar_t>::value_type> int
+    gesvd(SOLVERHandle& handle, Jobz jobz, real_t* S, DenseMatrix<scalar_t>& A, 
+          DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
+          int* devInfo, char* svd_mem, const double tol);
     
     template<typename scalar_t> void
     geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
