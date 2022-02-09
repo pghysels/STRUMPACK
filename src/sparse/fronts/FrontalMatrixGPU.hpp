@@ -38,6 +38,13 @@
 #include "dense/HIPWrapper.hpp"
 #endif
 #endif
+#if defined(STRUMPACK_USE_MAGMA)
+#include "dense/MAGMAWrapper.hpp"
+#endif
+#if defined(STRUMPACK_USE_KBLAS)
+#include "kblas.h"
+//#include "batch_getrf.h"
+#endif
 
 namespace strumpack {
 
@@ -111,21 +118,9 @@ namespace strumpack {
 
     void front_assembly(const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);
-    void factor_small_fronts(LInfo_t& L, std::size_t small_fronts,
-                             gpu::FrontData<scalar_t>* fdata,
+    void factor_small_fronts(LInfo_t& L, gpu::BLASHandle& blas_h,
+                             kblasHandle_t& kblas_h, magma_queue_t& magma_q,
                              const SPOptions<scalar_t>& opts);
-    // void factor_large_fronts(LInfo_t& L,
-    //                          std::vector<gpu::BLASHandle>& blas_handles,
-    //                          std::vector<gpu::SOLVERHandle>& solver_handles,
-    //                          std::vector<gpu::Stream>& streams,
-    //                          const SPOptions<scalar_t>& opts);
-    // void factor_largest_fronts(LInfo_t& L,
-    //                            std::size_t small_fronts,
-    //                            std::vector<gpu::BLASHandle>& blas_handles,
-    //                            std::vector<gpu::SOLVERHandle>& solver_handles,
-    //                            std::vector<gpu::Stream>& streams,
-    //                            gpu::Stream& copy_streams, scalar_t* pin,
-    //                            const SPOptions<scalar_t>& opts);
 
     void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
                        int etree_level=0, int task_depth=0);
@@ -136,41 +131,41 @@ namespace strumpack {
                           int etree_level, int task_depth) const;
 
 
-    void rhs_to_contig(LInfo_t& L, const DenseM_t& b, scalar_t* bptr) const;
-    void rhs_from_contig(LInfo_t& L, DenseM_t& b, const scalar_t* bptr) const;
+    // void rhs_to_contig(LInfo_t& L, const DenseM_t& b, scalar_t* bptr) const;
+    // void rhs_from_contig(LInfo_t& L, DenseM_t& b, const scalar_t* bptr) const;
 
-    void assemble_rhs(int nrhs, LInfo_t& L, scalar_t* db, scalar_t* dbupd,
-                      scalar_t* old_dbupd, char* dea_mem, char* hea_mem,
-                      std::size_t mem_size) const;
-    void extract_rhs(int nrhs, LInfo_t& L, scalar_t* dy, scalar_t* dyupd,
-                     scalar_t* old_dyupd, char* dea_mem, char* hea_mem,
-                     std::size_t mem_size) const;
+    // void assemble_rhs(int nrhs, LInfo_t& L, scalar_t* db, scalar_t* dbupd,
+    //                   scalar_t* old_dbupd, char* dea_mem, char* hea_mem,
+    //                   std::size_t mem_size) const;
+    // void extract_rhs(int nrhs, LInfo_t& L, scalar_t* dy, scalar_t* dyupd,
+    //                  scalar_t* old_dyupd, char* dea_mem, char* hea_mem,
+    //                  std::size_t mem_size) const;
 
-    void fwd_solve_gpu(DenseM_t& b, DenseM_t* work,
-                       const GPUFactors<scalar_t>* gpu_factors) const;
-    void fwd_small_fronts(int nrhs, LInfo_t& L,
-                          gpu::FrontData<scalar_t>* fdata,
-                          gpu::FrontData<scalar_t>* dfdata,
-                          scalar_t* dL, int* dpiv,
-                          scalar_t* db, scalar_t* dbupd) const;
-    void fwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dL, int* dpiv,
-                          int* derr, scalar_t* db, scalar_t* dbupd,
-                          std::vector<gpu::BLASHandle>& blas_handles,
-                          std::vector<gpu::SOLVERHandle>& solver_handles)
-      const;
+    // void fwd_solve_gpu(DenseM_t& b, DenseM_t* work,
+    //                    const GPUFactors<scalar_t>* gpu_factors) const;
+    // void fwd_small_fronts(int nrhs, LInfo_t& L,
+    //                       gpu::FrontData<scalar_t>* fdata,
+    //                       gpu::FrontData<scalar_t>* dfdata,
+    //                       scalar_t* dL, int* dpiv,
+    //                       scalar_t* db, scalar_t* dbupd) const;
+    // void fwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dL, int* dpiv,
+    //                       int* derr, scalar_t* db, scalar_t* dbupd,
+    //                       std::vector<gpu::BLASHandle>& blas_handles,
+    //                       std::vector<gpu::SOLVERHandle>& solver_handles)
+    //   const;
 
 
-    void bwd_solve_gpu(DenseM_t& y, DenseM_t* work,
-                       const GPUFactors<scalar_t>* gpu_factors) const;
-    void bwd_small_fronts(int nrhs, LInfo_t& L,
-                          gpu::FrontData<scalar_t>* fdata,
-                          gpu::FrontData<scalar_t>* dfdata,
-                          scalar_t* dU, scalar_t* dy, scalar_t* dyupd) const;
-    void bwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dU,
-                          scalar_t* db, scalar_t* dbupd,
-                          std::vector<gpu::BLASHandle>& blas_handles,
-                          std::vector<gpu::SOLVERHandle>& solver_handles)
-      const;
+    // void bwd_solve_gpu(DenseM_t& y, DenseM_t* work,
+    //                    const GPUFactors<scalar_t>* gpu_factors) const;
+    // void bwd_small_fronts(int nrhs, LInfo_t& L,
+    //                       gpu::FrontData<scalar_t>* fdata,
+    //                       gpu::FrontData<scalar_t>* dfdata,
+    //                       scalar_t* dU, scalar_t* dy, scalar_t* dyupd) const;
+    // void bwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dU,
+    //                       scalar_t* db, scalar_t* dbupd,
+    //                       std::vector<gpu::BLASHandle>& blas_handles,
+    //                       std::vector<gpu::SOLVERHandle>& solver_handles)
+    //   const;
 
     using F_t::lchild_;
     using F_t::rchild_;

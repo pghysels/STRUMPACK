@@ -40,6 +40,7 @@
 
 #include <magma_v2.h>
 
+
 namespace strumpack {
   namespace gpu {
     namespace magma {
@@ -81,6 +82,105 @@ namespace strumpack {
            A.ld(), piv.data(), &info);
         gpu::copy_host_to_device(dpiv, piv.data(), A.rows());
         return info;
+      }
+
+
+      inline void trsm_vbatched
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t *m, magma_int_t *n,
+       float alpha, float **dA_array, magma_int_t *ldda,
+       float **dB_array, magma_int_t *ddb, magma_int_t batchCount,
+       magma_queue_t queue ) {
+        magmablas_strsm_vbatched
+          (side, uplo, transA, diag, m, n, alpha, dA_array,
+           ldda, dB_array, ddb, batchCount, queue);
+      }
+      inline void trsm_vbatched
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t *m, magma_int_t *n,
+       double alpha, double **dA_array, magma_int_t *ldda,
+       double **dB_array, magma_int_t *ddb, magma_int_t batchCount,
+       magma_queue_t queue ) {
+        magmablas_dtrsm_vbatched
+          (side, uplo, transA, diag, m, n, alpha, dA_array,
+           ldda, dB_array, ddb, batchCount, queue);
+      }
+      inline void trsm_vbatched
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t *m, magma_int_t *n,
+       std::complex<float> alpha,
+       std::complex<float> **dA_array, magma_int_t *ldda,
+       std::complex<float> **dB_array, magma_int_t *ddb,
+       magma_int_t batchCount, magma_queue_t queue ) {
+        magmablas_ctrsm_vbatched
+          (side, uplo, transA, diag, m, n, *((magmaFloatComplex*)(&alpha)),
+           (magmaFloatComplex**)dA_array, ldda,
+           (magmaFloatComplex**)dB_array, ddb, batchCount, queue);
+      }
+      inline void trsm_vbatched
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t *m, magma_int_t *n,
+       std::complex<double> alpha,
+       std::complex<double> **dA_array, magma_int_t *ldda,
+       std::complex<double> **dB_array, magma_int_t *ddb,
+       magma_int_t batchCount, magma_queue_t queue ) {
+        magmablas_ztrsm_vbatched
+          (side, uplo, transA, diag, m, n, *((magmaDoubleComplex*)(&alpha)),
+           (magmaDoubleComplex**)dA_array, ldda,
+           (magmaDoubleComplex**)dB_array, ddb, batchCount, queue);
+      }
+
+      inline void gemm_vbatched
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k, float alpha,
+       float const *const *dA_array, magma_int_t *ldda,
+       float const *const *dB_array, magma_int_t *lddb,
+       float beta, float **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_queue_t queue) {
+        magmablas_sgemm_vbatched
+          (transA, transB, m, n, k, alpha, dA_array, ldda,
+           dB_array, lddb, beta, dC_array, lddc, batchCount, queue);
+      }
+      inline void gemm_vbatched
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k, double alpha,
+       double const *const *dA_array, magma_int_t *ldda,
+       double const *const *dB_array, magma_int_t *lddb,
+       double beta, double **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_queue_t queue) {
+        magmablas_dgemm_vbatched
+          (transA, transB, m, n, k, alpha, dA_array, ldda,
+           dB_array, lddb, beta, dC_array, lddc, batchCount, queue);
+      }
+      inline void gemm_vbatched
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k,
+       std::complex<float> alpha,
+       std::complex<float> const *const *dA_array, magma_int_t *ldda,
+       std::complex<float> const *const *dB_array, magma_int_t *lddb,
+       std::complex<float> beta,
+       std::complex<float> **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_queue_t queue) {
+        magmablas_cgemm_vbatched
+          (transA, transB, m, n, k, *((magmaFloatComplex*)(&alpha)),
+           (magmaFloatComplex**)dA_array, ldda,
+           (magmaFloatComplex**)dB_array, lddb, *((magmaFloatComplex*)(&beta)),
+           (magmaFloatComplex**)dC_array, lddc, batchCount, queue);
+      }
+      inline void gemm_vbatched
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k,
+       std::complex<double> alpha,
+       std::complex<double> const *const *dA_array, magma_int_t *ldda,
+       std::complex<double> const *const *dB_array, magma_int_t *lddb,
+       std::complex<double> beta,
+       std::complex<double> **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_queue_t queue) {
+        magmablas_zgemm_vbatched
+          (transA, transB, m, n, k, *((magmaDoubleComplex*)(&alpha)),
+           (magmaDoubleComplex**)dA_array, ldda,
+           (magmaDoubleComplex**)dB_array, lddb, *((magmaDoubleComplex*)(&beta)),
+           (magmaDoubleComplex**)dC_array, lddc, batchCount, queue);
       }
 
     } // end namespace magma

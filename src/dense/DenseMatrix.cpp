@@ -876,8 +876,8 @@ namespace strumpack {
     get_version(v[0], v[1], v[2]);
     os.write((const char*)v, sizeof(v));
     os.write((const char*)(&D), sizeof(DenseMatrix<scalar_t>));
-      os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
-      return os;
+    os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
+    return os;
   }
   template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<float>& D);
   template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<double>& D);
