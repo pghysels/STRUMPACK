@@ -63,10 +63,13 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() { gpu_check(hipStreamCreate(&s_)); }
+      Stream() { 
+       gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
+      }
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
+      void synchronize() { gpu_check(hipStreamSynchronize(s_)); }
     private:
       hipStream_t s_;
     };
@@ -93,6 +96,18 @@ namespace strumpack {
       operator const rocblas_handle&() const { return h_; }
     private:
       rocblas_handle h_;
+    };
+
+    class Event {
+    public:
+      Event() { gpu_check(hipEventCreateWithFlags
+                          (&e_, hipEventDisableTiming)); }
+      ~Event() { gpu_check(hipEventDestroy(e_)); }
+      void record() { gpu_check(hipEventRecord(e_)); }
+      void record(Stream& s) { gpu_check(hipEventRecord(e_, s)); }
+      void wait(Stream& s) { gpu_check(hipStreamWaitEvent(s, e_, 0)); }
+    private:
+      hipEvent_t e_;
     };
 
     template<typename T> void memset
@@ -249,7 +264,7 @@ namespace strumpack {
                       << hipGetErrorString(e) << std::endl;
             std::cerr << "#  Trying hipMallocManaged instead ..."
                       << std::endl;
-            hipGetLastError(); // reset to hipSuccess
+            gpu_check(hipGetLastError()); // reset to hipSuccess
             gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
@@ -309,7 +324,7 @@ namespace strumpack {
                       << hipGetErrorString(e) << std::endl;
             std::cerr << "#  Trying hipMallocManaged instead ..."
                       << std::endl;
-            hipGetLastError(); // reset to hipSuccess
+            gpu_check(hipGetLastError()); // reset to hipSuccess
             gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
             is_managed_ = true;
           }
