@@ -152,7 +152,7 @@ namespace strumpack {
         if (nnz) {
           unsigned int nt = 512, ops = 1;
           const int unroll = 8;
-          while (nt*unroll > nnz && nt > 8 && ops < 64) {
+          while (nt*unroll > nnz && nt > 8) {
             nt /= 2;
             ops *= 2;
           }
