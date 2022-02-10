@@ -299,11 +299,11 @@ namespace strumpack {
         magma_queue_create(0, &q);
 #endif
 #endif
-        gpu::DeviceMemory<scalar_t> dmB11(dsep*dsep), dmB12(dsep*A12.cols()), 
+        gpu::DeviceMemory<scalar_t> dmB11(dsep*dsep + gpu::getrf_buffersize<scalar_t>
+                                    (solvehandles[0], *std::max_element(tiles1.begin(), 
+                                     tiles1.end()))), 
+                                    dmB12(dsep*A12.cols()), 
                                     dmB21(A21.rows()*dsep);
-        int getrf_work_size = gpu::getrf_buffersize<scalar_t>
-           (solvehandles[0], *std::max_element(tiles1.begin(), tiles1.end()));
-        gpu::DeviceMemory<scalar_t> getrf_work(getrf_work_size);
         gpu::DeviceMemory<int> dpiv(dsep+1);
         std::size_t max_m = 0, max_mn = 0;
         for (std::size_t k1=0; k1<rb; k1++) {
@@ -374,8 +374,7 @@ namespace strumpack {
         }
         for (std::size_t i=0, s=0; i<rb; i++) {
           gpu::getrf(solvehandles[s], B11.tile(i, i).D(), 
-                     reinterpret_cast<scalar_t*>(getrf_work_size),
-                     dpiv+B11.tileroff(i), dpiv+dsep);
+                     dmB11 + dsep*dsep, dpiv+B11.tileroff(i), dpiv+dsep);
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j)) {
               std::size_t minmn = std::min(B11.tilerows(i), B11.tilecols(j));

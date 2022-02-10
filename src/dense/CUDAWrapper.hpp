@@ -380,14 +380,14 @@ namespace strumpack {
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> int
     gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n,
-                      gesvdjInfo_t params);
+                      gesvdjInfo_t& params);
 
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> void
     gesvdj(SOLVERHandle& handle, Jobz jobz, DenseMatrix<scalar_t>& A,
            real_t* d_S, DenseMatrix<scalar_t>& U,
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
-           int Lwork, int* devInfo, gesvdjInfo_t params);
+           int Lwork, int* devInfo, gesvdjInfo_t& params);
 
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> int
