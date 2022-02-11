@@ -999,22 +999,17 @@ namespace strumpack {
 
     void laswp(int n, float* a, int lda, int k1, int k2, const int* ipiv, int incx) {
       strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
-      assert(incx > 0);
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
+      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
+      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
       STRUMPACK_FC_GLOBAL(slaswp,SLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(4*laswp_moves(n,k1,k2));
     }
     void laswp(int n, double* a, int lda, int k1, int k2, const int* ipiv, int incx) {
       strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
-      assert(incx > 0);
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      // std::cout << "k1_ = " << k1_ << " k2_ = " << k2_ << " incx_ = " << incx_ << " ipiv_={";
-      for (int i=0; i<k2_; i++) {
-	ipiv_[i] = ipiv[k1-1+i*incx];
-      //  	std::cout << ipiv_[i] << "/" << ipiv[i] << " ";
-      }
-      // std::cout << "}" << std::endl;
+      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
+      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
       STRUMPACK_FC_GLOBAL(dlaswp,DLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(8*laswp_moves(n,k1,k2));
     }
@@ -1022,7 +1017,8 @@ namespace strumpack {
 	       const int* ipiv, int incx) {
       strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
+      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
+      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
       STRUMPACK_FC_GLOBAL(claswp,CLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(2*4*laswp_moves(n,k1,k2));
     }
@@ -1030,7 +1026,8 @@ namespace strumpack {
 	       const int* ipiv, int incx) {
       strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
+      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
+      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
       STRUMPACK_FC_GLOBAL(zlaswp,ZLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(2*8*laswp_moves(n,k1,k2));
     }
