@@ -47,7 +47,13 @@
 #cmakedefine STRUMPACK_USE_SLATE_SCALAPACK
 #cmakedefine STRUMPACK_USE_GETOPT
 #cmakedefine STRUMPACK_USE_MAGMA
+
 #cmakedefine STRUMPACK_USE_MATLAB
+#if defined STRUMPACK_USE_MATLAB
+#define strumpack_blas_int long long int
+#else
+#define strumpack_blas_int int
+#endif
 
 #cmakedefine STRUMPACK_COUNT_FLOPS
 #cmakedefine STRUMPACK_TASK_TIMERS

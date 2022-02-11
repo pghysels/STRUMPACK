@@ -141,6 +141,17 @@ if(STRUMPACK_USE_HIP)
 endif()
 
 
+if(TPL_ENABLE_MATLAB)
+  find_package(Matlab REQUIRED COMPONENTS MEX_COMPILER)
+  if(Matlab_FOUND)
+    option(STRUMPACK_USE_MATLAB "" ON)
+    # BLA_SIZEOF_INTEGER is new in CMake 3.22
+    set(BLA_SIZEOF_INTEGER 8)
+    add_compile_definitions(MKL_ILP64)
+  endif()
+endif()
+
+
 if(DEFINED TPL_BLAS_LIBRARIES)
   # xSDK policies require the user be able to specify BLAS libraries
   # through the TPL_BLAS_LIBRARIES variable. If these do not work,
@@ -486,13 +497,6 @@ if(TPL_ENABLE_COMBBLAS)
   endif()
 endif()
 
-if(TPL_ENABLE_MATLAB)
-  find_package(Matlab REQUIRED COMPONENTS MEX_COMPILER)
-  if(Matlab_FOUND)
-    option(STRUMPACK_USE_MATLAB "" ON)
-  endif()
-endif()
-
 
 # TODO PIC
 # TODO libatomic?
@@ -535,6 +539,14 @@ check_cxx_compiler_flag(-Wno-overloaded-virtual
 if(COMPILER_SUPPORTS_NOOVERLOAD_WARNING)
   target_compile_options(strumpack PUBLIC
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-overloaded-virtual>)
+endif()
+
+if(STRUMPACK_USE_MATLAB)
+  # Matlab uses 64-bit integer BLAS/LAPACK
+  target_compile_options(strumpack PUBLIC
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>>
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>)
+  target_compile_options(strumpack PUBLIC "-DMKL_ILP64")
 endif()
 
 

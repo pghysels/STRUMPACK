@@ -44,10 +44,10 @@ namespace strumpack {
   const int getrfOMPPanelWidth = 1;
   const int OMPPanelWidth = 8;
 
-  template<typename scalar> void gemm_omp_task
-  (char ta, char tb, int m, int n, int k, scalar alpha,
-   const scalar* a, int lda, const scalar* b, int ldb,
-   scalar beta, scalar* c, int ldc, int depth) {
+  template<typename scalar>
+  void gemm_omp_task(char ta, char tb, int m, int n, int k, scalar alpha,
+		     const scalar* a, int lda, const scalar* b, int ldb,
+		     scalar beta, scalar* c, int ldc, int depth) {
     if (depth>=params::task_recursion_cutoff_level ||
         double(m)*n*k <= gemmOMPThreshold)
       blas::gemm(ta, tb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
@@ -86,9 +86,11 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar> void gemv_omp_task
-  (char t, int m, int n, scalar alpha, const scalar *a, int lda,
-   const scalar *x, int incx, scalar beta, scalar *y, int incy, int depth) {
+  template<typename scalar>
+  void gemv_omp_task(char t, int m, int n, scalar alpha,
+		     const scalar *a, int lda,
+		     const scalar *x, int incx, scalar beta,
+		     scalar *y, int incy, int depth) {
     if (depth>=params::task_recursion_cutoff_level ||
         2*double(m)*n <= OMPTileSize*OMPTileSize/*OMPThreshold*/)
       blas::gemv(t, m, n, alpha, a, lda, x, incx, beta, y, incy);
@@ -169,9 +171,9 @@ namespace strumpack {
 // TODO test this code, or replace with SLATE
 #if 0 //_OPENMP >= 201307
   //#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-  template<typename scalar> void trsv_omp_task
-  (char ul, char ta, char d, int n, const scalar* a, int lda,
-   scalar* x, int incx, int depth) {
+  template<typename scalar>
+  void trsv_omp_task(char ul, char ta, char d, int n, const scalar* a, int lda,
+		     scalar* x, int incx, int depth) {
     if (depth>=params::task_recursion_cutoff_level ||
         double(n) <= OMPTileSize)
       blas::trsv(ul, ta, d, n, a, lda, x, incx);
@@ -218,9 +220,9 @@ namespace strumpack {
 
 #else
 
-  template<typename scalar> void trsv_omp_task
-  (char ul, char ta, char d, int n, const scalar* a, int lda,
-   scalar* x, int incx, int depth) {
+  template<typename scalar>
+  void trsv_omp_task(char ul, char ta, char d, int n, const scalar* a, int lda,
+		     scalar* x, int incx, int depth) {
     if (depth>=params::task_recursion_cutoff_level ||
         double(n)*n <= OMPTileSize*OMPTileSize/*OMPThreshold*/)
       blas::trsv(ul, ta, d, n, a, lda, x, incx);
@@ -250,9 +252,10 @@ namespace strumpack {
 #endif
 
 
-  template<typename scalar> void trmm_omp_task
-  (char s, char ul, char ta, char d, int m, int n,
-   scalar alpha, const scalar* a, int lda, scalar* b, int ldb, int depth) {
+  template<typename scalar>
+  void trmm_omp_task(char s, char ul, char ta, char d, int m, int n,
+		     scalar alpha, const scalar* a, int lda,
+		     scalar* b, int ldb, int depth) {
     if (m == 0 || n == 0) return;
     if (depth>=params::task_recursion_cutoff_level ||
         double(m)*n*n <= OMPThreshold)
@@ -374,9 +377,9 @@ namespace strumpack {
   }
 
   // it seems this is never called?! so optimized code is not tested
-  template<typename scalar> inline void trmv_omp_task
-  (char ul, char ta, char d, int n, const scalar* a, int lda,
-   scalar* x, int incx, int depth) {
+  template<typename scalar> inline
+  void trmv_omp_task(char ul, char ta, char d, int n, const scalar* a, int lda,
+		     scalar* x, int incx, int depth) {
     blas::trmv(ul, ta, d, n, a, lda, x, incx);
 
     // if (incx == 1) trmm_omp_task('L', ul, ta, d, n, 1, scalar(1.), A, lda, x, n, depth);
@@ -403,9 +406,10 @@ namespace strumpack {
     // }
   }
 
-  template<typename scalar> void trsm_omp_task
-  (char s, char ul, char ta, char d, int m, int n,
-   scalar alpha, const scalar* a, int lda, scalar* b, int ldb, int depth) {
+  template<typename scalar>
+  void trsm_omp_task(char s, char ul, char ta, char d, int m, int n,
+		     scalar alpha, const scalar* a, int lda,
+		     scalar* b, int ldb, int depth) {
     if (double(m)*m*n <= trsmOMPThreshold ||
         depth>=params::task_recursion_cutoff_level)
       blas::trsm(s, ul, ta, d, m, n, alpha, a, lda, b, ldb);
@@ -487,9 +491,9 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar> void laswp_omp_task
-  (int n, scalar* a, int lda, int k1, int k2,
-   const int* ipiv, int incx, int depth) {
+  template<typename scalar>
+  void laswp_omp_task(int n, scalar* a, int lda, int k1, int k2,
+		      const int* ipiv, int incx, int depth) {
     if (depth>=params::task_recursion_cutoff_level || n <= OMPTileSize)
       blas::laswp(n, a, lda, k1, k2, ipiv, incx);
     else {
@@ -503,21 +507,18 @@ namespace strumpack {
     }
   }
 
-  // recursive with row pivoting, drop in replacement for regular getrf
-  // (parameter col is for internal use)
-  template<typename scalar> void getrf_omp_task
-  (int m, int n, scalar* a, int lda, int* ipiv, int* info,
-   int depth, int col=0) {
+  // recursive with row pivoting, drop in replacement for regular
+  // getrf
+  template<typename scalar>
+  int getrf_omp_task(int m, int n, scalar* a, int lda, int* ipiv, int depth) {
+    int info = 0;
     //  getrfmod(m, n, a, lda, ipiv, info, depth);
-    if (depth>=params::task_recursion_cutoff_level || n <= 1) {
+    if (depth>=params::task_recursion_cutoff_level || n <= 1)
       // sequential part, can make this very skinny or add parallelism
-      blas::getrf(m, n, a, lda, ipiv, info);
-      if (*info > 0) info += col;
-    } else {
-      *info = 0;
+      info = blas::getrf(m, n, a, lda, ipiv);
+    else {
       int k = std::min(m,n/2);
-      getrf_omp_task(m, k, a, lda, ipiv, info, depth, col);
-      if (*info) return;
+      info = getrf_omp_task(m, k, a, lda, ipiv, depth);
       laswp_omp_task(n-k, a+k*lda, lda, 1, k, ipiv, 1, depth);
       trsm_omp_task
         ('L', 'L', 'N', 'U', k, n-k, scalar(1.), a, lda, a+k*lda, lda, depth);
@@ -525,19 +526,20 @@ namespace strumpack {
         gemm_omp_task
           ('N', 'N', m-k, n-k, k, scalar(-1.), a+k, lda,
            a+k*lda, lda, scalar(1.), a+k+k*lda, lda, depth);
-        getrf_omp_task
-          (m-k, n-k, a+k+k*lda, lda, &ipiv[k], info, depth, col+k);
-        if (*info) return;
+        int ierr = getrf_omp_task
+          (m-k, n-k, a+k+k*lda, lda, &ipiv[k], depth);
+	if (!info && ierr) info = ierr + k;
         laswp_omp_task
           (k, a+k, lda, 1, std::min(m-k, n-k), &ipiv[k], 1, depth);
         for (int i=0; i<std::min(m-k, n-k); i++) ipiv[k+i] += k;
       }
     }
+    return info;
   }
 
-  template<typename scalar> void geru_omp_task
-  (int m, int n, scalar alpha, const scalar* x, int incx,
-   const scalar* y, int incy, scalar* a, int lda, int depth) {
+  template<typename scalar>
+  void geru_omp_task(int m, int n, scalar alpha, const scalar* x, int incx,
+		     const scalar* y, int incy, scalar* a, int lda, int depth) {
     if (depth>=params::task_recursion_cutoff_level ||
         2*double(m)*n <= OMPThreshold)
       blas::geru(m, n, alpha, x, incx, y, incy, a, lda);
@@ -563,9 +565,9 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar> void gerc_omp_task
-  (int m, int n, scalar alpha, const scalar* x, int incx,
-   const scalar* y, int incy, scalar* a, int lda, int depth) {
+  template<typename scalar>
+  void gerc_omp_task(int m, int n, scalar alpha, const scalar* x, int incx,
+		     const scalar* y, int incy, scalar* a, int lda, int depth) {
     if (depth>=params::task_recursion_cutoff_level ||
         2*double(m)*n <= OMPThreshold)
       blas::gerc(m, n, alpha, x, incx, y, incy, a, lda);
@@ -592,14 +594,14 @@ namespace strumpack {
   }
 
 
-  template<typename scalar> inline void getrs_omp_task
-  (char t, int m, int n, const scalar *a, int lda, const int* piv,
-   scalar *b, int ldb, int* flag, int depth) {
+  template<typename scalar> inline
+  int getrs_omp_task(char t, int m, int n, const scalar *a, int lda,
+		     const int* piv, scalar *b, int ldb,
+		     int depth) {
     if (depth>=params::task_recursion_cutoff_level ||
         2*double(m)*n <= OMPThreshold)
-      blas::getrs(t, m, n, a, lda, piv, b, ldb, flag);
+      return blas::getrs(t, m, n, a, lda, piv, b, ldb);
     else {
-      flag = 0;
       if (t=='N' || t=='n') {
         if (n==1) {
           blas::laswp(1, b, ldb, 1, m, piv, 1);
@@ -617,6 +619,7 @@ namespace strumpack {
                   << std::endl;
         abort();
       }
+      return 0; // check division by zero?
     }
   }
 

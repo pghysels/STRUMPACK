@@ -578,7 +578,6 @@ namespace strumpack {
   template<typename scalar_t> int
   DenseMatrix<scalar_t>::LU(std::vector<int>& piv, int depth) {
     piv.resize(rows());
-    int info = 0;
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
                           && omp_in_parallel();
@@ -586,10 +585,9 @@ namespace strumpack {
     bool in_par = false;
 #endif
     if (in_par)
-      getrf_omp_task(rows(), cols(), data(), ld(), piv.data(), &info, depth);
+      return getrf_omp_task(rows(), cols(), data(), ld(), piv.data(), depth);
     else
-      blas::getrf(rows(), cols(), data(), ld(), piv.data(), &info);
-    return info;
+      return blas::getrf(rows(), cols(), data(), ld(), piv.data());
   }
 
   template<typename scalar_t> int
@@ -631,12 +629,11 @@ namespace strumpack {
    const std::vector<int>& piv, int depth) const {
     assert(b.rows() == rows());
     assert(piv.size() >= rows());
-    int info = 0;
     DenseMatrix<scalar_t> x(b);
     if (!rows()) return x;
-    getrs_omp_task
-      (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
-       x.data(), x.ld(), &info, depth);
+    int info = getrs_omp_task
+      (char(Trans::N), rows(), b.cols(), data(), ld(),
+       piv.data(), x.data(), x.ld(), depth);
     if (info) {
       std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
       exit(1);
@@ -655,11 +652,10 @@ namespace strumpack {
   DenseMatrix<scalar_t>::solve_LU_in_place
   (DenseMatrix<scalar_t>& b, const int* piv, int depth) const {
     assert(b.rows() == rows());
-    int info = 0;
     if (!rows()) return;
-    getrs_omp_task
-      (char(Trans::N), rows(), b.cols(), data(), ld(), piv,
-       b.data(), b.ld(), &info, depth);
+    int info = getrs_omp_task
+      (char(Trans::N), rows(), b.cols(), data(), ld(),
+       piv, b.data(), b.ld(), depth);
     if (info) {
       std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
       exit(1);
@@ -700,9 +696,9 @@ namespace strumpack {
   (DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q, int depth) const {
     auto minmn = std::min(rows(), cols());
     std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
-    int info;
     DenseMatrix<scalar_t> tmp(std::max(rows(), cols()), cols(), *this, 0, 0);
-    blas::gelqfmod(rows(), cols(), tmp.data(), tmp.ld(), tau.get(), &info, depth);
+    int info = blas::gelqfmod
+      (rows(), cols(), tmp.data(), tmp.ld(), tau.get(), depth);
     if (info) {
       std::cerr << "ERROR: LQ factorization failed with info="
                 << info << std::endl;
@@ -715,8 +711,8 @@ namespace strumpack {
         std::cerr << "WARNING: small diagonal on L from LQ" << std::endl;
         break;
       }
-    blas::xxglqmod(cols(), cols(), std::min(rows(), cols()),
-                   tmp.data(), tmp.ld(), tau.get(), &info, depth);
+    info = blas::xxglqmod(cols(), cols(), std::min(rows(), cols()),
+			  tmp.data(), tmp.ld(), tau.get(), depth);
     Q = DenseMatrix<scalar_t>(cols(), cols(), tmp, 0, 0); // generate Q
     if (info) {
       std::cerr << "ERROR: generation of Q from LQ failed with info="
