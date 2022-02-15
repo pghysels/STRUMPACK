@@ -998,36 +998,36 @@ namespace strumpack {
 
 
     void laswp(int n, float* a, int lda, int k1, int k2, const int* ipiv, int incx) {
-      strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
+      strumpack_blas_int n_ = n, lda_ = lda,
+        k1_ = 1, k2_ = k2-k1+1, incx_ = (incx > 0) ? 1 : -1;
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
-      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
+      for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+incx_*i*incx];
       STRUMPACK_FC_GLOBAL(slaswp,SLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(4*laswp_moves(n,k1,k2));
     }
     void laswp(int n, double* a, int lda, int k1, int k2, const int* ipiv, int incx) {
-      strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
+      strumpack_blas_int n_ = n, lda_ = lda,
+        k1_ = 1, k2_ = k2-k1+1, incx_ = (incx > 0) ? 1 : -1;
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
-      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
+      for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+incx_*i*incx];
       STRUMPACK_FC_GLOBAL(dlaswp,DLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(8*laswp_moves(n,k1,k2));
     }
     void laswp(int n, std::complex<float>* a, int lda, int k1, int k2,
                const int* ipiv, int incx) {
-      strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
+      strumpack_blas_int n_ = n, lda_ = lda,
+        k1_ = 1, k2_ = k2-k1+1, incx_ = (incx > 0) ? 1 : -1;
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
-      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
+      for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+incx_*i*incx];
       STRUMPACK_FC_GLOBAL(claswp,CLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(2*4*laswp_moves(n,k1,k2));
     }
     void laswp(int n, std::complex<double>* a, int lda, int k1, int k2,
                const int* ipiv, int incx) {
-      strumpack_blas_int n_ = n, lda_ = lda, k1_ = 1, k2_ = k2-k1+1, incx_ = 1;
+      strumpack_blas_int n_ = n, lda_ = lda,
+        k1_ = 1, k2_ = k2-k1+1, incx_ = (incx > 0) ? 1 : -1;
       std::vector<strumpack_blas_int> ipiv_(k2_);
-      if (incx > 0) for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+i*incx];
-      if (incx < 0) for (int i=0; i<k2_; i++) ipiv_[k2_-1-i] = ipiv[k1-1-i*incx];
+      for (int i=0; i<k2_; i++) ipiv_[i] = ipiv[k1-1+incx_*i*incx];
       STRUMPACK_FC_GLOBAL(zlaswp,ZLASWP)(&n_, a, &lda_, &k1_, &k2_, ipiv_.data(), &incx_);
       STRUMPACK_BYTES(2*8*laswp_moves(n,k1,k2));
     }
@@ -1743,28 +1743,28 @@ namespace strumpack {
     std::size_t lange(char norm, int m, int n, const std::size_t *a, int lda) { return 0; }
     bool lange(char norm, int m, int n, const bool *a, int lda) { return false; }
     float lange(char norm, int m, int n, const float *a, int lda) {
-      strumpack_blas_int info, m_ = m, n_ = n, lda_ = lda;
+      strumpack_blas_int m_ = m, n_ = n, lda_ = lda;
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<float[]> work(new float[m]);
         return STRUMPACK_FC_GLOBAL(slange,SLANGE)(&norm, &m_, &n_, a, &lda_, work.get());
       } else return STRUMPACK_FC_GLOBAL(slange,SLANGE)(&norm, &m_, &n_, a, &lda_, nullptr);
     }
     double lange(char norm, int m, int n, const double *a, int lda) {
-      strumpack_blas_int info, m_ = m, n_ = n, lda_ = lda;
+      strumpack_blas_int m_ = m, n_ = n, lda_ = lda;
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<double[]> work(new double[m]);
         return STRUMPACK_FC_GLOBAL(dlange,DLANGE)(&norm, &m_, &n_, a, &lda_, work.get());
       } else return STRUMPACK_FC_GLOBAL(dlange,DLANGE)(&norm, &m_, &n_, a, &lda_, nullptr);
     }
     float lange(char norm, int m, int n, const std::complex<float> *a, int lda) {
-      strumpack_blas_int info, m_ = m, n_ = n, lda_ = lda;
+      strumpack_blas_int m_ = m, n_ = n, lda_ = lda;
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<float[]> work(new float[m]);
         return STRUMPACK_FC_GLOBAL(clange,CLANGE)(&norm, &m_, &n_, a, &lda_, work.get());
       } else return STRUMPACK_FC_GLOBAL(clange,CLANGE)(&norm, &m_, &n_, a, &lda_, nullptr);
     }
     double lange(char norm, int m, int n, const std::complex<double> *a, int lda) {
-      strumpack_blas_int info, m_ = m, n_ = n, lda_ = lda;
+      strumpack_blas_int m_ = m, n_ = n, lda_ = lda;
       if (norm == 'I' || norm == 'i') {
         std::unique_ptr<double[]> work(new double[m]);
         return STRUMPACK_FC_GLOBAL(zlange,ZLANGE)(&norm, &m_, &n_, a, &lda_, work.get());
