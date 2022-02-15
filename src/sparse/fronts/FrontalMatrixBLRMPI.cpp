@@ -239,8 +239,8 @@ namespace strumpack {
         (A, opts, etree_level+1, task_depth);
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
-    if (opts.BLR_options().CB_construction() ==
-        BLR::CBConstruction::COLWISE) {
+    if (opts.BLR_options().BLR_factor_algorithm() ==
+        BLR::BLRFactorAlgorithm::COLWISE) {
       // factor column-block-wise for memory reduction
       if (dim_sep()) {
         if (dim_upd()) {
@@ -293,8 +293,7 @@ namespace strumpack {
       }
       if (lchild_) lchild_->release_work_memory();
       if (rchild_) rchild_->release_work_memory();
-    } else if (opts.BLR_options().CB_construction() ==
-                   BLR::CBConstruction::DENSE)  {
+    } else {
       build_front(A);
       extend_add();
       if (lchild_) lchild_->release_work_memory();
