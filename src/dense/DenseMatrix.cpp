@@ -712,7 +712,7 @@ namespace strumpack {
         break;
       }
     info = blas::xxglqmod(cols(), cols(), std::min(rows(), cols()),
-			  tmp.data(), tmp.ld(), tau.get(), depth);
+                          tmp.data(), tmp.ld(), tau.get(), depth);
     Q = DenseMatrix<scalar_t>(cols(), cols(), tmp, 0, 0); // generate Q
     if (info) {
       std::cerr << "ERROR: generation of Q from LQ failed with info="
