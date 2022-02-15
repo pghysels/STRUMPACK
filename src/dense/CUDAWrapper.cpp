@@ -107,8 +107,13 @@ namespace strumpack {
       int devs;
       cudaGetDeviceCount(&devs);
       if (devs > 1) {
-        MPIComm c;
-        cudaSetDevice(c.rank() % devs);
+        int flag, rank = 0;
+        MPI_Initialized(&flag);
+        if (flag) {
+          MPIComm c;
+          rank = c.rank();
+        }
+        cudaSetDevice(rank % devs);
       }
 #endif
       gpu_check(cudaFree(0));
