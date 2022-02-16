@@ -45,7 +45,7 @@ void mexFunction
     if (nrhs != 2)
       mexErrMsgTxt("STRUMPACK SOLVE requires 2 input arguments on first call: sparse matrix and rhs vector.");
   } else if (nrhs != 1 && nrhs != 2)
-    mexErrMsgTxt("STRUMPACK SOLVE requires 1 or 2 input arguments on first call: sparse matrix and rhs vector, or rhs vector (for subsequent solve with same matrix)");
+    mexErrMsgTxt("STRUMPACK SOLVE requires 1 or 2 input arguments: sparse matrix and rhs vector, or rhs vector (for subsequent solve with same matrix)");
   if (nlhs != 1)
     mexErrMsgTxt("STRUMPACK SOLVE requires 1 output argument.");
 
@@ -107,7 +107,7 @@ void mexFunction
     }
   }
 
-  if (sp->solve(mxGetPr(b_in), mxGetPr(x_out))
+  if (sp->solve(numrhs, mxGetPr(b_in), m, mxGetPr(x_out), m)
       != strumpack::ReturnCode::SUCCESS) {
     std::cout << "Error during triangular solve." << std::endl;
     mexErrMsgTxt("Error during triangular solve.\n");
