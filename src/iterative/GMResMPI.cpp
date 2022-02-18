@@ -146,8 +146,8 @@ namespace strumpack {
           }
         }
         blas::trsv('U', 'N', 'N', nrit+1, hess, ldh, b_, 1);
-        blas::gemv('N', n, nrit+1, scalar_t(1.), V, n, b_, 1,
-                   scalar_t(1.), x, 1);
+        blas::gemv('N', n, nrit+1, scalar_t(1.), V, std::max(n, 1ul),
+                   b_, 1, scalar_t(1.), x, 1);
       }
       return rho;
     }
