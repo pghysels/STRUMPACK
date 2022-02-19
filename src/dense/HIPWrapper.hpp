@@ -37,7 +37,7 @@
 
 #include <hip/hip_runtime_api.h>
 #include <hipblas.h>
-#include <hipsolver.h>
+//#include <hipsolver.h>
 #include <rocsolver.h>
 
 #include "DenseMatrix.hpp"

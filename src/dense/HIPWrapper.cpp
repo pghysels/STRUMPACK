@@ -84,7 +84,7 @@ namespace strumpack {
         return HIPBLAS_DIAG_UNIT;
       }
     }
-    hipsolverEigMode_t E2hipOp(Jobz op) {
+    /*hipsolverEigMode_t E2hipOp(Jobz op) {
       switch (op) {
       case Jobz::N: return HIPSOLVER_EIG_MODE_NOVECTOR;
       case Jobz::V: return HIPSOLVER_EIG_MODE_VECTOR;
@@ -92,7 +92,7 @@ namespace strumpack {
         assert(false);
         return HIPSOLVER_EIG_MODE_VECTOR;
       }
-    }
+    }*/
 
     void hip_assert(hipError_t code, const char *file, int line,
                      bool abort) {

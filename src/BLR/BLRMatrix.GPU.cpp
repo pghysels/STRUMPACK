@@ -273,11 +273,11 @@ namespace strumpack {
       B11 = BLRMatrix<scalar_t>(A11.rows(), tiles1, A11.cols(), tiles1);
       B12 = BLRMatrix<scalar_t>(A12.rows(), tiles1, A12.cols(), tiles2);
       B21 = BLRMatrix<scalar_t>(A21.rows(), tiles2, A21.cols(), tiles1);
-      piv.resize(B11.rows());
+      auto dsep = A11.rows();
+      piv.resize(dsep);
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
 #if 1 // B11, B12, B21, B22 on GPU
-        auto dsep = A11.rows();
         auto d2 = A22.rows();
         int nr_streams = 1;
         std::vector<gpu::Stream> streams(nr_streams);
@@ -375,6 +375,7 @@ namespace strumpack {
         for (std::size_t i=0, s=0; i<rb; i++) {
           gpu::getrf(solvehandles[s], B11.tile(i, i).D(), 
                      dmB11 + dsep*dsep, dpiv+B11.tileroff(i), dpiv+dsep);
+          gpu::synchronize();
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j)) {
               std::size_t minmn = std::min(B11.tilerows(i), B11.tilecols(j));
@@ -704,7 +705,7 @@ namespace strumpack {
             }
           }
         }
-        gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), B11.rows());
+        gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), dsep);
         for (std::size_t i=0; i<rb; i++)
           for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
             piv[l] += B11.tileroff(i);
