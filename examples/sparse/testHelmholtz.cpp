@@ -104,11 +104,11 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
 
   CSRMatrixMPI<std::complex<realt>,std::int64_t> A
     (lrows, ptr_loc.data(), ind_loc.data(), val_loc.data(),
-     dist.data(), MPI_COMM_WORLD, false);
+     dist.data(), MPI_COMM_WORLD, false); 
 
   return A;
 }
-
+ 
 int main(int argc, char* argv[]) {
   using realt = float;
   using scalart = std::complex<realt>;
@@ -153,8 +153,8 @@ int main(int argc, char* argv[]) {
     auto N = A.size();
     auto n_local = A.local_rows();
     std::vector<scalart> b(n_local), x(n_local);
-#if 0
-    std::vector<scalart> x_exact(n_local, scalart(1.)/std::sqrt(N));
+#if 1
+    std::vector<scalart> x_exact(n_local, scalart(1.));
     A.spmv(x_exact.data(), b.data());
 #else
     MPIComm c;
@@ -177,13 +177,13 @@ int main(int argc, char* argv[]) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << scaled_res << std::endl;
 
-    // strumpack::blas::axpy
-    //   (n_local, std::complex<realt>(-1.), x_exact.data(), 1, x.data(), 1);
-    // auto nrm_error = norm2(x, MPIComm());
-    // auto nrm_x_exact = norm2(x_exact, MPIComm());
-    // if (!rank)
-    //   std::cout << "# RELATIVE ERROR = "
-    //             << (nrm_error/nrm_x_exact) << std::endl;
+    strumpack::blas::axpy
+      (n_local, std::complex<realt>(-1.), x_exact.data(), 1, x.data(), 1);
+    auto nrm_error = norm2(x, MPIComm());
+    auto nrm_x_exact = norm2(x_exact, MPIComm());
+    if (!rank)
+      std::cout << "# RELATIVE ERROR = "
+                << (nrm_error/nrm_x_exact) << std::endl;
   }
   TimerList::Finalize();
   scalapack::Cblacs_exit(1);
