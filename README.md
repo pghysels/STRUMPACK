@@ -19,9 +19,11 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
+ - Wajih Boukaram - wajih.boukaram@lbl.gov 
 
 
 ## Past contributors
+ - Ryan Synk
  - Lucy Guo
  - Gustavo Chávez
  - Liza Rebrova - UCLA, University of Michigan

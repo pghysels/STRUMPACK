@@ -98,6 +98,10 @@ namespace strumpack {
     void find_upd_indices(const std::vector<std::size_t>& I,
                           std::vector<std::size_t>& lI,
                           std::vector<std::size_t>& oI) const;
+
+    void upd_to_parent(const F_t* pa, std::size_t& upd2sep,
+                       std::size_t* I) const;
+    void upd_to_parent(const F_t* pa, std::size_t* I) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa,
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;

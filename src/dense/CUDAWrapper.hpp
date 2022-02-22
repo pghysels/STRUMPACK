@@ -63,10 +63,19 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() { gpu_check(cudaStreamCreate(&s_)); }
+      Stream() {
+        gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
+        // gpu_check(cudaStreamCreate(&s_));
+      }
       ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
+      // void set_priority(int priority) {
+      //   gpu_check(cudaStreamDestroy(s_));
+      //   gpu_check(cudaStreamCreateWithPriority
+      //             (&s_, cudaStreamNonBlocking, priority));
+      // }
       operator cudaStream_t&() { return s_; }
       operator const cudaStream_t&() const { return s_; }
+      void synchronize() { cudaStreamSynchronize(s_); }
     private:
       cudaStream_t s_;
     };
@@ -74,6 +83,7 @@ namespace strumpack {
     class BLASHandle {
     public:
       BLASHandle() { gpu_check(cublasCreate(&h_)); }
+      BLASHandle(Stream& s) : BLASHandle() { set_stream(s); }
       ~BLASHandle() { gpu_check(cublasDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
       operator cublasHandle_t&() { return h_; }
@@ -85,12 +95,25 @@ namespace strumpack {
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
+      SOLVERHandle(Stream& s) : SOLVERHandle() { set_stream(s); }
       ~SOLVERHandle() { gpu_check(cusolverDnDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cusolverDnSetStream(h_, s)); }
       operator cusolverDnHandle_t&() { return h_; }
       operator const cusolverDnHandle_t&() const { return h_; }
     private:
       cusolverDnHandle_t h_;
+    };
+
+    class Event {
+    public:
+      Event() { gpu_check(cudaEventCreateWithFlags
+                          (&e_, cudaEventDisableTiming)); }
+      ~Event() { gpu_check(cudaEventDestroy(e_)); }
+      void record() { gpu_check(cudaEventRecord(e_)); }
+      void record(Stream& s) { gpu_check(cudaEventRecord(e_, s)); }
+      void wait(Stream& s) { gpu_check(cudaStreamWaitEvent(s, e_, 0)); }
+    private:
+      cudaEvent_t e_;
     };
 
     template<typename T> void memset
@@ -206,6 +229,7 @@ namespace strumpack {
         return *this;
       }
       ~DeviceMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
@@ -264,6 +288,7 @@ namespace strumpack {
         return *this;
       }
       ~HostMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
