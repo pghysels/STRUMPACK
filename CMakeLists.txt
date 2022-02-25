@@ -465,7 +465,7 @@ if(TPL_ENABLE_SLATE)
     # option(STRUMPACK_USE_SLATE_LAPACK "" ON)
     option(STRUMPACK_USE_SLATE "" ON)
     option(STRUMPACK_USE_SLATE_SCALAPACK "" ON)
-    set(STRUMPACK_PBLAS_BLOCKSIZE "256")
+    set(STRUMPACK_PBLAS_BLOCKSIZE "512")
   else()
     message(WARNING "SLATE was not found."
       " SLATE is required for GPU support in the distributed memory code.")
