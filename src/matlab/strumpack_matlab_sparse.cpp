@@ -40,7 +40,7 @@ void mexFunction
  int nrhs,               // number of inputs
  const mxArray *prhs[]   // matrix pointer array for inputs
  ) {
-  static std::unique_ptr<strumpack::StrumpackSparseSolver<double,int>> sp;
+  static std::unique_ptr<strumpack::StrumpackSparseSolver<double,std::int64_t>> sp;
   if (!sp) {
     if (nrhs != 2)
       mexErrMsgTxt("STRUMPACK SOLVE requires 2 input arguments on first call: sparse matrix and rhs vector.");
@@ -79,15 +79,15 @@ void mexFunction
 
     // the input matrix is compressed sparse COLUMN,
     // strumpack needs compressed sparse ROW
-    int *rowptr = (int*)mxMalloc((m+1)*sizeof(int));
-    int *colind = (int*)mxMalloc(nnz*sizeof(int));
-    int *rowsums = (int*)mxMalloc(m*sizeof(int));
+    std::int64_t *rowptr = (std::int64_t*)mxMalloc((m+1)*sizeof(std::int64_t));
+    std::int64_t *colind = (std::int64_t*)mxMalloc(nnz*sizeof(std::int64_t));
+    std::int64_t *rowsums = (std::int64_t*)mxMalloc(m*sizeof(std::int64_t));
     std::fill(rowsums, rowsums+m, 0);
     for (mwIndex c=0; c<m; c++)
       for (mwIndex i=m_colptr[c]; i<m_colptr[c+1]; i++)
 	rowsums[m_rowind[i]]++;
     rowptr[0] = 0;
-    for (int r=0; r<m; r++)
+    for (std::int64_t r=0; r<m; r++)
       rowptr[r+1] = rowptr[r] + rowsums[r];
     std::fill(rowsums, rowsums+m, 0);
     for (mwIndex c=0; c<m; c++)
@@ -96,10 +96,13 @@ void mexFunction
 	colind[rowptr[r]+rowsums[r]] = c;
 	rowsums[r]++;
       }
-    sp.reset(new strumpack::StrumpackSparseSolver<double,int>(verbose));
-    sp->options().set_reordering_method(strumpack::ReorderingStrategy::NATURAL);
+    sp.reset(new strumpack::StrumpackSparseSolver<double,std::int64_t>(verbose));
+    sp->options().set_reordering_method(strumpack::ReorderingStrategy::SCOTCH);
     sp->set_csr_matrix(m, rowptr, colind, mxGetPr(A_in));
-
+    sp->options().set_compression(strumpack::CompressionType::LOSSY);
+    sp->options().set_lossy_precision(10);
+    sp->options().set_Krylov_solver(strumpack::KrylovSolver::DIRECT);
+    // sp->options().set_matching(strumpack::MatchingJob::NONE);
     if (sp->factor()
 	!= strumpack::ReturnCode::SUCCESS) {
       std::cout << "Error during matrix factorization." << std::endl;
