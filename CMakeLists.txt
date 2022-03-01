@@ -543,7 +543,7 @@ endif()
 
 if(STRUMPACK_USE_MATLAB)
   # Matlab uses 64-bit integer BLAS/LAPACK
-  target_compile_options(strumpack PUBLIC
+  target_compile_options(strumpack PRIVATE
     $<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>>
     $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>)
   target_compile_options(strumpack PUBLIC "-DMKL_ILP64")
