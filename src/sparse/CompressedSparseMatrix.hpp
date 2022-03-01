@@ -44,12 +44,11 @@
 #include "StrumpackOptions.hpp"
 
 // where is this used?? in MC64?
-// #ifdef _LONGINT
-//   typedef long long int int_t;
-// #else // Default
-//   typedef int int_t;
-// #endif
-typedef strumpack_blas_int int_t;
+#ifdef _LONGINT
+typedef long long int int_t;
+#else // Default
+typedef int int_t;
+#endif
 
 namespace strumpack {
 
