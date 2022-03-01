@@ -36,6 +36,9 @@
 
 namespace strumpack {
 
+  template<typename scalar_t,typename integer_t> MPI_Datatype
+  EliminationTreeMPIDist<scalar_t,integer_t>::ParallelFront::pf_mpi_type = MPI_DATATYPE_NULL;
+
   template<typename scalar_t,typename integer_t>
   EliminationTreeMPIDist<scalar_t,integer_t>::EliminationTreeMPIDist
   (const Opts_t& opts, const CSRMPI_t& A, Reord_t& nd, const MPIComm& comm)
@@ -176,6 +179,7 @@ namespace strumpack {
           all_pfronts_[i++] = f;
     }
     comm_.all_gather_v(all_pfronts_.data(), rcnts, rdispls);
+    ParallelFront::free_mpi_type();
   }
 
   /**
@@ -354,6 +358,8 @@ namespace strumpack {
 #pragma omp parallel for
     for (std::size_t i=0; i<std::size_t(m)*n; i++)
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
+
+    Triplet::free_mpi_type();
   }
 
   template<typename integer_t, typename It>

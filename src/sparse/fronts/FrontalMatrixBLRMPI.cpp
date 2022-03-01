@@ -198,6 +198,7 @@ namespace strumpack {
       auto rbuf = Comm().all_to_all_v(sbuf);
       for (auto& e : rbuf) F21blr_.global(e.r, e.c) = e.v;
     }
+    Trip_t::free_mpi_type();
   }
 
 
@@ -265,6 +266,7 @@ namespace strumpack {
           for (auto& e : e21)
             s3buf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
           auto r3buf = Comm().all_to_all_v(s3buf);
+          Trip_t::free_mpi_type();
           piv_ = BLRMPI_t::partial_factor_col
             (F11blr_, F12blr_, F21blr_, F22blr_,
             adm_, opts.BLR_options(),
@@ -283,6 +285,7 @@ namespace strumpack {
           for (auto& e : e11)
             sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
           auto r1buf = Comm().all_to_all_v(sbuf);
+          Trip_t::free_mpi_type();
           std::vector<Trip_t> r2buf, r3buf;
           piv_ = F11blr_.factor_col
             (adm_, opts.BLR_options(),

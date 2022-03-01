@@ -74,6 +74,7 @@ namespace strumpack {
 #pragma omp parallel for
     for (integer_t i=0; i<m; i++)
       x[rbuf[i].i-lo] = rbuf[i].v;
+    IdxVal::free_mpi_type();
   }
 
   /**
