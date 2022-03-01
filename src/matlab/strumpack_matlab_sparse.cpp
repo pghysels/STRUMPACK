@@ -63,7 +63,7 @@ void mexFunction
   x_out = mxCreateDoubleMatrix(m, numrhs, mxREAL);
   if (babble)
     std::cout << "m= " << m
-	      << ", numrhs=" << numrhs << std::endl;
+              << ", numrhs=" << numrhs << std::endl;
 
   if (verbose)
     mexPrintf("Call STRUMPACK SOLVE, use STRUMPACK to factor first ...\n");
@@ -85,16 +85,16 @@ void mexFunction
     std::fill(rowsums, rowsums+m, 0);
     for (mwIndex c=0; c<m; c++)
       for (mwIndex i=m_colptr[c]; i<m_colptr[c+1]; i++)
-	rowsums[m_rowind[i]]++;
+        rowsums[m_rowind[i]]++;
     rowptr[0] = 0;
     for (std::int64_t r=0; r<m; r++)
       rowptr[r+1] = rowptr[r] + rowsums[r];
     std::fill(rowsums, rowsums+m, 0);
     for (mwIndex c=0; c<m; c++)
       for (mwIndex i=m_colptr[c]; i<m_colptr[c+1]; i++) {
-	mwIndex r = m_rowind[i];
-	colind[rowptr[r]+rowsums[r]] = c;
-	rowsums[r]++;
+        mwIndex r = m_rowind[i];
+        colind[rowptr[r]+rowsums[r]] = c;
+        rowsums[r]++;
       }
     sp.reset(new strumpack::StrumpackSparseSolver<double,std::int64_t>(verbose));
     sp->options().set_reordering_method(strumpack::ReorderingStrategy::SCOTCH);
@@ -103,8 +103,7 @@ void mexFunction
     sp->options().set_lossy_precision(10);
     sp->options().set_Krylov_solver(strumpack::KrylovSolver::DIRECT);
     // sp->options().set_matching(strumpack::MatchingJob::NONE);
-    if (sp->factor()
-	!= strumpack::ReturnCode::SUCCESS) {
+    if (sp->factor() != strumpack::ReturnCode::SUCCESS) {
       std::cout << "Error during matrix factorization." << std::endl;
       mexErrMsgTxt("Error during matrix factorization.\n");
     }
