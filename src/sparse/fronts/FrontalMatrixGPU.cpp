@@ -253,7 +253,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
-    host_Schur_.release();
+    host_Schur_.reset(nullptr);
   }
 
 #if defined(STRUMPACK_USE_MPI)
