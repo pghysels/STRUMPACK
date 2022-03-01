@@ -15,11 +15,11 @@
 #define abs(x) ((x) >= 0 ? (x) : -(x))
 #define min(a,b) ((a) < (b)) ? (a) : (b)
 
-#ifdef _LONGINT
+//#ifdef _LONGINT
 typedef long long int int_t;
-#else /* Default */
-typedef int int_t;
-#endif
+//#else /* Default */
+//typedef int int_t;
+//#endif
 
 extern double dlamch_(char*);
 
