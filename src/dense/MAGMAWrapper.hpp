@@ -57,6 +57,12 @@ namespace strumpack {
                   magma_queue_t queue, bool fwd);
       void laswpx(DenseMatrix<std::complex<double>>& A, int* dpiv, 
                   magma_queue_t queue, bool fwd);
+      
+      template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type> void
+      gesvd_magma(magma_vec_t jobu, magma_vec_t jobvt, real_t* S, 
+            DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U, 
+            DenseMatrix<scalar_t>& V);
 
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,

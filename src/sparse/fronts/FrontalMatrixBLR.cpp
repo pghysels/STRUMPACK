@@ -389,9 +389,13 @@ namespace strumpack {
         if (opts.use_gpu()) {
           gpu::DeviceMemory<scalar_t> dmF11(dsep*dsep), dmF12(dsep*dupd), 
                                       dmF21(dupd*dsep);
+          gpu::memset<scalar_t>(dmF11, 0, dsep*dsep);
+          gpu::memset<scalar_t>(dmF12, 0, dsep*dupd);
+          gpu::memset<scalar_t>(dmF21, 0, dupd*dsep);
           DenseMW_t dF11(dsep, dsep, dmF11, dsep), dF12(dsep, dupd, dmF12, dsep),
                     dF21(dupd, dsep, dmF21, dupd);
           CBdev_ = gpu::DeviceMemory<scalar_t>(dupd*dupd);
+          gpu::memset<scalar_t>(CBdev_, 0, dupd*dupd);
           F22_ = DenseMW_t(dupd, dupd, CBdev_, dupd);
           using Trip_t = Triplet<scalar_t>;
           std::vector<Trip_t> e11, e12, e21;

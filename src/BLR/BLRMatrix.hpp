@@ -170,7 +170,12 @@ namespace strumpack {
       const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_MAGMA)
+      void compress_tile_gpu_magma(gpu::BLASHandle& blashandle, std::size_t i, 
+                                   std::size_t j, DenseM_t& A, DenseM_t& dU, 
+                                   DenseM_t& dV, const Opts_t& opts);
+#endif
       void compress_tile_gpu(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
                              std::size_t i, std::size_t j, DenseM_t& A, DenseM_t& dU, 
                              DenseM_t& dV, int* dpiv, char* gesvd_mem,

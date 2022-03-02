@@ -128,8 +128,12 @@ namespace strumpack {
     (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
       if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
+      if (d.rows() != d.ld() || h.rows() != h.ld()) {
+        gpu_check(cudaMemcpy2D
+                  (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
+                   h.rows()*sizeof(T), h.cols(), cudaMemcpyDeviceToHost));
+      } else
+        copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
     }
     template<typename T> void copy_device_to_host_async
     (DenseMatrix<T>& h, const DenseMatrix<T>& d, const Stream& s) {

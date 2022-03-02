@@ -109,6 +109,110 @@ namespace strumpack {
                           1, A.ld(), 1, A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
+      int gesvd_nb(DenseMatrix<float>& A){
+        int nb = magma_get_sgesvd_nb(A.rows(), A.cols());
+        std::size_t minmn = std::min(A.rows(), A.cols());
+        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
+        return lwork;
+      }
+
+      int gesvd_nb(DenseMatrix<double>& A){
+        int nb = magma_get_dgesvd_nb(A.rows(), A.cols());
+        std::size_t minmn = std::min(A.rows(), A.cols());
+        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
+        return lwork;
+      }
+
+      int gesvd_nb(DenseMatrix<std::complex<float>>& A){
+        int nb = magma_get_dgesvd_nb(A.rows(), A.cols());
+        std::size_t minmn = std::min(A.rows(), A.cols());
+        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
+        return lwork;
+      }
+
+      int gesvd_nb(DenseMatrix<std::complex<double>>& A){
+        int nb = magma_get_dgesvd_nb(A.rows(), A.cols());
+        std::size_t minmn = std::min(A.rows(), A.cols());
+        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
+        return lwork;
+      }
+
+      void gesvd(magma_vec_t jobu, magma_vec_t jobvt, DenseMatrix<float>& A, float* S, 
+                 DenseMatrix<float>& U, DenseMatrix<float>& V, float* Workspace, 
+                 int lwork, float* E, int *info){
+        magma_sgesvd(jobu, jobvt, A.rows(), A.cols(),	A.data(), A.ld(), S,
+                   	 U.data(), U.ld(), V.data(), V.ld(), Workspace, lwork, 
+                     info);
+      }
+
+      void gesvd(magma_vec_t jobu, magma_vec_t jobvt, DenseMatrix<double>& A, double* S, 
+                 DenseMatrix<double>& U, DenseMatrix<double>& V, double* Workspace, 
+                 int lwork, double* E, int* info){
+        magma_dgesvd(jobu, jobvt, A.rows(), A.cols(),	A.data(), A.ld(), S,
+                   	 U.data(), U.ld(), V.data(), V.ld(), Workspace, lwork, 
+                     info);
+      }
+
+      void gesvd(magma_vec_t jobu, magma_vec_t jobvt, DenseMatrix<std::complex<float>>& A, 
+                 float* S, DenseMatrix<std::complex<float>>& U, 
+                 DenseMatrix<std::complex<float>>& V, std::complex<float>* Workspace, int lwork, float* E, 
+                 int *info){
+        magma_cgesvd(jobu, jobvt, A.rows(), A.cols(),	
+                     reinterpret_cast<magmaFloatComplex*>(A.data()), A.ld(), S,
+                   	 reinterpret_cast<magmaFloatComplex*>(U.data()), U.ld(), 
+                     reinterpret_cast<magmaFloatComplex*>(V.data()), V.ld(), 
+                     reinterpret_cast<magmaFloatComplex*>(Workspace), lwork, E, info);
+      }
+
+      void gesvd(magma_vec_t jobu, magma_vec_t jobvt, 
+                 DenseMatrix<std::complex<double>>& A, double* S, 
+                 DenseMatrix<std::complex<double>>& U, 
+                 DenseMatrix<std::complex<double>>& V, std::complex<double>* Workspace, 
+                 int lwork, double* E, int* info){
+        magma_zgesvd(jobu, jobvt, A.rows(), A.cols(),	
+                     reinterpret_cast<magmaDoubleComplex*>(A.data()), A.ld(), S,
+                   	 reinterpret_cast<magmaDoubleComplex*>(U.data()), U.ld(), 
+                     reinterpret_cast<magmaDoubleComplex*>(V.data()), V.ld(), 
+                     reinterpret_cast<magmaDoubleComplex*>(Workspace), lwork, E, info);
+      }
+      
+      template<typename scalar_t, typename real_t> void
+      gesvd_magma(magma_vec_t jobu, magma_vec_t jobvt, real_t* S, 
+          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U, 
+          DenseMatrix<scalar_t>& V) {
+        int info = 0;
+        std::size_t minmn = std::min(U.rows(), V.cols());
+        DenseMatrix<scalar_t> hA(A.rows(), A.cols());
+        copy_device_to_host(hA, A);
+        int gesvd_work_size = gesvd_nb(hA);
+        std::vector<real_t> hS(minmn);
+        DenseMatrix<scalar_t> hU(U.rows(), U.cols());
+        DenseMatrix<scalar_t> hV(V.rows(), V.cols());
+        std::vector<scalar_t> hwork(gesvd_work_size);
+        std::vector<real_t> hE(5*minmn);
+        gesvd(jobu, jobvt, hA, hS.data(), hU, hV, hwork.data(), 
+              gesvd_work_size, hE.data(), &info);
+        copy_host_to_device(S, hS.data(), minmn);
+        copy_host_to_device(U, hU);
+        copy_host_to_device(V, hV);
+      }
+
+      template void gesvd_magma(magma_vec_t, magma_vec_t, float*, DenseMatrix<float>&,
+                               DenseMatrix<float>&, DenseMatrix<float>&);
+
+      template void gesvd_magma(magma_vec_t, magma_vec_t, double*, DenseMatrix<double>&,
+                               DenseMatrix<double>&, DenseMatrix<double>&);
+      
+      template void gesvd_magma(magma_vec_t, magma_vec_t, float*, 
+                               DenseMatrix<std::complex<float>>&,
+                               DenseMatrix<std::complex<float>>&, 
+                               DenseMatrix<std::complex<float>>&);
+
+      template void gesvd_magma(magma_vec_t, magma_vec_t, double*, 
+                               DenseMatrix<std::complex<double>>&,
+                               DenseMatrix<std::complex<double>>&, 
+                               DenseMatrix<std::complex<double>>&);
+
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
                          float alpha,
