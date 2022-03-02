@@ -77,41 +77,39 @@ namespace strumpack {
     using FG_t = FrontalMatrixGPU<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-
   public:
     LevelInfo() {}
-
     LevelInfo(const std::vector<F_t*>& fronts,
-              gpu::SOLVERHandle& handle, kblasHandle_t& kblas_handle,
-              int max_streams, const SpMat_t* A=nullptr) {
-      f.reserve(fronts.size());
+              gpu::SOLVERHandle& handle,
+#if defined(STRUMPACK_USE_KBLAS)
+              kblasHandle_t& kblas_handle,
+#endif
+              const SpMat_t* A=nullptr) {
+      auto N = fronts.size();
+      f.reserve(N);
+      std::size_t max_dsep = 0;
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FG_t*>(F));
 #pragma omp parallel for                                                \
-  reduction(+:L_size,U_size,Schur_size,piv_size,total_upd_size)         \
-  reduction(+:small_fronts,factors_small)                               \
-  reduction(max:max_dsep)
-      for (std::size_t i=0; i<f.size(); i++) {
+  reduction(max:max_dsep)                                               \
+  reduction(+:factor_size,Schur_size,piv_size)                          \
+  reduction(+:total_upd_size,Nsmall)
+      for (std::size_t i=0; i<N; i++) {
         auto& F = *(f[i]);
         const std::size_t dsep = F.dim_sep();
         const std::size_t dupd = F.dim_upd();
-        L_size += dsep*(dsep + dupd);
-        U_size += dsep*dupd;
+        factor_size += dsep*(dsep + 2*dupd);
         Schur_size += dupd*dupd;
         piv_size += dsep;
         total_upd_size += dupd;
-        if (dsep <= FRONT_SMALL) {
-          factors_small += dsep*(dsep + 2*dupd);
-          small_fronts++;
-        }
+        if (dsep <= FRONT_SMALL) Nsmall++;
         if (dsep > max_dsep) max_dsep = dsep;
       }
-      if (small_fronts && small_fronts != f.size())
+      if (Nsmall && Nsmall != N)
         std::partition
           (f.begin(), f.end(), [](const FG_t* const& a) -> bool {
             return a->dim_sep() <= FRONT_SMALL; });
       if (A) {
-        auto N = f.size();
         elems11.resize(N+1);
         elems12.resize(N+1);
         elems21.resize(N+1);
@@ -132,44 +130,40 @@ namespace strumpack {
           Isize[i+1] += Isize[i];
         }
       }
-      factor_size = L_size + U_size;
-
-      d1_batch.resize(small_fronts+1);
-      d2_batch.resize(small_fronts+1);
-      ld1_batch.resize(small_fronts+1);
-      ld2_batch.resize(small_fronts+1);
-      F_batch.resize(4*small_fronts);
-      ipiv_batch.resize(small_fronts);
-      for (std::size_t i=0, c=0; i<f.size(); i++) {
+      d1_batch.resize(Nsmall);
+      d2_batch.resize(Nsmall);
+      ld1_batch.resize(Nsmall);
+      ld2_batch.resize(Nsmall);
+      F_batch.resize(4*Nsmall);
+      ipiv_batch.resize(Nsmall);
+      for (std::size_t i=0; i<Nsmall; i++) {
         auto& F = *(f[i]);
         const std::size_t dsep = F.dim_sep();
-        if (dsep > FRONT_SMALL) continue;
         const std::size_t dupd = F.dim_upd();
-        d1_batch[c] = dsep;
-        d2_batch[c] = dupd;
-        ld1_batch[c] = std::max(1ul, dsep);
-        ld2_batch[c] = std::max(1ul, dupd);
-        c++;
+        d1_batch[i] = dsep;
+        d2_batch[i] = dupd;
+        ld1_batch[i] = std::max(1ul, dsep);
+        ld2_batch[i] = std::max(1ul, dupd);
       }
 
-      getrf_work_per_stream = gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
-
+      std::size_t getrf_work_cusolver =
+        gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
+#if defined(STRUMPACK_USE_KBLAS)
       typedef typename kblas_base_type<scalar_t>::device_type kblas_type;
       getrf_work_bytes = kblas_getrf_vbatch_workspace_host<kblas_type>
-        (kblas_handle, d1_batch.data(), d1_batch.data(), small_fronts);
+        (kblas_handle, d1_batch.data(), d1_batch.data(), Nsmall);
+#else
+      getrf_work_bytes = 0;
+#endif
       getrf_work_bytes =
-        std::max(getrf_work_bytes,
-                 max_streams * sizeof(scalar_t) * getrf_work_per_stream);
+        std::max(getrf_work_bytes, sizeof(scalar_t) * getrf_work_cusolver);
 
       work_bytes =
         round_to_16(sizeof(scalar_t) * Schur_size) +
         round_to_16(getrf_work_bytes) +
-        round_to_16(sizeof(int) *
-                    (piv_size +
-                     std::max(std::size_t(max_streams), small_fronts) +
-                     4 * (small_fronts+1))) +
-        round_to_16(sizeof(scalar_t*) * 4 * small_fronts) +
-        round_to_16(sizeof(int*) * small_fronts);
+        round_to_16(sizeof(int) * (piv_size + N + 4 * (Nsmall+1))) +
+        round_to_16(sizeof(scalar_t*) * 4 * Nsmall) +
+        round_to_16(sizeof(int*) * Nsmall);
       ea_bytes =
         round_to_16(sizeof(gpu::AssembleData<scalar_t>) * f.size()) +
         round_to_16(sizeof(std::size_t) * Isize.back()) +
@@ -180,7 +174,7 @@ namespace strumpack {
     void print_info(int l, int lvls) {
       std::cout << "#  level " << l << " of " << lvls
                 << " has " << f.size() << " nodes and "
-                << small_fronts << " small fronts, needs "
+                << Nsmall << " small fronts, needs "
                 << factor_size * sizeof(scalar_t) / 1.e6
                 << " MB for factors, "
                 << Schur_size * sizeof(scalar_t) / 1.e6
@@ -224,7 +218,7 @@ namespace strumpack {
       }
     }
 
-    void set_work_pointers(void* wmem, int max_streams) {
+    void set_work_pointers(void* wmem) {
       auto schur = reinterpret_cast<scalar_t*>(wmem);
       for (auto F : f) {
         const int dupd = F->dim_upd();
@@ -240,31 +234,30 @@ namespace strumpack {
         F->piv_ = imem;
         imem += F->dim_sep();
       }
-      dev_getrf_err = imem;    imem += std::max(small_fronts,
-                                                (std::size_t)max_streams);
-      dev_d1_batch  = imem;    imem += small_fronts+1;
-      dev_d2_batch  = imem;    imem += small_fronts+1;
-      dev_ld1_batch = imem;    imem += small_fronts+1;
-      dev_ld2_batch = imem;    imem += small_fronts+1;
+      auto N = f.size();
+      dev_getrf_err = imem;    imem += N;
+      dev_d1_batch  = imem;    imem += Nsmall+1;
+      dev_d2_batch  = imem;    imem += Nsmall+1;
+      dev_ld1_batch = imem;    imem += Nsmall+1;
+      dev_ld2_batch = imem;    imem += Nsmall+1;
       auto fmem = reinterpret_cast<scalar_t**>(round_to_16(imem));
-      dev_F_batch = fmem;      fmem += 4 * small_fronts;
+      dev_F_batch = fmem;      fmem += 4 * Nsmall;
       auto ipmem = reinterpret_cast<int**>(round_to_16(fmem));
-      dev_ipiv_batch = ipmem;  ipmem += small_fronts;
+      dev_ipiv_batch = ipmem;  ipmem += Nsmall;
     }
 
-    static const int FRONT_SMALL = 1024;
+    static const int FRONT_SMALL = 256;
     std::vector<FG_t*> f;
-    std::size_t L_size = 0, U_size = 0, factor_size = 0,
-      factors_small = 0, Schur_size = 0, piv_size = 0,
+    std::size_t factor_size = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0, work_bytes = 0, ea_bytes = 0,
-      small_fronts = 0, max_dsep = 0;
+      Nsmall = 0;
     std::vector<std::size_t> elems11, elems12, elems21, Isize;
 
     char* dev_getrf_work = nullptr;
-    std::size_t getrf_work_per_stream = 0, getrf_work_bytes = 0;
+    std::size_t getrf_work_bytes = 0;
     int* dev_getrf_err = nullptr;
 
-    // meta-data for kblas batched call(s)
+    // meta-data for batched call(s)
     std::vector<int> d1_batch, d2_batch, ld1_batch, ld2_batch;
     std::vector<scalar_t*> F_batch;
     std::vector<int*> ipiv_batch;
@@ -405,66 +398,6 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t, typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
-  (LevelInfo<scalar_t,integer_t>& L, gpu::BLASHandle& blas_h,
-   kblasHandle_t& kblas_h, magma_queue_t& magma_q,
-   const SPOptions<scalar_t>& opts) {
-    if (!L.small_fronts) return;
-
-    std::size_t max_dsep = 0;
-    for (std::size_t i=0, c=0; i<L.f.size(); i++) {
-      auto& F = *(L.f[i]);
-      const std::size_t dsep = F.dim_sep();
-      if (dsep > L.FRONT_SMALL) continue;
-      L.F_batch[c                   ] = F.F11_.data();
-      L.F_batch[c +   L.small_fronts] = F.F12_.data();
-      L.F_batch[c + 2*L.small_fronts] = F.F21_.data();
-      L.F_batch[c + 3*L.small_fronts] = F.F22_.data();
-      L.ipiv_batch[c                ] = F.piv_;
-      max_dsep = std::max(max_dsep, dsep);
-      c++;
-    }
-    auto d1 = L.dev_d1_batch;
-    auto d2 = L.dev_d2_batch;
-    auto ld1 = L.dev_ld1_batch;
-    auto ld2 = L.dev_ld2_batch;
-    auto F11 = L.dev_F_batch;         auto F12 = F11 + L.small_fronts;
-    auto F21 = F12 + L.small_fronts;  auto F22 = F21 + L.small_fronts;
-    gpu::copy_host_to_device(d1, L.d1_batch.data(), L.small_fronts+1);
-    gpu::copy_host_to_device(d2, L.d2_batch.data(), L.small_fronts+1);
-    gpu::copy_host_to_device(ld1, L.ld1_batch.data(), L.small_fronts+1);
-    gpu::copy_host_to_device(ld2, L.ld2_batch.data(), L.small_fronts+1);
-    gpu::copy_host_to_device(F11, L.F_batch.data(), 4*L.small_fronts);
-    gpu::copy_host_to_device(L.dev_ipiv_batch, L.ipiv_batch.data(), L.small_fronts);
-
-    gpu::synchronize();
-
-    typedef typename kblas_base_type<scalar_t>::device_type kblas_type;
-    kblas_getrf_vbatch
-      (kblas_h, d1, d1, max_dsep, max_dsep,
-       (kblas_type**)F11, d1, L.dev_ipiv_batch,
-       L.dev_getrf_work, L.getrf_work_bytes,
-       L.dev_getrf_err, L.small_fronts);
-    gpu::synchronize();
-
-    gpu::laswp_fwd_vbatched
-      (blas_h, d1, max_dsep, F11, L.dev_ipiv_batch, L.small_fronts);
-    gpu::synchronize();
-
-    gpu::magma::trsm_vbatched
-      (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit, d1, d2,
-       scalar_t(1.), F11, ld1, F12, ld1, L.small_fronts, magma_q);
-    gpu::magma::trsm_vbatched
-      (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit, d1, d2,
-       scalar_t(1.), F11, ld1, F12, ld1, L.small_fronts, magma_q);
-    gpu::magma::gemm_vbatched
-      (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
-       F21, ld2, F12, ld1, scalar_t(1.), F22, ld2,
-       L.small_fronts, magma_q);
-    gpu::synchronize();
-  }
-
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
@@ -562,54 +495,52 @@ namespace strumpack {
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-#if defined(STRUMPACK_USE_MAGMA)
-    // if (opts.replace_tiny_pivots())
-    magma_init();
-    magma_queue_t magma_q;
-    magma_queue_create(0, &magma_q);
+#if defined(STRUMPACK_USE_KBLAS)
     kblasHandle_t kblas_handle;
+    // TODO need to free this handle!!
     kblasCreate(&kblas_handle);
-    kblasEnableMagma(kblas_handle);
-
-    kblas_gemm_batch_nonuniform_wsquery(kblas_handle);
-    kblasAllocateWorkspace(kblas_handle);
 #endif
-    const int max_streams = opts.gpu_streams();
-    std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
+
+    gpu::SOLVERHandle solver_handle;
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
       this->get_level_fronts(fp, l);
       auto& L = ldata[l];
-      L = LInfo_t(fp, solver_handles[0], kblas_handle, max_streams, &A);
+      L = LInfo_t(fp, solver_handle,
+#if defined(STRUMPACK_USE_KBLAS)
+                  kblas_handle,
+#endif
+                  &A);
     }
     auto peak_dmem = peak_device_memory(ldata);
     if (peak_dmem >= 0.9 * gpu::available_memory()) {
       split_smaller(A, opts, etree_level, task_depth);
       return;
     }
-    std::vector<gpu::Stream> streams(max_streams);
-    gpu::Stream copy_stream;
-    std::vector<gpu::BLASHandle> blas_handles(max_streams);
-    for (int i=0; i<max_streams; i++) {
-      blas_handles[i].set_stream(streams[i]);
-      solver_handles[i].set_stream(streams[i]);
-    }
-    std::size_t max_small_fronts = 0, max_pinned = 0;
-    for (int l=lvls-1; l>=0; l--) {
-      auto& L = ldata[l];
-      //max_small_fronts = std::max(max_small_fronts, L.N8+L.N16+L.N24+L.N32);
-      max_small_fronts = std::max(max_small_fronts, L.small_fronts);
-      for (auto& f : L.f) {
-        const std::size_t dsep = f->dim_sep();
-        const std::size_t dupd = f->dim_upd();
-        std::size_t fs = dsep*(dsep + 2*dupd);
-        max_pinned = std::max(max_pinned, fs);
-      }
-      max_pinned = std::max(max_pinned, L.factors_small);
-    }
-    gpu::HostMemory<scalar_t> pinned(2*max_pinned);
+    gpu::Stream comp_stream, copy_stream;
+    gpu::BLASHandle blas_handle;
+    blas_handle.set_stream(comp_stream);
+    solver_handle.set_stream(comp_stream);
+
+    magma_init();
+    magma_queue_t magma_q;
+    // TODO destroy magma_q when done
+    magma_queue_create_from_cuda
+      (0, comp_stream, blas_handle, NULL, &magma_q);
+#if defined(STRUMPACK_USE_KBLAS)
+    kblasSetStream(kblas_handle, comp_stream);
+    kblasEnableMagma(kblas_handle);
+    kblas_gemm_batch_nonuniform_wsquery(kblas_handle);
+    kblasAllocateWorkspace(kblas_handle);
+#endif
+
+    std::size_t pinned_size = 0;
+    for (int l=lvls-1; l>=0; l--)
+      pinned_size = std::max(pinned_size, ldata[l].factor_size);
+    gpu::HostMemory<scalar_t> pinned(pinned_size);
+
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
       peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
@@ -637,123 +568,105 @@ namespace strumpack {
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
         L.set_factor_pointers(dev_factors);
-        L.set_work_pointers(work_mem, max_streams);
+        L.set_work_pointers(work_mem);
         old_work = work_mem;
 
         // default stream
         front_assembly(A, L, hea_mem, dea_mem);
-        gpu::Event e_assemble;
-        e_assemble.record();
 
-        // default stream
-        // std::size_t small_fronts = L.N8 + L.N16 + L.N24 + L.N32;
-        factor_small_fronts(L, blas_handles[0], kblas_handle, magma_q, opts);
-        gpu::Event e_small;
-        e_small.record();
-
-        for (auto& s : streams)
-          e_assemble.wait(s);
-
-        // larger fronts in multiple streams.  Copy back in nchunks
-        // chunks, but a single chunk cannot be larger than the pinned
-        // buffer
-        const int nchunks = 16;
-        std::size_t Bf = (L.f.size()-L.small_fronts + nchunks - 1) / nchunks;
-        std::vector<std::size_t> chunks, factors_chunk;
-        for (std::size_t n=L.small_fronts, fc=0, c=0; n<L.f.size(); n++) {
-          auto& f = *(L.f[n]);
-          const std::size_t dsep = f.dim_sep();
-          const std::size_t dupd = f.dim_upd();
-          std::size_t size_front = dsep * (dsep + 2*dupd);
-          if (c == Bf || fc + size_front > max_pinned) {
-            chunks.push_back(c);
-            factors_chunk.push_back(fc);
-            c = fc = 0;
-          }
-          c++;
-          fc += size_front;
-          if (n == L.f.size()-1) { // final chunk
-            chunks.push_back(c);
-            factors_chunk.push_back(fc);
-          }
+        std::size_t N = L.f.size();
+        std::size_t Nsmall = L.Nsmall;
+#pragma omp parallel for
+        for (std::size_t i=0; i<Nsmall; i++) {
+          auto& f = *(L.f[i]);
+          L.F_batch[i           ] = f.F11_.data();
+          L.F_batch[i +   Nsmall] = f.F12_.data();
+          L.F_batch[i + 2*Nsmall] = f.F21_.data();
+          L.F_batch[i + 3*Nsmall] = f.F22_.data();
+          L.ipiv_batch[i]    = f.piv_;
+        }
+        auto d1 = L.dev_d1_batch;   auto d2 = L.dev_d2_batch;
+        auto ld1 = L.dev_ld1_batch; auto ld2 = L.dev_ld2_batch;
+        auto F11 = L.dev_F_batch;   auto F12 = F11 + Nsmall;
+        auto F21 = F12 + Nsmall;    auto F22 = F21 + Nsmall;
+        gpu::copy_host_to_device(d1,  L.d1_batch.data(),  Nsmall);
+        gpu::copy_host_to_device(d2,  L.d2_batch.data(),  Nsmall);
+        gpu::copy_host_to_device(ld1, L.ld1_batch.data(), Nsmall);
+        gpu::copy_host_to_device(ld2, L.ld2_batch.data(), Nsmall);
+        gpu::copy_host_to_device(F11, L.F_batch.data(),   4*Nsmall);
+        gpu::copy_host_to_device(L.dev_ipiv_batch, L.ipiv_batch.data(), Nsmall);
+        std::size_t max_d1_small = 0, max_d2_small = 0;
+        if (Nsmall) {
+          max_d1_small = *std::max_element(L.d1_batch.begin(), L.d1_batch.end());
+          max_d2_small = *std::max_element(L.d2_batch.begin(), L.d2_batch.end());
         }
 
-        e_small.wait(copy_stream);
-        gpu::copy_device_to_host_async<scalar_t>
-          (pinned, dev_factors, L.factors_small, copy_stream);
+#if defined(STRUMPACK_USE_KBLAS)
+        typedef typename kblas_base_type<scalar_t>::device_type kblas_type;
+        kblas_getrf_vbatch
+          (kblas_handle, d1, d1, max_d1_small, max_d1_small,
+           (kblas_type**)F11, d1, L.dev_ipiv_batch,
+           L.dev_getrf_work, L.getrf_work_bytes, L.dev_getrf_err, Nsmall);
+        comp_stream.synchronize();
+#else
+        gpu::magma::getrf_vbatched
+          (d1, d1, F11, ld1, L.dev_ipiv_batch,
+           L.dev_getrf_err, Nsmall, magma_q);
+#endif
+        for (std::size_t i=Nsmall; i<N; i++)
+          gpu::getrf
+            (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
+             L.f[i]->piv_, L.dev_getrf_err+i);
+
+        // TODO
+        // if (opts.replace_tiny_pivots())
+        //   gpu::replace_pivots
+        //     (f.dim_sep(), f.F11_.data(),
+        //      opts.pivot_threshold(), comp_stream);
+
+        gpu::laswp_fwd_vbatched
+          (blas_handle, d2, max_d2_small, F12, ld1, L.dev_ipiv_batch,
+           d1, Nsmall);
+        gpu::magma::trsm_vbatched
+          (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
+           d1, d2, scalar_t(1.), F11, ld1, F12, ld1, Nsmall, magma_q);
+        gpu::magma::trsm_vbatched
+          (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
+           d1, d2, scalar_t(1.), F11, ld1, F12, ld1, Nsmall, magma_q);
+        for (std::size_t i=Nsmall; i<N; i++)
+          gpu::getrs
+            (solver_handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
+             L.f[i]->F12_, L.dev_getrf_err+i);
 
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
-        scalar_t* host_factors = L.f[0]->host_factors_.get();
-        copy_stream.synchronize();
-#pragma omp parallel for
-        for (std::size_t i=0; i<L.factors_small; i++)
-          host_factors[i] = pinned[i];
-        host_factors += L.factors_small;
-
-        if (!chunks.empty()) {
-          scalar_t* pin[2] = {pinned.template as<scalar_t>(),
-            pinned.template as<scalar_t>() + max_pinned};
-          std::vector<gpu::Event> events(chunks.size());
-
-          for (std::size_t c=0, n=L.small_fronts; c<chunks.size(); c++) {
-            int s = c % streams.size(), n0 = n;
-#pragma omp parallel
-#pragma omp single
-            {
-              if (c) {
-#pragma omp task
-                {
-                  copy_stream.synchronize();
-                  auto fc = factors_chunk[c-1];
-#pragma omp taskloop //num_tasks(omp_get_num_threads()-1)
-                  for (std::size_t i=0; i<fc; i++)
-                    host_factors[i] = pin[(c-1) % 2][i];
-                  host_factors += fc;
-                }
-              }
-#pragma omp task
-              {
-                for (std::size_t ci=0; ci<chunks[c]; ci++, n++) {
-                  auto& f = *(L.f[n]);
-                  gpu::getrf
-                    (solver_handles[s], f.F11_,
-                     (scalar_t*)L.dev_getrf_work + s * L.getrf_work_per_stream,
-                     f.piv_, L.dev_getrf_err + s);
-                  if (opts.replace_tiny_pivots())
-                    gpu::replace_pivots
-                      (f.dim_sep(), f.F11_.data(),
-                       opts.pivot_threshold(), streams[s]);
-                  if (f.dim_upd()) {
-                    gpu::getrs
-                      (solver_handles[s], Trans::N, f.F11_, f.piv_,
-                       f.F12_, L.dev_getrf_err + s);
-                    gpu::gemm
-                      (blas_handles[s], Trans::N, Trans::N,
-                       scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
-                  }
-                }
-                events[c].record(streams[s]);
-                events[c].wait(copy_stream);
-                auto& f = *(L.f[n0]);
-                gpu::copy_device_to_host_async<scalar_t>
-                  (pin[c % 2], f.F11_.data(), factors_chunk[c], copy_stream);
-              }
-            }
-          }
-          copy_stream.synchronize();
-          auto fc = factors_chunk.back();
-#pragma omp parallel for
-          for (std::size_t i=0; i<fc; i++)
-            host_factors[i] = pin[(chunks.size()-1) % 2][i];
-        }
-
         L.f[0]->pivot_mem_.resize(L.piv_size);
+
+        comp_stream.synchronize();
+        gpu::copy_device_to_host_async<scalar_t>
+          (pinned, dev_factors, L.factor_size, copy_stream);
+
+        // use max_nocheck to overlap this with copy above
+        gpu::magma::gemm_vbatched_max_nocheck
+          (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
+           F21, ld2, F12, ld1, scalar_t(1.), F22, ld2, Nsmall,
+           max_d2_small, max_d2_small, max_d1_small, magma_q);
+        for (std::size_t i=Nsmall; i<N; i++)
+          gpu::gemm
+            (blas_handle, Trans::N, Trans::N, scalar_t(-1.),
+             L.f[i]->F21_, L.f[i]->F12_, scalar_t(1.), L.f[i]->F22_);
+
         copy_stream.synchronize();
+        auto host_factors = L.f[0]->host_factors_.get();
+#pragma omp parallel for
+        for (std::size_t i=0; i<L.factor_size; i++)
+          host_factors[i] = pinned[i];
+
         gpu::copy_device_to_host
           (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
+        comp_stream.synchronize();
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;
         abort();
@@ -778,10 +691,8 @@ namespace strumpack {
         (host_Schur_.get(), reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
-#if defined(STRUMPACK_USE_MAGMA)
-    //if (opts.replace_tiny_pivots())
+
     magma_finalize();
-#endif
   }
 
 

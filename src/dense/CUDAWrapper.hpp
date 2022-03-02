@@ -60,12 +60,15 @@ namespace strumpack {
     inline void synchronize() {
       gpu_check(cudaDeviceSynchronize());
     }
+    inline void stream_synchronize() {
+      gpu_check(cudaStreamSynchronize(0));
+    }
 
     class Stream {
     public:
       Stream() {
-        gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
-        // gpu_check(cudaStreamCreate(&s_));
+        // gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
+        gpu_check(cudaStreamCreate(&s_));
       }
       ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
       // void set_priority(int priority) {
@@ -340,9 +343,10 @@ namespace strumpack {
     laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
           int k1, int k2, int* ipiv, int inc);
 
+    // assume inc = 1
     template<typename scalar_t> void
     laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
-                       scalar_t** dA, int** dipiv,
+                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
                        unsigned int batchCount);
 
   } // end namespace gpu
