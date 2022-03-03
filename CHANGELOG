@@ -1,5 +1,5 @@
-Version 6.3.1 Released ...
-====================================
+Version 6.3.1 Released March 2022
+=================================
 - Fix for setting CUDA/HIP device when there are multiple,
   but MPI was not initialized
 - Memory leak fix in distributed memory GPU code
@@ -7,6 +7,9 @@ Version 6.3.1 Released ...
 - Change in BLR algorithm selection options
 - Changed default blocksize for 2D block cyclic distribution
   when using SLATE to 512
+- Add 64bit support in the matching (MC64)
+- Fix installation of Fortran modules
+
 
 Version 6.3.0 Released February 2022
 ====================================
