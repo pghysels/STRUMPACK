@@ -182,7 +182,7 @@ namespace strumpack {
     double d__1, d__2;
 
     /* Local variables */
-    int_t i__, j, k;
+    int_t i__, j, k = 0;
     double fact, rinf;
 
     /* *** Copyright (c) 1999  Council for the Central Laboratory of the */
@@ -766,7 +766,7 @@ namespace strumpack {
     /* Local variables */
     int_t i__, j, k;
     double a0;
-    int_t i0, q0;
+    int_t i0 = 0, q0;
     double ai, di;
     int_t ii, jj, kk;
     double bv;
@@ -774,7 +774,7 @@ namespace strumpack {
     double dq0;
     int_t kk1, kk2;
     double csp;
-    int_t isp, jsp, low;
+    int_t isp = 0, jsp = 0, low;
     double dnew;
     int_t jord, qlen, idum, jdum;
     double rinf;
@@ -2064,7 +2064,7 @@ namespace strumpack {
     int_t i__1, i__2, i__3, i__4;
 
     /* Local variables */
-    int_t i__, j, k, j1, ii, kk, id0, id1, in1, in2, nfc, num0, num1, num2, 
+    int_t i__ = 0, j, k, j1, ii = 0, kk, id0, id1, in1, in2, nfc, num0, num1, num2,
       jord, last;
 
 
@@ -2271,7 +2271,7 @@ namespace strumpack {
     int_t i__1, i__2, i__3;
 
     /* Local variables */
-    int_t i__, j, k, i0, k0, k1, k2, q0;
+    int_t i__, j, k, i0 = 0, k0 = 0, k1, k2, q0;
     double di;
     int_t ii, jj, kk;
     double vj;
@@ -2279,18 +2279,10 @@ namespace strumpack {
     double dq0;
     int_t kk1, kk2;
     double csp;
-    int_t isp, jsp, low;
+    int_t isp = 0, jsp = 0, low;
     double dmin__, dnew;
     int_t jord, qlen, jdum;
     double rinf;
-    // extern /* Subroutine */
-    //   int_t mc64dd_(int_t *, int_t *, int_t *,
-    //                 double *, int_t *, int_t *),
-    //   mc64ed_(int_t *, int_t *,
-    //           int_t *, double *, int_t *, int_t *),
-    //   mc64fd_(int_t *, int_t *, int_t *, int_t *,
-    //           double *, int_t *, int_t *);
-
 
     /* *** Copyright (c) 1999  Council for the Central Laboratory of the */
     /*     Research Councils                                             *** */
