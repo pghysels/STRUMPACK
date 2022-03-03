@@ -7,7 +7,7 @@ the U.S. Dept. of Energy).  All rights reserved.
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)
 
-   [http://portal.nersc.gov/project/sparse/strumpack/v6.1.0/](http://portal.nersc.gov/project/sparse/strumpack/v6.1.0/)
+   [http://portal.nersc.gov/project/sparse/strumpack/v6.3.1/](http://portal.nersc.gov/project/sparse/strumpack/v6.3.1/)
 
 
 ## Website
@@ -19,7 +19,7 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
- - Wajih Boukaram - wajih.boukaram@lbl.gov 
+ - Wajih Boukaram - wajih.boukaram@lbl.gov
 
 
 ## Past contributors
