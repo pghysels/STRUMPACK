@@ -73,6 +73,7 @@ if(@STRUMPACK_USE_BPACK@) # STRUMPACK_USE_BPACK
 endif()
 
 if(@STRUMPACK_USE_SLATE@) # STRUMPACK_USE_SLATE
+  set(slate_PREFIX @TPL_SLATE_PREFIX@)
   set(blaspp_DIR @blaspp_DIR@)
   set(lapackpp_DIR @lapackpp_DIR@)
   set(slate_DIR @slate_DIR@)
