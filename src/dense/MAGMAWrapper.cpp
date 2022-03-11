@@ -75,7 +75,7 @@ namespace strumpack {
         return info;
       }
 
-      void laswpx(DenseMatrix<float>& A, int* dpiv, magma_queue_t queue, bool fwd) {
+      void laswpx(DenseMatrix<float>& A, const int* dpiv, magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
         STRUMPACK_BYTES(4*blas::laswp_moves(A.cols(), 1, A.rows()));
@@ -83,7 +83,7 @@ namespace strumpack {
                           A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
-      void laswpx(DenseMatrix<double>& A, int* dpiv, magma_queue_t queue, bool fwd) {
+      void laswpx(DenseMatrix<double>& A, const int* dpiv, magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
         STRUMPACK_BYTES(8*blas::laswp_moves(A.cols(), 1, A.rows()));
@@ -91,7 +91,7 @@ namespace strumpack {
                           A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
-      void laswpx(DenseMatrix<std::complex<float>>& A, int* dpiv, 
+      void laswpx(DenseMatrix<std::complex<float>>& A, const int* dpiv, 
                   magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 
@@ -100,7 +100,7 @@ namespace strumpack {
                           1, A.ld(), 1, A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
       }
 
-      void laswpx(DenseMatrix<std::complex<double>>& A, int* dpiv, 
+      void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv, 
                   magma_queue_t queue, bool fwd) {
         std::vector<int> tpiv(A.rows());
         gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()); 

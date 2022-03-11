@@ -49,13 +49,13 @@ namespace strumpack {
       int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv);
       int getrf(DenseMatrix<std::complex<double>>& A, int* dpiv);
 
-      void laswpx(DenseMatrix<float>& A, int* dpiv, 
+      void laswpx(DenseMatrix<float>& A, const int* dpiv, 
                   magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<double>& A, int* dpiv, 
+      void laswpx(DenseMatrix<double>& A, const int* dpiv, 
                   magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<std::complex<float>>& A, int* dpiv, 
+      void laswpx(DenseMatrix<std::complex<float>>& A, const int* dpiv, 
                   magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<std::complex<double>>& A, int* dpiv, 
+      void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv, 
                   magma_queue_t queue, bool fwd);
       
       template<typename scalar_t,
@@ -107,4 +107,4 @@ namespace strumpack {
   } // end namespace gpu
 } // end namespace strumpack
 
-#endif // STRUMPACK_CUDA_WRAPPER_HPP
+#endif // STRUMPACK_MAGMA_WRAPPER_HPP

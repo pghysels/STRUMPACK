@@ -101,12 +101,33 @@ namespace strumpack {
     (const std::vector<int>& piv, bool fwd) {
       D().laswp(piv, fwd);
     }
+#if defined(STRUMPACK_USE_MAGMA)
+    template<typename scalar_t> void DenseTile<scalar_t>::laswpx
+    (const int* dpiv, magma_queue_t q, bool fwd) {
+      gpu::magma::laswpx(D(), dpiv, q, fwd);
+    }
+#endif
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    template<typename scalar_t> void 
+    DenseTile<scalar_t>::laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) {
+      gpu::laswp(handle, D(), 1, D().rows(), dpiv, fwd ? 1 : -1);
+    }
+#endif
 
     template<typename scalar_t> void DenseTile<scalar_t>::trsm_b
     (Side s, UpLo ul, Trans ta, Diag d,
      scalar_t alpha, const DenseM_t& a) {
       trsm(s, ul, ta, d, alpha, a, D(), params::task_recursion_cutoff_level);
     }
+
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    template<typename scalar_t> void DenseTile<scalar_t>::trsm_b
+    (gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta, 
+     Diag d, scalar_t alpha, const DenseM_t& a) {
+      strumpack::gpu::trsm
+        (handle, s, ul, ta, d, alpha, a, D());
+    }
+#endif
 
     template<typename scalar_t> void DenseTile<scalar_t>::gemv_a
     (Trans ta, scalar_t alpha, const DenseM_t& x,

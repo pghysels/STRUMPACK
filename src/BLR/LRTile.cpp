@@ -37,6 +37,14 @@
 #include "dense/ACA.hpp"
 #include "dense/BACA.hpp"
 
+#if defined(STRUMPACK_USE_CUDA)
+#include "dense/CUDAWrapper.hpp"
+#else
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
+#endif
+
 namespace strumpack {
   namespace BLR {
 
@@ -235,6 +243,26 @@ namespace strumpack {
     LRTile<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
       U().laswp(piv, fwd);
     }
+#if defined(STRUMPACK_USE_MAGMA)
+    template<typename scalar_t> void
+    LRTile<scalar_t>::laswpx(const int* dpiv, magma_queue_t q, bool fwd) {
+      gpu::magma::laswpx(U(), dpiv, q, fwd);
+    }
+#endif
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    template<typename scalar_t> void 
+    LRTile<scalar_t>::laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) {
+      gpu::laswp(handle, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
+    }
+#endif
+    template<typename scalar_t> void LRTile<scalar_t>::move_gpu_tile_to_cpu() {
+      DenseM_t hU(U().rows(), U().cols());
+      DenseM_t hV(V().rows(), V().cols());
+      gpu::copy_device_to_host(hU, U());
+      gpu::copy_device_to_host(hV, V());
+      U_.reset(new DenseM_t(hU));
+      V_.reset(new DenseM_t(hV));
+    }
 
     template<typename scalar_t> void
     LRTile<scalar_t>::trsm_b(Side s, UpLo ul, Trans ta, Diag d,
@@ -243,7 +271,15 @@ namespace strumpack {
         (s, ul, ta, d, alpha, a, (s == Side::L) ? U() : V(),
          params::task_recursion_cutoff_level);
     }
-
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    template<typename scalar_t> void 
+    LRTile<scalar_t>::trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
+                             Trans ta, Diag d, scalar_t alpha,
+                             const DenseM_t& a) {
+      strumpack::gpu::trsm
+        (handle, s, ul, ta, d, alpha, a, (s == Side::L) ? U() : V());
+    }
+#endif
     template<typename scalar_t> void
     LRTile<scalar_t>::gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
                              scalar_t beta, DenseM_t& y) const {

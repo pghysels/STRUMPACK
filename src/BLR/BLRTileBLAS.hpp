@@ -73,6 +73,13 @@ namespace strumpack {
          int task_depth) {
       trsm(s, ul, ta, d, alpha, a.D(), b, task_depth);
     }
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    template<typename scalar_t> void
+    trsm(gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
+         const BLRTile<scalar_t>& a, BLRTile<scalar_t>& b) {
+      b.trsm_b(handle, s, ul, ta, d, alpha, a.D());
+    }
+#endif
 
     template<typename scalar_t> void Schur_update_col
     (std::size_t j, const BLRTile<scalar_t>& a,

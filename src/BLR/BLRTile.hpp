@@ -37,6 +37,17 @@
 #include "dense/DenseMatrix.hpp"
 #include "BLROptions.hpp"
 
+#if defined(STRUMPACK_USE_CUDA)
+#include "dense/CUDAWrapper.hpp"
+#else
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
+#endif
+#if defined(STRUMPACK_USE_MAGMA)
+#include "dense/MAGMAWrapper.hpp"
+#endif
+
 namespace strumpack {
   namespace BLR {
 
@@ -104,9 +115,21 @@ namespace strumpack {
 
       virtual std::vector<int> LU() { assert(false); return std::vector<int>(); };
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
+#if defined(STRUMPACK_USE_MAGMA)
+      virtual void laswpx(const int* dpiv, magma_queue_t q, bool fwd) = 0;
+#endif
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      virtual void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) = 0;
+#endif
+      virtual void move_gpu_tile_to_cpu() = 0;
 
       virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                           scalar_t alpha, const DenseM_t& a) = 0;
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      virtual void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
+                          Trans ta, Diag d, scalar_t alpha,
+                          const DenseM_t& a) = 0;
+#endif
       virtual void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
                           scalar_t beta, DenseM_t& y) const = 0;
       virtual void gemm_a(Trans ta, Trans tb, scalar_t alpha,

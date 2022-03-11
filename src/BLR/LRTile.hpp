@@ -38,6 +38,17 @@
 #include "BLROptions.hpp"
 #include "dense/DenseMatrix.hpp"
 
+#if defined(STRUMPACK_USE_CUDA)
+#include "dense/CUDAWrapper.hpp"
+#else
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
+#endif
+#if defined(STRUMPACK_USE_MAGMA)
+#include "dense/MAGMAWrapper.hpp"
+#endif
+
 namespace strumpack {
   namespace BLR {
 
@@ -133,9 +144,22 @@ namespace strumpack {
                    DenseM_t& B) const override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
+#if defined(STRUMPACK_USE_MAGMA)
+      void laswpx(const int* dpiv, magma_queue_t q, bool fwd) override;
+#endif
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) override;
+#endif
+
+      void move_gpu_tile_to_cpu() override;
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
+                  Trans ta, Diag d, scalar_t alpha,
+                  const DenseM_t& a) override;
+#endif
 
       void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
                   scalar_t beta, DenseM_t& y) const override;
