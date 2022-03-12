@@ -64,7 +64,8 @@ namespace strumpack {
     class Stream {
     public:
       Stream() { 
-       gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
+       gpu_check(hipStreamCreate(&s_));
+       //gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
       }
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
