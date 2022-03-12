@@ -275,7 +275,7 @@ namespace strumpack {
     template<typename scalar_t> void 
     LRTile<scalar_t>::trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
                              Trans ta, Diag d, scalar_t alpha,
-                             const DenseM_t& a) {
+                             DenseM_t& a) {
       strumpack::gpu::trsm
         (handle, s, ul, ta, d, alpha, a, (s == Side::L) ? U() : V());
     }

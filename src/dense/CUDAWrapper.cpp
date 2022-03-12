@@ -441,22 +441,22 @@ namespace strumpack {
     template<typename scalar_t> void
     trsm(BLASHandle& handle, Side side, UpLo uplo,
          Trans trans, Diag diag, const scalar_t alpha,
-          const DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B) {
+         DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B) {
       trsm(handle, S2cuOp(side), U2cuOp(uplo), T2cuOp(trans), D2cuOp(diag), 
            B.rows(), B.cols(), &alpha, A.data(), A.ld(), B.data(), B.ld());
     }
 
     template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, const float,
-                       const DenseMatrix<float>&, DenseMatrix<float>&);
+                       DenseMatrix<float>&, DenseMatrix<float>&);
     template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, const double,
-                       const DenseMatrix<double>&, DenseMatrix<double>&);
+                       DenseMatrix<double>&, DenseMatrix<double>&);
     template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, 
                        const std::complex<float>, 
-                       const DenseMatrix<std::complex<float>>&, 
+                       DenseMatrix<std::complex<float>>&, 
                        DenseMatrix<std::complex<float>>&);
     template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, 
                        const std::complex<double>,
-                       const DenseMatrix<std::complex<double>>&, 
+                       DenseMatrix<std::complex<double>>&, 
                        DenseMatrix<std::complex<double>>&);
 
     void gesvdj_info_create(gesvdjInfo_t *info) {

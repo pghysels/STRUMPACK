@@ -135,7 +135,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
                   Trans ta, Diag d, scalar_t alpha,
-                  const DenseM_t& a) override;
+                  DenseM_t& a) override;
 #endif
       void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
                   scalar_t beta, DenseM_t& y) const override;

@@ -123,7 +123,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> void DenseTile<scalar_t>::trsm_b
     (gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta, 
-     Diag d, scalar_t alpha, const DenseM_t& a) {
+     Diag d, scalar_t alpha, DenseM_t& a) {
       strumpack::gpu::trsm
         (handle, s, ul, ta, d, alpha, a, D());
     }
