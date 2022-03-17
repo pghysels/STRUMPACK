@@ -332,10 +332,8 @@ namespace strumpack {
         magma_init();
         magma_queue_t q;
 #if defined(STRUMPACK_USE_CUDA)
-        gpu::Stream comp_stream;
-        gpu::BLASHandle handle(comp_stream);
         magma_queue_create_from_cuda
-          (0, comp_stream, handle, nullptr, &q);
+          (0, streams[0], handles[0], nullptr, &q);
 #else
         magma_queue_create(0, &q);
 #endif
@@ -416,7 +414,6 @@ namespace strumpack {
         for (std::size_t i=0, s=0; i<rb; i++) {
           gpu::getrf(solvehandles[s], B11.tile(i, i).D(), 
                      dmB11 + dsep*dsep, dpiv+B11.tileroff(i), dpiv+dsep);
-          gpu::synchronize();
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j)) {
               std::size_t minmn = std::min(B11.tilerows(i), B11.tilecols(j));
