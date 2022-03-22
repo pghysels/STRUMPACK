@@ -28,7 +28,9 @@
  */
 #include "StrumpackParameters.hpp"
 #include "FrontalMatrixHODLRMPI.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #include "ExtendAdd.hpp"
+#include "BLR/BLRExtendAdd.hpp"
 
 namespace strumpack {
 
@@ -65,17 +67,44 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> DistributedMatrix<scalar_t>
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::get_dense_CB() const {
+    auto dupd = dim_upd();
+    DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
+    eye.eye();
+    F22_->mult(Trans::N, eye, dF22);
+    return dF22;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
-    auto dupd = dim_upd();
-    DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
-    eye.eye();
-    F22_->mult(Trans::N, eye, dF22);
+    // auto dupd = dim_upd();
+    // DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
+    // eye.eye();
+    // F22_->mult(Trans::N, eye, dF22);
+    auto dF22 = get_dense_CB();
     ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
       (dF22, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+    auto dF22 = get_dense_CB();
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
+      (dF22, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
+  integer_t begin_col, integer_t end_col, const SPOptions<scalar_t>& opts) const {
+    auto dF22 = get_dense_CB();
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
+      (dF22, sbuf, pa, this->upd_to_parent(pa), begin_col, end_col);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -87,7 +116,6 @@ namespace strumpack {
     TIMER_TIME(TaskType::F22_MULT, 2, t_sprod);
     F22_->mult(op, R, S);
   }
-
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_children_CB
