@@ -271,7 +271,7 @@ namespace strumpack {
             (F11blr_, F12blr_, F21blr_, F22blr_,
             adm_, opts.BLR_options(),
             [&](int i, bool part, std::size_t CP) {
-              this->build_front_cols
+              build_front_cols
                 (A, i, part, CP, r1buf, r2buf, r3buf, opts);
             });
         } else {

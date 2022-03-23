@@ -46,6 +46,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+    using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
     using Opts_t = SPOptions<scalar_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
@@ -79,6 +80,17 @@ namespace strumpack {
                                    const FBLRMPI_t* pa, integer_t begin_col,
                                    integer_t end_col,
                                    const SPOptions<scalar_t>& opts)
+      const override;
+    void
+    extadd_blr_copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
+                                 BLRMPI_t& F21, BLRMPI_t& F22,
+                                 scalar_t** pbuf, const FBLRMPI_t* pa)
+      const override;
+    void
+    extadd_blr_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                                     BLRMPI_t& F21, BLRMPI_t& F22,
+                                     scalar_t** pbuf, const FBLRMPI_t* pa,
+                                     integer_t begin_col, integer_t end_col)
       const override;
 
     void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
@@ -118,8 +130,6 @@ namespace strumpack {
     void compress_flops_F12_F21();
     void compress_flops_F22();
     void compress_flops_Schur(long long int invf11_mult_flops);
-
-    DistM_t get_dense_CB() const;
 
     using F_t::lchild_;
     using F_t::rchild_;
