@@ -36,6 +36,13 @@
 #cmakedefine STRUMPACK_HIP_PLATFORM_HCC
 #cmakedefine STRUMPACK_HIP_PLATFORM_NVCC
 
+#cmakedefine STRUMPACK_USE_BLAS64
+#if defined(STRUMPACK_USE_BLAS64)
+#define strumpack_blas_int long long int
+#else
+#define strumpack_blas_int int
+#endif
+
 // #cmakedefine STRUMPACK_USE_METIS
 #cmakedefine STRUMPACK_USE_PARMETIS
 #cmakedefine STRUMPACK_USE_SCOTCH
@@ -47,6 +54,8 @@
 #cmakedefine STRUMPACK_USE_SLATE_SCALAPACK
 #cmakedefine STRUMPACK_USE_GETOPT
 #cmakedefine STRUMPACK_USE_MAGMA
+
+#cmakedefine STRUMPACK_USE_MATLAB
 
 #cmakedefine STRUMPACK_COUNT_FLOPS
 #cmakedefine STRUMPACK_TASK_TIMERS

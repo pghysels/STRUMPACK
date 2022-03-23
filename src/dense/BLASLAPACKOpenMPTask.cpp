@@ -69,331 +69,259 @@ namespace strumpack {
 #define ZGEMV_OMP_TASK_FC STRUMPACK_FC_GLOBAL_(zgemv_omp_task, ZGEMV_OMP_TASK)
 
   extern "C" {
-    void SGEMM_OMP_TASK_FC
-    (char* ta, char* tb, int* m, int* n, int* k,
-     float* alpha, const float* a, int* lda, const float* b, int* ldb,
-     float* beta, float* c, int* ldc, int* depth);
-    void DGEMM_OMP_TASK_FC
-    (char* ta, char* tb, int* m, int* n, int* k,
-     double* alpha, const double* a, int* lda, const double* b, int* ldb,
-     double* beta, double* c, int* ldc, int* depth);
-    void CGEMM_OMP_TASK_FC
-    (char* ta, char* tb, int* m, int* n, int* k,
-     std::complex<float>* alpha, const std::complex<float>* a, int* lda,
-     const std::complex<float>* b, int* ldb, std::complex<float>* beta,
-     std::complex<float>* c, int* ldc, int* depth);
-    void ZGEMM_OMP_TASK_FC
-    (char* ta, char* tb, int* m, int* n, int* k, std::complex<double>* alpha,
-     const std::complex<double>* a, int* lda,
-     const std::complex<double>* b, int* ldb, std::complex<double>* beta,
-     std::complex<double>* c, int* ldc, int* depth);
+    void SGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k,
+                           float* alpha, const float* a, int* lda, const float* b, int* ldb,
+                           float* beta, float* c, int* ldc, int* depth);
+    void DGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k,
+                           double* alpha, const double* a, int* lda, const double* b, int* ldb,
+                           double* beta, double* c, int* ldc, int* depth);
+    void CGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k,
+                           std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+                           const std::complex<float>* b, int* ldb, std::complex<float>* beta,
+                           std::complex<float>* c, int* ldc, int* depth);
+    void ZGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k, std::complex<double>* alpha,
+                           const std::complex<double>* a, int* lda,
+                           const std::complex<double>* b, int* ldb, std::complex<double>* beta,
+                           std::complex<double>* c, int* ldc, int* depth);
 
-    void STRSM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n, float* alpha,
-     const float* a, int* lda, float* B, int* ldb, int* depth);
-    void DTRSM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n, double* alpha,
-     const double* a, int* lda, double* B, int* ldb, int* depth);
-    void CTRSM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n,
-     std::complex<float>* alpha, const std::complex<float>* a, int* lda,
-     std::complex<float>* b, int* ldb, int* depth);
-    void ZTRSM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n,
-     std::complex<double>* alpha, const std::complex<double>* a, int* lda,
-     std::complex<double>* b, int* ldb, int* depth);
+    void STRSM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n, float* alpha,
+                           const float* a, int* lda, float* B, int* ldb, int* depth);
+    void DTRSM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n, double* alpha,
+                           const double* a, int* lda, double* B, int* ldb, int* depth);
+    void CTRSM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n,
+                           std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+                           std::complex<float>* b, int* ldb, int* depth);
+    void ZTRSM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n,
+                           std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+                           std::complex<double>* b, int* ldb, int* depth);
 
-    void STRMM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n, float* alpha,
-     const float* a, int* lda, float* b, int* ldb, int* depth);
-    void DTRMM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n, double* alpha,
-     const double* a, int* lda, double* b, int* ldb, int* depth);
-    void CTRMM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n,
-     std::complex<float>* alpha, const std::complex<float>* a, int* lda,
-     std::complex<float>* b, int* ldb, int* depth);
-    void ZTRMM_OMP_TASK_FC
-    (char* s, char* ul, char* ta, char* d, int* m, int* n,
-     std::complex<double>* alpha, const std::complex<double>* a, int* lda,
-     std::complex<double>* b, int* ldb, int* depth);
+    void STRMM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n, float* alpha,
+                           const float* a, int* lda, float* b, int* ldb, int* depth);
+    void DTRMM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n, double* alpha,
+                           const double* a, int* lda, double* b, int* ldb, int* depth);
+    void CTRMM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n,
+                           std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+                           std::complex<float>* b, int* ldb, int* depth);
+    void ZTRMM_OMP_TASK_FC(char* s, char* ul, char* ta, char* d, int* m, int* n,
+                           std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+                           std::complex<double>* b, int* ldb, int* depth);
 
-    void STRMV_OMP_TASK_FC
-    (char* ul, char* ta, char* d, int* n, const float* a, int* lda,
-     float* x, int* incx, int* depth);
-    void DTRMV_OMP_TASK_FC
-    (char* ul, char* ta, char* d, int* n, const double* a, int* lda,
-     double* x, int* incx, int* depth);
-    void CTRMV_OMP_TASK_FC
-    (char* ul, char* ta, char* d, int* n,
-     const std::complex<float>* a, int* lda,
-     std::complex<float>* x, int* incx, int* depth);
-    void ZTRMV_OMP_TASK_FC
-    (char* ul, char* ta, char* d, int* n,
-     const std::complex<double>* a, int* lda,
-     std::complex<double>* x, int* incx, int* depth);
+    void STRMV_OMP_TASK_FC(char* ul, char* ta, char* d, int* n, const float* a, int* lda,
+                           float* x, int* incx, int* depth);
+    void DTRMV_OMP_TASK_FC(char* ul, char* ta, char* d, int* n, const double* a, int* lda,
+                           double* x, int* incx, int* depth);
+    void CTRMV_OMP_TASK_FC(char* ul, char* ta, char* d, int* n,
+                           const std::complex<float>* a, int* lda,
+                           std::complex<float>* x, int* incx, int* depth);
+    void ZTRMV_OMP_TASK_FC(char* ul, char* ta, char* d, int* n,
+                           const std::complex<double>* a, int* lda,
+                           std::complex<double>* x, int* incx, int* depth);
 
-    void SGER_OMP_TASK_FC
-    (int* m, int* n, float* alpha, const float* x, int* incx,
-     const float* y, int* incy, float* a, int* lda, int* depth);
-    void DGER_OMP_TASK_FC
-    (int* m, int* n, double* alpha, const double* x, int* incx,
-     const double* y, int* incy, double* a, int* lda, int* depth);
-    void CGERU_OMP_TASK_FC
-    (int* m, int* n, std::complex<float>* alpha,
-     const std::complex<float>* x, int* incx,
-     const std::complex<float>* y, int* incy,
-     std::complex<float>* a, int* lda, int* depth);
-    void ZGERU_OMP_TASK_FC
-    (int* m, int* n, std::complex<double>* alpha,
-     const std::complex<double>* x, int* incx,
-     const std::complex<double>* y, int* incy,
-     std::complex<double>* a, int* lda, int* depth);
-    void CGERC_OMP_TASK_FC
-    (int* m, int* n, std::complex<float>* alpha,
-     const std::complex<float>* x, int* incx,
-     const std::complex<float>* y, int* incy,
-     std::complex<float>* a, int* lda, int* depth);
-    void ZGERC_OMP_TASK_FC
-    (int* m, int* n, std::complex<double>* alpha,
-     const std::complex<double>* x, int* incx,
-     const std::complex<double>* y, int* incy,
-     std::complex<double>* a, int* lda, int* depth);
+    void SGER_OMP_TASK_FC(int* m, int* n, float* alpha, const float* x, int* incx,
+                          const float* y, int* incy, float* a, int* lda, int* depth);
+    void DGER_OMP_TASK_FC(int* m, int* n, double* alpha, const double* x, int* incx,
+                          const double* y, int* incy, double* a, int* lda, int* depth);
+    void CGERU_OMP_TASK_FC(int* m, int* n, std::complex<float>* alpha,
+                           const std::complex<float>* x, int* incx,
+                           const std::complex<float>* y, int* incy,
+                           std::complex<float>* a, int* lda, int* depth);
+    void ZGERU_OMP_TASK_FC(int* m, int* n, std::complex<double>* alpha,
+                           const std::complex<double>* x, int* incx,
+                           const std::complex<double>* y, int* incy,
+                           std::complex<double>* a, int* lda, int* depth);
+    void CGERC_OMP_TASK_FC(int* m, int* n, std::complex<float>* alpha,
+                           const std::complex<float>* x, int* incx,
+                           const std::complex<float>* y, int* incy,
+                           std::complex<float>* a, int* lda, int* depth);
+    void ZGERC_OMP_TASK_FC(int* m, int* n, std::complex<double>* alpha,
+                           const std::complex<double>* x, int* incx,
+                           const std::complex<double>* y, int* incy,
+                           std::complex<double>* a, int* lda, int* depth);
 
-    void SLASWP_OMP_TASK_FC
-    (int* n, float* a, int* lda, int* k1, int* k2,
-     const int* ipiv, int* incx, int* depth);
-    void DLASWP_OMP_TASK_FC
-    (int* n, double* a, int* lda, int* k1, int* k2,
-     const int* ipiv, int* incx, int* depth);
-    void CLASWP_OMP_TASK_FC
-    (int* n, std::complex<float>* a, int* lda, int* k1, int* k2,
-     const int* ipiv, int* incx, int* depth);
-    void ZLASWP_OMP_TASK_FC
-    (int* n, std::complex<double>* a, int* lda, int* k1, int* k2,
-     const int* ipiv, int* incx, int* depth);
+    void SLASWP_OMP_TASK_FC(int* n, float* a, int* lda, int* k1, int* k2,
+                            const int* ipiv, int* incx, int* depth);
+    void DLASWP_OMP_TASK_FC(int* n, double* a, int* lda, int* k1, int* k2,
+                            const int* ipiv, int* incx, int* depth);
+    void CLASWP_OMP_TASK_FC(int* n, std::complex<float>* a, int* lda, int* k1, int* k2,
+                            const int* ipiv, int* incx, int* depth);
+    void ZLASWP_OMP_TASK_FC(int* n, std::complex<double>* a, int* lda, int* k1, int* k2,
+                            const int* ipiv, int* incx, int* depth);
 
-    void SGEMV_OMP_TASK_FC
-    (char* t, int* m, int* n, float* alpha,
-     const float *a, int* lda,
-     const float* x, int* incx, float* beta, float* y, int* incy, int* depth);
-    void DGEMV_OMP_TASK_FC
-    (char* t, int* m, int* n, double* alpha,
-     const double *a, int* lda,
-     const double* x, int* incx, double* beta,
-     double* y, int* incy, int* depth);
-    void CGEMV_OMP_TASK_FC
-    (char* t, int* m, int* N, std::complex<float>* alpha,
-     const std::complex<float> *a, int* lda,
-     const std::complex<float>* x, int* incx, std::complex<float>* beta,
-     std::complex<float>* y, int* incy, int* depth);
-    void ZGEMV_OMP_TASK_FC
-    (char* t, int* m, int* n, std::complex<double>* alpha,
-     const std::complex<double> *a, int* lda,
-     const std::complex<double>* x, int* incx, std::complex<double>* beta,
-     std::complex<double>* y, int* incy, int* depth);
+    void SGEMV_OMP_TASK_FC(char* t, int* m, int* n, float* alpha,
+                           const float *a, int* lda,
+                           const float* x, int* incx, float* beta, float* y, int* incy, int* depth);
+    void DGEMV_OMP_TASK_FC(char* t, int* m, int* n, double* alpha,
+                           const double *a, int* lda,
+                           const double* x, int* incx, double* beta,
+                           double* y, int* incy, int* depth);
+    void CGEMV_OMP_TASK_FC(char* t, int* m, int* N, std::complex<float>* alpha,
+                           const std::complex<float> *a, int* lda,
+                           const std::complex<float>* x, int* incx, std::complex<float>* beta,
+                           std::complex<float>* y, int* incy, int* depth);
+    void ZGEMV_OMP_TASK_FC(char* t, int* m, int* n, std::complex<double>* alpha,
+                           const std::complex<double> *a, int* lda,
+                           const std::complex<double>* x, int* incx, std::complex<double>* beta,
+                           std::complex<double>* y, int* incy, int* depth);
   }
 
   // these are wrappers to the templated version of gemm_omp_task
   // to make it easily callable from fortran
-  void SGEMM_OMP_TASK_FC
-  (char* ta, char* tb, int* m, int* n, int* k, float* alpha,
-   const float* a, int* lda, const float* b, int* ldb, float* beta,
-   float* c, int* ldc, int* depth) {
-    gemm_omp_task
-      (*ta, *tb, *m, *n, *k, *alpha, a, *lda,
-       b, *ldb, *beta, c, *ldc, *depth);
+  void SGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k, float* alpha,
+                         const float* a, int* lda, const float* b, int* ldb, float* beta,
+                         float* c, int* ldc, int* depth) {
+    gemm_omp_task(*ta, *tb, *m, *n, *k, *alpha, a, *lda, b, *ldb, *beta, c, *ldc, *depth);
   }
-  void DGEMM_OMP_TASK_FC
-  (char* ta, char* tb, int* m, int* n, int* k, double* alpha,
-   const double* a, int* lda, const double* b, int* ldb, double* beta,
-   double* c, int* ldc, int* depth) {
-    gemm_omp_task
-      (*ta, *tb, *m, *n, *k, *alpha, a, *lda,
-       b, *ldb, *beta, c, *ldc, *depth);
+  void DGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k, double* alpha,
+                         const double* a, int* lda, const double* b, int* ldb, double* beta,
+                         double* c, int* ldc, int* depth) {
+    gemm_omp_task(*ta, *tb, *m, *n, *k, *alpha, a, *lda, b, *ldb, *beta, c, *ldc, *depth);
   }
-  void CGEMM_OMP_TASK_FC
-  (char* ta, char* tb, int* m, int* n, int* k, std::complex<float>* alpha,
-   const std::complex<float>* a, int* lda,
-   const std::complex<float>* b, int* ldb, std::complex<float>* beta,
-   std::complex<float>* c, int* ldc, int* depth) {
-    gemm_omp_task
-      (*ta, *tb, *m, *n, *k, *alpha, a, *lda,
-       b, *ldb, *beta, c, *ldc, *depth);
+  void CGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k, std::complex<float>* alpha,
+                         const std::complex<float>* a, int* lda,
+                         const std::complex<float>* b, int* ldb, std::complex<float>* beta,
+                         std::complex<float>* c, int* ldc, int* depth) {
+    gemm_omp_task(*ta, *tb, *m, *n, *k, *alpha, a, *lda, b, *ldb, *beta, c, *ldc, *depth);
   }
-  void ZGEMM_OMP_TASK_FC
-  (char* ta, char* tb, int* m, int* n, int* k, std::complex<double>* alpha,
-   const std::complex<double>* a, int* lda,
-   const std::complex<double>* b, int* ldb, std::complex<double>* beta,
-   std::complex<double>* c, int* ldc, int* depth) {
-    gemm_omp_task
-      (*ta, *tb, *m, *n, *k, *alpha, a, *lda,
-       b, *ldb, *beta, c, *ldc, *depth);
+  void ZGEMM_OMP_TASK_FC(char* ta, char* tb, int* m, int* n, int* k, std::complex<double>* alpha,
+                         const std::complex<double>* a, int* lda,
+                         const std::complex<double>* b, int* ldb, std::complex<double>* beta,
+                         std::complex<double>* c, int* ldc, int* depth) {
+    gemm_omp_task(*ta, *tb, *m, *n, *k, *alpha, a, *lda, b, *ldb, *beta, c, *ldc, *depth);
   }
 
 
-  void STRSM_OMP_TASK_FC
-  (char* s, char* u, char* t, char* d, int* m, int* n, float* alpha,
-   const float* a, int* lda, float* b, int* ldb, int* depth) {
+  void STRSM_OMP_TASK_FC(char* s, char* u, char* t, char* d, int* m, int* n, float* alpha,
+                         const float* a, int* lda, float* b, int* ldb, int* depth) {
     trsm_omp_task(*s, *u, *t, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
-  void DTRSM_OMP_TASK_FC
-  (char* s, char* u, char* ta, char* d, int* m, int* n, double* alpha,
-   const double* a, int* lda, double* b, int* ldb, int* depth) {
+  void DTRSM_OMP_TASK_FC(char* s, char* u, char* ta, char* d, int* m, int* n, double* alpha,
+                         const double* a, int* lda, double* b, int* ldb, int* depth) {
     trsm_omp_task(*s, *u, *ta, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
-  void CTRSM_OMP_TASK_FC
-  (char* s, char* u, char* ta, char* d, int* m, int* n,
-   std::complex<float>* alpha, const std::complex<float>* a, int* lda,
-   std::complex<float>* b, int* ldb, int* depth) {
+  void CTRSM_OMP_TASK_FC(char* s, char* u, char* ta, char* d, int* m, int* n,
+                         std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+                         std::complex<float>* b, int* ldb, int* depth) {
     trsm_omp_task(*s, *u, *ta, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
-  void ZTRSM_OMP_TASK_FC
-  (char* s, char* u, char* ta, char* d, int* m, int* n,
-   std::complex<double>* alpha, const std::complex<double>* a, int* lda,
-   std::complex<double>* b, int* ldb, int* depth) {
+  void ZTRSM_OMP_TASK_FC(char* s, char* u, char* ta, char* d, int* m, int* n,
+                         std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+                         std::complex<double>* b, int* ldb, int* depth) {
     trsm_omp_task(*s, *u, *ta, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
 
 
-  void STRMM_OMP_TASK_FC
-  (char* s, char* u, char* ta, char* d, int* m, int* n, float* alpha,
-   const float* a, int* lda, float* b, int* ldb, int* depth) {
+  void STRMM_OMP_TASK_FC(char* s, char* u, char* ta, char* d, int* m, int* n, float* alpha,
+                         const float* a, int* lda, float* b, int* ldb, int* depth) {
     trmm_omp_task(*s, *u, *ta, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
-  void DTRMM_OMP_TASK_FC
-  (char* s, char* u, char* ta, char* d, int* m, int* n, double* alpha,
-   const double* a, int* lda, double* b, int* ldb, int* depth) {
+  void DTRMM_OMP_TASK_FC(char* s, char* u, char* ta, char* d, int* m, int* n, double* alpha,
+                         const double* a, int* lda, double* b, int* ldb, int* depth) {
     trmm_omp_task(*s, *u, *ta, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
-  void CTRMM_OMP_TASK_FC
-  (char* s, char* u, char* ta, char* d, int* m, int* n,
-   std::complex<float>* alpha, const std::complex<float>* a, int* lda,
-   std::complex<float>* b, int* ldb, int* depth) {
+  void CTRMM_OMP_TASK_FC(char* s, char* u, char* ta, char* d, int* m, int* n,
+                         std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+                         std::complex<float>* b, int* ldb, int* depth) {
     trmm_omp_task(*s, *u, *ta, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
-  void ZTRMM_OMP_TASK_FC
-  (char* s, char* u, char* ta, char* d, int* m, int* n,
-   std::complex<double>* alpha, const std::complex<double>* a, int* lda,
-   std::complex<double>* b, int* ldb, int* depth) {
+  void ZTRMM_OMP_TASK_FC(char* s, char* u, char* ta, char* d, int* m, int* n,
+                         std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+                         std::complex<double>* b, int* ldb, int* depth) {
     trmm_omp_task(*s, *u, *ta, *d, *m, *n, *alpha, a, *lda, b, *ldb, *depth);
   }
 
 
-  void STRMV_OMP_TASK_FC
-  (char* u, char* ta, char* d, int* n, const float* a, int* lda,
-   float* x, int* incx, int* depth) {
+  void STRMV_OMP_TASK_FC(char* u, char* ta, char* d, int* n, const float* a, int* lda,
+                         float* x, int* incx, int* depth) {
     trmv_omp_task(*u, *ta, *d, *n, a, *lda, x, *incx, *depth);
   }
-  void DTRMV_OMP_TASK_FC
-  (char* u, char* ta, char* d, int* n, const double* a, int* lda,
-   double* x, int* incx, int* depth) {
+  void DTRMV_OMP_TASK_FC(char* u, char* ta, char* d, int* n, const double* a, int* lda,
+                         double* x, int* incx, int* depth) {
     trmv_omp_task(*u, *ta, *d, *n, a, *lda, x, *incx, *depth);
   }
-  void CTRMV_OMP_TASK_FC
-  (char* u, char* ta, char* d, int* n,
-   const std::complex<float>* a, int* lda,
-   std::complex<float>* x, int* incx, int* depth) {
+  void CTRMV_OMP_TASK_FC(char* u, char* ta, char* d, int* n,
+                         const std::complex<float>* a, int* lda,
+                         std::complex<float>* x, int* incx, int* depth) {
     trmv_omp_task(*u, *ta, *d, *n, a, *lda, x, *incx, *depth);
   }
-  void ZTRMV_OMP_TASK_FC
-  (char* u, char* ta, char* d, int* n,
-   const std::complex<double>* a, int* lda,
-   std::complex<double>* x, int* incx, int* depth) {
+  void ZTRMV_OMP_TASK_FC(char* u, char* ta, char* d, int* n,
+                         const std::complex<double>* a, int* lda,
+                         std::complex<double>* x, int* incx, int* depth) {
     trmv_omp_task(*u, *ta, *d, *n, a, *lda, x, *incx, *depth);
   }
 
 
-  void SGER_OMP_TASK_FC
-  (int* m, int* n, float* alpha, const float* x, int* incx,
-   const float* y, int* incy, float* a, int* lda, int* depth) {
+  void SGER_OMP_TASK_FC(int* m, int* n, float* alpha, const float* x, int* incx,
+                        const float* y, int* incy, float* a, int* lda, int* depth) {
     geru_omp_task(*m, *n, *alpha, x, *incx, y, *incy, a, *lda, *depth);
   }
-  void DGER_OMP_TASK_FC
-  (int* m, int* n, double* alpha, const double* x, int* incx,
-   const double* y, int* incy, double* a, int* lda, int* depth) {
+  void DGER_OMP_TASK_FC(int* m, int* n, double* alpha, const double* x, int* incx,
+                        const double* y, int* incy, double* a, int* lda, int* depth) {
     geru_omp_task(*m, *n, *alpha, x, *incx, y, *incy, a, *lda, *depth);
   }
-  void CGERU_OMP_TASK_FC
-  (int* m, int* n, std::complex<float>* alpha,
-   const std::complex<float>* x, int* incx,
-   const std::complex<float>* y, int* incy,
-   std::complex<float>* a, int* lda, int* depth) {
+  void CGERU_OMP_TASK_FC(int* m, int* n, std::complex<float>* alpha,
+                         const std::complex<float>* x, int* incx,
+                         const std::complex<float>* y, int* incy,
+                         std::complex<float>* a, int* lda, int* depth) {
     geru_omp_task(*m, *n, *alpha, x, *incx, y, *incy, a, *lda, *depth);
   }
-  void ZGERU_OMP_TASK_FC
-  (int* m, int* n, std::complex<double>* alpha,
-   const std::complex<double>* x, int* incx,
-   const std::complex<double>* y, int* incy,
-   std::complex<double>* a, int* lda, int* depth) {
+  void ZGERU_OMP_TASK_FC(int* m, int* n, std::complex<double>* alpha,
+                         const std::complex<double>* x, int* incx,
+                         const std::complex<double>* y, int* incy,
+                         std::complex<double>* a, int* lda, int* depth) {
     geru_omp_task(*m, *n, *alpha, x, *incx, y, *incy, a, *lda, *depth);
   }
-  void CGERC_OMP_TASK_FC
-  (int* m, int* n, std::complex<float>* alpha,
-   const std::complex<float>* x, int* incx,
-   const std::complex<float>* y, int* incy,
-   std::complex<float>* a, int* lda, int* depth) {
+  void CGERC_OMP_TASK_FC(int* m, int* n, std::complex<float>* alpha,
+                         const std::complex<float>* x, int* incx,
+                         const std::complex<float>* y, int* incy,
+                         std::complex<float>* a, int* lda, int* depth) {
     gerc_omp_task(*m, *n, *alpha, x, *incx, y, *incy, a, *lda, *depth);
   }
-  void ZGERC_OMP_TASK_FC
-  (int* m, int* n, std::complex<double>* alpha,
-   const std::complex<double>* x, int* incx,
-   const std::complex<double>* y, int* incy,
-   std::complex<double>* a, int* lda, int* depth) {
+  void ZGERC_OMP_TASK_FC(int* m, int* n, std::complex<double>* alpha,
+                         const std::complex<double>* x, int* incx,
+                         const std::complex<double>* y, int* incy,
+                         std::complex<double>* a, int* lda, int* depth) {
     gerc_omp_task(*m, *n, *alpha, x, *incx, y, *incy, a, *lda, *depth);
   }
 
 
-  void SLASWP_OMP_TASK_FC
-  (int* n, float* a, int* lda, int* k1, int* k2,
-   const int* ipiv, int* incx, int* depth) {
+  void SLASWP_OMP_TASK_FC(int* n, float* a, int* lda, int* k1, int* k2,
+                          const int* ipiv, int* incx, int* depth) {
     laswp_omp_task(*n, a, *lda, *k1, *k2, ipiv, *incx, *depth);
   }
-  void DLASWP_OMP_TASK_FC
-  (int* n, double* a, int* lda, int* k1, int* k2,
-   const int* ipiv, int* incx, int* depth) {
+  void DLASWP_OMP_TASK_FC(int* n, double* a, int* lda, int* k1, int* k2,
+                          const int* ipiv, int* incx, int* depth) {
     laswp_omp_task(*n, a, *lda, *k1, *k2, ipiv, *incx, *depth);
   }
-  void CLASWP_OMP_TASK_FC
-  (int* n, std::complex<float>* a, int* lda, int* k1, int* k2,
-   const int* ipiv, int* incx, int* depth) {
+  void CLASWP_OMP_TASK_FC(int* n, std::complex<float>* a, int* lda, int* k1, int* k2,
+                          const int* ipiv, int* incx, int* depth) {
     laswp_omp_task(*n, a, *lda, *k1, *k2, ipiv, *incx, *depth);
   }
-  void ZLASWP_OMP_TASK_FC
-  (int* n, std::complex<double>* a, int* lda, int* k1, int* k2,
-   const int* ipiv, int* incx, int* depth) {
+  void ZLASWP_OMP_TASK_FC(int* n, std::complex<double>* a, int* lda, int* k1, int* k2,
+                          const int* ipiv, int* incx, int* depth) {
     laswp_omp_task(*n, a, *lda, *k1, *k2, ipiv, *incx, *depth);
   }
 
 
-  void SGEMV_OMP_TASK_FC
-  (char* t, int* m, int* n, float* alpha, const float *a, int* lda,
-   const float* x, int* incx, float* beta, float* y, int* incy, int* depth) {
-    gemv_omp_task
-      (*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
+  void SGEMV_OMP_TASK_FC(char* t, int* m, int* n, float* alpha, const float *a, int* lda,
+                         const float* x, int* incx, float* beta, float* y, int* incy, int* depth) {
+    gemv_omp_task(*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
   }
-  void DGEMV_OMP_TASK_FC
-  (char* t, int* m, int* n, double* alpha, const double *a, int* lda,
-   const double* x, int* incx, double* beta,
-   double* y, int* incy, int* depth) {
-    gemv_omp_task
-      (*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
+  void DGEMV_OMP_TASK_FC(char* t, int* m, int* n, double* alpha, const double *a, int* lda,
+                         const double* x, int* incx, double* beta,
+                         double* y, int* incy, int* depth) {
+    gemv_omp_task(*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
   }
-  void CGEMV_OMP_TASK_FC
-  (char* t, int* m, int* n, std::complex<float>* alpha,
-   const std::complex<float> *a, int* lda,
-   const std::complex<float>* x, int* incx, std::complex<float>* beta,
-   std::complex<float>* y, int* incy, int* depth) {
-    gemv_omp_task
-      (*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
+  void CGEMV_OMP_TASK_FC(char* t, int* m, int* n, std::complex<float>* alpha,
+                         const std::complex<float> *a, int* lda,
+                         const std::complex<float>* x, int* incx, std::complex<float>* beta,
+                         std::complex<float>* y, int* incy, int* depth) {
+    gemv_omp_task(*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
   }
-  void ZGEMV_OMP_TASK_FC
-  (char* t, int* m, int* n, std::complex<double>* alpha,
-   const std::complex<double> *a, int* lda,
-   const std::complex<double>* x, int* incx, std::complex<double>* beta,
-   std::complex<double>* y, int* incy, int* depth) {
-    gemv_omp_task
-      (*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
+  void ZGEMV_OMP_TASK_FC(char* t, int* m, int* n, std::complex<double>* alpha,
+                         const std::complex<double> *a, int* lda,
+                         const std::complex<double>* x, int* incx, std::complex<double>* beta,
+                         std::complex<double>* y, int* incy, int* depth) {
+    gemv_omp_task(*t, *m, *n, *alpha, a, *lda, x, *incx, *beta, y, *incy, *depth);
   }
 
 } // end namespace strumpack
