@@ -89,10 +89,15 @@ namespace strumpack {
     void init() {
 #if defined(STRUMPACK_USE_MPI)
       int devs;
-      hipGetDeviceCount(&devs);
+      gpu_check(hipGetDeviceCount(&devs));
       if (devs > 1) {
-        MPIComm c;
-        hipSetDevice(c.rank() % devs);
+        int flag, rank = 0;
+        MPI_Initialized(&flag);
+        if (flag) {
+          MPIComm c;
+          rank = c.rank();
+        }
+        gpu_check(hipSetDevice(rank % devs));
       }
 #endif
       gpu_check(hipFree(0));

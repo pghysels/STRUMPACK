@@ -1,6 +1,5 @@
-cmake_minimum_required(VERSION 3.11)
-project(STRUMPACK VERSION 6.2.1 LANGUAGES CXX C Fortran)
-
+cmake_minimum_required(VERSION 3.17)
+project(STRUMPACK VERSION 6.3.1 LANGUAGES CXX C Fortran)
 cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
@@ -8,6 +7,7 @@ option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
 option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
 option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" ON)
 option(STRUMPACK_USE_SYCL    "Use SYCL/DPC++ for Intel GPU acceleration" OFF)
+option(STRUMPACK_USE_BLAS64  "Use 64 bit interfaces to BLAS and LAPACK, e.g., MKL ILP64 or openblas64" OFF)
 
 option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" ON)
 option(TPL_ENABLE_PARMETIS   "Build with support for ParMetis" ON)
@@ -18,6 +18,7 @@ option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
 option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
+option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
@@ -149,6 +150,27 @@ if(STRUMPACK_USE_SYCL)
   # set(MKL_ARCH intel64)
   # set(MKL_INTERFACE lp64)
   find_package(MKL REQUIRED)
+endif()
+
+
+if(TPL_ENABLE_MATLAB)
+  find_package(Matlab REQUIRED COMPONENTS MEX_COMPILER)
+  if(Matlab_FOUND)
+    message("Found MATLAB, make sure to use BLAS/LAPACK with 64bit interface, such as Intel MKL ILP64")
+    set(STRUMPACK_USE_BLAS64 ON)
+    option(STRUMPACK_USE_MATLAB "" ON)
+  endif()
+endif()
+
+
+if(STRUMPACK_USE_BLAS64)
+  # BLA_SIZEOF_INTEGER is new in CMake 3.22
+  set(BLA_SIZEOF_INTEGER 8)
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+    ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+    PROPERTIES COMPILE_OPTIONS
+    "$<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>> $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>")
 endif()
 
 
@@ -470,6 +492,9 @@ if(TPL_ENABLE_BPACK)
 endif()
 
 if(TPL_ENABLE_SLATE)
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_SLATE_PREFIX}
+    $ENV{slate_DIR} $ENV{slate_ROOT}
+    $ENV{SLATE_DIR} $ENV{SLATE_ROOT})
   find_package(blaspp)
   find_package(lapackpp)
   find_package(slate)
@@ -478,7 +503,7 @@ if(TPL_ENABLE_SLATE)
     # option(STRUMPACK_USE_SLATE_LAPACK "" ON)
     option(STRUMPACK_USE_SLATE "" ON)
     option(STRUMPACK_USE_SLATE_SCALAPACK "" ON)
-    set(STRUMPACK_PBLAS_BLOCKSIZE "256")
+    set(STRUMPACK_PBLAS_BLOCKSIZE "512")
   else()
     message(WARNING "SLATE was not found."
       " SLATE is required for GPU support in the distributed memory code.")
@@ -497,6 +522,7 @@ if(TPL_ENABLE_COMBBLAS)
     message(STATUS "CombBLAS not found")
   endif()
 endif()
+
 
 # TODO PIC
 # TODO libatomic?
@@ -539,6 +565,12 @@ check_cxx_compiler_flag(-Wno-overloaded-virtual
 if(COMPILER_SUPPORTS_NOOVERLOAD_WARNING)
   target_compile_options(strumpack PUBLIC
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-overloaded-virtual>)
+endif()
+
+if(STRUMPACK_USE_BLAS64)
+  target_compile_options(strumpack PRIVATE
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>>
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>)
 endif()
 
 
@@ -651,7 +683,7 @@ if(hipblas_FOUND)
   #   #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
   #   else()
   #     target_compile_options(strumpack PRIVATE
-  # 	$<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
+  #     $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
   #     message(WARNING "No AMD GPU architecture was specified,"
   #       " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
   #       " where xxx can be for instance gfx906 (or a comma separated list)")
@@ -673,6 +705,7 @@ add_subdirectory(examples)
 # testing
 include(CTest)
 add_subdirectory(test)
+
 
 # documentation
 find_package(Doxygen)

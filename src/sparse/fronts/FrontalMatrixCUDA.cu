@@ -152,7 +152,7 @@ namespace strumpack {
         if (nnz) {
           unsigned int nt = 512, ops = 1;
           const int unroll = 8;
-          while (nt*unroll > nnz && nt > 8) {
+          while (nt*unroll > nnz && nt > 8 && ops < 64) {
             nt /= 2;
             ops *= 2;
           }
@@ -166,6 +166,7 @@ namespace strumpack {
           }
         }
       }
+      gpu_check(cudaPeekAtLastError());
       { // extend-add
         int du = 0;
         for (unsigned int f=0; f<nf; f++)
@@ -173,7 +174,7 @@ namespace strumpack {
         if (du) {
           const unsigned int unroll = 16;
           unsigned int nt = 512, ops = 1;
-          while (nt > du) {
+          while (nt > du && ops < 64) {
             nt /= 2;
             ops *= 2;
           }
@@ -196,6 +197,7 @@ namespace strumpack {
           }
         }
       }
+      gpu_check(cudaPeekAtLastError());
     }
 
 
@@ -350,6 +352,7 @@ namespace strumpack {
       int NT = 128;
       replace_pivots_kernel<T_,real_t><<<(n+NT-1)/NT, NT, 0, s>>>
         (n, reinterpret_cast<T_*>(A), thresh);
+      gpu_check(cudaPeekAtLastError());
     }
 
     /**
@@ -475,8 +478,11 @@ namespace strumpack {
       dim3 block(NT, NT); //, grid(count, 1, 1);
       LU_block_kernel_batched<T_,NT,real_t><<<count, block>>>
         (dat_, replace, thresh);
+      gpu_check(cudaPeekAtLastError());
       solve_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
+      gpu_check(cudaPeekAtLastError());
       Schur_block_kernel_batched<T_,NT><<<count, block>>>(dat_);
+      gpu_check(cudaPeekAtLastError());
     }
 
 
@@ -613,7 +619,8 @@ namespace strumpack {
           extend_add_rhs_kernel_left<<<grid, block>>>(nrhs, by, dat_+f);
         }
       }
-      cudaDeviceSynchronize();
+      gpu_check(cudaPeekAtLastError());
+      gpu_check(cudaDeviceSynchronize());
       for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
         int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
@@ -621,6 +628,7 @@ namespace strumpack {
           extend_add_rhs_kernel_right<<<grid, block>>>(nrhs, by, dat_+f);
         }
       }
+      gpu_check(cudaPeekAtLastError());
     }
 
     template<typename T, int NT> void

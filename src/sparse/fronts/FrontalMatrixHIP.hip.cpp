@@ -217,7 +217,7 @@ namespace strumpack {
         if (nnz) {
           unsigned int nt = 512, ops = 1;
           const int unroll = 8;
-          while (nt*unroll > nnz && nt > 8) {
+          while (nt*unroll > nnz && nt > 8 && ops < 64) {
             nt /= 2;
             ops *= 2;
           }
@@ -239,7 +239,7 @@ namespace strumpack {
         if (du) {
           const unsigned int unroll = 16;
           unsigned int nt = 512, ops = 1;
-          while (nt > du) {
+          while (nt > du && ops < 64) {
             nt /= 2;
             ops *= 2;
           }

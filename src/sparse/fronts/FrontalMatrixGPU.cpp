@@ -84,11 +84,12 @@ namespace strumpack {
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FG_t*>(F));
       std::size_t max_dsep = 0;
-#pragma omp parallel for                                               \
-  reduction(+:L_size,U_size,Schur_size,piv_size,total_upd_size)        \
-  reduction(+:N8,N16,N24,N32,factors_small)                            \
+#pragma omp parallel for                                                \
+  reduction(+:L_size,U_size,Schur_size,piv_size,total_upd_size)         \
+  reduction(+:N8,N16,N24,N32,factors_small)                             \
   reduction(max:max_dsep)
-      for (auto F : f) {
+      for (std::size_t i=0; i<f.size(); i++) {
+        auto F = f[i];
         const std::size_t dsep = F->dim_sep();
         const std::size_t dupd = F->dim_upd();
         L_size += dsep*(dsep + dupd);
@@ -160,7 +161,8 @@ namespace strumpack {
     void flops(long long& level_flops, long long& small_flops) {
       level_flops = small_flops = 0;
 #pragma omp parallel for reduction(+: level_flops, small_flops)
-      for (auto F : f) {
+      for (std::size_t i=0; i<f.size(); i++) {
+        auto F = f[i];
         auto flops = LU_flops(F->F11_) +
           gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
                      F->F21_, F->F12_, scalar_t(1.)) +
@@ -251,7 +253,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
-    host_Schur_.release();
+    host_Schur_.reset(nullptr);
   }
 
 #if defined(STRUMPACK_USE_MPI)

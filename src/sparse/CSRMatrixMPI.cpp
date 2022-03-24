@@ -866,6 +866,7 @@ namespace strumpack {
         sbuf[dest].emplace_back(col, row);
       }
     auto edges = comm_.all_to_all_v(sbuf);
+    IdxIJ::free_mpi_type();
     std::sort(edges.begin(), edges.end(),
               [](const IdxIJ& a, const IdxIJ& b) {
                 // sort according to rows, then columns

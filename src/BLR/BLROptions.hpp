@@ -62,11 +62,8 @@ namespace strumpack {
     enum class Admissibility { STRONG, WEAK };
     std::string get_name(Admissibility a);
 
-    enum class BLRFactorAlgorithm { RL, LL, COMB, STAR };
+    enum class BLRFactorAlgorithm { COLWISE, RL, LL, COMB, STAR };
     std::string get_name(BLRFactorAlgorithm a);
-
-    enum class CBConstruction { COLWISE, DENSE };
-    std::string get_name(CBConstruction a);
 
     enum class CompressionKernel { HALF, FULL };
     std::string get_name(CompressionKernel a);
@@ -113,9 +110,6 @@ namespace strumpack {
       void set_BLR_factor_algorithm(BLRFactorAlgorithm a) {
         blr_algo_ = a;
       }
-      void set_CB_construction(CBConstruction a) {
-        cb_construction_ = a;
-      }
       void set_compression_kernel(CompressionKernel a) {
         crn_krnl_ = a;
       }
@@ -124,7 +118,6 @@ namespace strumpack {
       Admissibility admissibility() const { return adm_; }
       int BACA_blocksize() const { return BACA_blocksize_; }
       BLRFactorAlgorithm BLR_factor_algorithm() const { return blr_algo_; }
-      CBConstruction CB_construction() const { return cb_construction_; }
       CompressionKernel compression_kernel() const { return crn_krnl_; }
 
       void set_from_command_line(int argc, const char* const* cargv) override;
@@ -138,7 +131,6 @@ namespace strumpack {
       Admissibility adm_ = Admissibility::WEAK;
       BLRFactorAlgorithm blr_algo_ = BLRFactorAlgorithm::RL;
       CompressionKernel crn_krnl_ = CompressionKernel::HALF;
-      CBConstruction cb_construction_ = CBConstruction::DENSE;
 
       void set_defaults() {
         this->rel_tol_ = default_BLR_rel_tol<real_t>();

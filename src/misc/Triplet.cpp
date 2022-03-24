@@ -37,8 +37,18 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> MPI_Datatype
+  Triplet<scalar_t,integer_t>::triplet_mpi_type = MPI_DATATYPE_NULL;
+
+  template<typename scalar_t,typename integer_t> void
+  Triplet<scalar_t,integer_t>::free_mpi_type() {
+    if (triplet_mpi_type != MPI_DATATYPE_NULL) {
+      MPI_Type_free(&triplet_mpi_type);
+      triplet_mpi_type = MPI_DATATYPE_NULL;
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> MPI_Datatype
   Triplet<scalar_t,integer_t>::mpi_type() {
-    static MPI_Datatype triplet_mpi_type = MPI_DATATYPE_NULL;
     if (triplet_mpi_type == MPI_DATATYPE_NULL) {
       using T = Triplet<scalar_t,integer_t>;
       const int count = 3;
@@ -50,14 +60,25 @@ namespace strumpack {
       MPI_Datatype tmp_mpi_type;
       MPI_Type_create_struct(count, b, o, t, &tmp_mpi_type);
       MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(T), &triplet_mpi_type);
+      MPI_Type_free(&tmp_mpi_type);
       MPI_Type_commit(&triplet_mpi_type);
     }
     return triplet_mpi_type;
   }
 
   template<typename scalar_t,typename integer_t> MPI_Datatype
+  IdxVal<scalar_t,integer_t>::idxval_mpi_type = MPI_DATATYPE_NULL;
+
+  template<typename scalar_t,typename integer_t> void
+  IdxVal<scalar_t,integer_t>::free_mpi_type() {
+    if (idxval_mpi_type != MPI_DATATYPE_NULL) {
+      MPI_Type_free(&idxval_mpi_type);
+      idxval_mpi_type = MPI_DATATYPE_NULL;
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> MPI_Datatype
   IdxVal<scalar_t,integer_t>::mpi_type() {
-    static MPI_Datatype idxval_mpi_type = MPI_DATATYPE_NULL;
     if (idxval_mpi_type == MPI_DATATYPE_NULL) {
       using T = IdxVal<scalar_t,integer_t>;
       const int count = 2;
@@ -68,14 +89,25 @@ namespace strumpack {
       MPI_Datatype tmp_mpi_type;
       MPI_Type_create_struct(count, b, o, t, &tmp_mpi_type);
       MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(T), &idxval_mpi_type);
+      MPI_Type_free(&tmp_mpi_type);
       MPI_Type_commit(&idxval_mpi_type);
     }
     return idxval_mpi_type;
   }
 
   template<typename integer_t> MPI_Datatype
+  IdxIJ<integer_t>::idxij_mpi_type = MPI_DATATYPE_NULL;
+
+  template<typename integer_t> void
+  IdxIJ<integer_t>::free_mpi_type() {
+    if (idxij_mpi_type != MPI_DATATYPE_NULL) {
+      MPI_Type_free(&idxij_mpi_type);
+      idxij_mpi_type = MPI_DATATYPE_NULL;
+    }
+  }
+
+  template<typename integer_t> MPI_Datatype
   IdxIJ<integer_t>::mpi_type() {
-    static MPI_Datatype idxij_mpi_type = MPI_DATATYPE_NULL;
     if (idxij_mpi_type == MPI_DATATYPE_NULL) {
       MPI_Type_contiguous
         (2, strumpack::mpi_type<integer_t>(), &idxij_mpi_type);
@@ -84,9 +116,20 @@ namespace strumpack {
     return idxij_mpi_type;
   }
 
+
+  template<typename scalar_t,typename integer_t> MPI_Datatype
+  Quadlet<scalar_t,integer_t>::quadlet_mpi_type = MPI_DATATYPE_NULL;
+
+  template<typename scalar_t,typename integer_t> void
+  Quadlet<scalar_t,integer_t>::free_mpi_type() {
+    if (quadlet_mpi_type != MPI_DATATYPE_NULL) {
+      MPI_Type_free(&quadlet_mpi_type);
+      quadlet_mpi_type = MPI_DATATYPE_NULL;
+    }
+  }
+
   template<typename scalar_t,typename integer_t> MPI_Datatype
   Quadlet<scalar_t,integer_t>::mpi_type() {
-    static MPI_Datatype quadlet_mpi_type = MPI_DATATYPE_NULL;
     if (quadlet_mpi_type == MPI_DATATYPE_NULL) {
       using T = Quadlet<scalar_t,integer_t>;
       const int count = 4;
@@ -100,6 +143,7 @@ namespace strumpack {
       MPI_Datatype tmp_mpi_type;
       MPI_Type_create_struct(count, b, o, t, &tmp_mpi_type);
       MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(T), &quadlet_mpi_type);
+      MPI_Type_free(&tmp_mpi_type);
       MPI_Type_commit(&quadlet_mpi_type);
     }
     return quadlet_mpi_type;

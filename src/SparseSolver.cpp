@@ -275,7 +275,7 @@ namespace strumpack {
          opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
          opts_.gmres_restart(), opts_.GramSchmidt_type(),
          use_initial_guess, opts_.verbose() && is_root_);
-    }
+    }; break;
     case KrylovSolver::BICGSTAB: {
       assert(x.cols() == 1);
       iterative::BiCGStab<scalar_t>

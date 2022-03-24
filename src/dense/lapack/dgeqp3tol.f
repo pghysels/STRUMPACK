@@ -2,7 +2,7 @@
 *        The first N elements of work store the exact column norms.
 *
       SUBROUTINE DGEQP3TOL( M, N, A, LDA, JPVT, TAU, WORK, LWORK, INFO,
-     $                      RANK, RTOL, ATOL, DEPTH )
+     $                      RANK, RTOL, ATOL )
 *
 *  -- LAPACK computational routine (version 3.4.2) --
 *  -- LAPACK is a software package provided by Univ. of Tennessee,    --
@@ -30,7 +30,7 @@
      $                   C
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           DGEQRF, DLAQP2MOD, DLAQPSMOD, DORMQR,
+      EXTERNAL           DGEQRF, DLAQP2, DLAQPS, DORMQR,
      $     DSWAP, XERBLA
 *     ..
 *     .. External Functions ..
@@ -197,9 +197,9 @@ c$$$  WORK( J ) = DNRM2( SM, A( NFXD+1, J ), 1 )
 *
 *              Factorize JB columns among columns J:N.
 *
-               CALL DLAQPSMOD( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
+               CALL DLAQPS( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
      $              JPVT( J ), TAU( J ), WORK( J ), WORK( N+J ),
-     $              WORK( 2*N+1 ), WORK( 2*N+JB+1 ), N-J+1, DEPTH)
+     $              WORK( 2*N+1 ), WORK( 2*N+JB+1 ), N-J+1)
                DO C=J,J+FJB-1
                   IF(ABS(A(C,C))/ABS(A(1,1))<=RTOL .OR.
      $                 ABS(A(C,C))<=ATOL) THEN
@@ -219,9 +219,9 @@ c$$$  WORK( J ) = DNRM2( SM, A( NFXD+1, J ), 1 )
 *
 *
          IF( J.LE.MINMN ) THEN
-            CALL DLAQP2MOD( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
+            CALL DLAQP2( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
      $                   TAU( J ), WORK( J ), WORK( N+J ),
-     $                   WORK( 2*N+1 ), DEPTH )
+     $                   WORK( 2*N+1 ) )
             DO C=J,MINMN
                IF(ABS(A(C,C))/ABS(A(1,1))<=RTOL .OR.
      $              ABS(A(C,C))<=ATOL) THEN

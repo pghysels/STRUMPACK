@@ -150,9 +150,8 @@ namespace strumpack {
         for (std::size_t r=upd2sep; r<dupd; r++)
           paF21(I[r]-pdsep,pc) += F22_(r,c);
       } else {
-        for (std::size_t r=0; r<upd2sep; r++){
+        for (std::size_t r=0; r<upd2sep; r++)
           paF12(I[r],pc-pdsep) += F22_(r, c);
-        }
         for (std::size_t r=upd2sep; r<dupd; r++)
           paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
       }

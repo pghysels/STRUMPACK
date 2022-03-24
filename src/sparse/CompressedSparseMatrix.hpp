@@ -43,13 +43,6 @@
 #include "dense/DenseMatrix.hpp"
 #include "StrumpackOptions.hpp"
 
-// where is this used?? in MC64?
-#ifdef _LONGINT
-  typedef long long int int_t;
-#else // Default
-  typedef int int_t;
-#endif
-
 namespace strumpack {
 
   // forward declarations
@@ -57,12 +50,6 @@ namespace strumpack {
   template<typename scalar_t> class DenseMatrix;
   template<typename scalar_t> class DistributedMatrix;
 
-  extern "C" {
-    int_t strumpack_mc64id_(int_t*);
-    int_t strumpack_mc64ad_
-    (int_t*, int_t*, int_t*, int_t*, int_t*, double*, int_t*,
-     int_t*, int_t*, int_t*, int_t*, double*, int_t*, int_t*);
-  }
 
   template<typename scalar_t, typename integer_t,
            typename real_t = typename RealType<scalar_t>::value_type>
@@ -82,7 +69,7 @@ namespace strumpack {
     std::vector<integer_t> Q;
     std::vector<real_t> R, C;
 
-    int_t mc64_work_int(std::size_t n, std::size_t nnz) const {
+    integer_t mc64_work_int(std::size_t n, std::size_t nnz) const {
       switch (job) {
       case MatchingJob::MAX_SMALLEST_DIAGONAL: return 4*n;
       case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 10*n + nnz;
@@ -93,7 +80,7 @@ namespace strumpack {
       }
     }
 
-    int_t mc64_work_double(std::size_t n, std::size_t nnz) const {
+    integer_t mc64_work_double(std::size_t n, std::size_t nnz) const {
       switch (job) {
       case MatchingJob::MAX_CARDINALITY: return 0;
       case MatchingJob::MAX_SMALLEST_DIAGONAL: return n;

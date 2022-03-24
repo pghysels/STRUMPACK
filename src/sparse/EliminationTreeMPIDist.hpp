@@ -112,8 +112,8 @@ namespace strumpack {
           prows(g->nprows()), pcols(g->npcols()), grid(g) {}
       integer_t dim_sep() const { return sep_end - sep_begin; }
 
+      static MPI_Datatype pf_mpi_type;
       static MPI_Datatype mpi_type() {
-        static MPI_Datatype pf_mpi_type = MPI_DATATYPE_NULL;
         if (pf_mpi_type == MPI_DATATYPE_NULL) {
           int b[6] = {1, 1, 1, 1, 1, 1};
           MPI_Datatype t[6] =
@@ -127,9 +127,16 @@ namespace strumpack {
           MPI_Datatype tmp_mpi_type;
           MPI_Type_create_struct(6, b, o, t, &tmp_mpi_type);
           MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(PF), &pf_mpi_type);
+          MPI_Type_free(&tmp_mpi_type);
           MPI_Type_commit(&pf_mpi_type);
         }
         return pf_mpi_type;
+      }
+      static void free_mpi_type() {
+        if (pf_mpi_type != MPI_DATATYPE_NULL) {
+          MPI_Type_free(&pf_mpi_type);
+          pf_mpi_type = MPI_DATATYPE_NULL;
+        }
       }
 
       integer_t sep_begin, sep_end;

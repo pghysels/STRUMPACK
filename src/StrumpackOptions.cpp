@@ -98,7 +98,7 @@ namespace strumpack {
     case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
       return "maximum matching with row and column scaling";
     case MatchingJob::COMBBLAS:
-      return "approximate weigthed perfect matching, from CombBLAS";
+      return "approximate weighted perfect matching, from CombBLAS";
     }
     return "UNKNOWN";
   }

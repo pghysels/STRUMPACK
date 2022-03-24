@@ -97,6 +97,7 @@ namespace strumpack {
       }
     }
     auto triplets = comm.all_to_all_v(sbuf);
+    Triplet::free_mpi_type();
 
     // TODO this sort can be avoided? first make the CSR/CSC
     // representation, then sort that row per row in parallel

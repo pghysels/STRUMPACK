@@ -85,7 +85,6 @@ namespace strumpack {
                                  BLRMPI_t& F21, BLRMPI_t& F22,
                                  scalar_t** pbuf, const FBLRMPI_t* pa)
       const override;
-
     void
     extadd_blr_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
                                      BLRMPI_t& F21, BLRMPI_t& F22,

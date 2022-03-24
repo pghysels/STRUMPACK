@@ -205,7 +205,7 @@ namespace strumpack {
                   << ", P=" << Comm().size() << ", T=" << params::num_threads
                   << ": " << time << " seconds, "
                   << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
-                  << (float(flops) / time) / 1.e9 << " GFLOP/s, "
+                  << (float(flops)*F11_.npactives() / time) / 1.e9 << " GFLOP/s, "
                   << " ds=" << this->dim_sep()
                   << ", du=" << this->dim_upd() << std::endl;
       }

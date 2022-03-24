@@ -34,6 +34,7 @@
 #include <string>
 
 #include "CSRMatrix.hpp"
+#include "MC64ad.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
 #endif
@@ -357,39 +358,39 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64
   (MatchingJob job, Match_t& M) {
-    int_t n = n_, nnz = nnz_, icntl[10], info[10], num,
+    integer_t n = n_, nnz = nnz_, icntl[10], info[10], num,
       ijob = static_cast<int>(job), liw = M.mc64_work_int(n_, nnz_),
       ldw = M.mc64_work_double(n_, nnz_);
-    std::unique_ptr<int_t[]> iw(new int_t[liw + n+1+nnz+n+n]);
+    std::unique_ptr<integer_t[]> iw(new integer_t[liw + n+1+nnz+n+n]);
     std::unique_ptr<double[]> dw(new double[ldw + nnz]);
-    strumpack_mc64id_(icntl);
+    mc64id(icntl);
     auto dval = dw.get() + ldw;
     auto cptr = iw.get() + liw;
     auto rind = cptr + n + 1;
     auto permutation = rind + nnz;
     auto rsums = permutation + n;
-    for (int_t i=0; i<n; i++) rsums[i] = 0;
-    for (int_t col=0; col<n; col++)
-      for (int_t i=ptr_[col]; i<ptr_[col+1]; i++)
+    for (integer_t i=0; i<n; i++) rsums[i] = 0;
+    for (integer_t col=0; col<n; col++)
+      for (integer_t i=ptr_[col]; i<ptr_[col+1]; i++)
         rsums[ind_[i]]++;
     cptr[0] = 1;  // start from 1, because mc64 is fortran!
-    for (int_t r=0; r<n; r++) {
+    for (integer_t r=0; r<n; r++) {
       cptr[r+1] = cptr[r] + rsums[r];
       rsums[r] = 0;
     }
-    for (int_t col=0; col<n; col++) {
-      for (int_t i=ptr_[col]; i<ptr_[col+1]; i++) {
-        int_t row = ind_[i], j = cptr[row] - 1 + rsums[row]++;
+    for (integer_t col=0; col<n; col++) {
+      for (integer_t i=ptr_[col]; i<ptr_[col+1]; i++) {
+        integer_t row = ind_[i], j = cptr[row] - 1 + rsums[row]++;
         if (is_complex<scalar_t>())
           dval[j] = static_cast<double>(std::abs(val_[i]));
         else dval[j] = static_cast<double>(std::real(val_[i]));
         rind[j] = col + 1;
       }
     }
-    strumpack_mc64ad_
-      (&ijob, &n, &nnz, cptr, rind, dval, &num,
-       permutation, &liw, iw.get(), &ldw, dw.get(), icntl, info);
-    for (int_t i=0; i<n; i++)
+    mc64ad(&ijob, &n, &nnz, cptr, rind, dval, &num,
+           permutation, &liw, iw.get(), &ldw, dw.get(),
+           icntl, info);
+    for (integer_t i=0; i<n; i++)
       M.Q[i] = permutation[i] - 1;
     if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
 #pragma omp parallel for
@@ -1262,34 +1263,26 @@ namespace strumpack {
   template CSRMatrix<double,int>
   cast_matrix<float,int,double>(const CSRMatrix<float,int>& mat);
   template CSRMatrix<std::complex<float>,int>
-  cast_matrix<std::complex<double>,int,std::complex<float>>
-  (const CSRMatrix<std::complex<double>,int>& mat);
+  cast_matrix<std::complex<double>,int,std::complex<float>>(const CSRMatrix<std::complex<double>,int>& mat);
   template CSRMatrix<std::complex<double>,int>
-  cast_matrix<std::complex<float>,int,std::complex<double>>
-  (const CSRMatrix<std::complex<float>,int>& mat);
+  cast_matrix<std::complex<float>,int,std::complex<double>>(const CSRMatrix<std::complex<float>,int>& mat);
 
   template CSRMatrix<float,long int>
   cast_matrix<double,long int,float>(const CSRMatrix<double,long int>& mat);
   template CSRMatrix<double,long int>
   cast_matrix<float,long int,double>(const CSRMatrix<float,long int>& mat);
   template CSRMatrix<std::complex<float>,long int>
-  cast_matrix<std::complex<double>,long int,std::complex<float>>
-  (const CSRMatrix<std::complex<double>,long int>& mat);
+  cast_matrix<std::complex<double>,long int,std::complex<float>>(const CSRMatrix<std::complex<double>,long int>& mat);
   template CSRMatrix<std::complex<double>,long int>
-  cast_matrix<std::complex<float>,long int,std::complex<double>>
-  (const CSRMatrix<std::complex<float>,long int>& mat);
+  cast_matrix<std::complex<float>,long int,std::complex<double>>(const CSRMatrix<std::complex<float>,long int>& mat);
 
   template CSRMatrix<float,long long int>
-  cast_matrix<double,long long int,float>
-  (const CSRMatrix<double,long long int>& mat);
+  cast_matrix<double,long long int,float>(const CSRMatrix<double,long long int>& mat);
   template CSRMatrix<double,long long int>
-  cast_matrix<float,long long int,double>
-  (const CSRMatrix<float,long long int>& mat);
+  cast_matrix<float,long long int,double>(const CSRMatrix<float,long long int>& mat);
   template CSRMatrix<std::complex<float>,long long int>
-  cast_matrix<std::complex<double>,long long int,std::complex<float>>
-  (const CSRMatrix<std::complex<double>,long long int>& mat);
+  cast_matrix<std::complex<double>,long long int,std::complex<float>>(const CSRMatrix<std::complex<double>,long long int>& mat);
   template CSRMatrix<std::complex<double>,long long int>
-  cast_matrix<std::complex<float>,long long int,std::complex<double>>
-  (const CSRMatrix<std::complex<float>,long long int>& mat);
+  cast_matrix<std::complex<float>,long long int,std::complex<double>>(const CSRMatrix<std::complex<float>,long long int>& mat);
 
 } // end namespace strumpack

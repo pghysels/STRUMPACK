@@ -28,7 +28,9 @@
  */
 #include "StrumpackParameters.hpp"
 #include "FrontalMatrixHODLRMPI.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #include "ExtendAdd.hpp"
+#include "BLR/BLRExtendAdd.hpp"
 
 namespace strumpack {
 
@@ -70,12 +72,47 @@ namespace strumpack {
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
-    auto dupd = dim_upd();
-    DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
-    eye.eye();
-    F22_->mult(Trans::N, eye, dF22);
+    auto dF22 = F22_->dense(grid());
     ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
       (dF22, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+    if (!dim_upd()) return;
+    if (Comm().is_null()) return;
+    auto dF22 = F22_->dense(grid());
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
+      (dF22, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
+  integer_t begin_col, integer_t end_col, const SPOptions<scalar_t>& opts) const {
+    if (!dim_upd()) return;
+    if (Comm().is_null()) return;
+    auto dF22 = F22_->dense(grid());
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
+      (dF22, sbuf, pa, this->upd_to_parent(pa), begin_col, end_col);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
+      (F11, F12, F21, F22, pbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa,
+   integer_t begin_col, integer_t end_col) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers_col
+      (F11, F12, F21, F22, pbuf, pa, this, begin_col, end_col);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -87,7 +124,6 @@ namespace strumpack {
     TIMER_TIME(TaskType::F22_MULT, 2, t_sprod);
     F22_->mult(op, R, S);
   }
-
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_children_CB

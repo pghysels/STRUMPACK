@@ -64,8 +64,8 @@ namespace strumpack {
     class Stream {
     public:
       Stream() {
-        gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
-        // gpu_check(cudaStreamCreate(&s_));
+        // gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
+        gpu_check(cudaStreamCreate(&s_));
       }
       ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
       // void set_priority(int priority) {
