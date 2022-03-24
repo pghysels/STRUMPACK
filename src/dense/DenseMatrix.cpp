@@ -697,8 +697,7 @@ namespace strumpack {
     auto minmn = std::min(rows(), cols());
     std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
     DenseMatrix<scalar_t> tmp(std::max(rows(), cols()), cols(), *this, 0, 0);
-    int info = blas::gelqfmod
-      (rows(), cols(), tmp.data(), tmp.ld(), tau.get(), depth);
+    int info = blas::gelqf(rows(), cols(), tmp.data(), tmp.ld(), tau.get());
     if (info) {
       std::cerr << "ERROR: LQ factorization failed with info="
                 << info << std::endl;
@@ -711,8 +710,8 @@ namespace strumpack {
         std::cerr << "WARNING: small diagonal on L from LQ" << std::endl;
         break;
       }
-    info = blas::xxglqmod(cols(), cols(), std::min(rows(), cols()),
-                          tmp.data(), tmp.ld(), tau.get(), depth);
+    info = blas::xxglq(cols(), cols(), std::min(rows(), cols()),
+                       tmp.data(), tmp.ld(), tau.get());
     Q = DenseMatrix<scalar_t>(cols(), cols(), tmp, 0, 0); // generate Q
     if (info) {
       std::cerr << "ERROR: generation of Q from LQ failed with info="
@@ -727,7 +726,7 @@ namespace strumpack {
     TIMER_TIME(TaskType::QR, 1, t_qr);
     int minmn = std::min(rows(), cols());
     std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
-    blas::geqrfmod(rows(), minmn, data(), ld(), tau.get(), depth);
+    blas::geqrf(rows(), minmn, data(), ld(), tau.get());
     real_t Rmax = std::abs(operator()(0, 0));
     real_t Rmin = Rmax;
     for (int i=0; i<minmn; i++) {
@@ -775,9 +774,8 @@ namespace strumpack {
     int rank = 0;
     // TODO make geqp3tol stop at max_rank
     if (m && n)
-      blas::geqp3tol
-        (m, n, data(), ld(), iind.data(), tau.get(),
-         rank, rel_tol, abs_tol, depth);
+      blas::geqp3tol(m, n, data(), ld(), iind.data(), tau.get(),
+                     rank, rel_tol, abs_tol);
     else std::iota(iind.begin(), iind.end(), 1);
     rank = std::min(rank, max_rank);
     for (int i=1; i<=n; i++) {
@@ -803,7 +801,7 @@ namespace strumpack {
     int rank;
     blas::geqp3tol
       (m, n, tmp.data(), tmp.ld(), ind.data(),
-       tau.get(), rank, rel_tol, abs_tol, depth);
+       tau.get(), rank, rel_tol, abs_tol);
     std::vector<int> piv(n);
     for (int i=1; i<=n; i++) {
       int j = ind[i-1];

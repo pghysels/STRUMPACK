@@ -1,5 +1,5 @@
       SUBROUTINE CGEQP3TOL( M, N, A, LDA, JPVT, TAU, WORK, LWORK, RWORK,
-     $     INFO, RANK, RTOL, ATOL, DEPTH )
+     $     INFO, RANK, RTOL, ATOL )
 *
 *  -- LAPACK computational routine (version 3.4.2) --
 *  -- LAPACK is a software package provided by Univ. of Tennessee,    --
@@ -28,7 +28,7 @@
      $                   C
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           CGEQRF, CLAQP2MOD, CLAQPSMOD, 
+      EXTERNAL           CGEQRF, CLAQP2, CLAQPS,
      $     CSWAP, CUNMQR, XERBLA
 *     ..
 *     .. External Functions ..
@@ -196,10 +196,9 @@
 *
 *              Factorize JB columns among columns J:N.
 *
-               CALL CLAQPSMOD( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
+               CALL CLAQPS( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
      $              JPVT( J ), TAU( J ), RWORK( J ),
-     $              RWORK( N+J ), WORK( 1 ), WORK( JB+1 ),
-     $              N-J+1, DEPTH )
+     $              RWORK( N+J ), WORK( 1 ), WORK( JB+1 ), N-J+1 )
 *
                DO C=J,J+FJB-1
                   IF(ABS(A(C,C))/ABS(A(1,1))<=RTOL .OR.
@@ -220,9 +219,8 @@
 *
 *
          IF( J.LE.MINMN ) THEN
-            CALL CLAQP2MOD( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
-     $           TAU( J ), RWORK( J ), RWORK( N+J ),
-     $           WORK( 1 ), DEPTH )
+            CALL CLAQP2( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
+     $           TAU( J ), RWORK( J ), RWORK( N+J ), WORK( 1 ) )
 *
             DO C=J,MINMN
                IF(ABS(A(C,C))/ABS(A(1,1))<=RTOL .OR.

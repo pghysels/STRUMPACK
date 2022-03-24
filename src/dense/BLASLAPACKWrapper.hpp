@@ -551,43 +551,29 @@ namespace strumpack {
 
     int geqp3tol(int m, int n, float* a, int lda, int* jpvt,
                  float* tau, float* work, int lwork, int& rank,
-                 float rtol, float atol, int depth);
+                 float rtol, float atol);
     int geqp3tol(int m, int n, double* a, int lda, int* jpvt,
                  double* tau, double* work, int lwork, int& rank,
-                 double rtol, double atol, int depth);
+                 double rtol, double atol);
     int geqp3tol(int m, int n, std::complex<float>* a, int lda, int* jpvt,
                  std::complex<float>* tau, std::complex<float>* work,
-                 int lwork, int& rank, float rtol, float atol, int depth);
+                 int lwork, int& rank, float rtol, float atol);
     int geqp3tol(int m, int n, std::complex<double>* a, int lda, int* jpvt,
                  std::complex<double>* tau, std::complex<double>* work,
-                 int lwork, int& rank, double rtol, double atol, int depth);
+                 int lwork, int& rank, double rtol, double atol);
 
     template<typename scalar, typename real> inline
     int geqp3tol(int m, int n, scalar* a, int lda, int* jpvt, scalar* tau,
-                 int& rank, real rtol, real atol, int depth) {
+                 int& rank, real rtol, real atol) {
       scalar lwork;
-      geqp3tol
-        (m, n, a, lda, jpvt, tau, &lwork, -1, rank, rtol, atol, depth);
+      geqp3tol(m, n, a, lda, jpvt, tau, &lwork, -1, rank, rtol, atol);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      if (! is_complex<scalar>()) {
-        bool tasked = depth < params::task_recursion_cutoff_level;
-        if (tasked) {
-          int loop_tasks = std::max(params::num_threads / (depth+1), 1);
-          int B = std::max(n / loop_tasks, 1);
-          for (int task=0; task<std::ceil(n/float(B)); task++) {
-#pragma omp task default(shared) firstprivate(task)
-            for (int i=task*B; i<std::min((task+1)*B,n); i++)
-              work[i] = nrm2(m, &a[i*lda], 1);
-          }
-#pragma omp taskwait
-        } else
-          for (int i=0; i<n; i++)
-            work[i] = nrm2(m, &a[i*lda], 1);
+      if (!is_complex<scalar>()) {
+        for (int i=0; i<n; i++)
+          work[i] = nrm2(m, &a[i*lda], 1);
       }
-      return geqp3tol
-        (m, n, a, lda, jpvt, tau, work.get(), ilwork,
-         rank, rtol, atol, depth);
+      return geqp3tol(m, n, a, lda, jpvt, tau, work.get(), ilwork, rank, rtol, atol);
     }
 
 
@@ -618,26 +604,6 @@ namespace strumpack {
       return geqrf(m, n, a, lda, tau, work.get(), ilwork);
     }
 
-    int geqrfmod(int m, int n, float* a, int lda,
-                 float* tau, float* work, int lwork, int depth);
-    int geqrfmod(int m, int n, double* a, int lda, double* tau,
-                 double* work, int lwork, int depth);
-    int geqrfmod(int m, int n, std::complex<float>* a, int lda,
-                 std::complex<float>* tau, std::complex<float>* work,
-                 int lwork, int depth);
-    int geqrfmod(int m, int n, std::complex<double>* a, int lda,
-                 std::complex<double>* tau, std::complex<double>* work,
-                 int lwork, int depth);
-    template<typename scalar> inline
-    int geqrfmod(int m, int n, scalar* a, int lda, scalar* tau, int depth) {
-      scalar lwork;
-      geqrfmod(m, n, a, lda, tau, &lwork, -1, depth);
-      int ilwork = int(std::real(lwork));
-      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      return geqrfmod(m, n, a, lda, tau, work.get(), ilwork, depth);
-    }
-
-
     inline long long gelqf_flops(long long m, long long n) {
       if (m > n)
         return n * (n * (.5 - (1./3.) * n + m) + m + 29./6.) +
@@ -666,26 +632,6 @@ namespace strumpack {
     }
 
 
-    int gelqfmod(int m, int n, float* a, int lda, float* tau,
-                 float* work, int lwork, int depth);
-    int gelqfmod(int m, int n, double* a, int lda, double* tau,
-                 double* work, int lwork, int depth);
-    int gelqfmod(int m, int n, std::complex<float>* a, int lda,
-                 std::complex<float>* tau, std::complex<float>* work,
-                 int lwork, int depth);
-    int gelqfmod(int m, int n, std::complex<double>* a, int lda,
-                 std::complex<double>* tau, std::complex<double>* work,
-                 int lwork, int depth);
-    template<typename scalar> inline
-    int gelqfmod(int m, int n, scalar* a, int lda, scalar* tau, int depth) {
-      scalar lwork;
-      gelqfmod(m, n, a, lda, tau, &lwork, -1, depth);
-      int ilwork = int(std::real(lwork));
-      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      return gelqfmod(m, n, a, lda, tau, work.get(), ilwork, depth);
-    }
-
-
     inline long long getrf_flops(long long m, long long n) {
       // TODO check this
       if (m < n) return (m / 2 * (m * (n - m / 3 - 1) + n) + 2 * m / 3) +
@@ -698,10 +644,6 @@ namespace strumpack {
     int getrf(int m, int n, std::complex<float>* a, int lda, int* ipiv);
     int getrf(int m, int n, std::complex<double>* a, int lda, int* ipiv);
 
-    int getrfmod(int m, int n, float* a, int lda, int* ipiv, int depth);
-    int getrfmod(int m, int n, double* a, int lda, int* ipiv, int depth);
-    int getrfmod(int m, int n, std::complex<float>* a, int lda, int* ipiv, int depth);
-    int getrfmod(int m, int n, std::complex<double>* a, int lda, int* ipiv, int depth);
 
     inline long long getrs_flops(long long n, long long nrhs) {
       return 2 * n * n * nrhs;
@@ -744,25 +686,6 @@ namespace strumpack {
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return xxglq(m, n, k, a, lda, tau, work.get(), ilwork);
-    }
-
-    // do not count flops here, they are counted in the blas routines
-    int xxglqmod(int m, int n, int k, float* a, int lda, const float* tau,
-                 float* work, int lwork, int depth);
-    int xxglqmod(int m, int n, int k, double* a, int lda, const double* tau,
-                 double* work, int lwork, int depth);
-    int xxglqmod(int m, int n, int k, std::complex<float>* a, int lda,
-                 const std::complex<float>* tau, std::complex<float>* work, int lwork, int depth);
-    int xxglqmod(int m, int n, int k, std::complex<double>* a, int lda,
-                 const std::complex<double>* tau, std::complex<double>* work, int lwork, int depth);
-    template<typename scalar> inline
-    int xxglqmod(int m, int n, int k, scalar* a, int lda,
-                 const scalar* tau, int depth) {
-      scalar lwork;
-      xxglqmod(m, n, k, a, lda, tau, &lwork, -1, depth);
-      int ilwork = int(std::real(lwork));
-      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      return xxglqmod(m, n, k, a, lda, tau, work.get(), ilwork, depth);
     }
 
 
