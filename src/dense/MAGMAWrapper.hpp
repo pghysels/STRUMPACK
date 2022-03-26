@@ -39,6 +39,10 @@
 #include "CUDAWrapper.hpp"
 
 #include <magma_v2.h>
+#include <magma_svbatched.h>
+#include <magma_dvbatched.h>
+#include <magma_cvbatched.h>
+#include <magma_zvbatched.h>
 
 
 namespace strumpack {
@@ -85,45 +89,69 @@ namespace strumpack {
       }
 
 
-      inline magma_int_t getrf_vbatched
+      inline magma_int_t getrf_vbatched_max_nocheck
       (magma_int_t* m, magma_int_t* n,
+       magma_int_t* minmn, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
        float **dA_array, magma_int_t *ldda,
-       magma_int_t **ipiv_array, magma_int_t *info_array,
-       magma_int_t batchCount, magma_queue_t queue) {
+       magma_int_t **dipiv_array, magma_int_t **dpivinfo_array,
+       magma_int_t *info_array, magma_int_t batchCount, magma_queue_t queue) {
         if (!batchCount) return 0;
-        return magma_sgetrf_vbatched
-          (m, n, dA_array, ldda, ipiv_array, info_array,
+        magma_int_t nb, recnb;
+        magma_get_sgetrf_vbatched_nbparam
+          (max_m, max_n, &nb, &recnb);
+        return magma_sgetrf_vbatched_max_nocheck
+          (m, n, minmn, max_m, max_n, max_minmn, max_mxn, nb, recnb,
+           dA_array, ldda, dipiv_array, dpivinfo_array, info_array,
            batchCount, queue);
       }
-      inline magma_int_t getrf_vbatched
+      inline magma_int_t getrf_vbatched_max_nocheck
       (magma_int_t* m, magma_int_t* n,
+       magma_int_t* minmn, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
        double **dA_array, magma_int_t *ldda,
-       magma_int_t **ipiv_array, magma_int_t *info_array,
-       magma_int_t batchCount, magma_queue_t queue) {
+       magma_int_t **dipiv_array, magma_int_t **dpivinfo_array,
+       magma_int_t *info_array, magma_int_t batchCount, magma_queue_t queue) {
         if (!batchCount) return 0;
-        return magma_dgetrf_vbatched
-          (m, n, dA_array, ldda, ipiv_array, info_array,
+        magma_int_t nb, recnb;
+        magma_get_dgetrf_vbatched_nbparam
+          (max_m, max_n, &nb, &recnb);
+        return magma_dgetrf_vbatched_max_nocheck
+          (m, n, minmn, max_m, max_n, max_minmn, max_mxn, nb, recnb,
+           dA_array, ldda, dipiv_array, dpivinfo_array, info_array,
            batchCount, queue);
       }
-      inline magma_int_t getrf_vbatched
+      inline magma_int_t getrf_vbatched_max_nocheck
       (magma_int_t* m, magma_int_t* n,
+       magma_int_t* minmn, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
        std::complex<float>** dA_array, magma_int_t *ldda,
-       magma_int_t **ipiv_array, magma_int_t *info_array,
-       magma_int_t batchCount, magma_queue_t queue) {
+       magma_int_t **dipiv_array, magma_int_t **dpivinfo_array,
+       magma_int_t *info_array, magma_int_t batchCount, magma_queue_t queue) {
         if (!batchCount) return 0;
-        return magma_cgetrf_vbatched
-          (m, n, (magmaFloatComplex**)dA_array, ldda,
-           ipiv_array, info_array, batchCount, queue);
+        magma_int_t nb, recnb;
+        magma_get_cgetrf_vbatched_nbparam
+          (max_m, max_n, &nb, &recnb);
+        return magma_cgetrf_vbatched_max_nocheck
+          (m, n, minmn, max_m, max_n, max_minmn, max_mxn, nb, recnb,
+           (magmaFloatComplex**)dA_array, ldda,
+           dipiv_array, dpivinfo_array, info_array, batchCount, queue);
       }
-      inline magma_int_t getrf_vbatched
+      inline magma_int_t getrf_vbatched_max_nocheck
       (magma_int_t* m, magma_int_t* n,
+       magma_int_t* minmn, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
        std::complex<double>** dA_array, magma_int_t *ldda,
-       magma_int_t **ipiv_array, magma_int_t *info_array,
-       magma_int_t batchCount, magma_queue_t queue) {
+       magma_int_t **dipiv_array, magma_int_t **dpivinfo_array,
+       magma_int_t *info_array, magma_int_t batchCount, magma_queue_t queue) {
         if (!batchCount) return 0;
-        return magma_zgetrf_vbatched
-          (m, n, (magmaDoubleComplex**)dA_array, ldda,
-           ipiv_array, info_array, batchCount, queue);
+        magma_int_t nb, recnb;
+        magma_get_zgetrf_vbatched_nbparam
+          (max_m, max_n, &nb, &recnb);
+        return magma_zgetrf_vbatched_max_nocheck
+          (m, n, minmn, max_m, max_n, max_minmn, max_mxn, nb, recnb,
+           (magmaDoubleComplex**)dA_array, ldda,
+           dipiv_array, dpivinfo_array, info_array, batchCount, queue);
       }
 
       inline void trsm_vbatched
