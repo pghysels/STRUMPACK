@@ -27,6 +27,7 @@
  *
  */
 #include <array>
+#include <fstream>
 
 #include "FrontalMatrixGPU.hpp"
 #include "FrontalMatrixGPUKernels.hpp"
@@ -39,6 +40,9 @@
 #include "kblas_operators.h"
 #include "batch_getrf.h"
 #endif
+
+
+#define VBATCHED_STATS
 
 
 namespace strumpack {
@@ -256,7 +260,7 @@ namespace strumpack {
       dpivinfo_array = ipmem;  ipmem += Nsmall;
     }
 
-    static const int FRONT_SMALL = 256;
+    static const int FRONT_SMALL = 1024*1024;
     std::vector<FG_t*> f;
     std::size_t factor_size = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0, work_bytes = 0, ea_bytes = 0,
@@ -568,6 +572,45 @@ namespace strumpack {
       t_gemm_small("gemm_small"),
       t_gemm("gemm");
 
+
+#if defined(VBATCHED_STATS)
+    {
+      std::ofstream fls("level_sizes.log");
+      for (int l=lvls-1; l>=0; l--) {
+        auto& L = ldata[l];
+        for (std::size_t i=0; i<L.f.size(); i++) {
+          auto& F = *(L.f[i]);
+          fls << F.dim_sep() << " " << F.dim_upd() << std::endl;
+        }
+        fls << std::endl << std::endl;
+      }
+
+      std::ofstream ld1("ld1.log"), ld2("ld2.log"), lmax("lmax.log");
+      for (int l=lvls-1; l>=0; l--) {
+        auto& L = ldata[l];
+        std::vector<integer_t> d1sizes, d2sizes;
+        auto N = L.f.size();
+        for (std::size_t i=0; i<N; i++) {
+          auto& F = *(L.f[i]);
+          if (F.dim_sep() || F.dim_upd()) {
+            d1sizes.push_back(F.dim_sep());
+            d2sizes.push_back(F.dim_upd());
+          }
+        }
+        std::sort(d1sizes.begin(), d1sizes.end());
+        std::sort(d2sizes.begin(), d2sizes.end());
+        auto N1 = d1sizes.size();
+        auto N2 = d2sizes.size();
+        ld1 << std::max(d1sizes[0], integer_t(1)) << " " << d1sizes[N1/4] << " " << d1sizes[N1/2] << " " << d1sizes[3*N1/4] << " " << d1sizes[N1-1];
+        ld2 << std::max(d2sizes[0], integer_t(1)) << " " << d2sizes[N2/4] << " " << d2sizes[N2/2] << " " << d2sizes[3*N2/4] << " " << d2sizes[N2-1];
+        lmax << N1;
+        ld1 << std::endl;
+        ld2 << std::endl;
+        lmax << std::endl;
+      }
+    }
+#endif
+
     for (int l=lvls-1; l>=0; l--) {
       TaskTimer tl("");
       tl.start();
@@ -634,12 +677,14 @@ namespace strumpack {
            L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dpivinfo_array, L.dev_getrf_err, Nsmall, magma_q);
 #endif
+        comp_stream.synchronize();
         t_getrf_small.stop();
         t_getrf_large.start();
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
              L.f[i]->piv_, L.dev_getrf_err+i);
+        comp_stream.synchronize();
         t_getrf_large.stop();
 
         // TODO
@@ -653,22 +698,26 @@ namespace strumpack {
         gpu::laswp_fwd_vbatched
           (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
+        comp_stream.synchronize();
         t_laswp.stop();
         t_trsm_L.start();
         gpu::magma::trsm_vbatched
           (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
            d1, d2, scalar_t(1.), F11, ld1, F12, ld1, Nsmall, magma_q);
+        comp_stream.synchronize();
         t_trsm_L.stop();
         t_trsm_U.start();
         gpu::magma::trsm_vbatched
           (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            d1, d2, scalar_t(1.), F11, ld1, F12, ld1, Nsmall, magma_q);
+        comp_stream.synchronize();
         t_trsm_U.stop();
         t_getrs.start();
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrs
             (solver_handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
              L.f[i]->F12_, L.dev_getrf_err+i);
+        comp_stream.synchronize();
         t_getrs.stop();
 
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
@@ -685,12 +734,14 @@ namespace strumpack {
           (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
            F21, ld2, F12, ld1, scalar_t(1.), F22, ld2, Nsmall,
            L.max_d2_small, L.max_d2_small, L.max_d1_small, magma_q);
+        comp_stream.synchronize();
         t_gemm_small.stop();
         t_gemm.start();
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::gemm
             (blas_handle, Trans::N, Trans::N, scalar_t(-1.),
              L.f[i]->F21_, L.f[i]->F12_, scalar_t(1.), L.f[i]->F22_);
+        comp_stream.synchronize();
         t_gemm.stop();
 
         copy_stream.synchronize();
@@ -713,20 +764,44 @@ namespace strumpack {
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
       if (opts.verbose()) {
+
+
+        long long flops_LU_small = 0, flops_LU_large = 0,
+          flops_trsm_L_small = 0, flops_trsm_L_large = 0,
+          flops_trsm_U_small = 0, flops_trsm_U_large = 0,
+          flops_gemm_small = 0, flops_gemm_large = 0;
+#if defined(VBATCHED_STATS)
+        for (std::size_t i=0; i<L.f.size(); i++) {
+          auto F = L.f[i];
+          if (F->dim_sep() <= L.FRONT_SMALL) {
+            flops_LU_small += LU_flops(F->F11_);
+            flops_gemm_small += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F->F21_, F->F12_, scalar_t(1.));
+            flops_trsm_L_small += trsm_flops(Side::L, scalar_t(1.), F->F11_, F->F12_);
+            flops_trsm_U_small += trsm_flops(Side::R, scalar_t(1.), F->F11_, F->F21_);
+          } else {
+            flops_LU_large += LU_flops(F->F11_);
+            flops_gemm_large += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F->F21_, F->F12_, scalar_t(1.));
+            flops_trsm_L_large += trsm_flops(Side::L, scalar_t(1.), F->F11_, F->F12_);
+            flops_trsm_U_large += trsm_flops(Side::R, scalar_t(1.), F->F11_, F->F21_);
+          }
+        }
+#endif
+        auto flops_getrs_large = flops_LU_large + flops_gemm_large + flops_trsm_L_large + flops_trsm_U_large;
+
         auto level_time = tl.elapsed();
         std::cout << "#   GPU Factorization complete, took: "
                   << level_time << " seconds, "
                   << level_flops / 1.e9 << " GFLOPS, "
                   << (float(level_flops) / level_time) / 1.e9
                   << " GFLOP/s" << std::endl;
-        std::cout << "#          LU_vb:       " << t_getrf_small.elapsed() << std::endl
-                  << "#          LU_large:    " << t_getrf_large.elapsed() << std::endl
+        std::cout << "#          LU_vb:       " << t_getrf_small.elapsed() << "  " << flops_LU_small/1.e9 << " GFlop " << (float(flops_LU_small)/t_getrf_small.elapsed())/1.e9 << " GFlop/s" << std::endl
+                  << "#          LU_large:    " << t_getrf_large.elapsed() << "  " << flops_LU_large/1.e9 << " GFlop " << (float(flops_LU_large)/t_getrf_large.elapsed())/1.e9 << " GFlop/s" << std::endl
                   << "#          laswp_vb:    " << t_laswp.elapsed() << std::endl
-                  << "#          getrs_large: " << t_getrs.elapsed() << std::endl
-                  << "#          trsm_L_vb    " << t_trsm_L.elapsed() << std::endl
-                  << "#          trsm_U_vb:   " <<t_trsm_U.elapsed() << std::endl
-                  << "#          gemm_vb:     " << t_gemm_small.elapsed() << std::endl
-                  << "#          gemm_large:  " << t_gemm.elapsed() << std::endl;
+                  << "#          getrs_large: " << t_getrs.elapsed() << "  " << flops_getrs_large/1.e9 << " GFlop " << (float(flops_getrs_large)/t_getrs.elapsed())/1.e9 << " GFlop/s" << std::endl
+                  << "#          trsm_L_vb    " << t_trsm_L.elapsed() << "  " << flops_trsm_L_small/1.e9 << " GFlop " << (float(flops_trsm_L_small)/t_trsm_L.elapsed())/1.e9 << " GFlop/s" << std::endl
+                  << "#          trsm_U_vb:   " <<t_trsm_U.elapsed() << "  " << flops_trsm_U_small/1.e9 << " GFlop " << (float(flops_trsm_U_small)/t_trsm_U.elapsed())/1.e9 << " GFlop/s" << std::endl
+                  << "#          gemm_vb:     " << t_gemm_small.elapsed() << "  " << flops_gemm_small/1.e9 << " GFlop " << (float(flops_gemm_small)/t_gemm_small.elapsed())/1.e9 << " GFlop/s" << std::endl
+                  << "#          gemm_large:  " << t_gemm.elapsed() << "  " << flops_gemm_large/1.e9 << " GFlop " << (float(flops_gemm_large)/t_gemm.elapsed())/1.e9 << " GFlop/s" << std::endl;
       }
     }
     const std::size_t dupd = dim_upd();
