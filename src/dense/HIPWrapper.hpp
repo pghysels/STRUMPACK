@@ -329,6 +329,16 @@ namespace strumpack {
          const DenseMatrix<scalar_t>& x, scalar_t beta,
          DenseMatrix<scalar_t>& y);
 
+    template<typename scalar_t> void
+    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
+          int k1, int k2, int* ipiv, int inc);
+
+    // assume inc = 1
+    template<typename scalar_t> void
+    laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
+                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
+                       unsigned int batchCount);
+
   } // end namespace gpu
 } // end namespace strumpack
 

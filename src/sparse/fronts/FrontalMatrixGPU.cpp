@@ -709,9 +709,9 @@ namespace strumpack {
 #if defined(VBATCHED_STATS)
 	t_laswp.start();
 #endif
-        // gpu::laswp_fwd_vbatched
-        //   (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
-        //    d1, Nsmall);
+        gpu::laswp_fwd_vbatched
+          (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
+           d1, Nsmall);
 #if defined(VBATCHED_STATS)
 	comp_stream.synchronize();
 	t_laswp.stop();
