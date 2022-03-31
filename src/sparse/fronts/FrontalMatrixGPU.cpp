@@ -260,7 +260,7 @@ namespace strumpack {
       dpivinfo_array = ipmem;  ipmem += Nsmall;
     }
 
-    static const int FRONT_SMALL = 1024*1024;
+    static const int FRONT_SMALL = 256;
     std::vector<FG_t*> f;
     std::size_t factor_size = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0, work_bytes = 0, ea_bytes = 0,
@@ -786,7 +786,7 @@ namespace strumpack {
           }
         }
 #endif
-        auto flops_getrs_large = flops_LU_large + flops_gemm_large + flops_trsm_L_large + flops_trsm_U_large;
+        auto flops_getrs_large = flops_trsm_L_large + flops_trsm_U_large;
 
         auto level_time = tl.elapsed();
         std::cout << "#   GPU Factorization complete, took: "
@@ -796,12 +796,16 @@ namespace strumpack {
                   << " GFLOP/s" << std::endl;
         std::cout << "#          LU_vb:       " << t_getrf_small.elapsed() << "  " << flops_LU_small/1.e9 << " GFlop " << (float(flops_LU_small)/t_getrf_small.elapsed())/1.e9 << " GFlop/s" << std::endl
                   << "#          LU_large:    " << t_getrf_large.elapsed() << "  " << flops_LU_large/1.e9 << " GFlop " << (float(flops_LU_large)/t_getrf_large.elapsed())/1.e9 << " GFlop/s" << std::endl
+		  << "#          LU_total:    " << (t_getrf_small.elapsed()+t_getrf_large.elapsed()) << "  " << (flops_LU_small+flops_LU_large)/1.e9 << " GFlop " << ((float(flops_LU_small)+float(flops_LU_large))/(t_getrf_small.elapsed()+t_getrf_large.elapsed()))/1.e9 << " GFlop/s" << std::endl
                   << "#          laswp_vb:    " << t_laswp.elapsed() << std::endl
                   << "#          getrs_large: " << t_getrs.elapsed() << "  " << flops_getrs_large/1.e9 << " GFlop " << (float(flops_getrs_large)/t_getrs.elapsed())/1.e9 << " GFlop/s" << std::endl
                   << "#          trsm_L_vb    " << t_trsm_L.elapsed() << "  " << flops_trsm_L_small/1.e9 << " GFlop " << (float(flops_trsm_L_small)/t_trsm_L.elapsed())/1.e9 << " GFlop/s" << std::endl
                   << "#          trsm_U_vb:   " <<t_trsm_U.elapsed() << "  " << flops_trsm_U_small/1.e9 << " GFlop " << (float(flops_trsm_U_small)/t_trsm_U.elapsed())/1.e9 << " GFlop/s" << std::endl
+		  << "#          getrs_total: " << (t_getrs.elapsed()+t_trsm_L.elapsed()+t_trsm_U.elapsed()) << "  " << (flops_getrs_large+flops_trsm_L_small+flops_trsm_U_small)/1.e9 << " GFlop " << ((float(flops_getrs_large)+float(flops_trsm_L_small)+float(flops_trsm_U_small))/(t_getrs.elapsed()+t_trsm_L.elapsed()+t_trsm_U.elapsed()))/1.e9 << " GFlop/s" << std::endl
                   << "#          gemm_vb:     " << t_gemm_small.elapsed() << "  " << flops_gemm_small/1.e9 << " GFlop " << (float(flops_gemm_small)/t_gemm_small.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          gemm_large:  " << t_gemm.elapsed() << "  " << flops_gemm_large/1.e9 << " GFlop " << (float(flops_gemm_large)/t_gemm.elapsed())/1.e9 << " GFlop/s" << std::endl;
+                  << "#          gemm_large:  " << t_gemm.elapsed() << "  " << flops_gemm_large/1.e9 << " GFlop " << (float(flops_gemm_large)/t_gemm.elapsed())/1.e9 << " GFlop/s" << std::endl
+		  << "#          gemm_total:  " << (t_gemm_small.elapsed()+t_gemm.elapsed()) << "  " << (flops_gemm_small+flops_gemm_large)/1.e9 << " GFlop " << ((float(flops_gemm_small)+float(flops_gemm_large))/(t_gemm_small.elapsed()+t_gemm.elapsed()))/1.e9 << " GFlop/s" << std::endl;
+
       }
     }
     const std::size_t dupd = dim_upd();
