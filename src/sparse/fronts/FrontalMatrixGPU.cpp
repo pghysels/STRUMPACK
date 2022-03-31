@@ -42,7 +42,7 @@
 #endif
 
 
-#define VBATCHED_STATS
+// #define VBATCHED_STATS
 
 
 namespace strumpack {
@@ -260,7 +260,7 @@ namespace strumpack {
       dpivinfo_array = ipmem;  ipmem += Nsmall;
     }
 
-    static const int FRONT_SMALL = 0;
+    static const int FRONT_SMALL = 1024*1024;
     std::vector<FG_t*> f;
     std::size_t factor_size = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0, work_bytes = 0, ea_bytes = 0,
@@ -542,8 +542,16 @@ namespace strumpack {
 
     magma_init();
     magma_queue_t magma_q;
+
+#if defined(STRUMPACK_USE_CUDA)
     magma_queue_create_from_cuda
       (0, comp_stream, blas_handle, NULL, &magma_q);
+#elif defined(STRUMPACK_USE_HIP)
+    magma_queue_create_from_hip
+      (0, comp_stream, blas_handle, NULL, &magma_q);
+    // magma_queue_create(0, &magma_q);
+#endif
+
 #if defined(STRUMPACK_USE_KBLAS)
     kblasSetStream(kblas_handle, comp_stream);
     kblasEnableMagma(kblas_handle);
@@ -701,9 +709,9 @@ namespace strumpack {
 #if defined(VBATCHED_STATS)
 	t_laswp.start();
 #endif
-        gpu::laswp_fwd_vbatched
-          (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
-           d1, Nsmall);
+        // gpu::laswp_fwd_vbatched
+        //   (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
+        //    d1, Nsmall);
 #if defined(VBATCHED_STATS)
 	comp_stream.synchronize();
 	t_laswp.stop();

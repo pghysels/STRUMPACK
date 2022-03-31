@@ -36,9 +36,10 @@
 #include <memory>
 
 #include "DenseMatrix.hpp"
-#include "CUDAWrapper.hpp"
+// #include "CUDAWrapper.hpp"
 
 #include <magma_v2.h>
+#include <magma_auxiliary.h>
 #include <magma_svbatched.h>
 #include <magma_dvbatched.h>
 #include <magma_cvbatched.h>
