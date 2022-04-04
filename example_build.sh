@@ -176,19 +176,28 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export COMBBLAS_DIR=/home/pieterg/local/CombBLAS/install
     export COMBBLASAPP_DIR=/home/pieterg/local/CombBLAS/Applications
 
-    cmake ../ \
+    # -DCMAKE_CXX_FLAGS="-fsycl-targets=nvptx64-nvidia-cuda -fno-sycl-libspirv" \
+    #  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas64.a"
+    #  -DTPL_LAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/liblapack64.a"
+
+    /home/pieterg/local/cmake-3.22.3/bin/cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
-          -DSTRUMPACK_USE_MPI=ON \
+          -DCMAKE_CXX_COMPILER=dpcpp \
+          -DCMAKE_C_COMPILER=icx \
+          -DCMAKE_Fortran_COMPILER=ifx \
+          -DSTRUMPACK_USE_SYCL=ON \
+          -DSTRUMPACK_USE_BLAS64=OFF \
+          -DSTRUMPACK_USE_MPI=OFF \
           -DSTRUMPACK_USE_OPENMP=ON \
           -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
-          -DSTRUMPACK_USE_CUDA=ON \
+          -DSTRUMPACK_USE_CUDA=OFF \
           -DCMAKE_CUDA_ARCHITECTURES="75" \
           -DSTRUMPACK_USE_HIP=OFF \
           -DTPL_ENABLE_MAGMA=OFF \
           -DTPL_ENABLE_SLATE=OFF \
-          -DTPL_ENABLE_COMBBLAS=ON \
+          -DTPL_ENABLE_COMBBLAS=OFF \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 
 fi
@@ -201,14 +210,14 @@ if ! $found_host; then
 
     export METIS_DIR=$HOME/local/metis-5.1.0/install
     cmake ../ \
-	  -DCMAKE_BUILD_TYPE=Debug \
-	  -DCMAKE_CXX_COMPILER=dpcpp \
-	  -DCMAKE_C_COMPILER=icx \
-	  -DCMAKE_Fortran_COMPILER=ifx \
-	  -DSTRUMPACK_USE_MPI=OFF \
-	  -DCMAKE_INSTALL_PREFIX=../install \
-	  -DSTRUMPACK_USE_SYCL=ON \
-	  -DSTRUMPACK_COUNT_FLOPS=ON
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_COMPILER=dpcpp \
+          -DCMAKE_C_COMPILER=icx \
+          -DCMAKE_Fortran_COMPILER=ifx \
+          -DSTRUMPACK_USE_MPI=OFF \
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DSTRUMPACK_USE_SYCL=ON \
+          -DSTRUMPACK_COUNT_FLOPS=ON
 
     # -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -lmkl_sycl -lmkl_intel_ilp64 -lmkl_intel_thread -lmkl_core -lsycl -lOpenCL -liomp5 -lpthread -lm -ldl "
     # -DTPL_BLAS_LIBRARIES="-L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
