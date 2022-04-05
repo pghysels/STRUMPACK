@@ -111,9 +111,8 @@ namespace strumpack {
 
     void front_assembly(const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);
-    void factor_small_fronts(LInfo_t& L, std::size_t small_fronts,
-                             gpu::FrontData<scalar_t>* fdata,
-                             const SPOptions<scalar_t>& opts);
+    void factor_small_fronts(LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
+                             int* dinfo, const SPOptions<scalar_t>& opts);
 
     ReturnCode split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
                              int etree_level=0, int task_depth=0);

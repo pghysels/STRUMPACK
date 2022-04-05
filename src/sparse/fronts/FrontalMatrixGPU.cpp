@@ -106,7 +106,7 @@ namespace strumpack {
         }
         if (dsep > max_dsep) max_dsep = dsep;
       }
-      auto small_fronts = N8 + N16 + N24 + N32;
+      small_fronts = N8 + N16 + N24 + N32;
       if (small_fronts && small_fronts != f.size())
         std::partition
           (f.begin(), f.end(), [](const FG_t* const& a) -> bool {
@@ -138,7 +138,7 @@ namespace strumpack {
       work_bytes =
         round_to_16(sizeof(scalar_t) *
                    (Schur_size + getrf_work_size * max_streams)) +
-        round_to_16(sizeof(int) * (piv_size + max_streams)) +
+        round_to_16(sizeof(int) * (piv_size + f.size())) +  // pivots and ierr from getrf
         round_to_16(sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N24 + N32));
       ea_bytes =
         round_to_16(sizeof(gpu::AssembleData<scalar_t>) * f.size()) +
@@ -211,8 +211,7 @@ namespace strumpack {
         F->piv_ = imem;
         imem += F->dim_sep();
       }
-      dev_getrf_err = imem;
-      imem += max_streams;
+      dev_getrf_err = imem;   imem += f.size();
       auto fdat = reinterpret_cast<gpu::FrontData<scalar_t>*>
         (round_to_16(imem));
       f8 = fdat;   fdat += N8;
@@ -225,7 +224,7 @@ namespace strumpack {
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
       factors_small = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0,  work_bytes = 0, ea_bytes = 0,
-      N8 = 0, N16 = 0, N24 = 0, N32 = 0;
+      N8 = 0, N16 = 0, N24 = 0, N32 = 0, small_fronts = 0;
     std::vector<std::size_t> elems11, elems12, elems21, Isize;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
@@ -366,11 +365,11 @@ namespace strumpack {
 
   template<typename scalar_t, typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
-  (LInfo_t& L, std::size_t small_fronts, gpu::FrontData<scalar_t>* fdata,
+  (LInfo_t& L, gpu::FrontData<scalar_t>* fdata, int* dinfo,
    const SPOptions<scalar_t>& opts) {
-    if (!small_fronts) return;
+    if (!L.small_fronts) return;
     for (std::size_t n=0, n8=0, n16=L.N8, n24=n16+L.N16, n32=n24+L.N24;
-         n<small_fronts; n++) {
+         n<L.small_fronts; n++) {
       auto& f = *(L.f[n]);
       const auto dsep = f.dim_sep();
       gpu::FrontData<scalar_t>
@@ -381,14 +380,13 @@ namespace strumpack {
       else if (dsep <= 24) fdata[n24++] = t;
       else                 fdata[n32++] = t;
     }
-    gpu::copy_host_to_device(L.f8, fdata, small_fronts);
+    gpu::copy_host_to_device(L.f8, fdata, L.small_fronts);
     auto replace = opts.replace_tiny_pivots();
     auto thresh = opts.pivot_threshold();
-    // TODO check info!
-    gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh);
-    gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16, replace, thresh);
-    gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh);
-    gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32, replace, thresh);
+    gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh, dinfo);
+    gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16, replace, thresh, dinfo+L.N8);
+    gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh, dinfo+L.N8+L.N16);
+    gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32, replace, thresh, dinfo+L.N8+L.N16+L.N24);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
@@ -451,18 +449,21 @@ namespace strumpack {
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
       gpu::copy_host_to_device(dF11, F11_);
-      // TODO check info code!!
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
+      int info;
+      gpu::copy_device_to_host(&info, dpiv+dsep, 1);
+      if (info) {
+        if (!opts.replace_tiny_pivots())
+          return ReturnCode::ZERO_PIVOT;
+        else err_code = ReturnCode::ZERO_PIVOT;
+      }
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
       gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
       gpu::copy_device_to_host(F11_, dF11);
-      if (opts.replace_tiny_pivots()) {
-        auto thresh = opts.pivot_threshold();
-        for (std::size_t i=0; i<F11_.rows(); i++)
-          if (std::abs(F11_(i,i)) < thresh)
-            F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
-      }
+      if (opts.replace_tiny_pivots())
+        gpu::replace_pivots
+          (F11_.rows(), dF11.data(), opts.pivot_threshold());
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
@@ -578,8 +579,7 @@ namespace strumpack {
         e_assemble.record();
 
         // default stream
-        std::size_t small_fronts = L.N8 + L.N16 + L.N24 + L.N32;
-        factor_small_fronts(L, small_fronts, fdata, opts);
+        factor_small_fronts(L, fdata, L.dev_getrf_err, opts);
         gpu::Event e_small;
         e_small.record();
 
@@ -590,9 +590,9 @@ namespace strumpack {
         // chunks, but a single chunk cannot be larger than the pinned
         // buffer
         const int nchunks = 16;
-        std::size_t Bf = (L.f.size()-small_fronts + nchunks - 1) / nchunks;
+        std::size_t Bf = (L.f.size()-L.small_fronts + nchunks - 1) / nchunks;
         std::vector<std::size_t> chunks, factors_chunk;
-        for (std::size_t n=small_fronts, fc=0, c=0; n<L.f.size(); n++) {
+        for (std::size_t n=L.small_fronts, fc=0, c=0; n<L.f.size(); n++) {
           auto& f = *(L.f[n]);
           const std::size_t dsep = f.dim_sep();
           const std::size_t dupd = f.dim_upd();
@@ -628,7 +628,7 @@ namespace strumpack {
             pinned.template as<scalar_t>() + max_pinned};
           std::vector<gpu::Event> events(chunks.size());
 
-          for (std::size_t c=0, n=small_fronts; c<chunks.size(); c++) {
+          for (std::size_t c=0, n=L.small_fronts; c<chunks.size(); c++) {
             int s = c % streams.size(), n0 = n;
 #pragma omp parallel
 #pragma omp single
@@ -648,19 +648,18 @@ namespace strumpack {
               {
                 for (std::size_t ci=0; ci<chunks[c]; ci++, n++) {
                   auto& f = *(L.f[n]);
-                  // TODO check info!!
                   gpu::getrf
                     (solver_handles[s], f.F11_,
                      L.dev_getrf_work + s * L.getrf_work_size,
-                     f.piv_, L.dev_getrf_err + s);
+                     f.piv_, L.dev_getrf_err + n);
                   if (opts.replace_tiny_pivots())
                     gpu::replace_pivots
                       (f.dim_sep(), f.F11_.data(),
-                       opts.pivot_threshold(), streams[s]);
+                       opts.pivot_threshold(), &streams[s]);
                   if (f.dim_upd()) {
                     gpu::getrs
                       (solver_handles[s], Trans::N, f.F11_, f.piv_,
-                       f.F12_, L.dev_getrf_err + s);
+                       f.F12_, L.dev_getrf_err + n);
                     gpu::gemm
                       (blas_handles[s], Trans::N, Trans::N,
                        scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);
@@ -683,11 +682,20 @@ namespace strumpack {
 
         L.f[0]->pivot_mem_.resize(L.piv_size);
         copy_stream.synchronize();
-
         gpu::copy_device_to_host
           (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
+
+        std::vector<int> getrf_infos(L.f.size());
+        gpu::copy_device_to_host
+          (getrf_infos.data(), L.dev_getrf_err, L.f.size());
+        for (auto ierr : getrf_infos)
+          if (ierr) {
+            if (!opts.replace_tiny_pivots())
+              return ReturnCode::ZERO_PIVOT;
+            else err_code = ReturnCode::ZERO_PIVOT;
+          }
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;
         abort();
