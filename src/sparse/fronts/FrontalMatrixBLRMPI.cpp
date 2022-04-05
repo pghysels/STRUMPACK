@@ -229,15 +229,26 @@ namespace strumpack {
     extend_add_cols(i, part, CP, opts);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (visit(lchild_))
-      lchild_->multifrontal_factorization
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (visit(lchild_)) {
+      auto el = lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-    if (visit(rchild_))
-      rchild_->multifrontal_factorization
+      if (el != ReturnCode::SUCCESS) {
+        if (!opts.replace_tiny_pivots()) return el;
+        else err_code = el;
+      }
+    }
+    if (visit(rchild_)) {
+      auto er = rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) {
+        if (!opts.replace_tiny_pivots()) return er;
+        else err_code = er;
+      }
+    }
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     if (opts.BLR_options().BLR_factor_algorithm() ==
@@ -350,6 +361,7 @@ namespace strumpack {
         std::cout << std::endl;
       }
     }
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void

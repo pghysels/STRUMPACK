@@ -53,21 +53,24 @@ namespace strumpack {
   public:
     EliminationTree() {}
 
-    EliminationTree
-    (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-     SeparatorTree<integer_t>& sep_tree);
+    EliminationTree(const SPOptions<scalar_t>& opts,
+                    const SpMat_t& A,
+                    SeparatorTree<integer_t>& sep_tree);
     virtual ~EliminationTree();
 
-    virtual void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts);
+    virtual ReturnCode
+    multifrontal_factorization(const SpMat_t& A,
+                               const SPOptions<scalar_t>& opts);
 
     virtual void move_to_gpu();
     virtual void remove_from_gpu();
     virtual void delete_factors();
 
     virtual void multifrontal_solve(DenseM_t& x) const;
-    virtual void multifrontal_solve_dist
-    (DenseM_t& x, const std::vector<integer_t>& dist) {} // TODO const
+
+    virtual void
+    multifrontal_solve_dist(DenseM_t& x,
+                            const std::vector<integer_t>& dist) {} // TODO const
 
     virtual integer_t maximum_rank() const;
     virtual long long factor_nonzeros() const;

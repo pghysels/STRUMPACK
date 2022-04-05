@@ -93,8 +93,8 @@ namespace strumpack {
                                      integer_t begin_col, integer_t end_col)
       const override;
 
-    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                    int etree_level=0, int task_depth=0)
+    ReturnCode multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                          int etree_level=0, int task_depth=0)
       override;
 
     void forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,

@@ -63,9 +63,9 @@ namespace strumpack {
     void update_values(const Opts_t& opts, const CSRMPI_t& A,
                        Reord_t& nd);
 
-    void multifrontal_factorization
-    (const CompressedSparseMatrix<scalar_t,integer_t>& A,
-     const Opts_t& opts) override;
+    ReturnCode
+    multifrontal_factorization(const CompressedSparseMatrix<scalar_t,integer_t>& A,
+                               const Opts_t& opts) override;
 
     void multifrontal_solve_dist(DenseM_t& x,
                                  const std::vector<integer_t>& dist) override;
@@ -148,34 +148,42 @@ namespace strumpack {
         is active. */
     std::vector<ParallelFront> all_pfronts_, local_pfronts_;
 
-    void symbolic_factorization
-    (std::vector<std::vector<integer_t>>& local_upd,
-     std::vector<float>& local_subtree_work,
-     std::vector<integer_t>& dsep_upd, float& dsep_work,
-     std::vector<integer_t>& dleaf_upd, float& dleaf_work);
+    void symbolic_factorization(std::vector<std::vector<integer_t>>& local_upd,
+                                std::vector<float>& local_subtree_work,
+                                std::vector<integer_t>& dsep_upd, float& dsep_work,
+                                std::vector<integer_t>& dleaf_upd, float& dleaf_work);
 
-    float symbolic_factorization_local
-    (integer_t sep, std::vector<std::vector<integer_t>>& upd,
-     std::vector<float>& subtree_work, int depth);
+    float symbolic_factorization_local(integer_t sep,
+                                       std::vector<std::vector<integer_t>>& upd,
+                                       std::vector<float>& subtree_work, int depth);
 
-    std::unique_ptr<F_t> proportional_mapping
-    (const Opts_t& opts,
-     std::vector<std::vector<integer_t>>& upd, std::vector<float>& subtree_work,
-     std::vector<integer_t>& dist_upd, std::vector<integer_t>& dleaf_upd,
-     std::vector<float>& dist_subtree_work,
-     integer_t dsep, int P0, int P, int P0_sibling, int P_sibling,
-     const MPIComm& fcomm, bool parent_compression, int level);
+    std::unique_ptr<F_t>
+    proportional_mapping(const Opts_t& opts,
+                         std::vector<std::vector<integer_t>>& upd,
+                         std::vector<float>& subtree_work,
+                         std::vector<integer_t>& dist_upd,
+                         std::vector<integer_t>& dleaf_upd,
+                         std::vector<float>& dist_subtree_work,
+                         integer_t dsep, int P0, int P,
+                         int P0_sibling, int P_sibling,
+                         const MPIComm& fcomm, bool parent_compression,
+                         int level);
 
-    std::unique_ptr<F_t> proportional_mapping_sub_graphs
-    (const Opts_t& opts, RedistSubTree<integer_t>& tree,
-     integer_t dsep, integer_t sep, int P0, int P, int P0_sibling,
-     int P_sibling, const MPIComm& fcomm, bool parent_compression, int level);
+    std::unique_ptr<F_t>
+    proportional_mapping_sub_graphs(const Opts_t& opts,
+                                    RedistSubTree<integer_t>& tree,
+                                    integer_t dsep, integer_t sep,
+                                    int P0, int P, int P0_sibling,
+                                    int P_sibling, const MPIComm& fcomm,
+                                    bool parent_compression, int level);
 
-    void communicate_distributed_separator
-    (integer_t dsep, const std::vector<integer_t>& dupd_send,
-     integer_t& dsep_begin, integer_t& dsep_end,
-     std::vector<integer_t>& dupd_recv, int P0, int P,
-     int P0_sibling, int P_sibling, int owner);
+    void
+    communicate_distributed_separator(integer_t dsep,
+                                      const std::vector<integer_t>& dupd_send,
+                                      integer_t& dsep_begin, integer_t& dsep_end,
+                                      std::vector<integer_t>& dupd_recv,
+                                      int P0, int P, int P0_sibling, int P_sibling,
+                                      int owner);
   };
 
 } // end namespace strumpack

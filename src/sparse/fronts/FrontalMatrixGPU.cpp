@@ -384,13 +384,14 @@ namespace strumpack {
     gpu::copy_host_to_device(L.f8, fdata, small_fronts);
     auto replace = opts.replace_tiny_pivots();
     auto thresh = opts.pivot_threshold();
+    // TODO check info!
     gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh);
     gpu::factor_block_batch<scalar_t,16>(L.N16, L.f16, replace, thresh);
     gpu::factor_block_batch<scalar_t,24>(L.N24, L.f24, replace, thresh);
     gpu::factor_block_batch<scalar_t,32>(L.N32, L.f32, replace, thresh);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixGPU<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
@@ -398,11 +399,23 @@ namespace strumpack {
       std::cout << "# Factorization does not fit in GPU memory, "
         "splitting in smaller traversals." << std::endl;
     const std::size_t dupd = dim_upd(), dsep = dim_sep();
-    if (lchild_)
-      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (rchild_)
-      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (lchild_) {
+      auto el = lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (el != ReturnCode::SUCCESS) {
+        if (!opts.replace_tiny_pivots()) return el;
+        else err_code = el;
+      }
+    }
+    if (rchild_) {
+      auto er = rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) {
+        if (!opts.replace_tiny_pivots()) return er;
+        else err_code = er;
+      }
+    }
     STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
     STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
     host_factors_.reset(new scalar_t[dsep*(dsep+2*dupd)]);
@@ -438,6 +451,7 @@ namespace strumpack {
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
       gpu::copy_host_to_device(dF11, F11_);
+      // TODO check info code!!
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
@@ -481,12 +495,14 @@ namespace strumpack {
                 << (float(level_flops) / level_time) / 1.e9
                 << " GFLOP/s" << std::endl;
     }
+    return err_code;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
+    ReturnCode err_code = ReturnCode::SUCCESS;
 #if defined(STRUMPACK_USE_MAGMA)
     if (opts.replace_tiny_pivots())
       magma_init();
@@ -502,10 +518,9 @@ namespace strumpack {
       L = LInfo_t(fp, solver_handles[0], max_streams, &A);
     }
     auto peak_dmem = peak_device_memory(ldata);
-    if (peak_dmem >= 0.9 * gpu::available_memory()) {
-      split_smaller(A, opts, etree_level, task_depth);
-      return;
-    }
+    if (peak_dmem >= 0.9 * gpu::available_memory())
+      return split_smaller(A, opts, etree_level, task_depth);
+
     std::vector<gpu::Stream> streams(max_streams);
     gpu::Stream copy_stream;
     std::vector<gpu::BLASHandle> blas_handles(max_streams);
@@ -633,6 +648,7 @@ namespace strumpack {
               {
                 for (std::size_t ci=0; ci<chunks[c]; ci++, n++) {
                   auto& f = *(L.f[n]);
+                  // TODO check info!!
                   gpu::getrf
                     (solver_handles[s], f.F11_,
                      L.dev_getrf_work + s * L.getrf_work_size,
@@ -667,6 +683,7 @@ namespace strumpack {
 
         L.f[0]->pivot_mem_.resize(L.piv_size);
         copy_stream.synchronize();
+
         gpu::copy_device_to_host
           (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         L.set_factor_pointers(L.f[0]->host_factors_.get());
@@ -699,6 +716,7 @@ namespace strumpack {
     if (opts.replace_tiny_pivots())
       magma_finalize();
 #endif
+    return err_code;
   }
 
 

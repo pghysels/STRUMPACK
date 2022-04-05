@@ -108,14 +108,14 @@ namespace strumpack {
 
     virtual void release_work_memory() = 0;
 
-    virtual void
+    virtual ReturnCode
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
                                int etree_level=0, int task_depth=0) = 0;
 
-    virtual void factor(const SpMat_t& A, const Opts_t& opts,
-                        VectorPool<scalar_t>& workspace,
-                        int etree_level=0, int task_depth=0) {
-      multifrontal_factorization(A, opts, etree_level, task_depth);
+    virtual ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
+                              VectorPool<scalar_t>& workspace,
+                              int etree_level=0, int task_depth=0) {
+      return multifrontal_factorization(A, opts, etree_level, task_depth);
     };
 
     virtual std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const {

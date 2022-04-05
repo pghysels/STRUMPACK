@@ -95,9 +95,9 @@ namespace strumpack {
     FrontalMatrixLossy(integer_t sep, integer_t sep_begin, integer_t sep_end,
                        std::vector<integer_t>& upd);
 
-    void factor(const SpMat_t& A, const SPOptions<scalar_t>& opts,
-                VectorPool<scalar_t>& workspace,
-                int etree_level=0, int task_depth=0) override;
+    ReturnCode factor(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                      VectorPool<scalar_t>& workspace,
+                      int etree_level=0, int task_depth=0) override;
 
     std::string type() const override { return "FrontalMatrixLossy"; }
 

@@ -142,12 +142,13 @@ namespace strumpack {
     F21 = F21c_.decompress();
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixLossy<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
-    FD_t::factor(A, opts, workspace, etree_level, task_depth);
+    auto e = FD_t::factor(A, opts, workspace, etree_level, task_depth);
     compress(opts);
+    return e;
   }
 
   template<typename scalar_t,typename integer_t> void
