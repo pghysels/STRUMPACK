@@ -152,10 +152,10 @@ namespace strumpack {
     return front;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   EliminationTree<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts) {
-    root_->multifrontal_factorization(A, opts);
+    return root_->multifrontal_factorization(A, opts);
   }
 
   template<typename scalar_t,typename integer_t> void

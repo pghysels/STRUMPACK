@@ -69,6 +69,16 @@ namespace strumpack {
     template<class T> struct cuda_type { typedef T value_type; };
     template<class T> struct cuda_type<std::complex<T>> { typedef thrust::complex<T> value_type; };
 
+    __device__ float real_part(float& a) { return a; }
+    __device__ double real_part(double& a) { return a; }
+    __device__ float real_part(thrust::complex<float>& a) { return a.real(); }
+    __device__ double real_part(thrust::complex<double>& a) { return a.real(); }
+
+    __device__ float absolute_value(float& a) { return fabsf(a); }
+    __device__ double absolute_value(double& a) { return fabs(a); }
+    __device__ float absolute_value(thrust::complex<float>& a) { return thrust::abs(a); }
+    __device__ double absolute_value(thrust::complex<double>& a) { return thrust::abs(a); }
+
 
     /**
      * Put elements of the sparse matrix in the F11, F12 and F21 parts
@@ -261,9 +271,9 @@ namespace strumpack {
 #if 0
         if (j == k && i == k) {
           p = k;
-          Mmax = abs(M[k+k*NT]);
+          Mmax = absolute_value(M[k+k*NT]);
           for (int l=k+1; l<n; l++) {
-            auto tmp = abs(M[l+k*NT]);
+            auto tmp = absolute_value(M[l+k*NT]);
             if (tmp > Mmax) {
               Mmax = tmp;
               p = l;
@@ -273,13 +283,13 @@ namespace strumpack {
         }
 #else
         if (j == k && i >= k)
-          cabs[i] = abs(M[i+j*NT]);
+          cabs[i] = absolute_value(M[i+j*NT]);
         __syncthreads();
         if (j == k && i == k) {
           p = k;
-          Mmax = cabs[k]; //abs(M[k+k*NT]);
+          Mmax = cabs[k];
           for (int l=k+1; l<n; l++) {
-            auto tmp = cabs[l]; //abs(M[l+k*NT]);
+            auto tmp = cabs[l];
             if (tmp > Mmax) {
               Mmax = tmp;
               p = l;
@@ -316,11 +326,6 @@ namespace strumpack {
       return info;
     }
 
-    __device__ float real_part(float& a) { return a; }
-    __device__ double real_part(double& a) { return a; }
-    __device__ float real_part(thrust::complex<float>& a) { return a.real(); }
-    __device__ double real_part(thrust::complex<double>& a) { return a.real(); }
-
     template<typename T, int NT, typename real_t> __global__ void
     LU_block_kernel_batched(FrontData<T>* dat, bool replace, real_t thresh) {
       FrontData<T>& A = dat[blockIdx.x];
@@ -329,7 +334,7 @@ namespace strumpack {
         int i = threadIdx.x, j = threadIdx.y;
         if (i == j && i < A.n1) {
           std::size_t k = i + i*A.n1;
-          if (abs(A.F11[k]) < thresh)
+          if (absolute_value(A.F11[k]) < thresh)
             A.F11[k] = (real_part(A.F11[k]) < 0) ? -thresh : thresh;
         }
       }
@@ -340,7 +345,7 @@ namespace strumpack {
       int i = blockIdx.x * blockDim.x + threadIdx.x;
       if (i < n) {
         std::size_t k = i + i*n;
-        if (abs(A[k]) < thresh)
+        if (absolute_value(A[k]) < thresh)
           A[k] = (real_part(A[k]) < 0) ? -thresh : thresh;
       }
     }

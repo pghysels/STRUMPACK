@@ -69,10 +69,10 @@ namespace strumpack {
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
 
-    void multifrontal_factorization(const SpMat_t& A,
-                                    const SPOptions<scalar_t>& opts,
-                                    int etree_level=0,
-                                    int task_depth=0) override;
+    ReturnCode multifrontal_factorization(const SpMat_t& A,
+                                          const SPOptions<scalar_t>& opts,
+                                          int etree_level=0,
+                                          int task_depth=0) override;
 
     std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const override;
 
@@ -114,21 +114,9 @@ namespace strumpack {
     void factor_small_fronts(LInfo_t& L, std::size_t small_fronts,
                              gpu::FrontData<scalar_t>* fdata,
                              const SPOptions<scalar_t>& opts);
-    // void factor_large_fronts(LInfo_t& L,
-    //                          std::vector<gpu::BLASHandle>& blas_handles,
-    //                          std::vector<gpu::SOLVERHandle>& solver_handles,
-    //                          std::vector<gpu::Stream>& streams,
-    //                          const SPOptions<scalar_t>& opts);
-    // void factor_largest_fronts(LInfo_t& L,
-    //                            std::size_t small_fronts,
-    //                            std::vector<gpu::BLASHandle>& blas_handles,
-    //                            std::vector<gpu::SOLVERHandle>& solver_handles,
-    //                            std::vector<gpu::Stream>& streams,
-    //                            gpu::Stream& copy_streams, scalar_t* pin,
-    //                            const SPOptions<scalar_t>& opts);
 
-    void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
-                       int etree_level=0, int task_depth=0);
+    ReturnCode split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+                             int etree_level=0, int task_depth=0);
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const;

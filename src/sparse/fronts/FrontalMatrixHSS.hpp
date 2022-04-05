@@ -70,9 +70,9 @@ namespace strumpack {
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override;
 
-    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                    int etree_level=0,
-                                    int task_depth=0) override;
+    ReturnCode multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                          int etree_level=0,
+                                          int task_depth=0) override;
 
     void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
                                     int etree_level=0,
@@ -118,9 +118,10 @@ namespace strumpack {
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
-    void multifrontal_factorization_node(const SpMat_t& A,
-                                         const Opts_t& opts, int etree_level,
-                                         int task_depth);
+    ReturnCode multifrontal_factorization_node(const SpMat_t& A,
+                                               const Opts_t& opts,
+                                               int etree_level,
+                                               int task_depth);
 
     void fwd_solve_node(DenseM_t& b, DenseM_t* work,
                         int etree_level, int task_depth) const;

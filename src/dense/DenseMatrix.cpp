@@ -580,7 +580,7 @@ namespace strumpack {
     piv.resize(rows());
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -932,7 +932,7 @@ namespace strumpack {
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -941,11 +941,10 @@ namespace strumpack {
         (char(ta), char(tb), c.rows(), c.cols(),
          (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
          b.data(), b.ld(), beta, c.data(), c.ld(), depth);
-    else{
+    else
       blas::gemm(char(ta), char(tb), c.rows(), c.cols(),
                  (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
                  b.data(), b.ld(), beta, c.data(), c.ld());
-    }
   }
 
 
@@ -957,7 +956,7 @@ namespace strumpack {
            (ta!=Trans::N && a.cols()==c.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -983,7 +982,7 @@ namespace strumpack {
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1016,7 +1015,7 @@ namespace strumpack {
        int depth) {
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1049,7 +1048,7 @@ namespace strumpack {
        int depth) {
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1077,7 +1076,7 @@ namespace strumpack {
     assert(a.rows() == a.cols() && a.cols() == b.rows());
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1107,7 +1106,7 @@ namespace strumpack {
     assert(ta == Trans::N || (a.cols() == y.rows() && a.rows() == x.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1137,7 +1136,7 @@ namespace strumpack {
     assert(ta == Trans::N || (a.cols() == y.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1148,7 +1147,7 @@ namespace strumpack {
     else
       blas::gemv(char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
                  x, incx, beta, y.data(), 1);
- }
+  }
 
   /**
    * DGEMV performs one of the matrix-vector operations
@@ -1167,7 +1166,7 @@ namespace strumpack {
     assert(ta == Trans::N || (a.rows() == x.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1194,7 +1193,7 @@ namespace strumpack {
        scalar_t* y, int incy, int depth) {
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif

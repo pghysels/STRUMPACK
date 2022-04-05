@@ -146,75 +146,82 @@ namespace strumpack {
     extend_add();
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
-    if (this->dim_sep() && grid()->active()) {
-      TaskTimer pf("FrontalMatrixDenseMPI_factor");
-      pf.start();
-      int info = 0;
+    ReturnCode e = ReturnCode::SUCCESS;
+    if (!this->dim_sep() || !grid()->active())
+      return e;
+    TaskTimer pf("FrontalMatrixDenseMPI_factor");
+    pf.start();
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-      if (opts.use_gpu())
-        slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
-      auto slateF11 = slate_matrix(F11_);
-      // TODO get return value
-      slate::getrf(slateF11, slate_piv_, slate_opts_);
+    if (opts.use_gpu())
+      slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
+    auto slateF11 = slate_matrix(F11_);
+    // TODO get return value
+    slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
-      info = F11_.LU(piv);
-#endif
-      if (info || opts.replace_tiny_pivots()) {
-        auto thresh = opts.pivot_threshold();
-        int prow = F11_.prow(), pcol = F11_.pcol();
-        for (int i=0; i<F11_.rows(); i++) {
-          int pr = F11_.rowg2p_fixed(i);
-          if (pr != prow) continue;
-          int pc = F11_.colg2p_fixed(i);
-          if (pc != pcol) continue;
-          auto& Fii = F11_.global_fixed(i,i);
-          if (std::abs(Fii) < thresh)
-            Fii = (std::real(Fii) < 0) ? -thresh : thresh;
-        }
-      }
-      long long flops = LU_flops(F11_);
-      if (this->dim_upd()) {
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-        auto slateF12 = slate_matrix(F12_);
-        auto slateF21 = slate_matrix(F21_);
-        auto slateF22 = slate_matrix(F22_);
-        slate::getrs(slateF11, slate_piv_, slateF12, slate_opts_);
-        slate::gemm(scalar_t(-1.), slateF21, slateF12,
-                    scalar_t(1.), slateF22, slate_opts_);
-#else
-        F12_.laswp(piv, true);
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, F12_);
-        trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
-#endif
-        flops += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
-          trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
-          trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
-      }
-      if (Comm().is_root() && opts.verbose()) {
-        auto time = pf.elapsed();
-        std::cout << "# DenseMPI factorization complete, "
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-                  << "GPU=" << opts.use_gpu()
-#else
-                  << "no GPU support"
-#endif
-                  << ", P=" << Comm().size() << ", T=" << params::num_threads
-                  << ": " << time << " seconds, "
-                  << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
-                  << (float(flops)*F11_.npactives() / time) / 1.e9 << " GFLOP/s, "
-                  << " ds=" << this->dim_sep()
-                  << ", du=" << this->dim_upd() << std::endl;
-      }
-      STRUMPACK_FULL_RANK_FLOPS(flops);
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-      STRUMPACK_FLOPS(flops);
-#endif
+    auto info = F11_.LU(piv);
+    if (info) {
+      if (!opts.replace_tiny_pivots())
+        return ReturnCode::ZERO_PIVOT;
+      else e = ReturnCode::ZERO_PIVOT;
     }
+#endif
+    if (opts.replace_tiny_pivots()) {
+      auto thresh = opts.pivot_threshold();
+      int prow = F11_.prow(), pcol = F11_.pcol();
+      for (int i=0; i<F11_.rows(); i++) {
+        int pr = F11_.rowg2p_fixed(i);
+        if (pr != prow) continue;
+        int pc = F11_.colg2p_fixed(i);
+        if (pc != pcol) continue;
+        auto& Fii = F11_.global_fixed(i,i);
+        if (std::abs(Fii) < thresh)
+          Fii = (std::real(Fii) < 0) ? -thresh : thresh;
+      }
+    }
+    long long flops = LU_flops(F11_);
+    if (this->dim_upd()) {
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      auto slateF12 = slate_matrix(F12_);
+      auto slateF21 = slate_matrix(F21_);
+      auto slateF22 = slate_matrix(F22_);
+      slate::getrs(slateF11, slate_piv_, slateF12, slate_opts_);
+      slate::gemm(scalar_t(-1.), slateF21, slateF12,
+                  scalar_t(1.), slateF22, slate_opts_);
+#else
+      F12_.laswp(piv, true);
+      trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, F12_);
+      trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
+#endif
+      flops += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
+        trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
+        trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
+    }
+    if (Comm().is_root() && opts.verbose()) {
+      auto time = pf.elapsed();
+      std::cout << "# DenseMPI factorization complete, "
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+                << "GPU=" << opts.use_gpu()
+#else
+                << "no GPU support"
+#endif
+                << ", P=" << Comm().size() << ", T=" << params::num_threads
+                << ": " << time << " seconds, "
+                << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
+                << (float(flops)*F11_.npactives() / time) / 1.e9 << " GFLOP/s, "
+                << " ds=" << this->dim_sep()
+                << ", du=" << this->dim_upd() << std::endl;
+    }
+    STRUMPACK_FULL_RANK_FLOPS(flops);
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    STRUMPACK_FLOPS(flops);
+#endif
+    return e;
   }
+
 
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
   template<typename scalar_t,typename integer_t> slate::Matrix<scalar_t>
@@ -225,19 +232,27 @@ namespace strumpack {
   }
 #endif
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDenseMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    if (visit(lchild_))
-      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (visit(rchild_))
-      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    // TaskTimer t("FrontalMatrixDenseMPI_factor");
-    // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    ReturnCode e = ReturnCode::SUCCESS;
+    if (visit(lchild_)) {
+      auto el = lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
+      if (el != ReturnCode::SUCCESS) {
+        if (!opts.replace_tiny_pivots()) return el;
+        else e = el;
+      }
+    }
+    if (visit(rchild_)) {
+      auto er = rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) {
+        if (!opts.replace_tiny_pivots()) return er;
+        else e = er;
+      }
+    }
     build_front(A);
     if (etree_level == 0 && opts.write_root_front()) {
-      //F11_.print_to_files("Froot");
       auto Fs = F11_.gather();
       std::string fname = is_complex<scalar_t>() ?
         "Froot_colmajor_complex_" : "Froot_colmajor_real_";
@@ -251,16 +266,12 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
-    partial_factorization(opts);
+    auto ef = partial_factorization(opts);
+    if (ef != ReturnCode::SUCCESS) e = ef;
 #if defined(STRUMPACK_USE_ZFP)
     compress(opts);
 #endif
-    // if (etree_level == 0 && opts.print_root_front_stats()) {
-    //   auto time = t.elapsed();
-    //   if (Comm().is_root())
-    //     std::cout << "#   - DenseMPI root front: Nsep= " << this->dim_sep()
-    //               << " , time= " << time << " sec" << std::endl;
-    // }
+    return e;
   }
 
 #if defined(STRUMPACK_USE_ZFP)

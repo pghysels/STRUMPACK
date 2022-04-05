@@ -231,11 +231,11 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_factorization
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
    const Opts_t& opts) {
-    this->root_->multifrontal_factorization(Aprop_, opts);
+    return this->root_->multifrontal_factorization(Aprop_, opts);
   }
 
   template<typename scalar_t,typename integer_t> void

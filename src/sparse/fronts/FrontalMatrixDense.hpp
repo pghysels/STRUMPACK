@@ -91,15 +91,15 @@ namespace strumpack {
     void sample_CB_to_F22(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
                           int task_depth=0) const override;
 
-    virtual void
+    virtual ReturnCode
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
                                int etree_level=0, int task_depth=0) override {
       VectorPool<scalar_t> workspace;
-      factor(A, opts, workspace, etree_level, task_depth);
+      return factor(A, opts, workspace, etree_level, task_depth);
     }
-    virtual void factor(const SpMat_t& A, const Opts_t& opts,
-                        VectorPool<scalar_t>& workspace,
-                        int etree_level=0, int task_depth=0) override;
+    virtual ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
+                              VectorPool<scalar_t>& workspace,
+                              int etree_level=0, int task_depth=0) override;
 
     void
     forward_multifrontal_solve(DenseM_t& b, DenseM_t* work, int etree_level=0,
@@ -143,11 +143,11 @@ namespace strumpack {
     FrontalMatrixDense(const FrontalMatrixDense&) = delete;
     FrontalMatrixDense& operator=(FrontalMatrixDense const&) = delete;
 
-    void factor_phase1(const SpMat_t& A, const Opts_t& opts,
-                       VectorPool<scalar_t>& workspace,
-                       int etree_level, int task_depth);
-    void factor_phase2(const SpMat_t& A, const Opts_t& opts,
-                       int etree_level, int task_depth);
+    ReturnCode factor_phase1(const SpMat_t& A, const Opts_t& opts,
+                             VectorPool<scalar_t>& workspace,
+                             int etree_level, int task_depth);
+    ReturnCode factor_phase2(const SpMat_t& A, const Opts_t& opts,
+                             int etree_level, int task_depth);
 
     virtual void
     fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd, int etree_level,

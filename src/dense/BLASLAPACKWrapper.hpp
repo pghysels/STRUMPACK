@@ -204,7 +204,10 @@ namespace strumpack {
     int ilaenv(int ispec, char name[], char opts[],
                int n1, int n2, int n3, int n4);
 
-    template<typename real> inline real lamch(char cmach);
+    template<typename scalar> inline
+    typename RealType<scalar>::value_type lamch(char cmach) {
+      return lamch<typename RealType<scalar>::value_type>(cmach);
+    }
     template<> float lamch<float>(char cmach);
     template<> double lamch<double>(char cmach);
 
