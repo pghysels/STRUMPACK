@@ -422,18 +422,12 @@ namespace strumpack {
     if (lchild_) {
       auto el = lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-      if (el != ReturnCode::SUCCESS) {
-        if (!opts.replace_tiny_pivots()) return el;
-        else err_code = el;
-      }
+      if (el != ReturnCode::SUCCESS) err_code = el;
     }
     if (rchild_) {
       auto er = rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-      if (er != ReturnCode::SUCCESS) {
-        if (!opts.replace_tiny_pivots()) return er;
-        else err_code = er;
-      }
+      if (er != ReturnCode::SUCCESS) err_code = er;
     }
     if (!this->dim_blk()) return err_code;
     TaskTimer t("");

@@ -401,18 +401,12 @@ namespace strumpack {
     if (lchild_) {
       auto el = lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-      if (el != ReturnCode::SUCCESS) {
-        if (!opts.replace_tiny_pivots()) return el;
-        else err_code = el;
-      }
+      if (el != ReturnCode::SUCCESS) err_code = el;
     }
     if (rchild_) {
       auto er = rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-      if (er != ReturnCode::SUCCESS) {
-        if (!opts.replace_tiny_pivots()) return er;
-        else err_code = er;
-      }
+      if (er != ReturnCode::SUCCESS) err_code = er;
     }
     STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
     STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
@@ -452,11 +446,7 @@ namespace strumpack {
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
       int info;
       gpu::copy_device_to_host(&info, dpiv+dsep, 1);
-      if (info) {
-        if (!opts.replace_tiny_pivots())
-          return ReturnCode::ZERO_PIVOT;
-        else err_code = ReturnCode::ZERO_PIVOT;
-      }
+      if (info) err_code = ReturnCode::ZERO_PIVOT;
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
       gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
@@ -692,9 +682,8 @@ namespace strumpack {
           (getrf_infos.data(), L.dev_getrf_err, L.f.size());
         for (auto ierr : getrf_infos)
           if (ierr) {
-            if (!opts.replace_tiny_pivots())
-              return ReturnCode::ZERO_PIVOT;
-            else err_code = ReturnCode::ZERO_PIVOT;
+            err_code = ReturnCode::ZERO_PIVOT;
+            break;
           }
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;

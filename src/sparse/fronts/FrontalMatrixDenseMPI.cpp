@@ -149,9 +149,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
-    ReturnCode e = ReturnCode::SUCCESS;
+    ReturnCode err_code = ReturnCode::SUCCESS;
     if (!this->dim_sep() || !grid()->active())
-      return e;
+      return err_code;
     TaskTimer pf("FrontalMatrixDenseMPI_factor");
     pf.start();
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
@@ -161,12 +161,8 @@ namespace strumpack {
     // TODO get return value
     slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
-    auto info = F11_.LU(piv);
-    if (info) {
-      if (!opts.replace_tiny_pivots())
-        return ReturnCode::ZERO_PIVOT;
-      else e = ReturnCode::ZERO_PIVOT;
-    }
+    if (F11_.LU(piv))
+      err_code = ReturnCode::ZERO_PIVOT;
 #endif
     if (opts.replace_tiny_pivots()) {
       auto thresh = opts.pivot_threshold();
@@ -219,7 +215,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
     STRUMPACK_FLOPS(flops);
 #endif
-    return e;
+    return err_code;
   }
 
 
@@ -236,20 +232,16 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    ReturnCode e = ReturnCode::SUCCESS;
+    ReturnCode err_code = ReturnCode::SUCCESS;
     if (visit(lchild_)) {
-      auto el = lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-      if (el != ReturnCode::SUCCESS) {
-        if (!opts.replace_tiny_pivots()) return el;
-        else e = el;
-      }
+      auto el = lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (el != ReturnCode::SUCCESS) err_code = el;
     }
     if (visit(rchild_)) {
-      auto er = rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-      if (er != ReturnCode::SUCCESS) {
-        if (!opts.replace_tiny_pivots()) return er;
-        else e = er;
-      }
+      auto er = rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) err_code = er;
     }
     build_front(A);
     if (etree_level == 0 && opts.write_root_front()) {
@@ -267,11 +259,11 @@ namespace strumpack {
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
     auto ef = partial_factorization(opts);
-    if (ef != ReturnCode::SUCCESS) e = ef;
+    if (ef != ReturnCode::SUCCESS) err_code = ef;
 #if defined(STRUMPACK_USE_ZFP)
     compress(opts);
 #endif
-    return e;
+    return err_code;
   }
 
 #if defined(STRUMPACK_USE_ZFP)
