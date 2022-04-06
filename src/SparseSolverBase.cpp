@@ -152,6 +152,19 @@ namespace strumpack {
     return Krylov_its_;
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) {
+    neg = zero = pos = 0;
+    if (opts_.matching() != MatchingJob::NONE)
+      return ReturnCode::INACCURATE_INERTIA;
+    if (!this->factored_) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    return tree()->inertia(neg, zero, pos);
+  }
+
   template<typename scalar_t,typename integer_t> void
   SparseSolverBase<scalar_t,integer_t>::draw
   (const std::string& name) const {

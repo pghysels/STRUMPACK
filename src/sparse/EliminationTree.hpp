@@ -75,9 +75,17 @@ namespace strumpack {
     virtual integer_t maximum_rank() const;
     virtual long long factor_nonzeros() const;
     virtual long long dense_factor_nonzeros() const;
+
+    virtual ReturnCode inertia(integer_t& neg,
+                               integer_t& zero,
+                               integer_t& pos) const;
+
     void print_rank_statistics(std::ostream &out) const;
+
     virtual FrontCounter front_counter() const { return nr_fronts_; }
+
     void draw(const SpMat_t& A, const std::string& name) const;
+
     F_t* root() const;
 
   protected:

@@ -138,7 +138,7 @@ namespace strumpack {
     DenseM_t F11_, F12_, F21_;
     DenseMW_t F22_;
     std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
-    std::vector<int> piv; // regular int because it is passed to BLAS
+    std::vector<int> piv_; // regular int because it is passed to BLAS
 
     FrontalMatrixDense(const FrontalMatrixDense&) = delete;
     FrontalMatrixDense& operator=(FrontalMatrixDense const&) = delete;
@@ -155,6 +155,14 @@ namespace strumpack {
     virtual void
     bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd, int etree_level,
                      int task_depth) const;
+
+    ReturnCode matrix_inertia(const DenseM_t& F,
+                              integer_t& neg,
+                              integer_t& zero,
+                              integer_t& pos) const;
+    virtual ReturnCode node_inertia(integer_t& neg,
+                                    integer_t& zero,
+                                    integer_t& pos) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;

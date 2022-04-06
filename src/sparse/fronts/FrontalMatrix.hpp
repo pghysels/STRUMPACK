@@ -121,7 +121,6 @@ namespace strumpack {
     virtual std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const {
       return nullptr;
     }
-    //{ return std::unique_ptr<GPUFactors<scalar_t>>(); }
 
     virtual void delete_factors() {}
 
@@ -144,6 +143,11 @@ namespace strumpack {
                           int etree_level, int task_depth) const;
     void bwd_solve_phase2(DenseM_t& y, DenseM_t& yupd, DenseM_t* work,
                           int etree_level, int task_depth) const;
+
+
+    ReturnCode inertia(integer_t& neg,
+                       integer_t& zero,
+                       integer_t& pos) const;
 
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
@@ -379,6 +383,12 @@ namespace strumpack {
                            integer_t* sorder,
                            bool is_root=true, int task_depth=0);
 
+    virtual ReturnCode node_inertia(integer_t& neg,
+                                    integer_t& zero,
+                                    integer_t& pos) const {
+      return ReturnCode::INACCURATE_INERTIA;
+    }
+
   private:
     FrontalMatrix(const FrontalMatrix&) = delete;
     FrontalMatrix& operator=(FrontalMatrix const&) = delete;
@@ -386,8 +396,7 @@ namespace strumpack {
     virtual void draw_node(std::ostream& of, bool is_root) const;
 
     virtual long long dense_node_factor_nonzeros() const {
-      long long dsep = dim_sep();
-      long long dupd = dim_upd();
+      long long dsep = dim_sep(), dupd = dim_upd();
       return dsep * (dsep + 2 * dupd);
     }
   };

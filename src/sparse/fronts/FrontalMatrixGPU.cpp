@@ -1317,6 +1317,21 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixGPU<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    using real_t = typename RealType<scalar_t>::value_type;
+    for (std::size_t i=0; i<F11_.rows(); i++) {
+      if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
+      auto absFii = std::abs(F11_(i, i));
+      if (absFii > real_t(0.)) pos++;
+      else if (absFii < real_t(0.)) neg++;
+      else if (absFii == real_t(0.)) zero++;
+      else std::cerr << "F(" << i << "," << i << ")=" << F11_(i,i) << std::endl;
+    }
+    return ReturnCode::SUCCESS;
+  }
+
   // explicit template instantiations
   template class FrontalMatrixGPU<float,int>;
   template class FrontalMatrixGPU<double,int>;

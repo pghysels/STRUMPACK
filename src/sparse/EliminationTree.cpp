@@ -206,6 +206,12 @@ namespace strumpack {
     return nonzeros;
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  EliminationTree<scalar_t,integer_t>::inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    return root_->inertia(neg, zero, pos);
+  }
+
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::draw
   (const SpMat_t& A, const std::string& name) const {

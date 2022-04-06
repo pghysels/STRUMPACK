@@ -115,6 +115,10 @@ namespace strumpack {
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
                           int etree_level, int task_depth) const override;
 
+    virtual ReturnCode node_inertia(integer_t& neg,
+                                    integer_t& zero,
+                                    integer_t& pos) const override;
+
     FrontalMatrixLossy(const FrontalMatrixLossy&) = delete;
     FrontalMatrixLossy& operator=(FrontalMatrixLossy const&) = delete;
   };

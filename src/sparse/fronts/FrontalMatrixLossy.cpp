@@ -158,7 +158,7 @@ namespace strumpack {
     decompress(F11, F12, F21);
     if (this->dim_sep()) {
       DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      bloc.laswp(this->piv, true);
+      bloc.laswp(this->piv_, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11, bloc, task_depth);
         if (this->dim_upd())
@@ -194,6 +194,12 @@ namespace strumpack {
              F11, yloc, task_depth);
       }
     }
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixLossy<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    return this->matrix_inertia(F11c_.decompress(), neg, zero, pos);
   }
 
   // explicit template instantiations

@@ -506,6 +506,43 @@ namespace strumpack {
     piv = std::vector<int>();
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::matrix_inertia
+  (const DistM_t& F, integer_t& neg, integer_t& zero, integer_t& pos) const {
+    using real_t = typename RealType<scalar_t>::value_type;
+    int prow = F.prow(), pcol = F.pcol();
+    for (int i=0; i<F.rows(); i++) {
+      int pr = F.rowg2p_fixed(i);
+      if (pr != prow) continue;
+      int pc = F.colg2p_fixed(i);
+      if (pc != pcol) continue;
+      if (piv[F.rowg2l(i)] != int(i+1))
+        return ReturnCode::INACCURATE_INERTIA;
+      real_t Fii = std::abs(F.global(i,i));
+      if (Fii > real_t(0.)) pos++;
+      else if (Fii < real_t(0.)) neg++;
+      else if (Fii == real_t(0.)) zero++;
+      else std::cerr << "F(" << i << "," << i << ")=" << Fii << std::endl;
+    }
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    if (!this->dim_sep() || !grid()->active())
+      return ReturnCode::SUCCESS;
+#if defined(STRUMPACK_USE_ZFP)
+    if (compressed_) {
+      DistM_t F11(grid(), this->dim_sep(), this->dim_sep());
+      auto f = F11.dense_wrapper();
+      F11c_.decompress(f);
+      return matrix_inertia(F11, neg, zero, pos);
+    }
+#endif
+    return matrix_inertia(F11_, neg, zero, pos);
+  }
+
   // explicit template instantiations
   template class FrontalMatrixDenseMPI<float,int>;
   template class FrontalMatrixDenseMPI<double,int>;

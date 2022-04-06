@@ -55,6 +55,37 @@ namespace strumpack {
     F22_.clear();
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDense<scalar_t,integer_t>::matrix_inertia
+  (const DenseM_t& F, integer_t& neg, integer_t& zero, integer_t& pos) const {
+    using real_t = typename RealType<scalar_t>::value_type;
+    for (std::size_t i=0; i<F.rows(); i++) {
+      if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
+      auto absFii = std::abs(F(i, i));
+      if (absFii > real_t(0.)) pos++;
+      else if (absFii < real_t(0.)) neg++;
+      else if (absFii == real_t(0.)) zero++;
+      else std::cerr << "F(" << i << "," << i << ")=" << F(i,i) << std::endl;
+    }
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDense<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    // using real_t = typename RealType<scalar_t>::value_type;
+    // for (std::size_t i=0; i<F11_.rows(); i++) {
+    //   if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
+    //   auto absFii = std::abs(F11_(i, i));
+    //   if (absFii > real_t(0.)) pos++;
+    //   else if (absFii < real_t(0.)) neg++;
+    //   else if (absFii == real_t(0.)) zero++;
+    //   else std::cerr << "F(" << i << "," << i << ")=" << F11_(i,i) << std::endl;
+    // }
+    // return ReturnCode::SUCCESS;
+    return matrix_inertia(F11_, neg, zero, pos);
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
@@ -255,7 +286,7 @@ namespace strumpack {
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (dim_sep()) {
-      auto info = F11_.LU(piv, task_depth);
+      auto info = F11_.LU(piv_, task_depth);
       if (info) {
         if (!opts.replace_tiny_pivots())
           return ReturnCode::ZERO_PIVOT;
@@ -268,7 +299,7 @@ namespace strumpack {
             F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
       }
       if (dim_upd()) {
-        F12_.laswp(piv, true);
+        F12_.laswp(piv_, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
              scalar_t(1.), F11_, F12_, task_depth);
         trsm(Side::R, UpLo::U, Trans::N, Diag::N,
@@ -308,7 +339,7 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      bloc.laswp(piv, true);
+      bloc.laswp(piv_, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11_, bloc, task_depth);
         if (dim_upd())
@@ -538,7 +569,7 @@ namespace strumpack {
     F12_ = DenseM_t();
     F21_ = DenseM_t();
     F22_ = DenseMW_t();
-    piv = std::vector<int>();
+    piv_ = std::vector<int>();
   }
 
 #if defined(STRUMPACK_USE_MPI)

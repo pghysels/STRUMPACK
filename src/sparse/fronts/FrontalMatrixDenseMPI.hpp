@@ -151,6 +151,14 @@ namespace strumpack {
     void decompress(DistM_t& F11, DistM_t& F12, DistM_t& F21) const;
 #endif
 
+    ReturnCode matrix_inertia(const DistM_t& F,
+                              integer_t& neg,
+                              integer_t& zero,
+                              integer_t& pos) const;
+    ReturnCode node_inertia(integer_t& neg,
+                            integer_t& zero,
+                            integer_t& pos) const override;
+
     using F_t::lchild_;
     using F_t::rchild_;
     using FMPI_t::visit;
