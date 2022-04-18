@@ -69,7 +69,7 @@ namespace strumpack {
     case ReorderingStrategy::MMD: return false;
     case ReorderingStrategy::MLF: return false;
     case ReorderingStrategy::AND: return false;
-    case ReorderingStrategy::SPECTRAL: return false;
+    case ReorderingStrategy::SPECTRAL: return true;
     }
     return false;
   }

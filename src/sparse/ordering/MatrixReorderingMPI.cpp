@@ -45,8 +45,11 @@
 #if defined(STRUMPACK_USE_PARMETIS)
 #include "ParMetisReordering.hpp"
 #endif
-#include "RCMReordering.hpp"
 #include "GeometricReorderingMPI.hpp"
+#include "RCMReordering.hpp"
+#include "ANDSparspak.hpp"
+#include "minimum_degree/AMDReordering.hpp"
+#include "minimum_degree/MMDReordering.hpp"
 
 namespace strumpack {
 
@@ -95,6 +98,22 @@ namespace strumpack {
         case ReorderingStrategy::RCM: {
           global_sep_tree = rcm_reordering(*Aseq, perm_, iperm_);
           break;
+        }
+        case ReorderingStrategy::AMD: {
+          global_sep_tree = ordering::amd_reordering(*Aseq, perm_, iperm_);
+          break;
+        }
+        case ReorderingStrategy::MMD: {
+          global_sep_tree = ordering::mmd_reordering(*Aseq, perm_, iperm_);
+          break;
+        }
+        case ReorderingStrategy::AND: {
+          global_sep_tree = ordering::and_reordering(*Aseq, perm_, iperm_);
+          break;
+        }
+        case ReorderingStrategy::MLF: {
+          std::cerr << "# ERROR: MLF ordering not supported." << std::endl;
+          return 1;
         }
         default: assert(true);
         }
@@ -161,6 +180,10 @@ namespace strumpack {
         abort();
 #endif
         break;
+      }
+      case ReorderingStrategy::SPECTRAL: {
+        std::cerr << "# ERROR: Parallel spectral ordering not yet implemented." << std::endl;
+        return 1;
       }
       default: assert(true);
       }
