@@ -495,29 +495,38 @@ namespace strumpack {
       return p;
     }
 
-    template<typename scalar_t,typename intt>
+
+    template<typename intt>
     std::unique_ptr<SeparatorTree<intt>>
-    spectral_nd(const CSRMatrix<scalar_t,intt>& g,
+    spectral_nd(intt n, const intt* ptr, const intt* ind,
                 std::vector<intt>& perm, std::vector<intt>& iperm,
                 const NDOptions& opts) {
       SpectralStats stats;
-      std::vector<intt,NoInit<intt>> ptr(g.size()+1), ind(g.nnz());
+      std::vector<intt,NoInit<intt>> lptr(n+1), lind(ptr[n]);
       intt e = 0;
-      for (intt j=0; j<g.size(); j++) {
-        ptr[j] = e;
-        for (intt t=g.ptr(j); t<g.ptr(j+1); t++)
-          if (g.ind(t) != j) ind[e++] = g.ind(t);
+      for (intt j=0; j<n; j++) {
+        lptr[j] = e;
+        for (intt t=ptr[j]; t<ptr[j+1]; t++)
+          if (ind[t] != j) lind[e++] = ind[t];
       }
-      ptr[g.size()] = e;
+      lptr[n] = e;
       if (!e)
         if (mpi_root())
           std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-      ind.resize(e);
-      Graph<intt> graph(std::move(ptr), std::move(ind));
+      lind.resize(e);
+      Graph<intt> graph(std::move(lptr), std::move(lind));
       auto p = spectral_nd(graph, stats, opts);
-      perm.assign(p.P(), p.P()+g.size());
-      iperm.assign(p.Pt(), p.Pt()+g.size());
+      perm.assign(p.P(), p.P()+n);
+      iperm.assign(p.Pt(), p.Pt()+n);
       return build_sep_tree_from_perm(graph.ptr(), graph.ind(), perm, iperm);
+    }
+
+    template<typename intt,typename G>
+    std::unique_ptr<SeparatorTree<intt>>
+    spectral_nd(const G& A,
+                std::vector<intt>& perm, std::vector<intt>& iperm,
+                const NDOptions& opts) {
+      return spectral_nd(A.size(), A.ptr(), A.ind(), perm, iperm, opts);
     }
 
   } // end namespace ordering

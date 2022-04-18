@@ -50,6 +50,7 @@
 #include "ANDSparspak.hpp"
 #include "minimum_degree/AMDReordering.hpp"
 #include "minimum_degree/MMDReordering.hpp"
+#include "spectral/SpectralReordering.hpp"
 
 namespace strumpack {
 
@@ -114,6 +115,11 @@ namespace strumpack {
         case ReorderingStrategy::MLF: {
           std::cerr << "# ERROR: MLF ordering not supported." << std::endl;
           return 1;
+        }
+        case ReorderingStrategy::SPECTRAL: {
+          global_sep_tree = ordering::spectral_nd
+            (*Aseq, perm_, iperm_, opts.ND_options());
+          break;
         }
         default: assert(true);
         }
