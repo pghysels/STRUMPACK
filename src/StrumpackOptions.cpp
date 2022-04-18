@@ -108,7 +108,7 @@ namespace strumpack {
     case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
       return "maximum matching with row and column scaling";
     case MatchingJob::COMBBLAS:
-      return "approximate weigthed perfect matching, from CombBLAS";
+      return "approximate weighted perfect matching, from CombBLAS";
     }
     return "UNKNOWN";
   }
@@ -147,8 +147,8 @@ namespace strumpack {
        {"sp_disable_METIS_NodeND",      no_argument, 0, 12},
        {"sp_enable_MUMPS_SYMQAMD",      no_argument, 0, 13},
        {"sp_disable_MUMPS_SYMQAMD",     no_argument, 0, 14},
-       {"sp_enable_aggamal",            no_argument, 0, 15},
-       {"sp_disable_aggamal",           no_argument, 0, 16},
+       {"sp_enable_agg_amalg",          no_argument, 0, 15},
+       {"sp_disable_agg_amalg",         no_argument, 0, 16},
        {"sp_matching",                  required_argument, 0, 17},
        {"sp_enable_assembly_tree_log",  no_argument, 0, 18},
        {"sp_disable_assembly_tree_log", no_argument, 0, 19},

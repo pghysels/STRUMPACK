@@ -30,6 +30,7 @@
 #define FRONTAL_MATRIX_HODLR_HPP
 
 #include "FrontalMatrix.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/ButterflyMatrix.hpp"
 
@@ -46,6 +47,7 @@ namespace strumpack {
     using VecVec_t = std::vector<std::vector<std::size_t>>;
     using Opts_t = SPOptions<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using BLRM_t = BLR::BLRMatrix<scalar_t>;
 
   public:
     FrontalMatrixHODLR(integer_t sep, integer_t sep_begin, integer_t sep_end,
@@ -61,9 +63,28 @@ namespace strumpack {
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
 
+    void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21,
+                           BLRM_t& paF22, const F_t* p, int task_depth,
+                           const Opts_t& opts) override;
+    void extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21,
+                               BLRM_t& paF22, const F_t* p,
+                               integer_t begin_col, integer_t end_col,
+                               int task_depth, const Opts_t& opts) override;
+
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FMPI_t* pa) const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa)
+      const override;
+    void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, 
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts)
+      const override;
+
 
     void sample_CB(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
                    int task_depth=0) const override;
@@ -97,8 +118,8 @@ namespace strumpack {
                          DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
                          int etree_level, int task_depth); // TODO const?
 
-    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                    int etree_level=0, int task_depth=0)
+    ReturnCode multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                          int etree_level=0, int task_depth=0)
       override;
 
     void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
@@ -128,8 +149,8 @@ namespace strumpack {
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
-    void multifrontal_factorization_node(const SpMat_t& A, const Opts_t& opts,
-                                         int etree_level, int task_depth);
+    // ReturnCode multifrontal_factorization_node(const SpMat_t& A, const Opts_t& opts,
+    //                                            int etree_level, int task_depth);
 
     void fwd_solve_node(DenseM_t& b, DenseM_t* work,
                         int etree_level, int task_depth) const;

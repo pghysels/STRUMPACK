@@ -91,11 +91,11 @@ namespace strumpack {
 
     template<typename T, int NT=32,
              typename real_t = typename RealType<T>::value_type>
-    void factor_block_batch(unsigned int, FrontData<T>*, bool, real_t);
+    void factor_block_batch(unsigned int, FrontData<T>*, bool, real_t, int*);
 
     template<typename T,
              typename real_t = typename RealType<T>::value_type>
-    void replace_pivots(int, T*, real_t, gpu::Stream&);
+    void replace_pivots(int, T*, real_t, gpu::Stream* = nullptr);
 
     template<typename T> void
     extend_add_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);

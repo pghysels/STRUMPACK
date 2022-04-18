@@ -60,9 +60,9 @@ namespace strumpack {
     void sample_children_CB(const SPOptions<scalar_t>& opts, const DistM_t& R,
                             DistM_t& Sr, DistM_t& Sc);
 
-    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                    int etree_level=0,
-                                    int task_depth=0) override;
+    ReturnCode multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                          int etree_level=0,
+                                          int task_depth=0) override;
 
     void forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,
                                     DistM_t& bupd, DenseM_t& seqbupd,

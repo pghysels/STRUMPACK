@@ -103,6 +103,7 @@ namespace strumpack {
       for (auto& t : triplets)
         sbuf[destr[t.r]+destc[t.c]].emplace_back(t);
       auto rbuf = Comm().all_to_all_v(sbuf);
+      Triplet<scalar_t>::free_mpi_type();
       if (B.active()) {
         std::fill(destr, destr+B.rows()+B.cols(), -1);
         auto lr = destr;

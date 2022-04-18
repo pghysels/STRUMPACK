@@ -198,6 +198,7 @@ namespace strumpack {
       auto rbuf = Comm().all_to_all_v(sbuf);
       for (auto& e : rbuf) F21blr_.global(e.r, e.c) = e.v;
     }
+    Trip_t::free_mpi_type();
   }
 
 
@@ -228,19 +229,24 @@ namespace strumpack {
     extend_add_cols(i, part, CP, opts);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (visit(lchild_))
-      lchild_->multifrontal_factorization
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (visit(lchild_)) {
+      auto el = lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-    if (visit(rchild_))
-      rchild_->multifrontal_factorization
+      if (el != ReturnCode::SUCCESS) err_code = el;
+    }
+    if (visit(rchild_)) {
+      auto er = rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) err_code = er;
+    }
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
-    if (opts.BLR_options().CB_construction() ==
-        BLR::CBConstruction::COLWISE) {
+    if (opts.BLR_options().BLR_factor_algorithm() ==
+        BLR::BLRFactorAlgorithm::COLWISE) {
       // factor column-block-wise for memory reduction
       if (dim_sep()) {
         if (dim_upd()) {
@@ -265,11 +271,12 @@ namespace strumpack {
           for (auto& e : e21)
             s3buf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
           auto r3buf = Comm().all_to_all_v(s3buf);
+          Trip_t::free_mpi_type();
           piv_ = BLRMPI_t::partial_factor_col
             (F11blr_, F12blr_, F21blr_, F22blr_,
             adm_, opts.BLR_options(),
             [&](int i, bool part, std::size_t CP) {
-              this->build_front_cols
+              build_front_cols
                 (A, i, part, CP, r1buf, r2buf, r3buf, opts);
             });
         } else {
@@ -283,6 +290,7 @@ namespace strumpack {
           for (auto& e : e11)
             sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
           auto r1buf = Comm().all_to_all_v(sbuf);
+          Trip_t::free_mpi_type();
           std::vector<Trip_t> r2buf, r3buf;
           piv_ = F11blr_.factor_col
             (adm_, opts.BLR_options(),
@@ -293,8 +301,7 @@ namespace strumpack {
       }
       if (lchild_) lchild_->release_work_memory();
       if (rchild_) rchild_->release_work_memory();
-    } else if (opts.BLR_options().CB_construction() ==
-                   BLR::CBConstruction::DENSE)  {
+    } else {
       build_front(A);
       extend_add();
       if (lchild_) lchild_->release_work_memory();
@@ -348,6 +355,7 @@ namespace strumpack {
         std::cout << std::endl;
       }
     }
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -1228,7 +1228,7 @@ namespace strumpack {
     int nz_ = 1;
     int components_ = 1;
     int separator_width_ = 1;
-    bool use_METIS_NodeNDP_ = false;
+    bool use_METIS_NodeNDP_ = true;
     bool use_MUMPS_SYMQAMD_ = false;
     bool use_agg_amalg_ = false;
     MatchingJob matching_job_ = MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING;

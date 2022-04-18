@@ -1,6 +1,7 @@
 target_sources(strumpack
   PRIVATE
-  ${CMAKE_CURRENT_LIST_DIR}/strumpack_mc64ad.c
+  ${CMAKE_CURRENT_LIST_DIR}/MC64ad.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/MC64ad.hpp
   ${CMAKE_CURRENT_LIST_DIR}/CompressedSparseMatrix.hpp
   ${CMAKE_CURRENT_LIST_DIR}/CompressedSparseMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/CSRGraph.hpp

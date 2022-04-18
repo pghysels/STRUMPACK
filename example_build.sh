@@ -180,6 +180,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DCMAKE_BUILD_TYPE=Debug \
           -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
+          -DBLA_VENDOR=OpenBLAS \
           -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \

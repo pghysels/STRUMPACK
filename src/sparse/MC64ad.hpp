@@ -24,51 +24,23 @@
  * Developers: Pieter Ghysels, Francois-Henry Rouet, Xiaoye S. Li.
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
+ *
  */
-#ifndef STRUMPACK_CONFIG_HPP
-#define STRUMPACK_CONFIG_HPP
+#ifndef STRUMPACK_MC64AD_HPP
+#define STRUMPACK_MC64AD_HPP
 
-#cmakedefine STRUMPACK_USE_MPI
-#cmakedefine STRUMPACK_USE_OPENMP
+namespace strumpack {
 
-#cmakedefine STRUMPACK_USE_CUDA
-#cmakedefine STRUMPACK_USE_HIP
-#cmakedefine STRUMPACK_HIP_PLATFORM_HCC
-#cmakedefine STRUMPACK_HIP_PLATFORM_NVCC
+  template<typename int_t>
+  int_t mc64ad(int_t *job, int_t *n, int_t *ne, int_t *
+               ip, int_t *irn, double *a, int_t *num, int_t *cperm,
+               int_t *liw, int_t *iw, int_t *ldw, double *dw,
+               int_t *icntl, int_t *info);
+  template<typename int_t>
+  int_t mc64id(int_t *icntl);
 
-#cmakedefine STRUMPACK_USE_BLAS64
-#if defined(STRUMPACK_USE_BLAS64)
-#define strumpack_blas_int long long int
-#else
-#define strumpack_blas_int int
-#endif
+}
 
-// #cmakedefine STRUMPACK_USE_METIS
-#cmakedefine STRUMPACK_USE_PARMETIS
-#cmakedefine STRUMPACK_USE_SCOTCH
-#cmakedefine STRUMPACK_USE_PTSCOTCH
-#cmakedefine STRUMPACK_USE_PAPI
-#cmakedefine STRUMPACK_USE_COMBBLAS
-#cmakedefine STRUMPACK_USE_BPACK
-#cmakedefine STRUMPACK_USE_ZFP
-#cmakedefine STRUMPACK_USE_SLATE_SCALAPACK
-#cmakedefine STRUMPACK_USE_GETOPT
-#cmakedefine STRUMPACK_USE_MAGMA
 
-#cmakedefine STRUMPACK_USE_MATLAB
-
-#cmakedefine STRUMPACK_COUNT_FLOPS
-#cmakedefine STRUMPACK_TASK_TIMERS
-#cmakedefine STRUMPACK_MESSAGE_COUNTER
-
-#cmakedefine STRUMPACK_USE_OPENMP_TASKLOOP
-#cmakedefine STRUMPACK_USE_OPENMP_TASK_DEPEND
-
-#define STRUMPACK_PBLAS_BLOCKSIZE @STRUMPACK_PBLAS_BLOCKSIZE@
-
-#define STRUMPACK_VERSION_MAJOR @STRUMPACK_VERSION_MAJOR@
-#define STRUMPACK_VERSION_MINOR @STRUMPACK_VERSION_MINOR@
-#define STRUMPACK_VERSION_PATCH @STRUMPACK_VERSION_PATCH@
-
-#endif // STRUMPACK_CONFIG_HPP
+#endif // STRUMPACK_MC64AD_HPP
 

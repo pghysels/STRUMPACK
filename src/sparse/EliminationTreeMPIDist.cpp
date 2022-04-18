@@ -36,6 +36,9 @@
 
 namespace strumpack {
 
+  template<typename scalar_t,typename integer_t> MPI_Datatype
+  EliminationTreeMPIDist<scalar_t,integer_t>::ParallelFront::pf_mpi_type = MPI_DATATYPE_NULL;
+
   template<typename scalar_t,typename integer_t>
   EliminationTreeMPIDist<scalar_t,integer_t>::EliminationTreeMPIDist
   (const Opts_t& opts, const CSRMPI_t& A, Reord_t& nd, const MPIComm& comm)
@@ -176,6 +179,7 @@ namespace strumpack {
           all_pfronts_[i++] = f;
     }
     comm_.all_gather_v(all_pfronts_.data(), rcnts, rdispls);
+    ParallelFront::free_mpi_type();
   }
 
   /**
@@ -227,11 +231,11 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_factorization
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
    const Opts_t& opts) {
-    this->root_->multifrontal_factorization(Aprop_, opts);
+    return this->root_->multifrontal_factorization(Aprop_, opts);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -354,6 +358,8 @@ namespace strumpack {
 #pragma omp parallel for
     for (std::size_t i=0; i<std::size_t(m)*n; i++)
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
+
+    Triplet::free_mpi_type();
   }
 
   template<typename integer_t, typename It>
@@ -743,21 +749,32 @@ namespace strumpack {
     auto chl = tree.lchild[sep];
     auto chr = tree.rchild[sep];
     if (chl != -1 && chr != -1) {
-      auto wl = tree.work[chl];
-      auto wr = tree.work[chr];
-      int Pl = std::max
-        (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
-      int Pr = std::max(1, P - Pl);
       bool use_compression = is_compressed
         (dim_sep, dim_upd, parent_compression, opts);
-      front->set_lchild
-        (proportional_mapping_sub_graphs
-         (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
-          fcomm.sub(0, Pl), use_compression, level+1));
-      front->set_rchild
-        (proportional_mapping_sub_graphs
-         (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
-          fcomm.sub(P-Pr, Pr), use_compression, level+1));
+      if (P == 1) {
+        front->set_lchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chl, P0, 1, P0, 1,
+            fcomm, use_compression, level+1));
+        front->set_rchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chr, P0, 1, P0, 1,
+            fcomm, use_compression, level+1));
+      } else {
+        auto wl = tree.work[chl];
+        auto wr = tree.work[chr];
+        int Pl = std::max
+          (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
+        int Pr = std::max(1, P - Pl);
+        front->set_lchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
+            fcomm.sub(0, Pl), use_compression, level+1));
+        front->set_rchild
+          (proportional_mapping_sub_graphs
+           (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
+            fcomm.sub(P-Pr, Pr), use_compression, level+1));
+      }
     }// else this->update_local_ranges(sep_begin, sep_end);
     return front;
   }

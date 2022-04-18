@@ -35,7 +35,7 @@
 #include "ETree.hpp"
 #include "SeparatorTree.hpp"
 
-#define MUMPS_SYMQAMD_FC STRUMPACK_FC_GLOBAL_(mumps_symqamd, MUMPS_SYMQAMD)
+#define MUMPS_SYMQAMD_FC STRUMPACK_FC_GLOBAL_(strumpack_symqamd, STRUMPACK_SYMQAMD)
 
 extern "C" void MUMPS_SYMQAMD_FC
 (int* TRESH, int* NDENSE, int* N, int* IWLEN, int* PE, int* PFREE,

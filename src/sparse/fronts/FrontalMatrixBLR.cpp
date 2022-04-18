@@ -177,8 +177,8 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
     auto I = this->upd_to_parent(p, upd2sep);
-    if (opts.BLR_options().CB_construction() ==
-        BLR::CBConstruction::COLWISE)
+    if (opts.BLR_options().BLR_factor_algorithm() ==
+        BLR::BLRFactorAlgorithm::COLWISE)
       F22blr_.decompress(); // change to colwise
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
@@ -226,8 +226,8 @@ namespace strumpack {
         break;
       }
     }
-    if (opts.BLR_options().CB_construction() ==
-        BLR::CBConstruction::COLWISE)
+    if (opts.BLR_options().BLR_factor_algorithm() ==
+        BLR::BLRFactorAlgorithm::COLWISE)
       F22blr_.decompress_local_columns(c_min, c_max);
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop default(shared) grainsize(64)      \
@@ -274,40 +274,46 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLR<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+    ReturnCode e;
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
-      factor_node(A, opts, etree_level, task_depth);
-    } else factor_node(A, opts, etree_level, task_depth);
+      e = factor_node(A, opts, etree_level, task_depth);
+    } else e = factor_node(A, opts, etree_level, task_depth);
+    return e;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
     if (task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        lchild_->multifrontal_factorization
+        el = lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
       if (rchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        rchild_->multifrontal_factorization
+        er = rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
       if (lchild_)
-        lchild_->multifrontal_factorization
+        el = lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
       if (rchild_)
-        rchild_->multifrontal_factorization
+        er = rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (el != ReturnCode::SUCCESS) err_code = el;
+    if (er != ReturnCode::SUCCESS) err_code = er;
     TaskTimer t("");
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0 = 0, ftot = 0;
@@ -322,8 +328,8 @@ namespace strumpack {
     const auto dupd = dim_upd();
     if (opts.BLR_options().low_rank_algorithm() ==
         BLR::LowRankAlgorithm::RRQR) {
-      if (opts.BLR_options().CB_construction() ==
-          BLR::CBConstruction::COLWISE) {
+      if (opts.BLR_options().BLR_factor_algorithm() ==
+          BLR::BLRFactorAlgorithm::COLWISE) {
         // factor column-block-wise for memory reduction
         if (dsep) {
           F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
@@ -338,12 +344,11 @@ namespace strumpack {
             (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
              upd_tiles_, admissibility_, opts.BLR_options(),
              [&](int i, bool part, std::size_t CP) {
-               this->build_front_cols
+               build_front_cols
                  (A, i, part, CP, e11, e12, e21, task_depth, opts);
              });
         }
-      } else if (opts.BLR_options().CB_construction() ==
-                 BLR::CBConstruction::DENSE) {
+      } else {
         DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
         F11.zero(); F12.zero(); F21.zero();
         A.extract_front
@@ -491,6 +496,7 @@ namespace strumpack {
     //   BLR::draw(F11blr_, "F11root_"
     //             + std::to_string(opts.BLR_options().leaf_size()) + "_"
     //             + BLR::get_name(opts.BLR_options().admissibility()));
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -682,14 +688,14 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
-    if (opts.BLR_options().CB_construction() == BLR::CBConstruction::DENSE)
-      BLR::BLRExtendAdd<scalar_t,integer_t>::
-        seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
-    else if (opts.BLR_options().CB_construction() ==
-             BLR::CBConstruction::COLWISE)
+    if (opts.BLR_options().BLR_factor_algorithm() ==
+             BLR::BLRFactorAlgorithm::COLWISE)
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         blrseq_copy_to_buffers_col
         (F22blr_, sbuf, pa, this, begin_col, end_col, opts.BLR_options());
+    else
+      BLR::BLRExtendAdd<scalar_t,integer_t>::
+        seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
   }
 #endif
 

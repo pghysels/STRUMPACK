@@ -47,7 +47,9 @@ namespace strumpack {
       : r(row), c(col), v(value) {}
 
 #if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
+    static MPI_Datatype triplet_mpi_type;
     static MPI_Datatype mpi_type();
+    static void free_mpi_type();
 #endif
   };
 
@@ -61,7 +63,9 @@ namespace strumpack {
     IdxVal(integer_t idx, scalar_t value) : i(idx), v(value) {}
 
 #if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
+    static MPI_Datatype idxval_mpi_type;
     static MPI_Datatype mpi_type();
+    static void free_mpi_type();
 #endif
   };
 
@@ -73,7 +77,9 @@ namespace strumpack {
     IdxIJ(integer_t ii, integer_t jj) : i(ii), j(jj) {}
 
 #if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
+    static MPI_Datatype idxij_mpi_type;
     static MPI_Datatype mpi_type();
+    static void free_mpi_type();
 #endif
   };
 
@@ -89,7 +95,9 @@ namespace strumpack {
       : r(row), c(col), k(block), v(val) {}
 
 #if defined(STRUMPACK_USE_MPI) && !defined(STRUMPACK_NO_TRIPLET_MPI)
+    static MPI_Datatype quadlet_mpi_type;
     static MPI_Datatype mpi_type();
+    static void free_mpi_type();
 #endif
   };
 

@@ -74,6 +74,7 @@ namespace strumpack {
 #pragma omp parallel for
     for (integer_t i=0; i<m; i++)
       x[rbuf[i].i-lo] = rbuf[i].v;
+    IdxVal::free_mpi_type();
   }
 
   /**
@@ -155,7 +156,6 @@ namespace strumpack {
                   const std::vector<float>& _work,
                   integer_t P0, integer_t P, integer_t P0_sibling,
                   integer_t P_sibling, integer_t owner, const MPIComm& comm) {
-
       auto rank = comm.rank();
       int dest0 = std::min(P0, P0_sibling);
       int dest1 = std::max(P0+P, P0_sibling+P_sibling);
@@ -164,6 +164,10 @@ namespace strumpack {
       std::vector<MPIRequest> sreq;
       if (rank == owner) {
         auto nbsep = tree.separators();
+        std::size_t sbufi_size = 3 + 4*nbsep;
+        for (integer_t i=0; i<nbsep; i++)
+          sbufi_size += _upd[i].size();
+        sbufi.reserve(sbufi_size);
         sbufi.push_back(nbsep);
         sbufi.insert(sbufi.end(), tree.lch(), tree.lch()+nbsep);
         sbufi.insert(sbufi.end(), tree.rch(), tree.rch()+nbsep);
@@ -174,7 +178,7 @@ namespace strumpack {
           sbufi.push_back(_upd[i].size());
         for (integer_t i=0; i<nbsep; i++)
           sbufi.insert(sbufi.end(), _upd[i].begin(), _upd[i].end());
-        sbuff.reserve(nbsep);
+        sbuff.reserve(_work.size());
         sbuff.insert(sbuff.end(), _work.begin(), _work.end());
         if (sbufi.size() >=
             static_cast<std::size_t>(std::numeric_limits<int>::max()))

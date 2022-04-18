@@ -152,10 +152,10 @@ namespace strumpack {
     return front;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   EliminationTree<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts) {
-    root_->multifrontal_factorization(A, opts);
+    return root_->multifrontal_factorization(A, opts);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -204,6 +204,12 @@ namespace strumpack {
 #pragma omp single nowait
     nonzeros = root_->dense_factor_nonzeros();
     return nonzeros;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  EliminationTree<scalar_t,integer_t>::inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    return root_->inertia(neg, zero, pos);
   }
 
   template<typename scalar_t,typename integer_t> void

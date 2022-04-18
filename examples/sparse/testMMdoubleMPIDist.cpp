@@ -75,6 +75,13 @@ test(int argc, char* argv[], CSRMatrix<scalar,integer>& A) {
   }
   spss.solve(b.data(), x.data());
 
+  integer neg, zero, pos;
+  auto err = spss.inertia(neg, zero, pos);
+  if (!rank)
+    std::cout << "# INERTIA neg,zero,pos = "
+              << neg << ", " << zero << ", " << pos
+              <<  " (" << err << ")" << std::endl;
+
   auto scaled_res = Adist.max_scaled_residual(x.data(), b.data());
   if (!rank)
     std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
