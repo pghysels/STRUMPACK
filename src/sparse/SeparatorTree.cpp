@@ -126,7 +126,7 @@ namespace strumpack {
     s.push(std::distance(etree.begin(),
                          std::find(etree.begin(), etree.end(),
                                    integer_t(-1))));
-    integer_t prev=-1;
+    integer_t prev = -1;
     while (!s.empty()) {
       integer_t i = s.top();
       if (prev == -1 || etree_lchild[prev] == i || etree_rchild[prev] == i) {

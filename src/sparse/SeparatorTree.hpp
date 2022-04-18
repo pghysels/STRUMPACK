@@ -63,7 +63,7 @@ namespace strumpack {
     SeparatorTree(integer_t nr_nodes);
 
     /**
-     * Construct from on a vector of Separators.
+     * Construct from a vector of Separators.
      */
     SeparatorTree(std::vector<Separator<integer_t>>& seps);
 
@@ -146,9 +146,10 @@ namespace strumpack {
    * from the elimination tree. Set the inverse permutation.
    */
   template<typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> build_sep_tree_from_perm
-  (const integer_t* ptr, const integer_t* ind,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm);
+  std::unique_ptr<SeparatorTree<integer_t>>
+  build_sep_tree_from_perm(const integer_t* ptr, const integer_t* ind,
+                           std::vector<integer_t>& perm,
+                           std::vector<integer_t>& iperm);
 
 } // end namespace strumpack
 
