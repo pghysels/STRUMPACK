@@ -40,7 +40,7 @@
 //#include "MLFReordering.hpp"
 //#include "sparse/ordering/sparspak/ANDReordering.hpp"
 #include "sparse/ordering/MetisReordering.hpp"
-#include "sparse/ordering/ScotchReordering.hpp"
+//#include "sparse/ordering/ScotchReordering.hpp"
 #include "sparse/SeparatorTree.hpp"
 // #if defined(PROJECTND_USE_SLEPC)
 // #include "SLEPcFiedlerSolver.hpp"

@@ -5,9 +5,9 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/SpectralReordering.hpp
   ${CMAKE_CURRENT_LIST_DIR}/LanczosFiedlerSolver.hpp)
 
-#install(FILES
-#  NDOptions.hpp
-#  SpectralStats.hpp
-#  SpectralReordering.hpp
-#  LanczosFiedlerSolver.hpp
-#   include/sparse/ordering/spectral)
+install(FILES
+  NDOptions.hpp
+  SpectralStats.hpp
+  SpectralReordering.hpp
+  LanczosFiedlerSolver.hpp
+  DESTINATION include/sparse/ordering/spectral)

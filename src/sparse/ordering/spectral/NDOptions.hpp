@@ -33,8 +33,12 @@
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
-// TODO make getopt optional!!
+#if defined(STRUMPACK_USE_GETOPT)
+#include <vector>
+#include <sstream>
+#include <cstring>
 #include <getopt.h>
+#endif
 #include "sparse/ordering/Graph.hpp"
 
 namespace strumpack {
@@ -400,10 +404,8 @@ namespace strumpack {
       }
 
       void describe_options() const {
-#if defined(PROJECTND_USE_MPI)
-        MPIComm c;
-        if (!c.is_root()) return;
-#endif
+#if defined(STRUMPACK_USE_GETOPT)
+	if (!mpi_root()) return;
         std::cout << "# Spectral ND options:" << std::endl;
         std::cout << "#   --nd_Fiedler_solver [auto|Lanczos|implicit-Lanczos|"
                   << "ca-Lanczos|pipe-Lanczos|slepc|lobpcg|lobpcg-multi] (default "
@@ -474,6 +476,7 @@ namespace strumpack {
                   << !verbose() << ")" << std::endl;
         std::cout << "#   --help or -h" << std::endl;
         std::cout << std::endl;
+#endif
       }
 
     private:

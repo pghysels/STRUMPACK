@@ -13,6 +13,11 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/MatrixReordering.hpp
   ${CMAKE_CURRENT_LIST_DIR}/MetisReordering.hpp)
 
+install(FILES
+  Graph.hpp
+  PPt.hpp
+  BLASLAPACKWrapper.hpp
+  DESTINATION include/sparse/ordering)
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
