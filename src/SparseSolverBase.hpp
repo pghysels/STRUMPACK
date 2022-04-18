@@ -216,7 +216,7 @@ namespace strumpack {
      * needs to be factored. One can call factor() explicitly, or if
      * this was not yet done, this routine will call factor()
      * internally.
-     * 
+     *
      * \param b input, will not be modified. DenseMatrix containgin
      * the right-hand side vector/matrix. Should have N rows, with N
      * the dimension of the input matrix for SparseSolver and
