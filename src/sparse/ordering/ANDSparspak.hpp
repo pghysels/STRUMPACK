@@ -40,21 +40,7 @@ namespace strumpack {
   namespace ordering {
 
     template<typename integer>
-    void gennd(integer neqns, integer* xadj, integer* adjncy,
-               integer* mask, integer* perm, integer* xls, integer* ls);
-
-
-    template<typename intt> inline void
-    WRAPPER_gennd(intt n, std::vector<intt>& xadj,
-                  std::vector<intt>& adjncy,
-                  std::vector<intt>& perm) {
-      std::unique_ptr<intt[]> iwork(new intt[3*n]);
-      auto mask = iwork.get();
-      auto xls = mask + n;
-      auto ls = mask + 2*n;
-      gennd(n, xadj.data(), adjncy.data(), mask, perm.data(), xls, ls);
-      //for (intt i=0; i<n; i++) perm[i]--;
-    }
+    void gennd(integer neqns, integer* xadj, integer* adjncy, integer* perm);
 
     template<typename integer_t>
     std::unique_ptr<SeparatorTree<integer_t>> and_reordering
@@ -71,7 +57,7 @@ namespace strumpack {
       if (e==0)
         if (mpi_root())
           std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-      WRAPPER_gennd(n, xadj, adjncy, iperm);
+      gennd(n, xadj.data(), adjncy.data(), iperm.data());
       for (integer_t i=0; i<n; i++)
         perm[iperm[i]] = i;
       return build_sep_tree_from_perm(ptr, ind, perm, iperm);

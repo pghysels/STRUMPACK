@@ -27,9 +27,7 @@
  *
  */
 #include <algorithm>
-
 #include "ANDSparspak.hpp"
-
 
 namespace strumpack {
   namespace ordering {
@@ -70,8 +68,7 @@ namespace strumpack {
 
     template<typename integer> integer
     fndsep(integer root, integer* xadj, integer* adjncy,
-           integer* mask, integer* sep,
-           integer* xls, integer* ls) {
+           integer* mask, integer* sep, integer* xls, integer* ls) {
       /* DETERMINE THE LEVEL STRUCTURE ROOTED AT ROOT. */
       integer nlvl = rootls(root, xadj, adjncy, mask, xls, ls);
       integer ccsize = xls[nlvl];
@@ -139,30 +136,29 @@ namespace strumpack {
     }
 
     template<typename integer> void
-    gennd(integer neqns, integer* xadj, integer* adjncy,
-          integer* mask, integer* perm, integer* xls, integer* ls) {
-      if (neqns <= 0) return;
-      for (integer i=0; i<neqns; ++i)
-        mask[i] = 1;
-      for (integer i=0, num=0; i<neqns; ++i) {
-        /* FOR EACH MASKED COMPONENT ... */
+    gennd(integer n, integer* xadj, integer* adjncy, integer* perm) {
+      if (n <= 0) return;
+      std::vector<integer,NoInit<integer>> iwork(3*n);
+      auto mask = iwork.data();
+      auto xls = mask + n;
+      auto ls = mask + 2*n;
+      std::fill(mask, mask+n, 1);
+      for (integer i=0, num=0; i<n && num<n; ++i) {
         do {
           if (mask[i] == 0) break;
           /* FIND A SEPARATOR AND NUMBER THE NODES NEXT. */
           auto nsep = fndsep(i, xadj, adjncy, mask, perm+num, xls, ls);
           num += nsep;
-          if (num >= neqns) goto L400;
-        } while (true);
+        } while (num < n);
       }
-    L400:
       /* SEPARATORS FOUND FIRST SHOULD BE ORDERED LAST */
-      std::reverse(perm, perm+neqns);
+      std::reverse(perm, perm+n);
     }
 
     // explicit template instantiation
-    template void gennd(int neqns, int* xadj, int* adjncy, int* mask, int* perm, int* xls, int* ls);
-    template void gennd(long int neqns, long int* xadj, long int* adjncy, long int* mask, long int* perm, long int* xls, long int* ls);
-    template void gennd(long long int neqns, long long int* xadj, long long int* adjncy, long long int* mask, long long int* perm, long long int* xls, long long int* ls);
+    template void gennd(int neqns, int* xadj, int* adjncy, int* perm);
+    template void gennd(long int neqns, long int* xadj, long int* adjncy, long int* perm);
+    template void gennd(long long int neqns, long long int* xadj, long long int* adjncy, long long int* perm);
 
   } // end namespace ordering
 } // end namespace strumpack
