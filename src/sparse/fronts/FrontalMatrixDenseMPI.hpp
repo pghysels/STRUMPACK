@@ -97,7 +97,7 @@ namespace strumpack {
     void sample_CB(Trans op, const DistM_t& R, DistM_t& S,
                    FrontalMatrix<scalar_t,integer_t>* pa) const override;
 
-    void
+    ReturnCode
     multifrontal_factorization(const SpMat_t& A,
                                const SPOptions<scalar_t>& opts,
                                int etree_level=0, int task_depth=0)
@@ -127,7 +127,7 @@ namespace strumpack {
     std::vector<int> piv;
 
     void build_front(const SpMat_t& A);
-    void partial_factorization(const SPOptions<scalar_t>& opts);
+    ReturnCode partial_factorization(const SPOptions<scalar_t>& opts);
 
     void fwd_solve_phase2(const DistM_t& F11, const DistM_t& F12,
                           const DistM_t& F21,
@@ -150,6 +150,14 @@ namespace strumpack {
     void compress(const SPOptions<scalar_t>& opts);
     void decompress(DistM_t& F11, DistM_t& F12, DistM_t& F21) const;
 #endif
+
+    ReturnCode matrix_inertia(const DistM_t& F,
+                              integer_t& neg,
+                              integer_t& zero,
+                              integer_t& pos) const;
+    ReturnCode node_inertia(integer_t& neg,
+                            integer_t& zero,
+                            integer_t& pos) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;

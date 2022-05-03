@@ -86,7 +86,7 @@ namespace strumpack {
       bool is_local_row(int i) const { return i % nprows_ == prow_; }
       bool is_local_col(int i) const { return i % npcols_ == pcol_; }
       bool is_local(int i, int j) const
-      { return is_local_row(i) & is_local_col(j); }
+      { return is_local_row(i) && is_local_col(j); }
 
       int rg2p(int i) const { return i % nprows(); }
       int cg2p(int j) const { return j % npcols(); }

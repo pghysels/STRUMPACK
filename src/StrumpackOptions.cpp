@@ -137,8 +137,8 @@ namespace strumpack {
        {"sp_disable_METIS_NodeND",      no_argument, 0, 12},
        {"sp_enable_MUMPS_SYMQAMD",      no_argument, 0, 13},
        {"sp_disable_MUMPS_SYMQAMD",     no_argument, 0, 14},
-       {"sp_enable_aggamal",            no_argument, 0, 15},
-       {"sp_disable_aggamal",           no_argument, 0, 16},
+       {"sp_enable_agg_amalg",          no_argument, 0, 15},
+       {"sp_disable_agg_amalg",         no_argument, 0, 16},
        {"sp_matching",                  required_argument, 0, 17},
        {"sp_enable_assembly_tree_log",  no_argument, 0, 18},
        {"sp_disable_assembly_tree_log", no_argument, 0, 19},
@@ -500,7 +500,7 @@ namespace strumpack {
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
     std::cout << "#   --sp_compression (default "
-              << get_name(comp_) << ")" << std::endl 
+              << get_name(comp_) << ")" << std::endl
               << "#          should be [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;

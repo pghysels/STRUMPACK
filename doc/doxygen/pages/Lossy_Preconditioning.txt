@@ -3,7 +3,7 @@
 Compression of the sparse triangular factors is implemented using the
 __ZFP__ library (>= 0.5.5):
 
-\link https://computing.llnl.gov/projects/floating-point-compression \endlink
+\link https://computing.llnl.gov/projects/floating-point-compression https://computing.llnl.gov/projects/floating-point-compression \endlink
 
 STRUMPACK needs to be configured with __ZFP__ support:
 \code {.bash}
@@ -37,6 +37,7 @@ CompressionType strumpack::SPOptions::compression() const;  // get compression t
 \endcode
 
 The lossy compression uses fixed precision (see \link
+https://zfp.readthedocs.io/en/release0.5.4/modes.html#modes
 https://zfp.readthedocs.io/en/release0.5.4/modes.html#modes \endlink).
 The precision is specified in number of bit planes, and can be set
 with:

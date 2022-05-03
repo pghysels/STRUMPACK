@@ -63,16 +63,8 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() {
-        // gpu_check(cudaStreamCreateWithFlags(&s_, cudaStreamNonBlocking));
-        gpu_check(cudaStreamCreate(&s_));
-      }
+      Stream() { gpu_check(cudaStreamCreate(&s_)); }
       ~Stream() { gpu_check(cudaStreamDestroy(s_)); }
-      // void set_priority(int priority) {
-      //   gpu_check(cudaStreamDestroy(s_));
-      //   gpu_check(cudaStreamCreateWithPriority
-      //             (&s_, cudaStreamNonBlocking, priority));
-      // }
       operator cudaStream_t&() { return s_; }
       operator const cudaStream_t&() const { return s_; }
       void synchronize() { cudaStreamSynchronize(s_); }
@@ -146,33 +138,39 @@ namespace strumpack {
     (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
+      copy_device_to_host
+        (h.data(), d.data(), std::size_t(d.rows())*d.cols());
     }
     template<typename T> void copy_device_to_host
     (DenseMatrix<T>& h, const T* d) {
       assert(h.rows() == h.ld());
-      copy_device_to_host(h.data(), d, h.rows()*h.cols());
+      copy_device_to_host
+        (h.data(), d, std::size_t(h.rows())*h.cols());
     }
     template<typename T> void copy_device_to_host
     (T* h, const DenseMatrix<T>& d) {
       assert(d.rows() == d.ld());
-      copy_device_to_host(h, d.data(), d.rows()*d.cols());
+      copy_device_to_host
+        (h, d.data(), std::size_t(d.rows())*d.cols());
     }
     template<typename T> void copy_host_to_device
     (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
+      copy_host_to_device
+        (d.data(), h.data(), std::size_t(d.rows())*d.cols());
     }
     template<typename T> void copy_host_to_device
     (DenseMatrix<T>& d, const T* h) {
       assert(d.rows() == d.ld());
-      copy_host_to_device(d.data(), h, d.rows()*d.cols());
+      copy_host_to_device
+        (d.data(), h, std::size_t(d.rows())*d.cols());
     }
     template<typename T> void copy_host_to_device
     (T* d, const DenseMatrix<T>& h) {
       assert(h.rows() == h.ld());
-      copy_host_to_device(d, h.data(), h.rows()*h.cols());
+      copy_host_to_device
+        (d, h.data(), std::size_t(h.rows())*h.cols());
     }
 
 

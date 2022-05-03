@@ -274,40 +274,46 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLR<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+    ReturnCode e;
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
-      factor_node(A, opts, etree_level, task_depth);
-    } else factor_node(A, opts, etree_level, task_depth);
+      e = factor_node(A, opts, etree_level, task_depth);
+    } else e = factor_node(A, opts, etree_level, task_depth);
+    return e;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
     if (task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        lchild_->multifrontal_factorization
+        el = lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
       if (rchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        rchild_->multifrontal_factorization
+        er = rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
       if (lchild_)
-        lchild_->multifrontal_factorization
+        el = lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
       if (rchild_)
-        rchild_->multifrontal_factorization
+        er = rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (el != ReturnCode::SUCCESS) err_code = el;
+    if (er != ReturnCode::SUCCESS) err_code = er;
     TaskTimer t("");
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0 = 0, ftot = 0;
@@ -490,6 +496,7 @@ namespace strumpack {
     //   BLR::draw(F11blr_, "F11root_"
     //             + std::to_string(opts.BLR_options().leaf_size()) + "_"
     //             + BLR::get_name(opts.BLR_options().admissibility()));
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void

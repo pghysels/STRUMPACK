@@ -77,15 +77,19 @@ namespace strumpack {
                                int task_depth, const Opts_t& opts) override;
     void sample_CB(const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
                    DenseM_t& Sc, F_t* pa, int task_depth) override;
-    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                    int etree_level=0, int task_depth=0)
+
+    ReturnCode multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                          int etree_level=0, int task_depth=0)
       override;
-    void factor_node(const SpMat_t& A, const Opts_t& opts,
-                     int etree_level=0, int task_depth=0);
+
+    ReturnCode factor_node(const SpMat_t& A, const Opts_t& opts,
+                           int etree_level=0, int task_depth=0);
+
 
     void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
                                     int etree_level=0, int task_depth=0)
       const override;
+
     void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int
                                      etree_level=0, int task_depth=0)
       const override;

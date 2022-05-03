@@ -194,14 +194,21 @@ namespace strumpack {
         (B[i], oI[i], oJ[i], Bloc[i], pbuf);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (visit(lchild_))
-      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (visit(rchild_))
-      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (!dim_blk()) return;
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (visit(lchild_)) {
+      auto el = lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (el != ReturnCode::SUCCESS) err_code = el;
+    }
+    if (visit(rchild_)) {
+      auto er = rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) err_code = er;
+    }
+    if (!dim_blk()) return err_code;
     TaskTimer t("FrontalMatrixHODLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     construct_hierarchy(A, opts);
@@ -273,6 +280,7 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -343,6 +343,17 @@ namespace strumpack {
     return nnz + nnzl + nnzr;
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrix<scalar_t,integer_t>::inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
+    if (lchild_) el = lchild_->inertia(neg, zero, pos);
+    if (rchild_) er = rchild_->inertia(neg, zero, pos);
+    if (el != ReturnCode::SUCCESS) return el;
+    if (er != ReturnCode::SUCCESS) return er;
+    return node_inertia(neg, zero, pos);
+  }
+
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve

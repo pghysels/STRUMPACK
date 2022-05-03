@@ -189,6 +189,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DSTRUMPACK_USE_BLAS64=OFF \
           -DSTRUMPACK_USE_MPI=OFF \
           -DSTRUMPACK_USE_OPENMP=ON \
+          -DBLA_VENDOR=OpenBLAS \
           -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
