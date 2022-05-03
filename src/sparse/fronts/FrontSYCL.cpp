@@ -412,8 +412,6 @@ namespace strumpack {
           nt /= 2;
           ops *= 2;
         }
-        // std::cout << "assemble, N= " << rnd(N,ops) << " nnz= " << nnz
-        //        << " ops= " << ops << " nt= " << nt << std::endl;
         assert(rnd(N,ops) * rnd(nnz,nt) < std::numeric_limits<int>::max());
         cl::sycl::range<2> global{rnd(N,ops), rnd(nnz,nt)}, local{ops, nt};
         q.parallel_for(cl::sycl::nd_range<2>{global, local},
@@ -436,9 +434,6 @@ namespace strumpack {
         gCB = rnd(gCB, nt);
         assert(gCB * gx * rnd(N,ops) < std::numeric_limits<int>::max());
         cl::sycl::range<3> global{rnd(N, ops), gx, gCB}, local{ops, 1, nt};
-        //std::cout << "ext-add, N= " << std::min(128ul, N-n) << " gCB= " << gCB << " nt= " << nt << std::endl;
-        // std::cout << "ext-add, N= " << rnd(N,ops) << " gx= " << gx << " gCB= " << gCB
-        //        << " ops= " << ops << " nt= " << nt << std::endl;
         q.parallel_for(cl::sycl::nd_range<3>{global, local},
                        EA<scalar_t,unroll>(dasmbl, N, true));
         q.wait_and_throw();
@@ -495,7 +490,8 @@ namespace strumpack {
       }
       scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
     }
-    std::size_t set_level(cl::sycl::queue& q, const LInfo_t& L, bool Schur, std::size_t B=0) {
+    std::size_t set_level(cl::sycl::queue& q, const LInfo_t& L,
+                          bool Schur, std::size_t B=0) {
       std::size_t i = 0;
       for (auto& f : L.f) {
         if (Schur && (f->dim_sep() == 0 || f->dim_upd() == 0))
@@ -540,8 +536,6 @@ namespace strumpack {
 
   template<std::size_t B, typename scalar_t, typename integer_t>
   struct PartialFactor {
-    // BatchMetaData<scalar_t,integer_t>* bdata_;
-    // PartialFactor(BatchMetaData<scalar_t,integer_t>* bdata) : bdata_(bdata) {}
     std::int64_t *ds_, *du_, **piv_;
     scalar_t **F11_, **F12_, **F21_, **F22_;
     PartialFactor(std::int64_t *ds, std::int64_t *du, std::int64_t **piv,
@@ -551,9 +545,6 @@ namespace strumpack {
     void operator()(cl::sycl::nd_item<3> it) const {
       auto front = it.get_group(0);
       int j = it.get_global_id(1), i = it.get_global_id(2);
-      // int n = bdata_->ds[front], n2 = bdata_->du[front];
-      // auto A11 = bdata_->F11[front];
-      // auto piv = bdata_->piv[front];
       int n = ds_[front], n2 = du_[front];
       auto A11 = F11_[front];
       auto piv = piv_[front];
@@ -975,10 +966,7 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      // F11_.solve_LU_in_place(bloc, reinterpret_cast<int>(piv.data(), task_depth);
-      // F11_.solve_LU_in_place(bloc, reinterpret_cast<int*>(piv_), task_depth);
       std::vector<int> p(piv_, piv_+dim_sep());
-      // std::iota(p.begin(), p.end(), 1);
       F11_.solve_LU_in_place(bloc, p.data(), task_depth);
       if (dim_upd()) {
         if (b.cols() == 1)
