@@ -224,7 +224,6 @@ if(DEFINED TPL_BLAS_LIBRARIES)
     endif()
   endif()
 else()
-  # set(BLA_VENDOR Intel10_64ilp)
   find_package(BLAS)
   if(NOT BLAS_FOUND)
     # BLAS was not specified in TPL_BLAS_LIBRARIES, and not found
@@ -614,8 +613,6 @@ if(BLAS_FOUND)
 endif()
 
 if(MKL_FOUND)
-  # target_link_libraries(strumpack PUBLIC
-  #  $<LINK_ONLY:MKL::MKL> $<LINK_ONLY:MKL::MKL_DPCPP>)
   target_link_libraries(strumpack PUBLIC MKL::MKL)
   target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
 endif()

@@ -30,7 +30,6 @@
 #define FRONTAL_MATRIX_GPU_KERNELS_HPP
 
 #include "misc/Triplet.hpp"
-
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
 #endif

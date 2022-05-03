@@ -499,15 +499,7 @@ namespace strumpack {
       magma_init();
 #endif
     const int max_streams = opts.gpu_streams();
-
-    // TODO this creates too many streams/queues when splitting smaller
-    std::vector<gpu::Stream> streams(max_streams);
-    std::vector<gpu::BLASHandle> blas_handles(max_streams);
     std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
-    for (int i=0; i<max_streams; i++) {
-      blas_handles[i].set_stream(streams[i]);
-      solver_handles[i].set_stream(streams[i]);
-    }
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
     for (int l=lvls-1; l>=0; l--) {
