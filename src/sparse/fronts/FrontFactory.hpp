@@ -56,11 +56,10 @@ namespace strumpack {
 
   template<typename scalar_t> bool is_GPU
   (const SPOptions<scalar_t>& opts) {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
     return opts.use_gpu() && opts.compression() == CompressionType::NONE;
-#else
-    return false;
 #endif
+    return false;
   }
   template<typename scalar_t> bool is_HSS
   (int dsep, int dupd, bool compressed_parent,

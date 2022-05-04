@@ -205,7 +205,8 @@ if ! $found_host; then
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_INSTALL_PREFIX=../install
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DTPL_SCALAPACK_LIBRARIES="/usr/lib64/openmpi/lib/libscalapack.so"
 
     ## if not found automatically, you can specify BLAS/LAPACK/SCALAPACK as:
     #  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a"

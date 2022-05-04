@@ -43,7 +43,13 @@ endif()
 if(STRUMPACK_USE_HIP)
   ## this needs to be added to hip_add_library directly
   # target_sources(strumpack PRIVATE
-  #   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip.cu)
+  #   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip.cpp)
+endif()
+
+if(STRUMPACK_USE_SYCL)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp)
 endif()
 
 if(STRUMPACK_USE_ZFP)

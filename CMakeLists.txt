@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.17)
 project(STRUMPACK VERSION 6.3.1 LANGUAGES CXX C Fortran)
+cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
 option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
 option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" ON)
+option(STRUMPACK_USE_SYCL    "Use SYCL/DPC++ for Intel GPU acceleration" OFF)
 option(STRUMPACK_USE_BLAS64  "Use 64 bit interfaces to BLAS and LAPACK, e.g., MKL ILP64 or openblas64" OFF)
 
 option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" ON)
@@ -138,6 +140,17 @@ if(STRUMPACK_USE_HIP)
       set(STRUMPACK_USE_HIP OFF)
     endif()
   endif()
+endif()
+
+if(STRUMPACK_USE_SYCL)
+  message(STATUS "SYCL/DPC++ enabled, looking for MKL")
+  list(APPEND CMAKE_PREFIX_PATH $ENV{MKLROOT} $ENV{TBBROOT})
+  # set(MKL_LINK dynamic)
+  # set(MKL_LINK static)
+  # set(MKL_ARCH intel64)
+  # set(MKL_INTERFACE lp64)   ## this doesn't work, only ilp64 works
+  set(STRUMPACK_USE_BLAS64 ON)
+  find_package(MKL REQUIRED)
 endif()
 
 
@@ -599,6 +612,11 @@ if(BLAS_FOUND)
   target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
 endif()
 
+if(MKL_FOUND)
+  target_link_libraries(strumpack PUBLIC MKL::MKL)
+  target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
+endif()
+
 # the order is important
 #   - ParMETIS before METIS, since ParMETIS needs METIS
 #   - (ParMETIS) before Scotch to avoid confusion with the Scotch
@@ -663,7 +681,7 @@ if(hipblas_FOUND)
   #   #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
   #   else()
   #     target_compile_options(strumpack PRIVATE
-  # 	$<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
+  #     $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
   #     message(WARNING "No AMD GPU architecture was specified,"
   #       " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
   #       " where xxx can be for instance gfx906 (or a comma separated list)")

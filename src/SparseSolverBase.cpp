@@ -39,10 +39,12 @@
 #include "iterative/IterativeSolvers.hpp"
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
-#else
+#endif
 #if defined(STRUMPACK_USE_HIP)
 #include "dense/HIPWrapper.hpp"
 #endif
+#if defined(STRUMPACK_USE_SYCL)
+#include "dense/DPCPPWrapper.hpp"
 #endif
 
 
@@ -555,8 +557,10 @@ namespace strumpack {
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    if (opts_.use_gpu())
-      gpu::init();
+    if (opts_.use_gpu()) gpu::init();
+#endif
+#if defined(STRUMPACK_USE_SYCL)
+    if (opts_.use_gpu()) dpcpp::init();
 #endif
     using real_t = typename RealType<scalar_t>::value_type;
     opts_.set_pivot_threshold
