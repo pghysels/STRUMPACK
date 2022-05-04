@@ -40,7 +40,8 @@ namespace strumpack {
   namespace ordering {
 
     template<typename integer>
-    void gennd(integer neqns, integer* xadj, integer* adjncy, integer* perm);
+    std::unique_ptr<SeparatorTree<integer>>
+    gennd(integer neqns, integer* xadj, integer* adjncy, integer* perm);
 
     template<typename integer_t>
     std::unique_ptr<SeparatorTree<integer_t>> and_reordering
@@ -57,9 +58,10 @@ namespace strumpack {
       if (e==0)
         if (mpi_root())
           std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-      gennd(n, xadj.data(), adjncy.data(), iperm.data());
+      auto stree = gennd(n, xadj.data(), adjncy.data(), iperm.data());
       for (integer_t i=0; i<n; i++)
         perm[iperm[i]] = i;
+      if (stree) return stree;
       return build_sep_tree_from_perm(ptr, ind, perm, iperm);
     }
 

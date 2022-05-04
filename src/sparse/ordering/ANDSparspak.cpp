@@ -135,13 +135,116 @@ namespace strumpack {
       return nsep;
     }
 
+
+    template<typename integer> struct Comp {
+      Comp(integer r, integer s) : root(r), size(s) {}
+      integer root, size;
+    };
+
+    template<typename integer> std::vector<Comp<integer>>
+    comps(integer n, integer nsub, integer* xadj, integer* adjncy,
+          integer* mask, integer* base,
+          integer* ls=nullptr) {
+      std::vector<Comp<integer>> C;
+      for (integer i=0; i<nsub; ++i) {
+        integer node = ls ? ls[i] : i;
+        if (mask[node] <= 0) continue;
+        auto stack = base;
+        *stack++ = node;
+        mask[node] = -1;
+        integer size = 1;
+        while (stack != base) {
+          auto k = *(--stack);
+          for (auto j=xadj[k]; j<xadj[k+1]; ++j) {
+            auto nbr = adjncy[j];
+            if (mask[nbr] == 1) {
+              *stack++ = nbr;
+              mask[nbr] = -1;
+              size++;
+            }
+          }
+        }
+        C.emplace_back(node, size);
+      }
+      for (integer i=0; i<nsub; ++i) {
+        integer node = ls ? ls[i] : i;
+        if (mask[node] == -1) mask[node] = 1;
+      }
+      return C;
+    }
+
     template<typename integer> void
+    recnd(std::vector<Comp<integer>>& C,
+          std::vector<Separator<integer>>& tree,
+          integer n, integer* xadj, integer* adjncy,
+          integer& num, integer* perm, integer* mask,
+          integer* base, integer* xls, integer* ls) {
+      if (C.size() == 1) {
+        auto& c = C[0];
+        // avoid allocating this for every node?
+        std::vector<integer> p(c.size);
+        auto nsep = fndsep(c.root, xadj, adjncy, mask, p.data(), xls, ls);
+        if (nsep == c.size || c.size <= 8) { // TODO get from options?
+          tree.emplace_back(c.size, -1, -1, -1);
+          for (integer i=0; i<c.size; i++)
+            perm[num + i] = ls[i];
+          num += c.size;
+          return;
+        }
+        auto nC = comps(n, c.size, xadj, adjncy, mask, base, ls);
+        recnd(nC, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+        tree.back().sep_end = nsep;
+        for (integer i=0; i<nsep; i++)
+          perm[num + i] = p[i];
+        num += nsep;
+      } else {
+        std::sort(C.begin(), C.end(),
+                  [](auto& a, auto& b) { return a.size < b.size; });
+        std::vector<Comp<integer>> Cl, Cr;
+        integer nl = 0, nr = 0;
+        for (auto& ci : C) {
+          if (nl <= nr) {
+            Cl.push_back(ci);
+            nl += ci.size;
+          } else {
+            Cr.push_back(ci);
+            nr += ci.size;
+          }
+        }
+        recnd(Cl, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+        auto lid = tree.size() - 1;
+        recnd(Cr, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+        auto rid = tree.size() - 1;
+        tree.emplace_back(0, -1, lid, rid);
+        tree[lid].pa = rid + 1;
+        tree[rid].pa = rid + 1;
+      }
+    }
+
+    template<typename integer>
+    std::unique_ptr<SeparatorTree<integer>>
     gennd(integer n, integer* xadj, integer* adjncy, integer* perm) {
-      if (n <= 0) return;
-      std::vector<integer,NoInit<integer>> iwork(3*n);
+      if (n <= 0) return nullptr;
+      std::vector<integer,NoInit<integer>> iwork(4*n);
       auto mask = iwork.data();
       auto xls = mask + n;
       auto ls = mask + 2*n;
+      auto base = mask + 3*n;
+      std::fill(mask, mask+n, 1);
+
+#if 1
+      auto C = comps(n, n, xadj, adjncy, mask, base);
+      std::vector<Separator<integer>> tree;
+      tree.reserve(n);
+      integer num = 0;
+      recnd(C, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+      for (std::size_t i=1; i<tree.size(); i++)
+        tree[i].sep_end = tree[i].sep_end + tree[i-1].sep_end;
+      return std::unique_ptr<SeparatorTree<integer>>
+        (new SeparatorTree<integer>(tree));
+
+#else
+      integer lvl = 0, num = 0;
       std::fill(mask, mask+n, 1);
       for (integer i=0, num=0; i<n && num<n; ++i) {
         do {
@@ -153,12 +256,19 @@ namespace strumpack {
       }
       /* SEPARATORS FOUND FIRST SHOULD BE ORDERED LAST */
       std::reverse(perm, perm+n);
+      return nullptr;
+#endif
     }
 
     // explicit template instantiation
-    template void gennd(int neqns, int* xadj, int* adjncy, int* perm);
-    template void gennd(long int neqns, long int* xadj, long int* adjncy, long int* perm);
-    template void gennd(long long int neqns, long long int* xadj, long long int* adjncy, long long int* perm);
+    template std::unique_ptr<SeparatorTree<int>>
+    gennd(int neqns, int* xadj, int* adjncy, int* perm);
+
+    template std::unique_ptr<SeparatorTree<long int>>
+    gennd(long int neqns, long int* xadj, long int* adjncy, long int* perm);
+
+    template std::unique_ptr<SeparatorTree<long long int>>
+    gennd(long long int neqns, long long int* xadj, long long int* adjncy, long long int* perm);
 
   } // end namespace ordering
 } // end namespace strumpack
