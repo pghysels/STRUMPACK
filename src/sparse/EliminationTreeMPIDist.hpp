@@ -158,24 +158,24 @@ namespace strumpack {
                                        std::vector<float>& subtree_work, int depth);
 
     std::unique_ptr<F_t>
-    proportional_mapping(const Opts_t& opts,
-                         std::vector<std::vector<integer_t>>& upd,
-                         std::vector<float>& subtree_work,
-                         std::vector<integer_t>& dist_upd,
-                         std::vector<integer_t>& dleaf_upd,
-                         std::vector<float>& dist_subtree_work,
-                         integer_t dsep, int P0, int P,
-                         int P0_sibling, int P_sibling,
-                         const MPIComm& fcomm, bool parent_compression,
-                         int level);
+    prop_map(const Opts_t& opts,
+             std::vector<std::vector<integer_t>>& upd,
+             std::vector<float>& subtree_work,
+             std::vector<integer_t>& dist_upd,
+             std::vector<integer_t>& dleaf_upd,
+             std::vector<float>& dist_subtree_work,
+             integer_t dsep, int P0, int P,
+             int P0_sibling, int P_sibling,
+             const MPIComm& fcomm, bool parent_compression,
+             int level);
 
     std::unique_ptr<F_t>
-    proportional_mapping_sub_graphs(const Opts_t& opts,
-                                    RedistSubTree<integer_t>& tree,
-                                    integer_t dsep, integer_t sep,
-                                    int P0, int P, int P0_sibling,
-                                    int P_sibling, const MPIComm& fcomm,
-                                    bool parent_compression, int level);
+    prop_map_sub_graphs(const Opts_t& opts,
+                        const RedistSubTree<integer_t>& tree,
+                        integer_t dsep, integer_t sep,
+                        int P0, int P, int P0_sibling,
+                        int P_sibling, const MPIComm& fcomm,
+                        bool parent_compression, int level);
 
     void
     communicate_distributed_separator(integer_t dsep,
