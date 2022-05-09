@@ -164,24 +164,20 @@ namespace strumpack {
              std::vector<integer_t>& dist_upd,
              std::vector<integer_t>& dleaf_upd,
              std::vector<float>& dist_subtree_work,
-             integer_t dsep, int P0, int P,
-             int P0_sibling, int P_sibling,
+             integer_t dsep, int P0, int P, int P0_sib, int P_sib,
              const MPIComm& fcomm, bool pa_comp, int level);
 
     std::unique_ptr<F_t>
     prop_map_sub_graphs(const Opts_t& opts,
                         const RedistSubTree<integer_t>& tree,
-                        integer_t dsep, integer_t sep,
-                        int P0, int P, int P0_sibling,
-                        int P_sibling, const MPIComm& fcomm,
-                        bool pa_comp, int level);
+                        int P0, int P, int P0_sib, int P_sib,
+                        const MPIComm& fcomm, bool pa_comp, int level);
 
     void comm_dist_sep(integer_t dsep,
                        const std::vector<integer_t>& dupd_send,
                        integer_t& dsep_begin, integer_t& dsep_end,
                        std::vector<integer_t>& dupd_recv,
-                       int P0, int P, int P0_sibling, int P_sibling,
-                       int owner);
+                       int P0, int P, int P0_sib, int P_sib, int owner);
   };
 
 } // end namespace strumpack

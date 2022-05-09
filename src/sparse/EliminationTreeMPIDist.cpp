@@ -604,12 +604,11 @@ namespace strumpack {
       dest1 = std::max(P0+P, P0_sib+P_sib);
     if (rank_ == owner) {
       sreq.resize(dest1-dest0);
-      int msg = 0;
       sbuf.reserve(2+dupd_send.size());
       sbuf.push_back(dsep_begin);
       sbuf.push_back(dsep_end);
       sbuf.insert(sbuf.end(), dupd_send.begin(), dupd_send.end());
-      for (int dest=dest0; dest<dest1; dest++)
+      for (int dest=dest0, msg=0; dest<dest1; dest++)
         comm_.isend(sbuf, dest, 0, &sreq[msg++]);
     }
     if (rank_ >= dest0 && rank_ < dest1) {
@@ -632,24 +631,19 @@ namespace strumpack {
    int P0, int P, int P0_sib, int P_sib,
    const MPIComm& fcomm, bool pa_comp, int level) {
     auto owner = nd_.proc_dist_sep[dsep];
-    integer_t dsep_begin, dsep_end;
-    std::vector<integer_t> dsep_upd;
     if (nd_.tree().is_leaf(dsep)) {
-      dsep_begin = nd_.sub_graph_range.first;
-      dsep_end = nd_.sub_graph_range.second;
-      comm_dist_sep(dsep, dleaf_upd, dsep_begin, dsep_end, dsep_upd,
-                    P0, P, P0_sib, P_sib, owner);
       RedistSubTree<integer_t> sub_tree
         (nd_.local_tree(), nd_.sub_graph_range.first,
          local_upd, local_subtree_work, P0, P,
          P0_sib, P_sib, owner, comm_);
       if (!sub_tree.nr_sep) return nullptr;
       return prop_map_sub_graphs
-        (opts, sub_tree, dsep, sub_tree.root, P0, P, P0_sib, P_sib,
+        (opts, sub_tree, P0, P, P0_sib, P_sib,
          fcomm, pa_comp, level);
     }
-    dsep_begin = nd_.dist_sep_range.first;
-    dsep_end = nd_.dist_sep_range.second;
+    std::vector<integer_t> dsep_upd;
+    integer_t dsep_begin = nd_.dist_sep_range.first,
+      dsep_end = nd_.dist_sep_range.second;
     comm_dist_sep(dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
                   P0, P, P0_sib, P_sib, owner);
     auto dim_dsep = dsep_end - dsep_begin;
@@ -709,7 +703,6 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::prop_map_sub_graphs
   (const Opts_t& opts, const RedistSubTree<integer_t>& tree,
-   integer_t dsep, integer_t sep,
    int P0, int P, int P0_sib, int P_sib,
    const MPIComm& fcomm, bool pa_comp, int level) {
     struct MapData {
@@ -724,7 +717,7 @@ namespace strumpack {
     };
     std::stack<MapData> fstack;
     fstack.emplace
-      (MapData{sep, P0, P, P0_sib, P_sib,
+      (MapData{tree.root, P0, P, P0_sib, P_sib,
          &fcomm, MPI_COMM_NULL, pa_comp, level, nullptr, true});
     std::unique_ptr<F_t> froot;
     while (!fstack.empty()) {
@@ -748,7 +741,6 @@ namespace strumpack {
           auto fmpi = create_frontal_matrix<scalar_t,integer_t>
             (opts, local_pfronts_.size(), sep_beg, sep_end, upd,
              m.pa_comp, m.level, this->nr_fronts_,
-             //m.pfcomm ? *m.pfcomm : m.fcomm, m.P, rank_ == m.P0);
              *pcomm, m.P, rank_ == m.P0);
           if (rank_ >= m.P0 && rank_ < m.P0+m.P)
             local_pfronts_.emplace_back

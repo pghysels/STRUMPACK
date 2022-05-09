@@ -162,7 +162,7 @@ namespace strumpack {
       int dest1 = std::max(P0+P, P0_sib+P_sib);
       std::vector<integer_t> sbufi;
       std::vector<float> sbuff;
-      std::vector<MPIRequest> sreq;
+      std::vector<MPI_Request> sreq;
       if (rank == owner) {
         auto nbsep = tree.separators();
         std::size_t sbufi_size = 3 + 4*nbsep;
@@ -190,11 +190,11 @@ namespace strumpack {
                     << std::endl
                     << "\tPlease send this message to"
                     << " the STRUMPACK developers." << std::endl;
-        sreq.reserve(2*(dest1-dest0));
+        sreq.resize(2*(dest1-dest0));
         // TODO the sibling only needs the root of the tree!!
-        for (int dest=dest0; dest<dest1; dest++) {
-          sreq.emplace_back(comm.isend(sbufi, dest, 0));
-          sreq.emplace_back(comm.isend(sbuff, dest, 1));
+        for (int dest=dest0, msg=0; dest<dest1; dest++) {
+          comm.isend(sbufi, dest, 0, &sreq[msg++]);
+          comm.isend(sbuff, dest, 1, &sreq[msg++]);
         }
       }
       bool receiver = (rank >= dest0 && rank < dest1);
