@@ -150,15 +150,16 @@ namespace strumpack {
 
     // send the symbolic info of the entire tree belonging to dist_sep
     // owned by owner to [P0,P0+P) send only the root of the sub tree
-    // to [P0_brother,P0_brother+P_brother)
+    // to [P0_sib,P0_sib+P_sib)
     RedistSubTree(const SeparatorTree<integer_t>& tree, integer_t sub_begin,
                   const std::vector<std::vector<integer_t>>& _upd,
                   const std::vector<float>& _work,
-                  integer_t P0, integer_t P, integer_t P0_sibling,
-                  integer_t P_sibling, integer_t owner, const MPIComm& comm) {
+                  integer_t P0, integer_t P,
+                  integer_t P0_sib, integer_t P_sib,
+                  integer_t owner, const MPIComm& comm) {
       auto rank = comm.rank();
-      int dest0 = std::min(P0, P0_sibling);
-      int dest1 = std::max(P0+P, P0_sibling+P_sibling);
+      int dest0 = std::min(P0, P0_sib);
+      int dest1 = std::max(P0+P, P0_sib+P_sib);
       std::vector<integer_t> sbufi;
       std::vector<float> sbuff;
       std::vector<MPIRequest> sreq;
