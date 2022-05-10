@@ -151,7 +151,8 @@ namespace strumpack {
     // send the symbolic info of the entire tree belonging to dist_sep
     // owned by owner to [P0,P0+P) send only the root of the sub tree
     // to [P0_sib,P0_sib+P_sib)
-    RedistSubTree(const SeparatorTree<integer_t>& tree, integer_t sub_begin,
+    RedistSubTree(const SeparatorTree<integer_t>& tree,
+                  integer_t dsep, integer_t sub_begin,
                   const std::vector<std::vector<integer_t>>& _upd,
                   const std::vector<float>& _work,
                   integer_t P0, integer_t P,
@@ -162,7 +163,7 @@ namespace strumpack {
       int dest1 = std::max(P0+P, P0_sib+P_sib);
       std::vector<integer_t> sbufi;
       std::vector<float> sbuff;
-      std::vector<MPI_Request> sreq;
+      std::vector<MPIRequest> sreq;
       if (rank == owner) {
         auto nbsep = tree.separators();
         std::size_t sbufi_size = 3 + 4*nbsep;
@@ -190,22 +191,29 @@ namespace strumpack {
                     << std::endl
                     << "\tPlease send this message to"
                     << " the STRUMPACK developers." << std::endl;
-        sreq.resize(2*(dest1-dest0));
+        sreq.reserve(2*(dest1-dest0));
         // TODO the sibling only needs the root of the tree!!
-        for (int dest=dest0, msg=0; dest<dest1; dest++) {
-          comm.isend(sbufi, dest, 0, &sreq[msg++]);
-          comm.isend(sbuff, dest, 1, &sreq[msg++]);
+        for (int dest=dest0; dest<dest1; dest++) {
+          if (dest != owner) {
+            sreq.emplace_back(comm.isend(sbufi, dest, dsep));
+            sreq.emplace_back(comm.isend(sbuff, dest, 2*dsep));
+          }
         }
       }
-      bool receiver = (rank >= dest0 && rank < dest1);
-      if (receiver) {
-        rbufi = comm.template recv<integer_t>(owner, 0);
-        rbuff = comm.template recv<float>(owner, 1);
+      bool receiver = rank >= dest0 && rank < dest1;
+      if (receiver && rank != owner) {
+        rbufi = comm.template recv<integer_t>(owner, dsep);
+        rbuff = comm.template recv<float>(owner, 2*dsep);
       }
       if (rank == owner) {
         wait_all(sreq);
-        sbuff.clear(); sbuff.shrink_to_fit();
-        sbufi.clear(); sbufi.shrink_to_fit();
+        if (receiver) {
+          rbufi = std::move(sbufi);
+          rbuff = std::move(sbuff);
+        } else {
+          sbuff.clear(); sbuff.shrink_to_fit();
+          sbufi.clear(); sbufi.shrink_to_fit();
+        }
       }
       if (receiver) {
         auto pi = rbufi.data();

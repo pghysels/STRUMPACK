@@ -599,23 +599,28 @@ namespace strumpack {
                 std::vector<integer_t>& dupd_recv,
                 int P0, int P, int P0_sib, int P_sib, int owner) {
     std::vector<integer_t> sbuf;
-    std::vector<MPI_Request> sreq;
+    std::vector<MPIRequest> sreq;
     int dest0 = std::min(P0, P0_sib),
       dest1 = std::max(P0+P, P0_sib+P_sib);
     if (rank_ == owner) {
-      sreq.resize(dest1-dest0);
       sbuf.reserve(2+dupd_send.size());
       sbuf.push_back(dsep_begin);
       sbuf.push_back(dsep_end);
       sbuf.insert(sbuf.end(), dupd_send.begin(), dupd_send.end());
-      for (int dest=dest0, msg=0; dest<dest1; dest++)
-        comm_.isend(sbuf, dest, 0, &sreq[msg++]);
+      sreq.reserve(dest1-dest0);
+      for (int dest=dest0; dest<dest1; dest++)
+        if (dest != rank_)
+          sreq.emplace_back(comm_.isend(sbuf, dest, dsep));
     }
     if (rank_ >= dest0 && rank_ < dest1) {
-      auto rbuf = comm_.template recv<integer_t>(owner, 0);
-      dsep_begin = rbuf[0];
-      dsep_end = rbuf[1];
-      dupd_recv.assign(rbuf.begin()+2, rbuf.end());
+      if (rank_ == owner)
+        dupd_recv = dupd_send;
+      else {
+        auto rbuf = comm_.template recv<integer_t>(owner, dsep);
+        dsep_begin = rbuf[0];
+        dsep_end = rbuf[1];
+        dupd_recv.assign(rbuf.begin()+2, rbuf.end());
+      }
     }
     if (rank_ == owner) wait_all(sreq);
   }
@@ -633,9 +638,9 @@ namespace strumpack {
     auto owner = nd_.proc_dist_sep[dsep];
     if (nd_.tree().is_leaf(dsep)) {
       RedistSubTree<integer_t> sub_tree
-        (nd_.local_tree(), nd_.sub_graph_range.first,
-         local_upd, local_subtree_work, P0, P,
-         P0_sib, P_sib, owner, comm_);
+        (nd_.local_tree(), dsep, nd_.sub_graph_range.first,
+         local_upd, local_subtree_work,
+         P0, P, P0_sib, P_sib, owner, comm_);
       if (!sub_tree.nr_sep) return nullptr;
       return prop_map_sub_graphs
         (opts, sub_tree, P0, P, P0_sib, P_sib,

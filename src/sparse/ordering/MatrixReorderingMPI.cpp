@@ -57,7 +57,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   MatrixReorderingMPI<scalar_t,integer_t>::MatrixReorderingMPI
   (integer_t n, const MPIComm& c)
-    : MatrixReordering<scalar_t,integer_t>(n), dsep_leaf(-1), comm_(&c) {
+    : MatrixReordering<scalar_t,integer_t>(n), comm_(&c), dsep_leaf_(-1) {
   }
 
   template<typename scalar_t,typename integer_t>
@@ -269,7 +269,7 @@ namespace strumpack {
          sep<sep_tree_->separators(); sep++) {
       if (sep_tree_->is_leaf(sep)) {
         // sep is a leaf, so it is the local graph of proces p
-        if (p_local == rank) dsep_leaf = sep;
+        if (p_local == rank) dsep_leaf_ = sep;
         sub_graph_ranges[p_local] =
           std::make_pair(sep_tree_->sizes(sep), sep_tree_->sizes(sep+1));
         proc_dist_sep[sep] = p_local++;
@@ -344,9 +344,9 @@ namespace strumpack {
         comm_->all_reduce(local_tree_->separators(), MPI_SUM) +
         std::max(integer_t(0), sep_tree_->separators() - comm_->size());
       integer_t local_levels;
-      if (dsep_leaf != -1)
+      if (dsep_leaf_ != -1)
         local_levels = local_tree_->levels() +
-          sep_tree_->level(dsep_leaf) - 1;
+          sep_tree_->level(dsep_leaf_) - 1;
       else local_levels = sep_tree_->levels();
       integer_t max_level = comm_->all_reduce(local_levels, MPI_MAX);
       if (comm_->is_root())
