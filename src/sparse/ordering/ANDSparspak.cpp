@@ -178,12 +178,10 @@ namespace strumpack {
           std::vector<Separator<integer>>& tree,
           integer n, integer* xadj, integer* adjncy,
           integer& num, integer* perm, integer* mask,
-          integer* base, integer* xls, integer* ls) {
+          integer* base, integer* xls, integer* ls, integer* work) {
       if (C.size() == 1) {
         auto& c = C[0];
-        // avoid allocating this for every node?
-        std::vector<integer> p(c.size);
-        auto nsep = fndsep(c.root, xadj, adjncy, mask, p.data(), xls, ls);
+        auto nsep = fndsep(c.root, xadj, adjncy, mask, work, xls, ls);
         if (nsep == c.size || c.size <= 8) { // TODO get from options?
           tree.emplace_back(c.size, -1, -1, -1);
           for (integer i=0; i<c.size; i++)
@@ -192,10 +190,11 @@ namespace strumpack {
           return;
         }
         auto nC = comps(n, c.size, xadj, adjncy, mask, base, ls);
-        recnd(nC, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+        recnd(nC, tree, n, xadj, adjncy, num, perm,
+              mask, base, xls, ls, work+nsep);
         tree.back().sep_end = nsep;
         for (integer i=0; i<nsep; i++)
-          perm[num + i] = p[i];
+          perm[num + i] = work[i];
         num += nsep;
       } else {
         std::sort(C.begin(), C.end(),
@@ -211,9 +210,11 @@ namespace strumpack {
             nr += ci.size;
           }
         }
-        recnd(Cl, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+        recnd(Cl, tree, n, xadj, adjncy, num, perm,
+              mask, base, xls, ls, work);
         auto lid = tree.size() - 1;
-        recnd(Cr, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+        recnd(Cr, tree, n, xadj, adjncy, num, perm,
+              mask, base, xls, ls, work);
         auto rid = tree.size() - 1;
         tree.emplace_back(0, -1, lid, rid);
         tree[lid].pa = rid + 1;
@@ -225,11 +226,12 @@ namespace strumpack {
     std::unique_ptr<SeparatorTree<integer>>
     gennd(integer n, integer* xadj, integer* adjncy, integer* perm) {
       if (n <= 0) return nullptr;
-      std::vector<integer,NoInit<integer>> iwork(4*n);
+      std::vector<integer,NoInit<integer>> iwork(5*n);
       auto mask = iwork.data();
       auto xls = mask + n;
       auto ls = mask + 2*n;
       auto base = mask + 3*n;
+      auto work = mask + 4*n;
       std::fill(mask, mask+n, 1);
 
 #if 1
@@ -237,7 +239,7 @@ namespace strumpack {
       std::vector<Separator<integer>> tree;
       tree.reserve(n);
       integer num = 0;
-      recnd(C, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls);
+      recnd(C, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls, work);
       for (std::size_t i=1; i<tree.size(); i++)
         tree[i].sep_end = tree[i].sep_end + tree[i-1].sep_end;
       return std::unique_ptr<SeparatorTree<integer>>
