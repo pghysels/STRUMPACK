@@ -173,7 +173,11 @@ namespace strumpack {
       const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
-#if defined(STRUMPACK_USE_CUDA)
+      void compress_tile_gpu(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
+                             std::size_t i, std::size_t j, DenseM_t& A, scalar_t* d_U, 
+                             scalar_t* d_V, int* dpiv, char* gesvd_mem,
+                             const Opts_t& opts);
+/*#if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
       void compress_tile_gpu_magma(gpu::BLASHandle& blashandle, std::size_t i, 
                                    std::size_t j, DenseM_t& A, scalar_t* d_U, 
@@ -193,7 +197,7 @@ namespace strumpack {
       void compress_tile_gpu_hip(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
                              std::size_t i, std::size_t j, DenseM_t& A, scalar_t* d_U, 
                              scalar_t* d_V, int* dpiv, const Opts_t& opts);
-#endif
+#endif*/
       void fill(scalar_t v);
       void fill_col(scalar_t v, std::size_t k, bool part, std::size_t CP);
 
@@ -326,6 +330,10 @@ namespace strumpack {
       void draw(const BLRMatrix<T>& H, const std::string& name);
       template<typename T,typename I> friend class BLRExtendAdd;
     };
+
+    template<typename scalar_t> int 
+    compress_mem(gpu::SOLVERHandle& solvehandle,
+                 std::size_t maxm_all, std::size_t maxmn_all);
 
     template<typename scalar_t> void
     LUAR(const std::vector<BLRTile<scalar_t>*>& Ti,

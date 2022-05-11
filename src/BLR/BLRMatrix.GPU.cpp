@@ -184,6 +184,243 @@ namespace strumpack {
       block(i, j) = std::unique_ptr<LRTile<scalar_t>>
         (new LRTile<scalar_t>(hU, hV));
     }  
+
+    template<typename scalar_t> int compress_mem
+    (gpu::SOLVERHandle& solvehandle, std::size_t maxm_all, std::size_t maxmn_all){
+#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_MAGMA)
+#if defined(STRUMPACK_USE_KBLAS)
+      int svd_size = 0;
+#else
+      int svd_size = 0;
+#endif
+#else
+      gesvdjInfo_t params = nullptr;
+      int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
+          (solvehandle, Jobz::V, maxm_all, maxm_all+1, params);
+      int svd_size = round_to_16(sizeof(scalar_t) * (2*maxm_all + 2*maxmn_all + gesvd_work_size));
+#endif
+#else
+#if defined(STRUMPACK_USE_HIP)
+      int svd_size = 0;
+#endif
+#endif
+      return svd_size;
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress_tile_gpu
+    (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, std::size_t i, 
+     std::size_t j, DenseM_t& A, scalar_t* d_U, scalar_t* d_V, int* dpiv,
+     char* svd_mem, const Opts_t& opts) {
+#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_MAGMA)
+#if defined(STRUMPACK_USE_KBLAS)
+      #if 0 //GEQP2
+      if (tilerows(i) != 0 && tilecols(j) != 0) {
+        std::size_t minmn = std::min(tilerows(i), tilecols(j));
+        DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
+        DenseMW_t dV(minmn, tilecols(j), d_V, minmn);
+        gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
+        DenseMW_t dA(A.rows(), A.cols(), dmemA, A.rows());
+        gpu::copy_device_to_device(dA, A);
+        int rank = 0;
+        gpu::DeviceMemory<int> drank(1);
+        int* dprank = drank;
+        const double tol = opts.abs_tol();//!!
+        gpu::DeviceMemory<scalar_t> d_tau(minmn);
+        scalar_t* dptau = d_tau;
+        gpu::DeviceMemory<int> d_ind(dV.cols());
+        int* dpind = d_ind;
+        gpu::kblas::geqp2_strided(blashandle.kblas_handle(), dA.rows(), dA.cols(), dA.data(), dA.ld(), 
+                                  dA.rows()*dA.cols(), dptau, minmn, dpind, dV.cols(), 
+                                  dprank, tol, 1);
+        gpu::copy_device_to_host(&rank, drank.as<int>(), 1);
+        if (rank*(tilerows(i) + dV.cols()) < tilerows(i)*dV.cols()){
+          DenseMW_t dU_tmp(tilerows(i), rank, dU, 0, 0);
+          DenseMW_t dV_tmp(rank, dV.cols(), dV, 0, 0);
+          gpu::kblas::orgqr_strided(blashandle.kblas_handle(), dA.rows(), rank, dA.data(), dA.ld(), 
+                                    dA.rows()*rank, dptau, minmn, 1);
+          gpu::copy_device_to_device(dU_tmp.data(), dA.data(), dU.rows()*rank);
+          gpu::gemm(blashandle, Trans::C, Trans::N, scalar_t(1.), dU_tmp, A, scalar_t(0.), dV_tmp);
+          scalar_t* dA_tmp = tile(i, j).D().data();
+          DenseMW_t dAijU(tilerows(i), rank, dA_tmp, tilerows(i));
+          dA_tmp += tilerows(i) * rank;
+          DenseMW_t dAijV(rank, tilecols(j), dA_tmp, rank);
+          dA_tmp += rank * tilecols(j);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(dAijU, dAijV));
+          gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_tmp);
+        }
+      }
+#else //ARA
+      if (tilerows(i) > 15 && tilecols(j) > 15) {
+        std::size_t minmn = std::min(tilerows(i), tilecols(j));
+        DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
+        DenseMW_t dV(tilecols(j), minmn, d_V, tilecols(j));
+        gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
+        DenseMW_t dA(A.rows(), A.cols(), dmemA, A.rows());
+        gpu::copy_device_to_device(dA, A);
+        int rank = 0;
+        gpu::DeviceMemory<int> drank(1);
+        const double tol = opts.rel_tol();
+        int rows = dA.rows(), cols = dA.cols();
+        gpu::DeviceMemory<int> drows(1), dcols(1);
+        gpu::copy_host_to_device(drows.as<int>(), &rows, 1);
+        gpu::copy_host_to_device(dcols.as<int>(), &cols, 1);
+        scalar_t* hA_ptr = dA.data();
+        gpu::DeviceMemory<scalar_t*> dApptr(1);
+        scalar_t** dA_pptr = dApptr;
+        gpu::copy_host_to_device(dA_pptr, &hA_ptr, 1);
+        scalar_t* hU_ptr = dU.data();
+        gpu::DeviceMemory<scalar_t*> dUpptr(1);
+        scalar_t** dU_pptr = dUpptr;
+        gpu::copy_host_to_device(dU_pptr, &hU_ptr, 1);
+        scalar_t* hV_ptr = dV.data();
+        gpu::DeviceMemory<scalar_t*> dVpptr(1);
+        scalar_t** dV_pptr = dVpptr;
+        gpu::copy_host_to_device(dV_pptr, &hV_ptr, 1);
+        gpu::kblas::ara(blashandle.kblas_handle(), drows.as<int>(), dcols.as<int>(), 
+                        dA_pptr, drows, dU_pptr, drows.as<int>(), dV_pptr, 
+                        dcols.as<int>(), drank.as<int>(), tol, rows, cols, 
+                        minmn, 32, 10, blashandle.kblas_rand_state(), 1, 1);
+        gpu::copy_device_to_host(&rank, drank.as<int>(), 1);
+        if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
+          DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
+          gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
+          DenseMW_t dV_tmp(rank, dV.rows(), d_V, rank);
+          gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
+                              dV_tmp, dV_tmp);
+          scalar_t* dA_tmp = tile(i, j).D().data();
+          DenseMW_t dAijU(tilerows(i), rank, dA_tmp, tilerows(i));
+          dA_tmp += tilerows(i) * rank;
+          DenseMW_t dAijV(rank, tilecols(j), dA_tmp, rank);
+          dA_tmp += rank * tilecols(j);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(dAijU, dAijV));
+          gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_tmp);
+        }
+      }
+#endif
+#else //CUDA && MAGMA && !KBLAS
+      if (tilerows(i) != 0 && tilecols(j) != 0) {
+        using real_t = typename RealType<scalar_t>::value_type;
+        std::size_t minmn = std::min(tilerows(i), tilecols(j));
+        DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
+        DenseMW_t dV(minmn, tilecols(j), d_V, minmn);
+        gpu::DeviceMemory<real_t> d_S(minmn);
+        real_t* dS = d_S;
+        std::vector<real_t> S_tmp;
+        S_tmp.resize(minmn);
+        int rank = 0;
+        const double tol = opts.rel_tol();
+        gpu::magma::gesvd_magma<scalar_t>(MagmaSomeVec, MagmaSomeVec, dS, 
+                                          A, dU, dV);
+        gpu::copy_device_to_host(S_tmp.data(), dS, minmn);
+        while(S_tmp[rank] >= tol){
+          rank++;
+        }
+        if (rank*(dU.rows() + dV.cols()) < dU.rows()*dV.cols()){
+          DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
+          DenseMW_t dV_tmp(rank, dV.cols(), dV, 0, 0);
+          gpu::DeviceMemory<scalar_t> d_x(rank);
+          gpu::copy_real_to_scalar<scalar_t>(d_x, dS, rank);
+          gpu::dgmm<scalar_t>(blashandle, Side::L, dV_tmp, 
+                              d_x, dV_tmp);
+          scalar_t* dA = tile(i, j).D().data();
+          DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
+          dA += tilerows(i) * rank;
+          DenseMW_t dAijV(rank, tilecols(j), dA, rank);
+          dA += rank * tilecols(j);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(dAijU, dAijV));
+          gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_tmp);
+        }
+      }
+#endif //end KBLAS
+#else //CUDA && !MAGMA
+      if (tilerows(i) != 0 && tilecols(j) != 0) {
+        using real_t = typename RealType<scalar_t>::value_type;
+        std::size_t minmn = std::min(tilerows(i), tilecols(j));
+        DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
+        DenseMW_t dV(tilecols(j), minmn, d_V, tilecols(j));
+        auto dS = reinterpret_cast<real_t*>(svd_mem);
+        std::vector<real_t> S_tmp;
+        S_tmp.resize(minmn);
+        int rank = 0;
+        const double tol = opts.rel_tol();
+        int gesvd_work_size = gpu::gesvd<scalar_t>(handle, Jobz::V, dS, 
+                                A, dU, dV, dpiv, svd_mem, tol);
+        gpu::copy_device_to_host(S_tmp.data(), dS, minmn);
+        while(S_tmp[rank] >= tol){
+          rank++;
+        }
+        if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
+          DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
+          auto d_V = reinterpret_cast<scalar_t*>(svd_mem);
+          d_V += minmn + (A.rows() * A.cols()) + gesvd_work_size;
+          DenseMW_t dV_T(rank, dV.rows(), d_V, rank);
+          gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
+                              dV_T, dV_T);
+          d_V += rank * dV.rows();
+          gpu::copy_real_to_scalar<scalar_t>(d_V, dS, rank);
+          gpu::dgmm<scalar_t>(blashandle, Side::L, dV_T, 
+                              d_V, dV_T);
+          scalar_t* dA = tile(i, j).D().data();
+          DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
+          dA += tilerows(i) * rank;
+          DenseMW_t dAijV(rank, tilecols(j), dA, rank);
+          dA += rank * tilecols(j);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(dAijU, dAijV));
+          gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_T);
+        }
+      }
+#endif //end MAGMA
+#else //!CUDA 
+#if defined(STRUMPACK_USE_HIP)
+      if (tilerows(i) != 0 && tilecols(j) != 0) {
+        using real_t = typename RealType<scalar_t>::value_type;
+        std::size_t minmn = std::min(tilerows(i), tilecols(j));
+        DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
+        DenseMW_t dV(minmn, tilecols(j), d_V, minmn);
+        gpu::DeviceMemory<real_t> d_S(minmn);
+        real_t* dS = d_S;
+        std::vector<real_t> S_tmp;
+        S_tmp.resize(minmn);
+        int rank = 0;
+        const double tol = opts.rel_tol();
+        gpu::gesvd_hip<scalar_t>(handle, dS, A, dU, dV, dpiv);
+        gpu::copy_device_to_host(S_tmp.data(), dS, minmn);
+        while(S_tmp[rank] >= tol){
+          rank++;
+        }
+        if (rank*(dU.rows() + dV.cols()) < dU.rows()*dV.cols()){
+          DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
+          DenseMW_t dV_tmp(rank, dV.cols(), dV, 0, 0);
+          gpu::DeviceMemory<scalar_t> d_x(rank);
+          gpu::copy_real_to_scalar<scalar_t>(d_x, dS, rank);
+          gpu::dgmm<scalar_t>(blashandle, Side::L, dV_tmp, 
+                              d_x, dV_tmp);
+          scalar_t* dA = tile(i, j).D().data();
+          DenseMW_t dAijU(tilerows(i), rank, dA, tilerows(i));
+          dA += tilerows(i) * rank;
+          DenseMW_t dAijV(rank, tilecols(j), dA, rank);
+          dA += rank * tilecols(j);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(dAijU, dAijV));
+          gpu::copy_device_to_device(tile(i, j).U(), dU_tmp);
+          gpu::copy_device_to_device(tile(i, j).V(), dV_tmp);
+        }
+      }
+#endif
+#endif
+    }
+#if 0
 #if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
     template<typename scalar_t> void
@@ -410,6 +647,7 @@ namespace strumpack {
       }
     }
 #endif
+#endif
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor_gpu
     (DenseMatrix<scalar_t>& A11, DenseMatrix<scalar_t>& A12,
@@ -429,40 +667,42 @@ namespace strumpack {
       auto rb2 = B21.rowblocks();
 #if 1 // B11, B12, B21, B22 on GPU
         auto d2 = A22.rows();
-        int nr_streams = 1;
+        /*int nr_streams = 1;
         std::vector<gpu::Stream> streams(nr_streams);
         std::vector<gpu::SOLVERHandle> solvehandles(nr_streams);
-        std::vector<gpu::BLASHandle> handles(nr_streams);
-        for (int i=0; i<nr_streams; i++) {
+        std::vector<gpu::BLASHandle> handles(nr_streams);*/
+        gpu::Stream copy_stream, comp_stream;
+        gpu::BLASHandle handle(comp_stream);
+        gpu::SOLVERHandle solvehandle(comp_stream);
+        /*for (int i=0; i<nr_streams; i++) {  
           solvehandles[i].set_stream(streams[i]);
           handles[i].set_stream(streams[i]);
-        }
+        }*/
 #if defined(STRUMPACK_USE_MAGMA)
         magma_init();
         magma_queue_t q;
 #if defined(STRUMPACK_USE_CUDA)
         magma_queue_create_from_cuda
-          (0, streams[0], handles[0], nullptr, &q);
+          (0, comp_stream, handle, nullptr, &q);
 #else
         magma_queue_create(0, &q);
 #endif
-        //magma_iset_pointer(nullptr, nullptr, 1, 0, 0, 0, 0, q);
 #if defined(STRUMPACK_USE_KBLAS)
         using real_t = typename RealType<scalar_t>::value_type;
         const int BLOCK_SIZE = 32;
-        kblasHandle_t kblas_handle;
+        /*kblasHandle_t kblas_handle;
         // TODO need to free this handle!!
         kblasRandState_t rand_state;
         kblasCreate(&kblas_handle);
         kblasSetStream(kblas_handle, streams[0]);
         kblasInitRandState(kblas_handle, &rand_state, 16384*2, 0);
-        kblasEnableMagma(kblas_handle);
-        kblas_ara_batch_wsquery<real_t>(kblas_handle, BLOCK_SIZE, 1);
-        kblasAllocateWorkspace(kblas_handle);
+        kblasEnableMagma(kblas_handle);*/
+        kblas_ara_batch_wsquery<real_t>(handle.kblas_handle(), BLOCK_SIZE, 1);
+        kblasAllocateWorkspace(handle.kblas_handle());
 #endif
 #endif
         gpu::DeviceMemory<scalar_t> dmB11(dsep*dsep + gpu::getrf_buffersize<scalar_t>
-                                    (solvehandles[0], *std::max_element(tiles1.begin(), 
+                                    (solvehandle, *std::max_element(tiles1.begin(), 
                                      tiles1.end()))), 
                                      dmB12(dsep*A12.cols()), 
                                      dmB21(A21.rows()*dsep);
@@ -489,13 +729,15 @@ namespace strumpack {
                     maxm_all = std::max(max_m, max_m12);
         maxmn_all = std::max(maxmn_all, max_m21*max_n21);
         maxm_all = std::max(maxm_all, max_m21);
-#if defined(STRUMPACK_USE_CUDA)
+        int cmprs_size = compress_mem<scalar_t>(solvehandle, maxm_all, maxmn_all);
+        gpu::DeviceMemory<char> cmprs_mem(cmprs_size);
+/*#if defined(STRUMPACK_USE_CUDA)
         gesvdjInfo_t params = nullptr;
         int gesvd_work_size = gpu::gesvdj_buffersize<scalar_t>
           (solvehandles[0], Jobz::V, maxm_all, maxm_all+1, params);
         int svd_size = round_to_16(sizeof(scalar_t) * (2*maxm_all + 2*maxmn_all + gesvd_work_size));
         gpu::DeviceMemory<char> svd_mem(svd_size);
-#endif
+#endif*/
         gpu::DeviceMemory<scalar_t> d_U(max_mn);
         gpu::DeviceMemory<scalar_t> d_V(max_mn);
         gpu::DeviceMemory<scalar_t> d_U12(max_m12*max_n12);
@@ -525,12 +767,12 @@ namespace strumpack {
             dA21 += B21.tilerows(i) * B21.tilecols(j);
           }
         }
-        for (std::size_t i=0, s=0; i<rb; i++) {
-          gpu::getrf(solvehandles[s], B11.tile(i, i).D(), 
+        for (std::size_t i=0; i<rb; i++) {
+          gpu::getrf(solvehandle, B11.tile(i, i).D(), 
                      dmB11 + dsep*dsep, dpiv+B11.tileroff(i), dpiv+dsep);
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(i, j)) {
-#if defined(STRUMPACK_USE_CUDA)
+/*#if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
 #if defined(STRUMPACK_USE_KBLAS)
               B11.compress_tile_gpu_kblas(kblas_handle, handles[s], rand_state, i, j, B11.tile(i, j).D(), 
@@ -548,27 +790,29 @@ namespace strumpack {
               B11.compress_tile_gpu_hip(solvehandles[s], handles[s], i, j, B11.tile(i, j).D(),
                                         d_U, dAijV, dpiv+dsep, opts);
 #endif
-#endif   
+#endif  */
+              B11.compress_tile_gpu(solvehandle, handle, i, j, B11.tile(i, j).D(),
+                                    d_U, d_V, dpiv+dsep, svd_mem, opts);
 #if defined(STRUMPACK_USE_MAGMA)
               B11.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
 #else
-              B11.tile(i, j).laswp(solvehandles[s], dpiv+B11.tileroff(i), true);
+              B11.tile(i, j).laswp(solvehandle, dpiv+B11.tileroff(i), true);
 #endif
-              trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U, 
+              trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U, 
                    scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
             } else {
 #if defined(STRUMPACK_USE_MAGMA)
               B11.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
 #else
-              B11.tile(i, j).laswp(solvehandles[s], dpiv+B11.tileroff(i), true);
+              B11.tile(i, j).laswp(solvehandle, dpiv+B11.tileroff(i), true);
 #endif
-              gpu::trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U,
+              gpu::trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
             }
           }
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(j, i)) {
-#if defined(STRUMPACK_USE_CUDA)
+/*#if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
 #if defined(STRUMPACK_USE_KBLAS)
               B11.compress_tile_gpu_kblas(kblas_handle, handles[s], rand_state, j, i, B11.tile(j, i).D(), 
@@ -586,17 +830,19 @@ namespace strumpack {
               B11.compress_tile_gpu_hip(solvehandles[s], handles[s], j, i, B11.tile(j, i).D(),
                                         d_U, d_V, dpiv+dsep, opts);
 #endif
-#endif 
-              trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N, 
+#endif */
+              B11.compress_tile_gpu(solvehandle, handle, j, i, B11.tile(j, i).D(), 
+                                    d_U, d_V, dpiv+dsep, cmprs_mem, opts);
+              trsm(handle, Side::R, UpLo::U, Trans::N, Diag::N, 
                    scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
             } else{
-              gpu::trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N,
+              gpu::trsm(handle, Side::R, UpLo::U, Trans::N, Diag::N,
                         scalar_t(1.), B11.tile(i, i).D(), B11.tile(j, i).D());
             }
           }
           //B12, B21 on GPU
           for (std::size_t j=0; j<rb2; j++) {
-#if defined(STRUMPACK_USE_CUDA)
+/*#if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
 #if defined(STRUMPACK_USE_KBLAS)
             B12.compress_tile_gpu_kblas(kblas_handle, handles[s], rand_state, i, j, B12.tile(i, j).D(), 
@@ -614,15 +860,17 @@ namespace strumpack {
             B12.compress_tile_gpu_hip(solvehandles[s], handles[s], i, j, B12.tile(i, j).D(),
                                       d_U12, d_V12, dpiv+dsep, opts);
 #endif
-#endif 
+#endif */
+            B12.compress_tile_gpu(solvehandle, handle, i, j, B12.tile(i, j).D(), 
+                                  d_U12, d_V12, dpiv+dsep, cmprs_mem, opts);
 #if defined(STRUMPACK_USE_MAGMA)
             B12.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
 #else
-            B12.tile(i, j).laswp(solvehandles[s], dpiv+B11.tileroff(i), true);
+            B12.tile(i, j).laswp(solvehandle, dpiv+B11.tileroff(i), true);
 #endif
-            trsm(handles[s], Side::L, UpLo::L, Trans::N, Diag::U, 
+            trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U, 
                  scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
-#if defined(STRUMPACK_USE_CUDA)
+/*#if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
 #if defined(STRUMPACK_USE_KBLAS)
             B21.compress_tile_gpu_kblas(kblas_handle, handles[s], rand_state, j, i, B21.tile(j, i).D(), 
@@ -640,8 +888,10 @@ namespace strumpack {
             B21.compress_tile_gpu_hip(solvehandles[s], handles[s], j, i, B21.tile(j, i).D(),
                                       d_U21, d_V21, dpiv+dsep, opts);
 #endif
-#endif 
-            trsm(handles[s], Side::R, UpLo::U, Trans::N, Diag::N, 
+#endif */
+            B21.compress_tile_gpu(solvehandle, handle, j, i, B21.tile(j, i).D(), 
+                                  d_U21, d_V21, dpiv+dsep, cmprs_mem, opts);
+            trsm(handle, Side::R, UpLo::U, Trans::N, Diag::N, 
                  scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
           }
           //GEMM B11
@@ -705,13 +955,13 @@ namespace strumpack {
             }
           }
 #if defined(STRUMPACK_USE_MAGMA)
-          b1.run(scalar_t(1.), scalar_t(0.), q, streams[s]);
-          b2.run(scalar_t(1.), scalar_t(0.), q, streams[s]);
-          b3.run(scalar_t(-1.), scalar_t(1.), q, streams[s]);
+          b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+          b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+          b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
 #else
-          b1.run(scalar_t(1.), scalar_t(0.), handles[s]);
-          b2.run(scalar_t(1.), scalar_t(0.), handles[s]);
-          b3.run(scalar_t(-1.), scalar_t(1.), handles[s]);
+          b1.run(scalar_t(1.), scalar_t(0.), handle);
+          b2.run(scalar_t(1.), scalar_t(0.), handle);
+          b3.run(scalar_t(-1.), scalar_t(1.), handle);
 #endif
           //GEMM B12
           if (rb>0 && rb2>0) {
@@ -826,13 +1076,13 @@ namespace strumpack {
               }
             }
 #if defined(STRUMPACK_USE_MAGMA)
-            b1.run(scalar_t(1.), scalar_t(0.), q, streams[s]);
-            b2.run(scalar_t(1.), scalar_t(0.), q, streams[s]);
-            b3.run(scalar_t(-1.), scalar_t(1.), q, streams[s]);
+            b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+            b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+            b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
 #else
-            b1.run(scalar_t(1.), scalar_t(0.), handles[s]);
-            b2.run(scalar_t(1.), scalar_t(0.), handles[s]);
-            b3.run(scalar_t(-1.), scalar_t(1.), handles[s]);
+            b1.run(scalar_t(1.), scalar_t(0.), handle);
+            b2.run(scalar_t(1.), scalar_t(0.), handle);
+            b3.run(scalar_t(-1.), scalar_t(1.), handle);
 #endif
           }
         }
@@ -909,13 +1159,13 @@ namespace strumpack {
             }
           }
 #if defined(STRUMPACK_USE_MAGMA)
-          b1.run(scalar_t(1.), scalar_t(0.), q, streams[0]);
-          b2.run(scalar_t(1.), scalar_t(0.), q, streams[0]);
-          b3.run(scalar_t(-1.), scalar_t(1.), q, streams[0]);
+          b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+          b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+          b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
 #else
-          b1.run(scalar_t(1.), scalar_t(0.), handles[0]);
-          b2.run(scalar_t(1.), scalar_t(0.), handles[0]);
-          b3.run(scalar_t(-1.), scalar_t(1.), handles[0]);
+          b1.run(scalar_t(1.), scalar_t(0.), handle);
+          b2.run(scalar_t(1.), scalar_t(0.), handle);
+          b3.run(scalar_t(-1.), scalar_t(1.), handle);
 #endif
         }
         for (std::size_t i=0; i<rb; i++) {
@@ -929,7 +1179,7 @@ namespace strumpack {
           }
         }
         gpu::synchronize();
-        streams[0].synchronize();
+        comp_stream.synchronize();
         A11.clear();
         if(d2){
           A12.clear();

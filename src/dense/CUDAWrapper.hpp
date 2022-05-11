@@ -41,6 +41,10 @@
 
 #include "DenseMatrix.hpp"
 
+#if defined(STRUMPACK_USE_KBLAS)
+#include "kblas.h"
+#endif
+
 
 namespace strumpack {
   namespace gpu {
@@ -74,22 +78,47 @@ namespace strumpack {
 
     class BLASHandle {
     public:
-      BLASHandle() { gpu_check(cublasCreate(&h_)); }
-      BLASHandle(Stream& s) {
-        gpu_check(cublasCreate(&h_));
+      BLASHandle() { 
+        gpu_check(cublasCreate(&h_)); 
+#if defined(STRUMPACK_USE_KBLAS)
+        create_kblas_handle(); 
+#endif
+      }
+      BLASHandle(Stream& s):BLASHandle() {
         set_stream(s);
+#if defined(STRUMPACK_USE_KBLAS)
+        set_kblas_stream(s);
+        kblasInitRandState(kh_, &rs_, 16384*2, 0);
+        kblasEnableMagma(kh_);
+#endif
       }
       ~BLASHandle() { gpu_check(cublasDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
       operator cublasHandle_t&() { return h_; }
       operator const cublasHandle_t&() const { return h_; }
+#if defined(STRUMPACK_USE_KBLAS)
+      void create_kblas_handle() { kblasCreate(&kh_); }
+      kblasHandle_t & kblas_handle() { return kh_; }
+      const kblasHandle_t & kblas_handle() const { return kh_; }
+      kblasRandState_t & kblas_rand_state() { return rs_; }
+      const kblasRandState_t & kblas_rand_state() const { return rs_; }
+      void set_kblas_stream(Stream& s) { kblasSetStream(kh_, s); }
+#endif
     private:
       cublasHandle_t h_;
+#if defined(STRUMPACK_USE_KBLAS)
+      kblasHandle_t kh_;
+      kblasRandState_t rs_;
+#endif
     };
 
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
+      SOLVERHandle(Stream& s) { 
+        gpu_check(cusolverDnCreate(&h_)); 
+        set_stream(s);
+      }
       ~SOLVERHandle() { gpu_check(cusolverDnDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cusolverDnSetStream(h_, s)); }
       operator cusolverDnHandle_t&() { return h_; }
