@@ -107,7 +107,7 @@ namespace strumpack {
     private:
       cublasHandle_t h_;
 #if defined(STRUMPACK_USE_KBLAS)
-      kblasHandle_t kh_;
+      kblasHandle_t kh_; // TODO need to free this handle!!
       kblasRandState_t rs_;
 #endif
     };

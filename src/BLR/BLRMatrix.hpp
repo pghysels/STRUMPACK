@@ -177,27 +177,6 @@ namespace strumpack {
                              std::size_t i, std::size_t j, DenseM_t& A, scalar_t* d_U, 
                              scalar_t* d_V, int* dpiv, char* gesvd_mem,
                              const Opts_t& opts);
-/*#if defined(STRUMPACK_USE_CUDA)
-#if defined(STRUMPACK_USE_MAGMA)
-      void compress_tile_gpu_magma(gpu::BLASHandle& blashandle, std::size_t i, 
-                                   std::size_t j, DenseM_t& A, scalar_t* d_U, 
-                                   scalar_t* d_V, const Opts_t& opts);
-#if defined(STRUMPACK_USE_KBLAS)
-      void compress_tile_gpu_kblas(kblasHandle_t& kblas_handle, gpu::BLASHandle& handle, 
-                                   kblasRandState_t rand_state, std::size_t i, std::size_t j, 
-                                   DenseM_t& A, scalar_t* d_U, scalar_t* d_V, const Opts_t& opts);
-#endif
-#endif
-      void compress_tile_gpu(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
-                             std::size_t i, std::size_t j, DenseM_t& A, scalar_t* d_U, 
-                             scalar_t* d_V, int* dpiv, char* gesvd_mem,
-                             const Opts_t& opts);
-#endif
-#if defined(STRUMPACK_USE_HIP)
-      void compress_tile_gpu_hip(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
-                             std::size_t i, std::size_t j, DenseM_t& A, scalar_t* d_U, 
-                             scalar_t* d_V, int* dpiv, const Opts_t& opts);
-#endif*/
       void fill(scalar_t v);
       void fill_col(scalar_t v, std::size_t k, bool part, std::size_t CP);
 
