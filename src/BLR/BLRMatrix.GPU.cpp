@@ -792,7 +792,7 @@ namespace strumpack {
 #endif
 #endif  */
               B11.compress_tile_gpu(solvehandle, handle, i, j, B11.tile(i, j).D(),
-                                    d_U, d_V, dpiv+dsep, svd_mem, opts);
+                                    d_U, d_V, dpiv+dsep, cmprs_mem, opts);
 #if defined(STRUMPACK_USE_MAGMA)
               B11.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
 #else
