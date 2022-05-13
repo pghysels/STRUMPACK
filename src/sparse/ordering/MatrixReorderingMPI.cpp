@@ -52,6 +52,7 @@
 #include "minimum_degree/MMDReordering.hpp"
 #include "spectral/SpectralReordering.hpp"
 
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>

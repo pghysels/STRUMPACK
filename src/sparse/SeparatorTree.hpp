@@ -151,6 +151,45 @@ namespace strumpack {
                            std::vector<integer_t>& perm,
                            std::vector<integer_t>& iperm);
 
+  /*! \brief Symmetric elimination tree
+   *
+   * <pre>
+   *      p = spsymetree (A);
+   *
+   *      Find the elimination tree for symmetric matrix A.
+   *      This uses Liu's algorithm, and runs in time O(nz*log n).
+   *
+   *      Input:
+   *        Square sparse matrix A.  No check is made for symmetry;
+   *        elements below and on the diagonal are ignored.
+   *        Numeric values are ignored, so any explicit zeros are
+   *        treated as nonzero.
+   *      Output:
+   *        Integer array of parents representing the etree, with n
+   *        meaning a root of the elimination forest.
+   *      Note:
+   *        This routine uses only the upper triangle, while sparse
+   *        Cholesky (as in spchol.c) uses only the lower.  Matlab's
+   *        dense Cholesky uses only the upper.  This routine could
+   *        be modified to use the lower triangle either by transposing
+   *        the matrix or by traversing it by rows with auxiliary
+   *        pointer and link arrays.
+   *
+   *      John R. Gilbert, Xerox, 10 Dec 1990
+   *      Based on code by JRG dated 1987, 1988, and 1990.
+   *      Modified by X.S. Li, November 1999.
+   * </pre>
+   */
+  template<typename integer_t> std::vector<integer_t>
+  spsymetree(const integer_t* acolst,      // column starts
+             const integer_t* acolend,     //   and ends past 1
+             const integer_t* arow,        // row indices of A
+             integer_t n,                  // dimension of A
+             integer_t subgraph_begin=0);  // first row/column of subgraph
+
+  template<typename integer_t> std::vector<integer_t>
+  etree_postorder(const std::vector<integer_t>& etree);
+
 } // end namespace strumpack
 
 #endif

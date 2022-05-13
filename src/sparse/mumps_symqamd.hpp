@@ -32,7 +32,6 @@
 #include "StrumpackFortranCInterface.h"
 #include "CompressedSparseMatrix.hpp"
 #include "StrumpackOptions.hpp"
-#include "ETree.hpp"
 #include "SeparatorTree.hpp"
 
 #define MUMPS_SYMQAMD_FC STRUMPACK_FC_GLOBAL_(strumpack_symqamd, STRUMPACK_SYMQAMD)
@@ -55,7 +54,7 @@ namespace strumpack {
     int TRESH = 0;              /* <= 0 Recommended value. Automatic setting will be done. */
     int* NDENSE = new int[N];   /* [N] used internally */
     int IWLEN = NNZ;            /* length of workspace IW */
-    int* PE = new int[N];       /* [N] On input PE(i) contains the pointers in IW to
+    std::vector<int> PE(N);     /* [N] On input PE(i) contains the pointers in IW to
                                  * (the column indices of) row i of the matrix.  On
                                  * output it contains the tree:
                                  * - if I is a principal variable (NV(I) >0) then -pe(I) is the
@@ -95,7 +94,7 @@ namespace strumpack {
     }
     PFREE++;
     MUMPS_SYMQAMD_FC
-      (&TRESH, NDENSE, &N, &IWLEN, PE, &PFREE, LEN, IW, NV, ELEN,
+      (&TRESH, NDENSE, &N, &IWLEN, PE.data(), &PFREE, LEN, IW, NV, ELEN,
        LAST, &NCMPA, DEGREE, HEAD, NEXT, W, PERM,
        LISTVAR_SCHUR, &SIZE_SCHUR, &AGG6);
     for (int i=0; i<N; i++) {
@@ -113,12 +112,12 @@ namespace strumpack {
     for (int i=0; i<N; i++) NV[i] = tmp[i];
 
     // post-order the assembly tree
-    auto po = etree_postorder(N, PE);
+    auto po = etree_postorder(PE);
     for (int i=0; i<N; i++) tmp[po[i]] = po[PE[i]];
     for (int i=0; i<N; i++) PE[i] = tmp[i];
     for (int i=0; i<N; i++) tmp[po[i]] = NV[i];
     for (int i=0; i<N; i++) NV[i] = tmp[i];
-    std::replace(PE, PE+N, N, -1);
+    std::replace(PE.begin(), PE.end(), N, -1);
 
     // combine perm with postordering of the tree
     for (int i=0; i<N; i++) tmp[i] = po[perm[i]];
@@ -212,7 +211,7 @@ namespace strumpack {
       sep_tree->sizes(f+1) = sep_tree->sizes(f) + sep_tree->sizes(f+1);
     assert(sep_tree->sizes(sep_tree->separators()) == N);
     delete[] NDENSE;
-    delete[] PE;
+    // delete[] PE;
     delete[] LEN;
     delete[] IW;
     delete[] NV;

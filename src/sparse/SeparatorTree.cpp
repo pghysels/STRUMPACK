@@ -34,7 +34,6 @@
 
 #include "StrumpackConfig.hpp"
 #include "SeparatorTree.hpp"
-#include "ETree.hpp"
 
 namespace strumpack {
 
@@ -395,7 +394,8 @@ namespace strumpack {
   }
 
   /** extract the tree with the top 2*P-1 nodes, ie a tree with P leafs */
-  template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
+  template<typename integer_t>
+  std::unique_ptr<SeparatorTree<integer_t>>
   SeparatorTree<integer_t>::toptree(integer_t P) const {
     integer_t top_nodes = std::min(std::max(integer_t(0), 2*P-1), nr_seps_);
     auto top = std::unique_ptr<SeparatorTree<integer_t>>
@@ -455,10 +455,43 @@ namespace strumpack {
     return top;
   }
 
+
+  template<typename integer_t> std::vector<integer_t>
+  etree_postorder(const std::vector<integer_t>& etree) {
+    integer_t n = etree.size();
+    std::vector<integer_t> first_kid(n+1, -1), next_kid(n+1);
+    // set up structure describing children
+    for (integer_t v=n-1; v>=0; v--) {
+      integer_t dad = etree[v];
+      next_kid[v] = first_kid[dad];
+      first_kid[dad] = v;
+    }
+    // depth-first search from dummy root vertex #n
+    std::vector<integer_t> post(n+1);
+    integer_t current = n, postnum = 0;
+    while (postnum != n) {
+      integer_t first = first_kid[current]; // no kid for the current node
+      if (first == -1) {              // no first kid for the current node
+        post[current] = postnum++;    // numbering this node because it has no kid
+        integer_t next = next_kid[current]; // looking for the next kid
+        while (next == -1) {
+          current = etree[current];   // no more kids : back to the parent node
+          post[current] = postnum++;  // numbering the parent node
+          next = next_kid[current];   // get the next kid
+        }
+        if (postnum == n+1) break;    // stopping criterion
+        current = next;               // updating current node
+      } else current = first;         // updating current node
+    }
+    return post;
+  }
+
+
   template<typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> build_sep_tree_from_perm
-  (const integer_t* ptr, const integer_t* ind,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+  std::unique_ptr<SeparatorTree<integer_t>>
+  build_sep_tree_from_perm(const integer_t* ptr, const integer_t* ind,
+                           std::vector<integer_t>& perm,
+                           std::vector<integer_t>& iperm) {
     integer_t n = perm.size();
     std::vector<integer_t> rlo(n), rhi(n), pind(ptr[n]);
     for (integer_t i=0; i<n; i++) {
@@ -478,8 +511,51 @@ namespace strumpack {
     for (integer_t i=0; i<n; i++) perm[i] = iwork[i];
     for (integer_t i=0; i<n; i++) iperm[perm[i]] = i;
     return std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(etree));  // build separator tree
+      (new SeparatorTree<integer_t>(etree));
   }
+
+  /** path halving */
+  template<typename integer_t> inline integer_t
+  find(integer_t i, std::vector<integer_t>& pp) {
+    integer_t p = pp[i];
+    integer_t gp = pp[p];
+    while (gp != p) {
+      pp[i] = gp;
+      i = gp;
+      p = pp[i];
+      gp = pp[p];
+    }
+    return p;
+  }
+
+  template<typename integer_t> std::vector<integer_t>
+  spsymetree(const integer_t *acolst,    // column starts
+             const integer_t *acolend,   //   and ends past 1
+             const integer_t *arow,      // row indices of A
+             integer_t n,                // dimension of A
+             integer_t subgraph_begin) { // first row/column of subgraph
+    // if working on subgraph, acolst/end only for subgraph and n is
+    // number of vertices in the subgraph
+    std::vector<integer_t> root(n, 0), pp(n, 0), parent(n);
+    for (integer_t col=0; col<n; col++) {
+      integer_t cset = pp[col] = col;
+      root[cset] = col;
+      parent[col] = n;
+      for (integer_t p=acolst[col]; p<acolend[col]; p++) {
+        integer_t row = arow[p] - subgraph_begin;
+        if (row >= col) continue;
+        integer_t rset = find(row, pp);
+        integer_t rroot = root[rset];
+        if (rroot != col) {
+          parent[rroot] = col;
+          cset = pp[cset] = rset;
+          root[cset] = col;
+        }
+      }
+    }
+    return parent;
+  }
+
 
   // explicit template instantiations
   template class SeparatorTree<int>;
@@ -498,5 +574,23 @@ namespace strumpack {
   build_sep_tree_from_perm(const long long int* ptr, const long long int* ind,
                            std::vector<long long int>& perm,
                            std::vector<long long int>& iperm);
+
+  template std::vector<int>
+  spsymetree(const int* acolst, const int* acolend,
+             const int* arow, int n, int subgraph_begin);
+  template std::vector<long int>
+  spsymetree(const long int* acolst, const long int* acolend,
+             const long int* arow, long int n, long int subgraph_begin);
+  template std::vector<long long int>
+  spsymetree(const long long int* acolst, const long long int* acolend,
+             const long long int* arow, long long int n,
+             long long int subgraph_begin);
+
+  template std::vector<int>
+  etree_postorder(const std::vector<int>& etree);
+  template std::vector<long int>
+  etree_postorder(const std::vector<long int>& etree);
+  template std::vector<long long int>
+  etree_postorder(const std::vector<long long int>& etree);
 
 } // end namespace strumpack

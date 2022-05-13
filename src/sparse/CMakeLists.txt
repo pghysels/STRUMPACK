@@ -10,7 +10,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/CSRMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/EliminationTree.hpp
   ${CMAKE_CURRENT_LIST_DIR}/EliminationTree.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
   ${CMAKE_CURRENT_LIST_DIR}/SeparatorTree.hpp
   ${CMAKE_CURRENT_LIST_DIR}/SeparatorTree.cpp)
 
@@ -26,7 +25,6 @@ if(STRUMPACK_USE_MPI)
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/CSRMatrixMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/CSRMatrixMPI.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ETree.hpp
     ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/EliminationTreeMPIDist.hpp
