@@ -27,6 +27,8 @@
  *
  */
 #include <algorithm>
+#include <stack>
+
 #include "ANDSparspak.hpp"
 
 namespace strumpack {
@@ -173,80 +175,91 @@ namespace strumpack {
       return C;
     }
 
-    template<typename integer> void
-    recnd(std::vector<Comp<integer>>& C,
-          std::vector<Separator<integer>>& tree,
-          integer n, integer* xadj, integer* adjncy,
-          integer& num, integer* perm, integer* mask,
-          integer* base, integer* xls, integer* ls, integer* work) {
-      if (C.size() == 1) {
-        auto& c = C[0];
-        auto nsep = fndsep(c.root, xadj, adjncy, mask, work, xls, ls);
-        if (nsep == c.size || c.size <= 8) { // TODO get from options?
-          tree.emplace_back(c.size, -1, -1, -1);
-          for (integer i=0; i<c.size; i++)
-            perm[num + i] = ls[i];
-          num += c.size;
-          return;
-        }
-        auto nC = comps(n, c.size, xadj, adjncy, mask, base, ls);
-        recnd(nC, tree, n, xadj, adjncy, num, perm,
-              mask, base, xls, ls, work+nsep);
-        tree.back().sep_end = nsep;
-        for (integer i=0; i<nsep; i++)
-          perm[num + i] = work[i];
-        num += nsep;
-      } else {
-        std::sort(C.begin(), C.end(),
-                  [](auto& a, auto& b) { return a.size < b.size; });
-        std::vector<Comp<integer>> Cl, Cr;
-        integer nl = 0, nr = 0;
-        for (auto& ci : C) {
-          if (nl <= nr) {
-            Cl.push_back(ci);
-            nl += ci.size;
-          } else {
-            Cr.push_back(ci);
-            nr += ci.size;
-          }
-        }
-        recnd(Cl, tree, n, xadj, adjncy, num, perm,
-              mask, base, xls, ls, work);
-        auto lid = tree.size() - 1;
-        recnd(Cr, tree, n, xadj, adjncy, num, perm,
-              mask, base, xls, ls, work);
-        auto rid = tree.size() - 1;
-        tree.emplace_back(0, -1, lid, rid);
-        tree[lid].pa = rid + 1;
-        tree[rid].pa = rid + 1;
-      }
-    }
 
     template<typename integer>
     std::unique_ptr<SeparatorTree<integer>>
     gennd(integer n, integer* xadj, integer* adjncy, integer* perm) {
       if (n <= 0) return nullptr;
-      std::vector<integer,NoInit<integer>> iwork(5*n);
+#if 1
+      std::vector<Separator<integer>> tree;
+      tree.reserve(n);
+      integer num = 0;
+      std::vector<integer,NoInit<integer>> iwork(4*n);
       auto mask = iwork.data();
       auto xls = mask + n;
       auto ls = mask + 2*n;
       auto base = mask + 3*n;
-      auto work = mask + 4*n;
       std::fill(mask, mask+n, 1);
-
-#if 1
-      auto C = comps(n, n, xadj, adjncy, mask, base);
-      std::vector<Separator<integer>> tree;
-      tree.reserve(n);
-      integer num = 0;
-      recnd(C, tree, n, xadj, adjncy, num, perm, mask, base, xls, ls, work);
+      struct NDData {
+        std::vector<Comp<integer>> C;
+        integer nsep, pa;
+        bool left;
+      };
+      std::stack<NDData> ndstack;
+      ndstack.emplace
+        (NDData{comps(n, n, xadj, adjncy, mask, base), 0, -1, false});
+      while (!ndstack.empty()) {
+        auto s = ndstack.top();
+        ndstack.pop();
+        if (s.C.size() == 1) {
+          auto& c = s.C[0];
+          auto nsep = fndsep(c.root, xadj, adjncy, mask, perm+num, xls, ls);
+          if (nsep == c.size || c.size <= 8) { // TODO get from options?
+            integer id = tree.size();
+            tree.emplace_back(c.size, s.pa, -1, -1);
+            if (s.pa != -1) {
+              if (s.left) tree[s.pa].lch = id;
+              else tree[s.pa].rch = id;
+            }
+            for (integer i=0; i<c.size; i++)
+              perm[num++] = ls[i];
+            continue;
+          }
+          ndstack.emplace
+            (NDData{comps(n, c.size, xadj, adjncy, mask, base, ls),
+               nsep, s.pa, s.left});
+          num += nsep;
+        } else {
+          integer id = tree.size();
+          tree.emplace_back(s.nsep, s.pa, -1, -1);
+          if (s.pa != -1) {
+            if (s.left) tree[s.pa].lch = id;
+            else tree[s.pa].rch = id;
+          }
+          std::sort(s.C.begin(), s.C.end(),
+                    [](auto& a, auto& b) { return a.size < b.size; });
+          std::vector<Comp<integer>> Cl, Cr;
+          integer nl = 0, nr = 0;
+          for (auto& ci : s.C) {
+            if (nl <= nr) {
+              Cl.push_back(ci);
+              nl += ci.size;
+            } else {
+              Cr.push_back(ci);
+              nr += ci.size;
+            }
+          }
+          ndstack.emplace(NDData{std::move(Cl), 0, id, true});
+          ndstack.emplace(NDData{std::move(Cr), 0, id, false});
+        }
+      }
+      std::reverse(perm, perm+n);
+      std::reverse(tree.begin(), tree.end());
+      auto nbsep = tree.size() - 1;
+      for (auto& s : tree) {
+        if (s.pa  != -1) s.pa  = nbsep - s.pa;
+        if (s.lch != -1) s.lch = nbsep - s.lch;
+        if (s.rch != -1) s.rch = nbsep - s.rch;
+      }
       for (std::size_t i=1; i<tree.size(); i++)
         tree[i].sep_end = tree[i].sep_end + tree[i-1].sep_end;
       return std::unique_ptr<SeparatorTree<integer>>
         (new SeparatorTree<integer>(tree));
-
 #else
-      integer lvl = 0, num = 0;
+      std::vector<integer,NoInit<integer>> iwork(4*n);
+      auto mask = iwork.data();
+      auto xls = mask + n;
+      auto ls = mask + 2*n;
       std::fill(mask, mask+n, 1);
       for (integer i=0, num=0; i<n && num<n; ++i) {
         do {
