@@ -68,8 +68,8 @@ namespace strumpack {
     const std::vector<integer_t>& perm() const { return perm_; }
     const std::vector<integer_t>& iperm() const { return iperm_; }
 
-    const SeparatorTree<integer_t>& tree() const { return *sep_tree_; }
-    SeparatorTree<integer_t>& tree() { return *sep_tree_; }
+    const SeparatorTree<integer_t>& tree() const { return tree_; }
+    SeparatorTree<integer_t>& tree() { return tree_; }
 
   protected:
     virtual void
@@ -83,7 +83,7 @@ namespace strumpack {
 
     std::vector<integer_t> perm_, iperm_;
 
-    std::unique_ptr<SeparatorTree<integer_t>> sep_tree_;
+    SeparatorTree<integer_t> tree_;
 
   private:
     void

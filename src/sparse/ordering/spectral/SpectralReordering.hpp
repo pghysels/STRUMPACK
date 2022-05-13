@@ -497,7 +497,7 @@ namespace strumpack {
 
 
     template<typename intt>
-    std::unique_ptr<SeparatorTree<intt>>
+    SeparatorTree<intt>
     spectral_nd(intt n, const intt* ptr, const intt* ind,
                 std::vector<intt>& perm, std::vector<intt>& iperm,
                 const NDOptions& opts) {
@@ -522,7 +522,7 @@ namespace strumpack {
     }
 
     template<typename intt,typename G>
-    std::unique_ptr<SeparatorTree<intt>>
+    SeparatorTree<intt>
     spectral_nd(const G& A,
                 std::vector<intt>& perm, std::vector<intt>& iperm,
                 const NDOptions& opts) {

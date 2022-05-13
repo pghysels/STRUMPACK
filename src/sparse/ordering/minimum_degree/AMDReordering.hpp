@@ -103,24 +103,29 @@ namespace strumpack {
       return p;
     }
 
-    template<typename integer_t> inline void WRAPPER_amd
-    (AMDInt n, std::vector<AMDInt>& xadj, std::vector<AMDInt>& adjncy,
-     std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    template<typename integer_t> inline void
+    WRAPPER_amd(AMDInt n, std::vector<AMDInt>& xadj,
+                std::vector<AMDInt>& adjncy,
+                std::vector<integer_t>& perm,
+                std::vector<integer_t>& iperm) {
       std::vector<AMDInt> p(n), ip(n);
       WRAPPER_amd(n, xadj.data(), adjncy.data(), p.data(), ip.data());
       iperm.assign(ip.begin(), ip.end());
       perm.assign(p.begin(), p.end());
     }
-    template<> inline void WRAPPER_amd
-    (AMDInt n, std::vector<AMDInt>& xadj, std::vector<AMDInt>& adjncy,
-     std::vector<AMDInt>& perm, std::vector<AMDInt>& iperm) {
+    template<> inline void
+    WRAPPER_amd(AMDInt n, std::vector<AMDInt>& xadj,
+                std::vector<AMDInt>& adjncy,
+                std::vector<AMDInt>& perm,
+                std::vector<AMDInt>& iperm) {
       WRAPPER_amd(n, xadj.data(), adjncy.data(), perm.data(), iperm.data());
     }
 
     template<typename integer_t>
-    std::unique_ptr<SeparatorTree<integer_t>> amd_reordering
-    (integer_t n, const integer_t* ptr, const integer_t* ind,
-     std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    SeparatorTree<integer_t>
+    amd_reordering(integer_t n, const integer_t* ptr, const integer_t* ind,
+                   std::vector<integer_t>& perm,
+                   std::vector<integer_t>& iperm) {
       std::vector<AMDInt> xadj(n+1), adjncy(ptr[n]);
       integer_t e = 0;
       for (integer_t j=0; j<n; j++) {
@@ -141,9 +146,11 @@ namespace strumpack {
     }
 
     template<typename integer_t,typename G>
-    std::unique_ptr<SeparatorTree<integer_t>> amd_reordering
-    (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
-      return amd_reordering<integer_t>(A.size(), A.ptr(), A.ind(), perm, iperm);
+    SeparatorTree<integer_t>
+    amd_reordering(const G& A, std::vector<integer_t>& perm,
+                   std::vector<integer_t>& iperm) {
+      return amd_reordering<integer_t>
+        (A.size(), A.ptr(), A.ind(), perm, iperm);
     }
 
   } // end namespace ordering

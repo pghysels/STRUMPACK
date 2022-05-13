@@ -34,11 +34,12 @@
 
 namespace strumpack {
 
-  template<typename integer_t> inline int WRAPPER_ParMETIS_V32_NodeND
-  (const std::vector<integer_t>& dist, std::vector<idx_t>& xadj,
-   std::vector<idx_t>& adjncy, idx_t numflag,
-   std::vector<integer_t>& local_order, std::vector<idx_t>& sizes,
-   MPI_Comm c) {
+  template<typename integer_t> inline int
+  WRAPPER_ParMETIS_V32_NodeND(const std::vector<integer_t>& dist,
+                              std::vector<idx_t>& xadj,
+                              std::vector<idx_t>& adjncy, idx_t numflag,
+                              std::vector<integer_t>& local_order,
+                              std::vector<idx_t>& sizes, MPI_Comm c) {
     std::vector<idx_t> vtxdist(dist.size()), loc_order(local_order.size());
     vtxdist.assign(dist.begin(), dist.end());
     int ierr = ParMETIS_V32_NodeND
@@ -48,11 +49,13 @@ namespace strumpack {
     local_order.assign(loc_order.begin(), loc_order.end());
     return ierr;
   }
-  template<> inline int WRAPPER_ParMETIS_V32_NodeND
-  (const std::vector<idx_t>& dist, std::vector<idx_t>& xadj,
-   std::vector<idx_t>& adjncy, idx_t numflag,
-   std::vector<idx_t>& local_order, std::vector<idx_t>& sizes,
-   MPI_Comm c) {
+  template<> inline int
+  WRAPPER_ParMETIS_V32_NodeND(const std::vector<idx_t>& dist,
+                              std::vector<idx_t>& xadj,
+                              std::vector<idx_t>& adjncy, idx_t numflag,
+                              std::vector<idx_t>& local_order,
+                              std::vector<idx_t>& sizes,
+                              MPI_Comm c) {
     return ParMETIS_V32_NodeND
       (const_cast<idx_t*>(dist.data()), xadj.data(), adjncy.data(),
        NULL, &numflag, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -60,11 +63,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>>
-  parmetis_nested_dissection
-  (const CSRMatrixMPI<scalar_t,integer_t>& A, MPI_Comm comm,
-   bool build_tree, std::vector<integer_t>& perm,
-   const SPOptions<scalar_t>& opts) {
+  SeparatorTree<integer_t>
+  parmetis_nested_dissection(const CSRMatrixMPI<scalar_t,integer_t>& A,
+                             MPI_Comm comm, bool build_tree,
+                             std::vector<integer_t>& perm,
+                             const SPOptions<scalar_t>& opts) {
     auto P = mpi_nprocs(comm);
     auto local_rows = A.local_rows();
     auto ptr = A.ptr();
@@ -91,7 +94,8 @@ namespace strumpack {
         if (!mpi_rank(comm))
           std::cerr << "ParMETIS_V32_NodeND failed with ierr="
                     << ierr << std::endl;
-        return nullptr; // TODO throw an exception
+        // TODO throw an exception
+        return SeparatorTree<integer_t>();
       }
 
       std::unique_ptr<int[]> rcnts(new int[2*P]);
@@ -106,17 +110,16 @@ namespace strumpack {
          perm.data(), rcnts.get(), displs, mpi_type<integer_t>(), comm);
     }
 
-    std::unique_ptr<SeparatorTree<integer_t>> sep_tree;
+    SeparatorTree<integer_t> sep_tree;
     if (build_tree) {
       // p2 subdomains, p2-1 distributed separators
       integer_t dist_nr_sep = 2*p2 - 1;
-      sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
-        (new SeparatorTree<integer_t>(dist_nr_sep));
-      sep_tree->sizes[0] = 0;
+      sep_tree = SeparatorTree<integer_t>(dist_nr_sep);
+      sep_tree.sizes[0] = 0;
       for (integer_t i=0; i<dist_nr_sep; i++) {
-        sep_tree->parent[i] = -1;
-        sep_tree->lch[i] = -1;
-        sep_tree->rch[i] = -1;
+        sep_tree.parent[i] = -1;
+        sep_tree.lch[i] = -1;
+        sep_tree.rch[i] = -1;
       }
       int nr_dist_levels = std::log2(p2);
       std::function<void(integer_t,integer_t&,integer_t)>
@@ -126,13 +129,13 @@ namespace strumpack {
           build_dist_binary_separator_tree(2*dsep+2, pid, level-1);
           integer_t lch = pid - 1;
           build_dist_binary_separator_tree(2*dsep+1, pid, level-1);
-          sep_tree->lch[pid] = lch;
-          sep_tree->rch[pid] = pid-1;
-          sep_tree->parent[lch] = pid;
-          sep_tree->parent[pid-1] = pid;
+          sep_tree.lch[pid] = lch;
+          sep_tree.rch[pid] = pid-1;
+          sep_tree.parent[lch] = pid;
+          sep_tree.parent[pid-1] = pid;
         }
-        sep_tree->sizes[pid+1] = sizes[dist_nr_sep-1-dsep]
-          + sep_tree->sizes[pid];
+        sep_tree.sizes[pid+1] = sizes[dist_nr_sep-1-dsep]
+          + sep_tree.sizes[pid];
         pid++;
       };
       integer_t pid = 0;

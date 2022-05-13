@@ -59,8 +59,9 @@ namespace strumpack {
       std::copy(ip.begin(), ip.end(), iperm);
       std::copy(p.begin(), p.end(), perm);
     }
-    template<> inline void WRAPPER_mmd
-    (MMDInt n, MMDInt* xadj, MMDInt* adjncy, MMDInt* perm, MMDInt* iperm) {
+    template<> inline void
+    WRAPPER_mmd(MMDInt n, MMDInt* xadj, MMDInt* adjncy,
+                MMDInt* perm, MMDInt* iperm) {
       MMDInt iwsize = 4*n, nadj = xadj[n]-1, nofsub = 0, iflag = 0;
       std::unique_ptr<MMDInt[]> iwork(new MMDInt[iwsize]);
       ORDMMD_FC(&n, &nadj, xadj, adjncy, iperm, perm,
@@ -87,24 +88,27 @@ namespace strumpack {
     }
 
 
-    template<typename integer_t> inline void WRAPPER_mmd
-    (MMDInt n, std::vector<MMDInt>& xadj, std::vector<MMDInt>& adjncy,
-     std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    template<typename integer_t> inline void
+    WRAPPER_mmd(MMDInt n,
+                std::vector<MMDInt>& xadj, std::vector<MMDInt>& adjncy,
+                std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
       std::vector<MMDInt> p(n), ip(n);
       WRAPPER_mmd(n, xadj.data(), adjncy.data(), p.data(), ip.data());
       iperm.assign(ip.begin(), ip.end());
       perm.assign(p.begin(), p.end());
     }
-    template<> inline void WRAPPER_mmd
-    (MMDInt n, std::vector<MMDInt>& xadj, std::vector<MMDInt>& adjncy,
-     std::vector<MMDInt>& perm, std::vector<MMDInt>& iperm) {
+    template<> inline void
+    WRAPPER_mmd(MMDInt n,
+                std::vector<MMDInt>& xadj, std::vector<MMDInt>& adjncy,
+                std::vector<MMDInt>& perm, std::vector<MMDInt>& iperm) {
       WRAPPER_mmd(n, xadj.data(), adjncy.data(), perm.data(), iperm.data());
     }
 
     template<typename integer_t>
-    std::unique_ptr<SeparatorTree<integer_t>> mmd_reordering
-    (integer_t n, const integer_t* ptr, const integer_t* ind,
-     std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    SeparatorTree<integer_t>
+    mmd_reordering(integer_t n, const integer_t* ptr, const integer_t* ind,
+                   std::vector<integer_t>& perm,
+                   std::vector<integer_t>& iperm) {
       std::vector<MMDInt> xadj(n+1), adjncy(ptr[n]);
       integer_t e = 0;
       for (integer_t j=0; j<n; j++) {
@@ -125,9 +129,11 @@ namespace strumpack {
     }
 
     template<typename integer_t,typename G>
-    std::unique_ptr<SeparatorTree<integer_t>> mmd_reordering
-    (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
-      return mmd_reordering<integer_t>(A.size(), A.ptr(), A.ind(), perm, iperm);
+    SeparatorTree<integer_t>
+    mmd_reordering(const G& A, std::vector<integer_t>& perm,
+                   std::vector<integer_t>& iperm) {
+      return mmd_reordering<integer_t>
+        (A.size(), A.ptr(), A.ind(), perm, iperm);
     }
 
   } // end namespace ordering

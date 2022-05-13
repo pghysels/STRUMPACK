@@ -72,7 +72,7 @@ namespace strumpack {
       auto rank = comm_->rank();
       auto P = comm_->size();
       auto Aseq = A.gather_graph();
-      std::unique_ptr<SeparatorTree<integer_t>> global_sep_tree;
+      SeparatorTree<integer_t> global_sep_tree;
       if (Aseq) { // only root
         switch (opts.reordering_method()) {
         case ReorderingStrategy::NATURAL: {
@@ -125,21 +125,20 @@ namespace strumpack {
         default: assert(true);
         }
         Aseq.reset();
-        global_sep_tree->check();
+        global_sep_tree.check();
       }
       comm_->broadcast(perm_);
       comm_->broadcast(iperm_);
       integer_t nbsep;
-      if (!rank) nbsep = global_sep_tree->separators();
+      if (!rank) nbsep = global_sep_tree.separators();
       comm_->broadcast(nbsep);
       if (rank)
-        global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
-          (new SeparatorTree<integer_t>(nbsep));
-      global_sep_tree->broadcast(*comm_);
-      local_tree_ = global_sep_tree->subtree(rank, P);
-      sep_tree_ = global_sep_tree->toptree(P);
-      local_tree_->check();
-      sep_tree_->check();
+        global_sep_tree = SeparatorTree<integer_t>(nbsep);
+      global_sep_tree.broadcast(*comm_);
+      ltree_ = global_sep_tree.subtree(rank, P);
+      tree_ = global_sep_tree.toptree(P);
+      ltree_.check();
+      tree_.check();
       for (std::size_t i=0; i<perm_.size(); i++)
         iperm_[perm_[i]] = i;
       get_local_graphs(A);
@@ -160,15 +159,15 @@ namespace strumpack {
                     << std::endl;
           return 1;
         }
-        std::tie(sep_tree_, local_tree_) =
-          geometric_nested_dissection_dist
-          (nx, ny, nz, components, width, A.begin_row(), A.end_row(),
-           *comm_, perm_, iperm_, opts.nd_param(), opts.nd_planar_levels());
+        std::tie(tree_, ltree_) =
+          geometric_ND_dist(nx, ny, nz, components, width,
+                            A.begin_row(), A.end_row(), *comm_, perm_, iperm_,
+                            opts.nd_param(), opts.nd_planar_levels());
         break;
       }
       case ReorderingStrategy::PARMETIS: {
 #if defined(STRUMPACK_USE_PARMETIS)
-        sep_tree_ = parmetis_nested_dissection
+        tree_ = parmetis_nested_dissection
           (A, comm_->comm(), true, perm_, opts);
 #else
         std::cerr << "ERROR: STRUMPACK was not configured with ParMetis support"
@@ -179,7 +178,7 @@ namespace strumpack {
       }
       case ReorderingStrategy::PTSCOTCH: {
 #if defined(STRUMPACK_USE_PTSCOTCH)
-        sep_tree_ = ptscotch_nested_dissection
+        tree_ = ptscotch_nested_dissection
           (A, comm_->comm(), true, perm_, opts);
 #else
         std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
@@ -194,12 +193,12 @@ namespace strumpack {
       }
       default: assert(true);
       }
-      sep_tree_->check();
+      tree_.check();
       get_local_graphs(A);
       if (opts.reordering_method() == ReorderingStrategy::PARMETIS ||
           opts.reordering_method() == ReorderingStrategy::PTSCOTCH)
         build_local_tree(A);
-      local_tree_->check();
+      ltree_.check();
     }
     nested_dissection_print(opts, A.nnz());
     return 0;
@@ -213,7 +212,7 @@ namespace strumpack {
     if (base == 0) std::copy(p, p+n, perm_.data());
     else for (std::size_t i=0; i<n; i++) perm_[i] = p[i] - base;
     auto Aseq = A.gather_graph();
-    std::unique_ptr<SeparatorTree<integer_t>> global_sep_tree;
+    SeparatorTree<integer_t> global_sep_tree;
     if (Aseq) {
       global_sep_tree = build_sep_tree_from_perm
         (Aseq->ptr(), Aseq->ind(), perm_, iperm_);
@@ -222,15 +221,15 @@ namespace strumpack {
     auto rank = comm_->rank();
     auto P = comm_->size();
     integer_t nbsep;
-    if (!rank) nbsep = global_sep_tree->separators();
+    if (!rank) nbsep = global_sep_tree.separators();
     comm_->broadcast(nbsep);
     if (rank)
-      global_sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
-        (new SeparatorTree<integer_t>(nbsep));
-    global_sep_tree->broadcast(*comm_);
-    local_tree_ = global_sep_tree->subtree(rank, P);
-    sep_tree_ = global_sep_tree->toptree(P);
-    for (std::size_t i=0; i<perm_.size(); i++) iperm_[perm_[i]] = i;
+      global_sep_tree = SeparatorTree<integer_t>(nbsep);
+    global_sep_tree.broadcast(*comm_);
+    ltree_ = global_sep_tree.subtree(rank, P);
+    tree_ = global_sep_tree.toptree(P);
+    for (std::size_t i=0; i<perm_.size(); i++)
+      iperm_[perm_[i]] = i;
     get_local_graphs(A);
     nested_dissection_print(opts, A.nnz());
     return 0;
@@ -265,20 +264,20 @@ namespace strumpack {
     auto rank = comm_->rank();
     sub_graph_ranges.resize(P);
     dist_sep_ranges.resize(P);
-    proc_dist_sep.resize(sep_tree_->separators());
+    proc_dist_sep.resize(tree_.separators());
     for (integer_t sep=0, p_local=0, p_dist=0;
-         sep<sep_tree_->separators(); sep++) {
-      if (sep_tree_->is_leaf(sep)) {
+         sep<tree_.separators(); sep++) {
+      if (tree_.is_leaf(sep)) {
         // sep is a leaf, so it is the local graph of proces p
         if (p_local == rank) dsep_leaf_ = sep;
         sub_graph_ranges[p_local] =
-          std::make_pair(sep_tree_->sizes[sep], sep_tree_->sizes[sep+1]);
+          std::make_pair(tree_.sizes[sep], tree_.sizes[sep+1]);
         proc_dist_sep[sep] = p_local++;
       } else {
         // sep was computed using distributed nested dissection,
         // assign it to process p_dist
         dist_sep_ranges[p_dist] =
-          std::make_pair(sep_tree_->sizes[sep], sep_tree_->sizes[sep+1]);
+          std::make_pair(tree_.sizes[sep], tree_.sizes[sep+1]);
         proc_dist_sep[sep] = p_dist++;
       }
     }
@@ -304,8 +303,7 @@ namespace strumpack {
       iwork[post[i]] = post[sub_etree[i]];
     for (integer_t i=0; i<sub_n; ++i)
       sub_etree[i] = iwork[i];
-    local_tree_ = std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(sub_etree));
+    ltree_ = SeparatorTree<integer_t>(sub_etree);
     for (integer_t i=0; i<sub_n; i++) {
       iwork[post[i]] = i;
       post[i] += sub_graph_range.first;
@@ -332,7 +330,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   MatrixReorderingMPI<scalar_t,integer_t>::clear_tree_data() {
     MatrixReordering<scalar_t,integer_t>::clear_tree_data();
-    local_tree_ = nullptr;
+    ltree_ = SeparatorTree<integer_t>();
     my_sub_graph = CSRGraph<integer_t>();
     my_dist_sep = CSRGraph<integer_t>();
   }
@@ -342,13 +340,12 @@ namespace strumpack {
   (const Opts_t& opts, integer_t nnz) const {
     if (opts.verbose()) {
       auto total_separators =
-        comm_->all_reduce(local_tree_->separators(), MPI_SUM) +
-        std::max(integer_t(0), sep_tree_->separators() - comm_->size());
+        comm_->all_reduce(ltree_.separators(), MPI_SUM) +
+        std::max(integer_t(0), tree_.separators() - comm_->size());
       integer_t local_levels;
       if (dsep_leaf_ != -1)
-        local_levels = local_tree_->levels() +
-          sep_tree_->level(dsep_leaf_) - 1;
-      else local_levels = sep_tree_->levels();
+        local_levels = ltree_.levels() + tree_.level(dsep_leaf_) - 1;
+      else local_levels = tree_.levels();
       integer_t max_level = comm_->all_reduce(local_levels, MPI_MAX);
       if (comm_->is_root())
         MatrixReordering<scalar_t,integer_t>::nested_dissection_print

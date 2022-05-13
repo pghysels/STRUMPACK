@@ -46,11 +46,11 @@ namespace strumpack {
   (const Opts_t& opts, const CSRMPI_t& A, Reord_t& nd, const MPIComm& comm)
     : EliminationTreeMPI<scalar_t,integer_t>(comm), nd_(nd) {
 
-    std::vector<std::vector<integer_t>> lupd(nd_.local_tree().separators());
+    std::vector<std::vector<integer_t>> lupd(nd_.ltree().separators());
     // every process is responsible for 1 distributed separator, so
     // store only 1 dist_upd
     std::vector<integer_t> dist_upd, dleaf_upd;
-    std::vector<float> ltree_work(nd_.local_tree().separators()),
+    std::vector<float> ltree_work(nd_.ltree().separators()),
       dtree_work(nd_.tree().separators());
 
     float dsep_work, dleaf_work;
@@ -378,8 +378,8 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::symb_fact_loc
   (integer_t sep, std::vector<std::vector<integer_t>>& upd,
    std::vector<float>& work, int depth) {
-    auto chl = nd_.local_tree().lch[sep];
-    auto chr = nd_.local_tree().rch[sep];
+    auto chl = nd_.ltree().lch[sep];
+    auto chr = nd_.ltree().rch[sep];
     float fs = 0.;
     if (depth < params::task_recursion_cutoff_level) {
       float fl = 0., fr = 0.;
@@ -399,13 +399,13 @@ namespace strumpack {
       if (chr != -1)
         fs += symb_fact_loc(chr, upd, work, depth);
     }
-    auto sep_begin = nd_.local_tree().sizes[sep] +
+    auto sep_begin = nd_.ltree().sizes[sep] +
       nd_.sub_graph_range.first;
-    auto sep_end = nd_.local_tree().sizes[sep+1] +
+    auto sep_end = nd_.ltree().sizes[sep+1] +
       nd_.sub_graph_range.first;
     {
-      auto lor = nd_.local_tree().sizes[sep];
-      auto hir = nd_.local_tree().sizes[sep+1];
+      auto lor = nd_.ltree().sizes[sep];
+      auto hir = nd_.ltree().sizes[sep+1];
       std::size_t maxest = nd_.my_sub_graph.ptr(hir) -
         nd_.my_sub_graph.ptr(lor);
       if (chl != -1) maxest += upd[chl].size();
@@ -475,11 +475,11 @@ namespace strumpack {
     nd_.my_sub_graph.sort_rows();
 
     float fs = 0.;
-    if (!nd_.local_tree().is_empty()) {
+    if (!nd_.ltree().is_empty()) {
 #pragma omp parallel
 #pragma omp single
       fs = symb_fact_loc
-        (nd_.local_tree().root(), local_upd, local_subtree_work, 0);
+        (nd_.ltree().root(), local_upd, local_subtree_work, 0);
     }
 
     dsep_work = dleaf_work = 0.;
@@ -494,10 +494,10 @@ namespace strumpack {
       auto pa_rank = nd_.proc_dist_sep[pa];
       if (nd_.tree().is_leaf(dsep)) {
         // Leaf of distributed tree is local subgraph for process
-        // proc_dist_sep[dsep], unless the local_tree is empty.
-        if (!nd_.local_tree().is_empty()) {
-          dleaf_work = local_subtree_work[nd_.local_tree().root()];
-          dleaf_upd = local_upd[nd_.local_tree().root()];
+        // proc_dist_sep[dsep], unless the ltree is empty.
+        if (!nd_.ltree().is_empty()) {
+          dleaf_work = local_subtree_work[nd_.ltree().root()];
+          dleaf_upd = local_upd[nd_.ltree().root()];
         } else {
           auto sep_begin = nd_.sub_graph_range.first;
           auto sep_end = nd_.sub_graph_range.second;
@@ -537,7 +537,7 @@ namespace strumpack {
              nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r+1),
              dist_upd, sep_end);
         int nr_children = (nd_.tree().is_leaf(dsep) &&
-                           nd_.local_tree().is_empty()) ? 0 : 2;
+                           nd_.ltree().is_empty()) ? 0 : 2;
         std::vector<integer_t> d2ch(nr_children);
         std::vector<float> wch(nr_children);
         float fs = 0.;
@@ -638,7 +638,7 @@ namespace strumpack {
     auto owner = nd_.proc_dist_sep[dsep];
     if (nd_.tree().is_leaf(dsep)) {
       RedistSubTree<integer_t> sub_tree
-        (nd_.local_tree(), dsep, nd_.sub_graph_range.first,
+        (nd_.ltree(), dsep, nd_.sub_graph_range.first,
          local_upd, local_subtree_work,
          P0, P, P0_sib, P_sib, owner, comm_);
       if (!sub_tree.nr_sep) return nullptr;

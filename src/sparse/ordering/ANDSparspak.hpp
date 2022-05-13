@@ -40,13 +40,14 @@ namespace strumpack {
   namespace ordering {
 
     template<typename integer>
-    std::unique_ptr<SeparatorTree<integer>>
+    SeparatorTree<integer>
     gennd(integer neqns, integer* xadj, integer* adjncy, integer* perm);
 
     template<typename integer_t>
-    std::unique_ptr<SeparatorTree<integer_t>> and_reordering
-    (integer_t n, const integer_t* ptr, const integer_t* ind,
-     std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+    SeparatorTree<integer_t>
+    and_reordering(integer_t n, const integer_t* ptr, const integer_t* ind,
+                   std::vector<integer_t>& perm,
+                   std::vector<integer_t>& iperm) {
       std::vector<integer_t> xadj(n+1), adjncy(ptr[n]);
       integer_t e = 0;
       for (integer_t j=0; j<n; j++) {
@@ -61,14 +62,15 @@ namespace strumpack {
       auto stree = gennd(n, xadj.data(), adjncy.data(), iperm.data());
       for (integer_t i=0; i<n; i++)
         perm[iperm[i]] = i;
-      if (stree) return stree;
-      return build_sep_tree_from_perm(ptr, ind, perm, iperm);
+      return stree;
+      // if (stree) return stree;
+      // return build_sep_tree_from_perm(ptr, ind, perm, iperm);
     }
 
     template<typename integer_t,typename G>
-    std::unique_ptr<SeparatorTree<integer_t>> and_reordering
-    (const G& A, std::vector<integer_t>& perm,
-     std::vector<integer_t>& iperm) {
+    SeparatorTree<integer_t>
+    and_reordering(const G& A, std::vector<integer_t>& perm,
+                   std::vector<integer_t>& iperm) {
       return and_reordering<integer_t>
         (A.size(), A.ptr(), A.ind(), perm, iperm);
     }

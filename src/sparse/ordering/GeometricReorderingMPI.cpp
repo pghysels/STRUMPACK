@@ -36,13 +36,13 @@
 namespace strumpack {
 
   template<typename integer_t>
-  std::pair<std::unique_ptr<SeparatorTree<integer_t>>,
-            std::unique_ptr<SeparatorTree<integer_t>>>
-  geometric_nested_dissection_dist
-  (int nx, int ny, int nz, int components, int width,
-   integer_t lo, integer_t hi, const MPIComm& comm,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   int nd_param, int nd_planar) {
+  std::pair<SeparatorTree<integer_t>,
+            SeparatorTree<integer_t>>
+  geometric_ND_dist(int nx, int ny, int nz, int components, int width,
+                    integer_t lo, integer_t hi, const MPIComm& comm,
+                    std::vector<integer_t>& perm,
+                    std::vector<integer_t>& iperm,
+                    int nd_param, int nd_planar) {
     assert(components == 1);
     assert(width == 1);
     auto P = comm.size();
@@ -161,39 +161,34 @@ namespace strumpack {
       }
       if (dsep && dsep_leaf) dsep_leaf_id++;
     };
-
     rec_nd({{0, 0, 0}}, {{nx, ny, nz}}, 1, 0);
-    std::unique_ptr<SeparatorTree<integer_t>> local_stree
-      (new SeparatorTree<integer_t>(local_tree));
-    std::unique_ptr<SeparatorTree<integer_t>> dist_stree
-      (new SeparatorTree<integer_t>(dist_tree));
-    return std::make_pair
-      <std::unique_ptr<SeparatorTree<integer_t>>,
-       std::unique_ptr<SeparatorTree<integer_t>>>
-      (std::move(dist_stree), std::move(local_stree));
+    return std::make_pair<SeparatorTree<integer_t>,
+                          SeparatorTree<integer_t>>
+      (SeparatorTree<integer_t>(dist_tree),
+       SeparatorTree<integer_t>(local_tree));
   }
 
   // explicit template instantiations
-  template std::pair<std::unique_ptr<SeparatorTree<int>>,
-                     std::unique_ptr<SeparatorTree<int>>>
-  geometric_nested_dissection_dist
-  (int nx, int ny, int nz, int components, int width,
-   int lo, int hi, const MPIComm& comm,
-   std::vector<int>& perm, std::vector<int>& iperm,
-   int nd_param, int nd_planar);
-  template std::pair<std::unique_ptr<SeparatorTree<long int>>,
-                     std::unique_ptr<SeparatorTree<long int>>>
-  geometric_nested_dissection_dist
-  (int nx, int ny, int nz, int components, int width,
-   long int lo, long int hi, const MPIComm& comm,
-   std::vector<long int>& perm, std::vector<long int>& iperm,
-   int nd_param, int nd_planar);
-  template std::pair<std::unique_ptr<SeparatorTree<long long int>>,
-                     std::unique_ptr<SeparatorTree<long long int>>>
-  geometric_nested_dissection_dist
-  (int nx, int ny, int nz, int components, int width,
-   long long int lo, long long int hi, const MPIComm& comm,
-   std::vector<long long int>& perm, std::vector<long long int>& iperm,
-   int nd_param, int nd_planar);
+  template std::pair<SeparatorTree<int>,
+                     SeparatorTree<int>>
+  geometric_ND_dist(int nx, int ny, int nz, int components, int width,
+                    int lo, int hi, const MPIComm& comm,
+                    std::vector<int>& perm, std::vector<int>& iperm,
+                    int nd_param, int nd_planar);
+
+  template std::pair<SeparatorTree<long int>,
+                     SeparatorTree<long int>>
+  geometric_ND_dist(int nx, int ny, int nz, int components, int width,
+                    long int lo, long int hi, const MPIComm& comm,
+                    std::vector<long int>& perm, std::vector<long int>& iperm,
+                    int nd_param, int nd_planar);
+
+  template std::pair<SeparatorTree<long long int>,
+                     SeparatorTree<long long int>>
+  geometric_ND_dist(int nx, int ny, int nz, int components, int width,
+                    long long int lo, long long int hi, const MPIComm& comm,
+                    std::vector<long long int>& perm,
+                    std::vector<long long int>& iperm,
+                    int nd_param, int nd_planar);
 
 } // end namespace strumpack

@@ -314,11 +314,10 @@ namespace strumpack {
   /**
    * Extract subtree p of P.
    */
-  template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
+  template<typename integer_t> SeparatorTree<integer_t>
   SeparatorTree<integer_t>::subtree(integer_t p, integer_t P) const {
     if (!nr_seps_)
-      return std::unique_ptr<SeparatorTree<integer_t>>
-        (new SeparatorTree<integer_t>(0));
+      return SeparatorTree<integer_t>(0);
     std::vector<bool> mark(nr_seps_);
     mark[root()] = true;
     integer_t nr_subtrees = 1;
@@ -355,8 +354,7 @@ namespace strumpack {
     find_my_root(root(), temp);
 
     if (sub_root == -1)
-      return std::unique_ptr<SeparatorTree<integer_t>>
-        (new SeparatorTree<integer_t>(0));
+      return SeparatorTree<integer_t>(0);
     std::function<integer_t(integer_t)> count = [&](integer_t node) {
       integer_t c = 1;
       if (lch[node] != -1) c += count(lch[node]);
@@ -364,8 +362,7 @@ namespace strumpack {
       return c;
     };
     auto sub_size = count(sub_root);
-    auto sub = std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(sub_size));
+    SeparatorTree<integer_t> sub(sub_size);
     if (sub_size == 0) return sub;
     std::function<void(integer_t,integer_t&)> fill_sub =
       [&](integer_t node, integer_t& id) {
@@ -373,33 +370,31 @@ namespace strumpack {
       if (lch[node] != -1) {
         fill_sub(lch[node], id);
         left_root = id-1;
-      } else sub->lch[id] = -1;
+      } else sub.lch[id] = -1;
       if (rch[node] != -1) {
         fill_sub(rch[node], id);
-        sub->rch[id] = id-1;
-        sub->parent[id-1] = id;
-      } else sub->rch[id] = -1;
+        sub.rch[id] = id-1;
+        sub.parent[id-1] = id;
+      } else sub.rch[id] = -1;
       if (lch[node] != -1) {
-        sub->lch[id] = left_root;
-        sub->parent[left_root] = id;
+        sub.lch[id] = left_root;
+        sub.parent[left_root] = id;
       }
-      sub->sizes[id+1] = sub->sizes[id] + sizes[node+1] - sizes[node];
+      sub.sizes[id+1] = sub.sizes[id] + sizes[node+1] - sizes[node];
       id++;
     };
     integer_t id = 0;
-    sub->sizes[0] = 0;
+    sub.sizes[0] = 0;
     fill_sub(sub_root, id);
-    sub->parent[sub_size-1] = -1;
+    sub.parent[sub_size-1] = -1;
     return sub;
   }
 
   /** extract the tree with the top 2*P-1 nodes, ie a tree with P leafs */
-  template<typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>>
+  template<typename integer_t> SeparatorTree<integer_t>
   SeparatorTree<integer_t>::toptree(integer_t P) const {
     integer_t top_nodes = std::min(std::max(integer_t(0), 2*P-1), nr_seps_);
-    auto top = std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(top_nodes));
+    SeparatorTree<integer_t> top(top_nodes);
     std::vector<bool> mark(nr_seps_);
     mark[root()] = true;
     integer_t nr_leafs = 1;
@@ -432,26 +427,26 @@ namespace strumpack {
       auto mytid = tid;
       tid--;
       if (rch[node]!=-1 && mark[rch[node]]) {
-        top->rch[mytid] = tid;
-        top->parent[top->rch[mytid]] = mytid;
+        top.rch[mytid] = tid;
+        top.parent[top.rch[mytid]] = mytid;
         fill_top(rch[node], tid);
-      } else top->rch[mytid] = -1;
+      } else top.rch[mytid] = -1;
       if (lch[node]!=-1 && mark[lch[node]]) {
-        top->lch[mytid] = tid;
-        top->parent[top->lch[mytid]] = mytid;
+        top.lch[mytid] = tid;
+        top.parent[top.lch[mytid]] = mytid;
         fill_top(lch[node], tid);
-      } else top->lch[mytid] = -1;
-      if (top->rch[mytid] == -1)
-        top->sizes[mytid+1] = subtree_size(node);
+      } else top.lch[mytid] = -1;
+      if (top.rch[mytid] == -1)
+        top.sizes[mytid+1] = subtree_size(node);
       else
-        top->sizes[mytid+1] = sizes[node+1] - sizes[node];
+        top.sizes[mytid+1] = sizes[node+1] - sizes[node];
     };
     integer_t tid = top_nodes-1;
-    top->sizes[0] = 0;
+    top.sizes[0] = 0;
     fill_top(root(), tid);
-    top->parent[top_nodes-1] = -1;
+    top.parent[top_nodes-1] = -1;
     for (integer_t i=0; i<top_nodes; i++)
-      top->sizes[i+1] = top->sizes[i] + top->sizes[i+1];
+      top.sizes[i+1] = top.sizes[i] + top.sizes[i+1];
     return top;
   }
 
@@ -487,8 +482,7 @@ namespace strumpack {
   }
 
 
-  template<typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>>
+  template<typename integer_t> SeparatorTree<integer_t>
   build_sep_tree_from_perm(const integer_t* ptr, const integer_t* ind,
                            std::vector<integer_t>& perm,
                            std::vector<integer_t>& iperm) {
@@ -510,8 +504,7 @@ namespace strumpack {
     for (integer_t i=0; i<n; i++) iwork[i] = post[perm[i]];
     for (integer_t i=0; i<n; i++) perm[i] = iwork[i];
     for (integer_t i=0; i<n; i++) iperm[perm[i]] = i;
-    return std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(etree));
+    return SeparatorTree<integer_t>(etree);
   }
 
   /** path halving */
@@ -562,15 +555,15 @@ namespace strumpack {
   template class SeparatorTree<long int>;
   template class SeparatorTree<long long int>;
 
-  template std::unique_ptr<SeparatorTree<int>>
+  template SeparatorTree<int>
   build_sep_tree_from_perm(const int* ptr, const int* ind,
                            std::vector<int>& perm,
                            std::vector<int>& iperm);
-  template std::unique_ptr<SeparatorTree<long int>>
+  template SeparatorTree<long int>
   build_sep_tree_from_perm(const long int* ptr, const long int* ind,
                            std::vector<long int>& perm,
                            std::vector<long int>& iperm);
-  template std::unique_ptr<SeparatorTree<long long int>>
+  template SeparatorTree<long long int>
   build_sep_tree_from_perm(const long long int* ptr, const long long int* ind,
                            std::vector<long long int>& perm,
                            std::vector<long long int>& iperm);

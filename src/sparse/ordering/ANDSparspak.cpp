@@ -177,10 +177,9 @@ namespace strumpack {
 
 
     template<typename integer>
-    std::unique_ptr<SeparatorTree<integer>>
+    SeparatorTree<integer>
     gennd(integer n, integer* xadj, integer* adjncy, integer* perm) {
-      if (n <= 0) return nullptr;
-#if 1
+      if (n <= 0) return SeparatorTree<integer>();
       std::vector<Separator<integer>> tree;
       tree.reserve(n);
       integer num = 0;
@@ -253,37 +252,37 @@ namespace strumpack {
       }
       for (std::size_t i=1; i<tree.size(); i++)
         tree[i].sep_end = tree[i].sep_end + tree[i-1].sep_end;
-      return std::unique_ptr<SeparatorTree<integer>>
-        (new SeparatorTree<integer>(tree));
-#else
-      std::vector<integer,NoInit<integer>> iwork(4*n);
-      auto mask = iwork.data();
-      auto xls = mask + n;
-      auto ls = mask + 2*n;
-      std::fill(mask, mask+n, 1);
-      for (integer i=0, num=0; i<n && num<n; ++i) {
-        do {
-          if (mask[i] == 0) break;
-          /* FIND A SEPARATOR AND NUMBER THE NODES NEXT. */
-          auto nsep = fndsep(i, xadj, adjncy, mask, perm+num, xls, ls);
-          num += nsep;
-        } while (num < n);
-      }
-      /* SEPARATORS FOUND FIRST SHOULD BE ORDERED LAST */
-      std::reverse(perm, perm+n);
-      return nullptr;
-#endif
+      return SeparatorTree<integer>(tree);
+// #else
+//       std::vector<integer,NoInit<integer>> iwork(4*n);
+//       auto mask = iwork.data();
+//       auto xls = mask + n;
+//       auto ls = mask + 2*n;
+//       std::fill(mask, mask+n, 1);
+//       for (integer i=0, num=0; i<n && num<n; ++i) {
+//         do {
+//           if (mask[i] == 0) break;
+//           /* FIND A SEPARATOR AND NUMBER THE NODES NEXT. */
+//           auto nsep = fndsep(i, xadj, adjncy, mask, perm+num, xls, ls);
+//           num += nsep;
+//         } while (num < n);
+//       }
+//       /* SEPARATORS FOUND FIRST SHOULD BE ORDERED LAST */
+//       std::reverse(perm, perm+n);
+//       return nullptr;
+// #endif
     }
 
     // explicit template instantiation
-    template std::unique_ptr<SeparatorTree<int>>
+    template SeparatorTree<int>
     gennd(int neqns, int* xadj, int* adjncy, int* perm);
 
-    template std::unique_ptr<SeparatorTree<long int>>
+    template SeparatorTree<long int>
     gennd(long int neqns, long int* xadj, long int* adjncy, long int* perm);
 
-    template std::unique_ptr<SeparatorTree<long long int>>
-    gennd(long long int neqns, long long int* xadj, long long int* adjncy, long long int* perm);
+    template SeparatorTree<long long int>
+    gennd(long long int neqns, long long int* xadj, long long int* adjncy,
+          long long int* perm);
 
   } // end namespace ordering
 } // end namespace strumpack

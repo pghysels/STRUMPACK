@@ -37,13 +37,13 @@
 namespace strumpack {
 
   template<typename integer_t>
-  std::pair<std::unique_ptr<SeparatorTree<integer_t>>,
-            std::unique_ptr<SeparatorTree<integer_t>>>
-  geometric_nested_dissection_dist
-  (int nx, int ny, int nz, int components, int width,
-   integer_t lo, integer_t hi, const MPIComm& comm,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   int nd_param, int nd_planar);
+  std::pair<SeparatorTree<integer_t>,
+            SeparatorTree<integer_t>>
+  geometric_ND_dist(int nx, int ny, int nz, int components, int width,
+                    integer_t lo, integer_t hi, const MPIComm& comm,
+                    std::vector<integer_t>& perm,
+                    std::vector<integer_t>& iperm,
+                    int nd_param, int nd_planar);
 
 } // end namespace strumpack
 
