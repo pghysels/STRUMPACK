@@ -151,7 +151,7 @@ namespace strumpack {
       void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) override;
 #endif
 
-      void move_gpu_tile_to_cpu() override;
+      void move_gpu_tile_to_cpu(gpu::Stream& s) override;
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;

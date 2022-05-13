@@ -165,26 +165,6 @@ namespace strumpack {
       gpu::copy_device_to_device(tile(i, j).D(), tile(A, i, j));
     }
 
-    template<typename scalar_t>
-    void BLRMatrix<scalar_t>::move_dense_gpu_tile_to_cpu
-    (std::size_t i, std::size_t j, DenseM_t& dD) {
-      DenseM_t hD(dD.rows(), dD.cols());
-      gpu::copy_device_to_host(hD, dD);
-      block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-        (new DenseTile<scalar_t>(hD));
-    }
-
-    template<typename scalar_t>
-    void BLRMatrix<scalar_t>::move_LR_gpu_tile_to_cpu
-    (std::size_t i, std::size_t j, DenseM_t& dU, DenseM_t& dV) {
-      DenseM_t hU(dU.rows(), dU.cols());
-      DenseM_t hV(dV.rows(), dV.cols());
-      gpu::copy_device_to_host(hU, dU);
-      gpu::copy_device_to_host(hV, dV);
-      block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-        (new LRTile<scalar_t>(hU, hV));
-    }  
-
     template<typename scalar_t> int compress_mem
     (gpu::SOLVERHandle& solvehandle, std::size_t maxm_all, std::size_t maxmn_all){
 #if defined(STRUMPACK_USE_CUDA)
@@ -216,7 +196,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
 #if defined(STRUMPACK_USE_KBLAS)
-      #if 0 //GEQP2
+#if 0 //GEQP2
       if (tilerows(i) != 0 && tilecols(j) != 0) {
         std::size_t minmn = std::min(tilerows(i), tilecols(j));
         DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
@@ -761,13 +741,11 @@ namespace strumpack {
 #endif
           }
         }
-        gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), dsep);
-        for (std::size_t i=0; i<rb; i++)
-          for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
-            piv[l] += B11.tileroff(i);
+        gpu::synchronize();
+        gpu::copy_device_to_host_async(piv.data(), dpiv.as<int>(), dsep, copy_stream);
         for (std::size_t i=0; i<rb; i++) {
           for (std::size_t j=0; j<rb; j++){
-            B11.tile(i, j).move_gpu_tile_to_cpu();
+            B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
           }
         }
         //GEMM B22
@@ -843,18 +821,21 @@ namespace strumpack {
           b3.run(scalar_t(-1.), scalar_t(1.), handle);
 #endif
         }
+        gpu::synchronize();
+        for (std::size_t i=0; i<rb; i++)
+          for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
+            piv[l] += B11.tileroff(i);
         for (std::size_t i=0; i<rb; i++) {
           for (std::size_t j=0; j<rb2; j++){
-            B12.tile(i, j).move_gpu_tile_to_cpu();
+            B12.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
           }
         }
         for (std::size_t i=0; i<rb2; i++) {
           for (std::size_t j=0; j<rb; j++){
-            B21.tile(i, j).move_gpu_tile_to_cpu();
+            B21.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
           }
         }
         gpu::synchronize();
-        comp_stream.synchronize();
         A11.clear();
         if(d2){
           A12.clear();

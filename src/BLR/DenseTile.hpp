@@ -124,9 +124,9 @@ namespace strumpack {
       void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) override;
 #endif
 
-      void move_gpu_tile_to_cpu() override {
+      void move_gpu_tile_to_cpu(gpu::Stream& s) override {
         DenseM_t hD(D().rows(), D().cols());
-        gpu::copy_device_to_host(hD, D());
+        gpu::copy_device_to_host_async(hD, D(), s);
         D_.reset(new DenseM_t(hD));
       }
 

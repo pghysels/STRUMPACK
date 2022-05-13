@@ -121,7 +121,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       virtual void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) = 0;
 
-      virtual void move_gpu_tile_to_cpu() = 0;
+      virtual void move_gpu_tile_to_cpu(gpu::Stream& s) = 0;
 #endif
       virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                           scalar_t alpha, const DenseM_t& a) = 0;

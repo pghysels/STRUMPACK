@@ -255,11 +255,11 @@ namespace strumpack {
       gpu::laswp(handle, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
     }
 #endif
-    template<typename scalar_t> void LRTile<scalar_t>::move_gpu_tile_to_cpu() {
+    template<typename scalar_t> void LRTile<scalar_t>::move_gpu_tile_to_cpu(gpu::Stream& s) {
       DenseM_t hU(U().rows(), U().cols());
       DenseM_t hV(V().rows(), V().cols());
-      gpu::copy_device_to_host(hU, U());
-      gpu::copy_device_to_host(hV, V());
+      gpu::copy_device_to_host_async(hU, U(), s);
+      gpu::copy_device_to_host_async(hV, V(), s);
       U_.reset(new DenseM_t(hU));
       V_.reset(new DenseM_t(hV));
     }
