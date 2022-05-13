@@ -65,8 +65,8 @@ namespace strumpack {
   EliminationTree<scalar_t,integer_t>::symbolic_factorization
   (const SpMat_t& A, const SeparatorTree<integer_t>& sep_tree,
    integer_t sep, std::vector<std::vector<integer_t>>& upd, int depth) const {
-    auto chl = sep_tree.lch(sep);
-    auto chr = sep_tree.rch(sep);
+    auto chl = sep_tree.lch[sep];
+    auto chr = sep_tree.rch[sep];
     if (depth < params::task_recursion_cutoff_level) {
       if (chl != -1)
 #pragma omp task untied default(shared)                                 \
@@ -81,8 +81,8 @@ namespace strumpack {
       if (chl != -1) symbolic_factorization(A, sep_tree, chl, upd, depth);
       if (chr != -1) symbolic_factorization(A, sep_tree, chr, upd, depth);
     }
-    auto sep_begin = sep_tree.sizes(sep);
-    auto sep_end = sep_tree.sizes(sep+1);
+    auto sep_begin = sep_tree.sizes[sep];
+    auto sep_end = sep_tree.sizes[sep+1];
     if (sep != sep_tree.root()) { // not necessary for the root
       for (integer_t c=sep_begin; c<sep_end; c++) {
         auto ice = A.ind()+A.ptr(c+1);
@@ -128,26 +128,26 @@ namespace strumpack {
    SeparatorTree<integer_t>& sep_tree,
    std::vector<std::vector<integer_t>>& upd, integer_t sep,
    bool hss_parent, int level) {
-    auto sep_begin = sep_tree.sizes(sep);
-    auto sep_end = sep_tree.sizes(sep+1);
+    auto sep_begin = sep_tree.sizes[sep];
+    auto sep_end = sep_tree.sizes[sep+1];
     auto dim_sep = sep_end - sep_begin;
     // dummy nodes added at the end of the separator tree have
     // dim_sep==0, but they have sep_begin=sep_end=N, which is wrong
     // So fix this here!
-    if (dim_sep == 0 && sep_tree.lch(sep) != -1)
-      sep_begin = sep_end = sep_tree.sizes(sep_tree.rch(sep)+1);
+    if (dim_sep == 0 && sep_tree.lch[sep] != -1)
+      sep_begin = sep_end = sep_tree.sizes[sep_tree.rch[sep]+1];
     auto front = create_frontal_matrix<scalar_t,integer_t>
       (opts, sep, sep_begin, sep_end, upd[sep],
        hss_parent, level, nr_fronts_);
     bool compressed =
       is_compressed(dim_sep, upd[sep].size(), hss_parent, opts);
-    if (sep_tree.lch(sep) != -1)
+    if (sep_tree.lch[sep] != -1)
       front->set_lchild
-        (setup_tree(opts, A, sep_tree, upd, sep_tree.lch(sep),
+        (setup_tree(opts, A, sep_tree, upd, sep_tree.lch[sep],
                     compressed, level+1));
-    if (sep_tree.rch(sep) != -1)
+    if (sep_tree.rch[sep] != -1)
       front->set_rchild
-        (setup_tree(opts, A, sep_tree, upd, sep_tree.rch(sep),
+        (setup_tree(opts, A, sep_tree, upd, sep_tree.rch[sep],
                     compressed, level+1));
     return front;
   }

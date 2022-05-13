@@ -378,8 +378,8 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::symb_fact_loc
   (integer_t sep, std::vector<std::vector<integer_t>>& upd,
    std::vector<float>& work, int depth) {
-    auto chl = nd_.local_tree().lch(sep);
-    auto chr = nd_.local_tree().rch(sep);
+    auto chl = nd_.local_tree().lch[sep];
+    auto chr = nd_.local_tree().rch[sep];
     float fs = 0.;
     if (depth < params::task_recursion_cutoff_level) {
       float fl = 0., fr = 0.;
@@ -399,13 +399,13 @@ namespace strumpack {
       if (chr != -1)
         fs += symb_fact_loc(chr, upd, work, depth);
     }
-    auto sep_begin = nd_.local_tree().sizes(sep) +
+    auto sep_begin = nd_.local_tree().sizes[sep] +
       nd_.sub_graph_range.first;
-    auto sep_end = nd_.local_tree().sizes(sep+1) +
+    auto sep_end = nd_.local_tree().sizes[sep+1] +
       nd_.sub_graph_range.first;
     {
-      auto lor = nd_.local_tree().sizes(sep);
-      auto hir = nd_.local_tree().sizes(sep+1);
+      auto lor = nd_.local_tree().sizes[sep];
+      auto hir = nd_.local_tree().sizes[sep+1];
       std::size_t maxest = nd_.my_sub_graph.ptr(hir) -
         nd_.my_sub_graph.ptr(lor);
       if (chl != -1) maxest += upd[chl].size();
@@ -490,7 +490,7 @@ namespace strumpack {
       // process: 1 leaf and 1 non-leaf
       if (nd_.proc_dist_sep[dsep] != rank_) continue;
       if (nd_.tree().is_root(dsep)) continue; // skip the root separator
-      auto pa = nd_.tree().pa(dsep);
+      auto pa = nd_.tree().parent[dsep];
       auto pa_rank = nd_.proc_dist_sep[pa];
       if (nd_.tree().is_leaf(dsep)) {
         // Leaf of distributed tree is local subgraph for process
@@ -676,8 +676,8 @@ namespace strumpack {
     }
 
     // here we should still continue, to send the local subgraph
-    auto chl = nd_.tree().lch(dsep);
-    auto chr = nd_.tree().rch(dsep);
+    auto chl = nd_.tree().lch[dsep];
+    auto chr = nd_.tree().rch[dsep];
     auto wl = dist_subtree_work[chl];
     auto wr = dist_subtree_work[chr];
     int Pl = std::max(1, std::min(int(std::round(P * wl / (wl + wr))), P-1));

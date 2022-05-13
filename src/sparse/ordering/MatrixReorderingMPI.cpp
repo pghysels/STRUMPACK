@@ -272,13 +272,13 @@ namespace strumpack {
         // sep is a leaf, so it is the local graph of proces p
         if (p_local == rank) dsep_leaf_ = sep;
         sub_graph_ranges[p_local] =
-          std::make_pair(sep_tree_->sizes(sep), sep_tree_->sizes(sep+1));
+          std::make_pair(sep_tree_->sizes[sep], sep_tree_->sizes[sep+1]);
         proc_dist_sep[sep] = p_local++;
       } else {
         // sep was computed using distributed nested dissection,
         // assign it to process p_dist
         dist_sep_ranges[p_dist] =
-          std::make_pair(sep_tree_->sizes(sep), sep_tree_->sizes(sep+1));
+          std::make_pair(sep_tree_->sizes[sep], sep_tree_->sizes[sep+1]);
         proc_dist_sep[sep] = p_dist++;
       }
     }

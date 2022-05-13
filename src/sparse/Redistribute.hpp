@@ -171,11 +171,11 @@ namespace strumpack {
           sbufi_size += _upd[i].size();
         sbufi.reserve(sbufi_size);
         sbufi.push_back(nbsep);
-        sbufi.insert(sbufi.end(), tree.lch(), tree.lch()+nbsep);
-        sbufi.insert(sbufi.end(), tree.rch(), tree.rch()+nbsep);
+        sbufi.insert(sbufi.end(), tree.lch, tree.lch+nbsep);
+        sbufi.insert(sbufi.end(), tree.rch, tree.rch+nbsep);
         sbufi.push_back(tree.root());
         for (integer_t s=0; s<nbsep+1; s++)
-          sbufi.push_back(tree.sizes(s) + sub_begin);
+          sbufi.push_back(tree.sizes[s] + sub_begin);
         for (integer_t i=0; i<nbsep; i++)
           sbufi.push_back(_upd[i].size());
         for (integer_t i=0; i<nbsep; i++)

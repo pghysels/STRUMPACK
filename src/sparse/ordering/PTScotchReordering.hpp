@@ -133,11 +133,11 @@ namespace strumpack {
                  ptscotch_tree.end(), integer_t(-1)));
     auto sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
       (new SeparatorTree<integer_t>(nr_sep));
-    sep_tree->sizes(0) = 0;
+    sep_tree->sizes[0] = 0;
     for (integer_t i=0; i<nr_sep; i++) {
-      sep_tree->pa(i) = -1;
-      sep_tree->lch(i) = -1;
-      sep_tree->rch(i) = -1;
+      sep_tree->parent[i] = -1;
+      sep_tree->lch[i] = -1;
+      sep_tree->rch[i] = -1;
     }
     std::function<void(integer_t,integer_t&)> f =
       [&](integer_t i, integer_t& pid) {
@@ -145,16 +145,16 @@ namespace strumpack {
         f(ptscotch_lchild[i], pid);
         integer_t left_root_id = pid - 1;
         f(ptscotch_rchild[i], pid);
-        sep_tree->rch(pid) = pid - 1;
-        sep_tree->pa(sep_tree->rch(pid)) = pid;
-        sep_tree->lch(pid) = left_root_id;
-        sep_tree->pa(sep_tree->lch(pid)) = pid;
+        sep_tree->rch[pid] = pid - 1;
+        sep_tree->parent[sep_tree->rch[pid]] = pid;
+        sep_tree->lch[pid] = left_root_id;
+        sep_tree->parent[sep_tree->lch[pid]] = pid;
       }
       auto size_pid = ptscotch_sizes[i];
       if (ptscotch_lchild[i] != -1 && ptscotch_rchild[i] != -1)
         size_pid -= ptscotch_sizes[ptscotch_lchild[i]]
           + ptscotch_sizes[ptscotch_rchild[i]];
-      sep_tree->sizes(pid+1) = sep_tree->sizes(pid) + size_pid;
+      sep_tree->sizes[pid+1] = sep_tree->sizes[pid] + size_pid;
       pid++;
     };
     nr_sep = 0;

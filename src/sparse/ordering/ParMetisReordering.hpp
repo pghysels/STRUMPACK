@@ -112,11 +112,11 @@ namespace strumpack {
       integer_t dist_nr_sep = 2*p2 - 1;
       sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
         (new SeparatorTree<integer_t>(dist_nr_sep));
-      sep_tree->sizes(0) = 0;
+      sep_tree->sizes[0] = 0;
       for (integer_t i=0; i<dist_nr_sep; i++) {
-        sep_tree->pa(i) = -1;
-        sep_tree->lch(i) = -1;
-        sep_tree->rch(i) = -1;
+        sep_tree->parent[i] = -1;
+        sep_tree->lch[i] = -1;
+        sep_tree->rch[i] = -1;
       }
       int nr_dist_levels = std::log2(p2);
       std::function<void(integer_t,integer_t&,integer_t)>
@@ -126,13 +126,13 @@ namespace strumpack {
           build_dist_binary_separator_tree(2*dsep+2, pid, level-1);
           integer_t lch = pid - 1;
           build_dist_binary_separator_tree(2*dsep+1, pid, level-1);
-          sep_tree->lch(pid) = lch;
-          sep_tree->rch(pid) = pid-1;
-          sep_tree->pa(lch) = pid;
-          sep_tree->pa(pid-1) = pid;
+          sep_tree->lch[pid] = lch;
+          sep_tree->rch[pid] = pid-1;
+          sep_tree->parent[lch] = pid;
+          sep_tree->parent[pid-1] = pid;
         }
-        sep_tree->sizes(pid+1) = sizes[dist_nr_sep-1-dsep]
-        + sep_tree->sizes(pid);
+        sep_tree->sizes[pid+1] = sizes[dist_nr_sep-1-dsep]
+          + sep_tree->sizes[pid];
         pid++;
       };
       integer_t pid = 0;
