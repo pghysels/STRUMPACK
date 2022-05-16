@@ -683,17 +683,24 @@ namespace strumpack {
     // #endif
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontSYCL<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (opts.verbose())
       std::cout << "# Factorization does not fit in GPU memory, "
         "splitting in smaller traversals." << std::endl;
-    if (lchild_)
-      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (rchild_)
-      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (lchild_) {
+      auto el = lchild_->multifrontal_factorization
+	(A, opts, etree_level+1, task_depth);
+      if (el != ReturnCode::SUCCESS) err_code = el;
+    }
+    if (rchild_) {
+      auto er = rchild_->multifrontal_factorization
+	(A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) err_code = er;
+    }
 
     const std::size_t dupd = dim_upd(), dsep = dim_sep();
     STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
@@ -736,6 +743,7 @@ namespace strumpack {
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
       dpcpp::memcpy(q, dF11, F11_).wait();
       dpcpp::getrf(q, dF11, dpiv, scratchpad, scratchpad_size).wait();
+      // TODO check info code
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
       dpcpp::memcpy(q, F11_, dF11);
@@ -783,6 +791,7 @@ namespace strumpack {
                 << (float(level_flops) / level_time) / 1.e9
                 << " GFLOP/s" << std::endl;
     }
+    return err_code;
   }
 
 
@@ -793,10 +802,11 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontSYCL<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
+    ReturnCode err_code = ReturnCode::SUCCESS;
     cl::sycl::queue q(cl::sycl::default_selector{});
     // cl::sycl::queue q(cl::sycl::cpu_selector{});
     if (opts.verbose())
@@ -864,8 +874,7 @@ namespace strumpack {
       all_dmem = dpcpp::DeviceMemory<char>(peak_dmem, q, false);
       batch = BatchMetaData<scalar_t,integer_t>(ldata, q);
     } catch (std::exception& e) {
-      split_smaller(A, opts, etree_level, task_depth);
-      return;
+      return split_smaller(A, opts, etree_level, task_depth);
     }
 
     std::size_t peak_hea_mem = 0;
@@ -935,6 +944,7 @@ namespace strumpack {
       q.wait_and_throw();
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void
