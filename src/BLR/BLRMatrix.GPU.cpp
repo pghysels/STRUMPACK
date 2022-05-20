@@ -505,33 +505,22 @@ namespace strumpack {
             if (admissible(i, j)) {
               B11.compress_tile_gpu(solvehandle, handle, i, j, B11.tile(i, j).D(),
                                     d_U, d_V, dpiv+dsep, cmprs_mem, opts);
-#if defined(STRUMPACK_USE_MAGMA)
-              B11.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
-#else
-              B11.tile(i, j).laswp(solvehandle, dpiv+B11.tileroff(i), true);
-#endif
-              trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U, 
-                   scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
-            } else {
-#if defined(STRUMPACK_USE_MAGMA)
-              B11.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
-#else
-              B11.tile(i, j).laswp(solvehandle, dpiv+B11.tileroff(i), true);
-#endif
-              gpu::trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U,
-                        scalar_t(1.), B11.tile(i, i).D(), B11.tile(i, j).D());
             }
+#if defined(STRUMPACK_USE_MAGMA)
+            B11.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
+#else
+            B11.tile(i, j).laswp(solvehandle, dpiv+B11.tileroff(i), true);
+#endif
+            trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U, 
+                 scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
           }
           for (std::size_t j=i+1; j<rb; j++) {
             if (admissible(j, i)) {
               B11.compress_tile_gpu(solvehandle, handle, j, i, B11.tile(j, i).D(), 
                                     d_U, d_V, dpiv+dsep, cmprs_mem, opts);
-              trsm(handle, Side::R, UpLo::U, Trans::N, Diag::N, 
-                   scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
-            } else{
-              gpu::trsm(handle, Side::R, UpLo::U, Trans::N, Diag::N,
-                        scalar_t(1.), B11.tile(i, i).D(), B11.tile(j, i).D());
             }
+            trsm(handle, Side::R, UpLo::U, Trans::N, Diag::N, 
+                 scalar_t(1.), B11.tile(i, i), B11.tile(j, i));
           }
           //B12, B21 on GPU
           for (std::size_t j=0; j<rb2; j++) {
