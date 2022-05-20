@@ -143,11 +143,11 @@ namespace strumpack {
       integer root, size;
     };
 
-    template<typename integer> std::vector<Comp<integer>>
+    template<typename integer> integer
     comps(integer n, integer nsub, integer* xadj, integer* adjncy,
-          integer* mask, integer* base,
+          integer* mask, integer* base, std::vector<Comp<integer>>& C,
           integer* ls=nullptr) {
-      std::vector<Comp<integer>> C;
+      integer ncomps = 0;
       for (integer i=0; i<nsub; ++i) {
         integer node = ls ? ls[i] : i;
         if (mask[node] <= 0) continue;
@@ -167,12 +167,13 @@ namespace strumpack {
           }
         }
         C.emplace_back(node, size);
+        ncomps++;
       }
       for (integer i=0; i<nsub; ++i) {
         integer node = ls ? ls[i] : i;
         if (mask[node] == -1) mask[node] = 1;
       }
-      return C;
+      return ncomps;
     }
 
 
@@ -190,18 +191,19 @@ namespace strumpack {
       auto base = mask + 3*n;
       std::fill(mask, mask+n, 1);
       struct NDData {
-        std::vector<Comp<integer>> C;
-        integer nsep, pa;
+        integer ncomps, nsep, pa;
         bool left;
       };
-      std::stack<NDData> ndstack;
+      std::vector<Comp<integer>> C;
+      std::stack<NDData,std::vector<NDData>> ndstack;
       ndstack.emplace
-        (NDData{comps(n, n, xadj, adjncy, mask, base), 0, -1, false});
+        (NDData{comps(n, n, xadj, adjncy, mask, base, C), 0, -1, false});
       while (!ndstack.empty()) {
         auto s = ndstack.top();
         ndstack.pop();
-        if (s.C.size() == 1) {
-          auto& c = s.C[0];
+        if (s.ncomps == 1) {
+          auto& c = C.back();
+          C.pop_back();
           auto nsep = fndsep(c.root, xadj, adjncy, mask, perm+num, xls, ls);
           if (nsep == c.size || c.size <= 8) { // TODO get from options?
             integer id = tree.size();
@@ -215,7 +217,7 @@ namespace strumpack {
             continue;
           }
           ndstack.emplace
-            (NDData{comps(n, c.size, xadj, adjncy, mask, base, ls),
+            (NDData{comps(n, c.size, xadj, adjncy, mask, base, C, ls),
                nsep, s.pa, s.left});
           num += nsep;
         } else {
@@ -225,21 +227,24 @@ namespace strumpack {
             if (s.left) tree[s.pa].lch = id;
             else tree[s.pa].rch = id;
           }
-          std::sort(s.C.begin(), s.C.end(),
-                    [](auto& a, auto& b) { return a.size < b.size; });
-          std::vector<Comp<integer>> Cl, Cr;
-          integer nl = 0, nr = 0;
-          for (auto& ci : s.C) {
+          auto Cend = C.end();
+          auto Cbeg = Cend - s.ncomps;
+          std::sort(Cbeg, Cend, [](auto& a, auto& b) {
+            return a.size > b.size; });
+          integer nl = 0, nr = 0, ncl = 0, ncr = 0;
+          for (auto& ci=Cbeg; ci!=C.end(); ci++) {
             if (nl <= nr) {
-              Cl.push_back(ci);
-              nl += ci.size;
+              nl += ci->size;
+              ncl++;
             } else {
-              Cr.push_back(ci);
-              nr += ci.size;
+              Cend--;
+              std::swap(*ci, *Cend);
+              nr += ci->size;
+              ncr++;
             }
           }
-          ndstack.emplace(NDData{std::move(Cl), 0, id, true});
-          ndstack.emplace(NDData{std::move(Cr), 0, id, false});
+          ndstack.emplace(NDData{ncl, 0, id, true});
+          ndstack.emplace(NDData{ncr, 0, id, false});
         }
       }
       std::reverse(perm, perm+n);
