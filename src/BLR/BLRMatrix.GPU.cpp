@@ -742,10 +742,18 @@ namespace strumpack {
           }
         }
         gpu::synchronize();
-        gpu::copy_device_to_host_async(piv.data(), dpiv.as<int>(), dsep, copy_stream);
+        std::size_t max_pinned = 0;
         for (std::size_t i=0; i<rb; i++) {
           for (std::size_t j=0; j<rb; j++){
-            B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
+            std::size_t ts = B11.tile(i, j).rows()* B11.tile(i, j).cols();
+            max_pinned = std::max(max_pinned, ts);
+          }
+        }
+        gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), dsep);
+        gpu::HostMemory<scalar_t> pinned(max_pinned);
+        for (std::size_t i=0; i<rb; i++) {
+          for (std::size_t j=0; j<rb; j++){
+            B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream, pinned);
           }
         }
         //GEMM B22

@@ -124,9 +124,15 @@ namespace strumpack {
       void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) override;
 #endif
 
-      void move_gpu_tile_to_cpu(gpu::Stream& s) override {
+      void move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned = NULL) override {
         DenseM_t hD(D().rows(), D().cols());
-        gpu::copy_device_to_host_async(hD, D(), s);
+        if (pinned == NULL){
+          gpu::copy_device_to_host_async(hD, D(), s);
+        } else {
+          gpu::copy_device_to_host_async(pinned, D().data(), D().rows()*D().cols(), s);
+          gpu_check(cudaMemcpy(hD.data(), pinned, D().rows()*D().cols()*sizeof(scalar_t),
+                           cudaMemcpyHostToHost));
+        }
         D_.reset(new DenseM_t(hD));
       }
 

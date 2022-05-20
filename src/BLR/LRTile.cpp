@@ -255,11 +255,24 @@ namespace strumpack {
       gpu::laswp(handle, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
     }
 #endif
-    template<typename scalar_t> void LRTile<scalar_t>::move_gpu_tile_to_cpu(gpu::Stream& s) {
+
+    template<typename scalar_t> void LRTile<scalar_t>::move_gpu_tile_to_cpu
+     (gpu::Stream& s, scalar_t* pinned) {
       DenseM_t hU(U().rows(), U().cols());
       DenseM_t hV(V().rows(), V().cols());
-      gpu::copy_device_to_host_async(hU, U(), s);
-      gpu::copy_device_to_host_async(hV, V(), s);
+      if (pinned == NULL){
+        gpu::copy_device_to_host_async(hU, U(), s);
+        gpu::copy_device_to_host_async(hV, V(), s);
+      } else {
+        gpu::copy_device_to_host_async(pinned, U().data(), U().rows()*U().cols(), s);
+        gpu_check(cudaMemcpy(hU.data(), pinned, U().rows()*U().cols()*sizeof(scalar_t),
+                           cudaMemcpyHostToHost));
+        //gpu::copy_host_to_host_async(hU, pinned, s);
+        gpu::copy_device_to_host_async(pinned, V().data(), V().rows()*V().cols(), s);
+        gpu_check(cudaMemcpy(hV.data(), pinned, V().rows()*V().cols()*sizeof(scalar_t),
+                           cudaMemcpyHostToHost));
+        //gpu::copy_host_to_host_async(hV, pinned, s);
+      }
       U_.reset(new DenseM_t(hU));
       V_.reset(new DenseM_t(hV));
     }
