@@ -231,15 +231,18 @@ namespace strumpack {
           auto Cbeg = Cend - s.ncomps;
           std::sort(Cbeg, Cend, [](auto& a, auto& b) {
             return a.size > b.size; });
+          std::vector<Comp<integer>> cc(Cbeg, Cend);
           integer nl = 0, nr = 0, ncl = 0, ncr = 0;
-          for (auto& ci=Cbeg; ci!=C.end(); ci++) {
+          for (auto ci : cc) {
             if (nl <= nr) {
-              nl += ci->size;
+              *Cbeg = ci;
+              Cbeg++;
+              nl += ci.size;
               ncl++;
             } else {
               Cend--;
-              std::swap(*ci, *Cend);
-              nr += ci->size;
+              *Cend = ci;
+              nr += ci.size;
               ncr++;
             }
           }

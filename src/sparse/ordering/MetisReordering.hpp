@@ -209,7 +209,7 @@ namespace strumpack {
     SeparatorTree<integer_t> sep_tree;
     idx_t options[METIS_NOPTIONS];
     METIS_SetDefaultOptions(options);
-    options[METIS_OPTION_CCORDER] = 1;
+    // options[METIS_OPTION_CCORDER] = 1;
     // options[METIS_OPTION_SEED] = 42;
     if (opts.use_METIS_NodeNDP()) {
       integer_t nodes =

@@ -59,9 +59,6 @@ namespace strumpack {
     SeparatorTree() = default;
     SeparatorTree(integer_t nr_nodes);
     SeparatorTree(const std::vector<Separator<integer_t>>& seps);
-    SeparatorTree(std::vector<integer_t>& etree);
-    SeparatorTree(std::vector<integer_t>& etree,
-                  std::vector<integer_t>& perm);
 
     integer_t levels() const;
     integer_t level(integer_t i) const;
@@ -148,15 +145,22 @@ namespace strumpack {
    *      Modified by X.S. Li, November 1999.
    * </pre>
    */
-  template<typename integer_t> std::vector<integer_t>
+  template<typename integer_t>
+  std::vector<integer_t>
   spsymetree(const integer_t* acolst,      // column starts
              const integer_t* acolend,     //   and ends past 1
              const integer_t* arow,        // row indices of A
              integer_t n,                  // dimension of A
              integer_t subgraph_begin=0);  // first row/column of subgraph
 
-  template<typename integer_t> std::vector<integer_t>
+  template<typename integer_t>
+  std::vector<integer_t>
   etree_postorder(const std::vector<integer_t>& etree);
+
+  template<typename integer_t>
+  std::vector<Separator<integer_t>>
+  separators_from_etree(std::vector<integer_t>& etree,
+                        std::vector<integer_t>& post);
 
 } // end namespace strumpack
 

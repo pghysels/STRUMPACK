@@ -297,13 +297,13 @@ namespace strumpack {
     auto sub_etree =
       spsymetree(my_sub_graph.ptr(), my_sub_graph.ptr()+1,
                  my_sub_graph.ind(), sub_n, sub_graph_range.first);
-    auto post = etree_postorder(sub_etree);
-    std::vector<integer_t> iwork(sub_n);
+    std::vector<integer_t> iwork(sub_n), post(sub_n);
+    auto seps = separators_from_etree(sub_etree, post);
     for (integer_t i=0; i<sub_n; ++i)
       iwork[post[i]] = post[sub_etree[i]];
     for (integer_t i=0; i<sub_n; ++i)
       sub_etree[i] = iwork[i];
-    ltree_ = SeparatorTree<integer_t>(sub_etree);
+    ltree_ = SeparatorTree<integer_t>(seps);
     for (integer_t i=0; i<sub_n; i++) {
       iwork[post[i]] = i;
       post[i] += sub_graph_range.first;
@@ -321,9 +321,12 @@ namespace strumpack {
     MPI_Allgatherv
       (post.data(), rcnts[rank], mpi_type<integer_t>(), gpost.data(),
        rcnts.get(), displs, mpi_type<integer_t>(), comm_->comm());
-    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
-    for (integer_t i=0; i<n; i++) perm_[gpost[i]] = iperm_[i];
-    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
+    for (integer_t i=0; i<n; i++)
+      iperm_[perm_[i]] = i;
+    for (integer_t i=0; i<n; i++)
+      perm_[gpost[i]] = iperm_[i];
+    for (integer_t i=0; i<n; i++)
+      iperm_[perm_[i]] = i;
     std::swap(perm_, iperm_);
   }
 

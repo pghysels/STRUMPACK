@@ -58,169 +58,6 @@ namespace strumpack {
     check();
   }
 
-  template<typename integer_t>
-  SeparatorTree<integer_t>::
-  SeparatorTree(std::vector<integer_t>& etree) {
-    std::cout << "TODO use version with perm" << std::endl;
-  }
-
-  // TODO combine small leafs
-  template<typename integer_t>
-  SeparatorTree<integer_t>::
-  SeparatorTree(std::vector<integer_t>& etree,
-                std::vector<integer_t>& perm) {
-    if (etree.empty()) return;
-    integer_t dofs = etree.size(), n = dofs;
-    if (std::count(etree.begin(), etree.end(), dofs) != 1)
-      etree.push_back(n++);
-    std::replace(etree.begin(), etree.end(), n, integer_t(-1));
-    integer_t root = n - 1;
-    std::vector<integer_t> kid0(n), kids(n), nch(n), w(n, 1);
-    for (integer_t i=0; i<n; i++) {
-      auto p = etree[i];
-      if (p == -1) continue;
-      nch[p]++;
-      w[p] += w[i];
-    }
-    for (integer_t i=1; i<n; i++)
-      kid0[i] = kid0[i-1] + nch[i-1];
-    std::fill(nch.begin(), nch.end(), 0);
-    for (integer_t i=0; i<n; i++) {
-      auto p = etree[i];
-      if (p == -1) continue;
-      kids[kid0[p]+nch[p]++] = i;
-    }
-    integer_t node = 0;
-    while (node < n) {
-      auto nc = nch[node];
-      if (nc > 2) {
-        nch[node] = 2;
-        etree.push_back(node);
-        etree.push_back(node);
-        auto k0 = kid0[node];
-        auto kbeg = kids.begin() + k0;
-        auto kend = kbeg + nc;
-        std::sort(kbeg, kend, [&w](auto a, auto b) {
-          return w[a] > w[b]; });
-        std::vector<integer_t> sk(kbeg, kend);
-        integer_t wl = 0, wr = 0, ncl = 0, ncr = 0;
-        for (auto ki : sk) {
-          if (wl < wr) {
-            *kbeg = ki;
-            wl += w[ki];
-            ncl++;
-            kbeg++;
-          } else {
-            kend--;
-            *kend = ki;
-            wr += w[ki];
-            ncr++;
-          }
-        }
-        kid0.push_back(k0);
-        kid0.push_back(k0+ncl);
-        nch.push_back(ncl);
-        nch.push_back(ncr);
-        for (integer_t c=0; c<ncl; c++)
-          etree[kids[k0+c]] = n;
-        for (integer_t c=ncl; c<nc; c++)
-          etree[kids[k0+c]] = n + 1;
-        n += 2;
-      }
-      node++;
-    }
-
-    std::vector<integer_t> post(n), kid(n, -1), sib(n);
-    for (integer_t v=n-1; v>=0; v--) {
-      auto dad = etree[v];
-      if (dad == -1) continue;
-      sib[v] = kid[dad];
-      kid[dad] = v;
-    }
-    integer_t current = root, postnum = 0;
-    while (postnum < dofs) {
-      auto first = kid[current];
-      if (first == -1) {
-        if (current < dofs)
-        post[current] = postnum++;
-        auto next = sib[current];
-        while (next == -1) {
-          current = etree[current];
-          if (current < dofs)
-            post[current] = postnum++;
-          next = sib[current];
-        }
-        current = next;
-      } else current = first;
-    }
-    std::vector<integer_t> iwork(n);
-    for (integer_t i=0; i<dofs; i++)
-      iwork[i] = post[perm[i]];
-    for (integer_t i=0; i<dofs; i++)
-      perm[i] = iwork[i];
-
-    std::vector<integer_t> elc(n, -1), erc(n, -1);
-    for (integer_t i=0; i<n; i++) {
-      auto p = etree[i];
-      if (p == -1) continue;
-      if (elc[p] == -1) elc[p] = i;
-      else if (erc[p] == -1) erc[p] = i;
-    }
-    std::vector<Separator<integer_t>> seps;
-    std::stack<integer_t,std::vector<integer_t>> s, l;
-    s.push(std::distance(etree.begin(),
-                         std::find(etree.begin(), etree.end(),
-                                   integer_t(-1))));
-    integer_t prev = -1;
-    while (!s.empty()) {
-      integer_t i = s.top();
-      if (prev == -1 || elc[prev] == i || erc[prev] == i) {
-        if (elc[i] != -1) s.push(elc[i]);
-        else if (erc[i] != -1) s.push(erc[i]);
-      } else if (elc[i] == prev) {
-        if (erc[i] != -1) {
-          l.push(seps.size() - 1);
-          s.push(erc[i]); // go down right
-        }
-      } else {
-        // skip nodes that have only one child, this will group nodes
-        // in fronts
-        if ((erc[i] == -1 && elc[i] == -1) ||
-            (erc[i] != -1 && elc[i] != -1)) {
-          // two children, or no children
-          auto pid = seps.size();
-          seps.emplace_back
-            ((seps.empty()) ? 0 : seps.back().sep_end, -1,
-             (elc[i] != -1) ? l.top() : -1, (erc[i] != -1) ? pid-1 : -1);
-          if (elc[i] != -1) {
-            seps[l.top()].pa = pid;
-            l.pop();
-          }
-          if (erc[i] != -1) seps[pid-1].pa = pid;
-        }
-        // nodes >= dofs are empty separators introduced to avoid
-        // nodes with three children, so do not count those when
-        // computing separator size!
-        if (i < dofs)
-          seps.back().sep_end++;
-        s.pop();
-      }
-      prev = i;
-    }
-    allocate(seps.size());
-    sizes[0] = 0;
-    integer_t i = 0;
-    for (const auto& s : seps) {
-      sizes[i+1] = s.sep_end;
-      parent[i] = s.pa;
-      lch[i] = s.lch;
-      rch[i] = s.rch;
-      i++;
-    }
-    root_ = -1;
-    check();
-  }
-
 #if defined(STRUMPACK_USE_MPI)
   template<typename integer_t> void
   SeparatorTree<integer_t>::broadcast(const MPIComm& c) {
@@ -230,9 +67,8 @@ namespace strumpack {
 
   template<typename integer_t> integer_t
   SeparatorTree<integer_t>::levels() const {
-    if (nr_seps_) {
-      return level(root());
-    } else return 0;
+    if (nr_seps_) return level(root());
+    else return 0;
   }
 
   template<typename integer_t> integer_t
@@ -493,7 +329,6 @@ namespace strumpack {
     return top;
   }
 
-
   template<typename integer_t> std::vector<integer_t>
   etree_postorder(const std::vector<integer_t>& etree) {
     integer_t n = etree.size();
@@ -542,7 +377,7 @@ namespace strumpack {
   template<typename integer_t>
   std::vector<Separator<integer_t>>
   separators_from_etree(std::vector<integer_t>& etree,
-                        std::vector<integer_t>& perm) {
+                        std::vector<integer_t>& post) {
     integer_t dofs = etree.size(), n = dofs;
     if (std::count(etree.begin(), etree.end(), dofs) != 1)
       etree.push_back(n++);
@@ -580,9 +415,9 @@ namespace strumpack {
         for (auto ki : sk) {
           if (wl < wr) {
             *kbeg = ki;
+            kbeg++;
             wl += w[ki];
             ncl++;
-            kbeg++;
           } else {
             kend--;
             *kend = ki;
@@ -603,7 +438,7 @@ namespace strumpack {
       node++;
     }
 
-    std::vector<integer_t> post(n), kid(n, -1), sib(n);
+    std::vector<integer_t> /*post(n),*/ kid(n, -1), sib(n);
     for (integer_t v=n-1; v>=0; v--) {
       auto dad = etree[v];
       if (dad == -1) continue;
@@ -626,18 +461,13 @@ namespace strumpack {
         current = next;
       } else current = first;
     }
-    std::vector<integer_t> iwork(n);
-    for (integer_t i=0; i<dofs; i++)
-      iwork[i] = post[perm[i]];
-    for (integer_t i=0; i<dofs; i++)
-      perm[i] = iwork[i];
 
     std::vector<integer_t> elc(n, -1), erc(n, -1);
     for (integer_t i=0; i<n; i++) {
       auto p = etree[i];
       if (p == -1) continue;
       if (elc[p] == -1) elc[p] = i;
-      else if (erc[p] == -1) erc[p] = i;
+      else erc[p] = i;
     }
     std::vector<Separator<integer_t>> seps;
     std::stack<integer_t,std::vector<integer_t>> s, l;
@@ -689,10 +519,15 @@ namespace strumpack {
                            std::vector<integer_t>& perm,
                            std::vector<integer_t>& iperm) {
     auto etree = etree_from_perm(ptr, ind, perm);
-    auto stree = SeparatorTree(separators_from_etree(etree, perm));
+    auto n = perm.size();
+    std::vector<integer_t> post(n);
+    auto seps = separators_from_etree(etree, post);
+    for (std::size_t i=0; i<n; i++)
+      iperm[i] = post[perm[i]];
     for (std::size_t i=0; i<perm.size(); i++)
-      iperm[perm[i]] = i;
-    return stree;
+      perm[iperm[i]] = i;
+    std::swap(perm, iperm);
+    return SeparatorTree<integer_t>(seps);
   }
 
   /** path halving */
@@ -773,5 +608,15 @@ namespace strumpack {
   etree_postorder(const std::vector<long int>& etree);
   template std::vector<long long int>
   etree_postorder(const std::vector<long long int>& etree);
+
+  template std::vector<Separator<int>>
+  separators_from_etree(std::vector<int>& etree,
+                        std::vector<int>& post);
+  template std::vector<Separator<long int>>
+  separators_from_etree(std::vector<long int>& etree,
+                        std::vector<long int>& post);
+  template std::vector<Separator<long long int>>
+  separators_from_etree(std::vector<long long int>& etree,
+                        std::vector<long long int>& post);
 
 } // end namespace strumpack
