@@ -57,21 +57,11 @@ namespace strumpack {
   template<typename integer_t> class SeparatorTree {
   public:
     SeparatorTree() = default;
-
-    /**
-     * Construct based on number of separators.
-     */
     SeparatorTree(integer_t nr_nodes);
-
-    /**
-     * Construct from a vector of Separators.
-     */
-    SeparatorTree(std::vector<Separator<integer_t>>& seps);
-
-    /**
-     * Construct from an elimination tree.
-     */
+    SeparatorTree(const std::vector<Separator<integer_t>>& seps);
     SeparatorTree(std::vector<integer_t>& etree);
+    SeparatorTree(std::vector<integer_t>& etree,
+                  std::vector<integer_t>& perm);
 
     integer_t levels() const;
     integer_t level(integer_t i) const;
