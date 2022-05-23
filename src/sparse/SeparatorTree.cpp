@@ -380,7 +380,7 @@ namespace strumpack {
                         std::vector<integer_t>& post) {
     integer_t dofs = etree.size(), n = dofs;
     if (std::count(etree.begin(), etree.end(), dofs) != 1)
-      etree.push_back(n++);
+      etree.push_back(++n);
     std::replace(etree.begin(), etree.end(), n, integer_t(-1));
     integer_t root = n - 1;
     std::vector<integer_t> kid0(n), kids(n), nch(n), w(n, 1);
@@ -437,8 +437,7 @@ namespace strumpack {
       }
       node++;
     }
-
-    std::vector<integer_t> /*post(n),*/ kid(n, -1), sib(n);
+    std::vector<integer_t> kid(n, -1), sib(n);
     for (integer_t v=n-1; v>=0; v--) {
       auto dad = etree[v];
       if (dad == -1) continue;
@@ -461,7 +460,6 @@ namespace strumpack {
         current = next;
       } else current = first;
     }
-
     std::vector<integer_t> elc(n, -1), erc(n, -1);
     for (integer_t i=0; i<n; i++) {
       auto p = etree[i];
