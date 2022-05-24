@@ -160,54 +160,49 @@ extern "C" {
 
   void STRUMPACK_destroy(STRUMPACK_SparseSolver* S);
 
-  void STRUMPACK_set_csr_matrix
-  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
-   const void* col_ind, const void* values, int symmetric_pattern);
+  void STRUMPACK_set_csr_matrix(STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
+                                const void* col_ind, const void* values, int symmetric_pattern);
 
-  void STRUMPACK_update_csr_matrix_values
-  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
-   const void* col_ind, const void* values, int symmetric_pattern);
+  void STRUMPACK_update_csr_matrix_values(STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
+                                          const void* col_ind, const void* values, int symmetric_pattern);
 
 #if defined(STRUMPACK_USE_MPI)
-  void STRUMPACK_set_distributed_csr_matrix
-  (STRUMPACK_SparseSolver S, const void* local_rows,
-   const void* row_ptr, const void* col_ind, const void* values,
-   const void* dist, int symmetric_pattern);
+  void STRUMPACK_set_distributed_csr_matrix(STRUMPACK_SparseSolver S, const void* local_rows,
+                                            const void* row_ptr, const void* col_ind, const void* values,
+                                            const void* dist, int symmetric_pattern);
 
-  void STRUMPACK_update_distributed_csr_matrix_values
-  (STRUMPACK_SparseSolver S, const void* local_rows,
-   const void* row_ptr, const void* col_ind, const void* values,
-   const void* dist, int symmetric_pattern);
+  void STRUMPACK_update_distributed_csr_matrix_values(STRUMPACK_SparseSolver S, const void* local_rows,
+                                                      const void* row_ptr, const void* col_ind, const void* values,
+                                                      const void* dist, int symmetric_pattern);
 
 
-  void STRUMPACK_set_MPIAIJ_matrix
-  (STRUMPACK_SparseSolver S, const void* n,
-   const void* d_ptr, const void* d_ind, const void* d_val,
-   const void* o_ptr, const void* o_ind, const void* o_val,
-   const void* garray);
+  void STRUMPACK_set_MPIAIJ_matrix(STRUMPACK_SparseSolver S, const void* n,
+                                   const void* d_ptr, const void* d_ind, const void* d_val,
+                                   const void* o_ptr, const void* o_ind, const void* o_val,
+                                   const void* garray);
 
-  void STRUMPACK_update_MPIAIJ_matrix_values
-  (STRUMPACK_SparseSolver S, const void* n,
-   const void* d_ptr, const void* d_ind, const void* d_val,
-   const void* o_ptr, const void* o_ind, const void* o_val,
-   const void* garray);
+  void STRUMPACK_update_MPIAIJ_matrix_values(STRUMPACK_SparseSolver S, const void* n,
+                                             const void* d_ptr, const void* d_ind, const void* d_val,
+                                             const void* o_ptr, const void* o_ind, const void* o_val,
+                                             const void* garray);
 #endif
 
-  STRUMPACK_RETURN_CODE STRUMPACK_solve
-  (STRUMPACK_SparseSolver S, const void* b, void* x, int use_initial_guess);
+  STRUMPACK_RETURN_CODE STRUMPACK_solve(STRUMPACK_SparseSolver S, const void* b, void* x, int use_initial_guess);
 
-  STRUMPACK_RETURN_CODE STRUMPACK_matsolve
-  (STRUMPACK_SparseSolver S, int nrhs, const void* b, int ldb,
-   void* x, int ldx, int use_initial_guess);
+  STRUMPACK_RETURN_CODE STRUMPACK_matsolve(STRUMPACK_SparseSolver S, int nrhs, const void* b, int ldb,
+                                           void* x, int ldx, int use_initial_guess);
 
   void STRUMPACK_set_from_options(STRUMPACK_SparseSolver S);
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder(STRUMPACK_SparseSolver S);
 
-  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular
-  (STRUMPACK_SparseSolver S, int nx, int ny, int nz, int components, int width);
+  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S, int nx, int ny, int nz,
+                                                  int components, int width);
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S);
+
+  STRUMPACK_RETURN_CODE STRUMPACK_inertia(STRUMPACK_SparseSolver S,
+                                          int* neg, int* zero, int* pos);
 
   void STRUMPACK_move_to_gpu(STRUMPACK_SparseSolver S);
 
