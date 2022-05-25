@@ -57,7 +57,7 @@
 #include "GeometricReordering.hpp"
 #include "minimum_degree/AMDReordering.hpp"
 #include "minimum_degree/MMDReordering.hpp"
-#include "spectral/SpectralReordering.hpp"
+// #include "spectral/SpectralReordering.hpp"
 
 namespace strumpack {
 
@@ -119,9 +119,11 @@ namespace strumpack {
       return 1;
     }
     case ReorderingStrategy::SPECTRAL: {
-      tree_ = ordering::spectral_nd
-        (A, perm_, iperm_, opts.ND_options());
-      break;
+      std::cerr << "# ERROR: spectral ordering not supported." << std::endl;
+      return 1;
+      // tree_ = ordering::spectral_nd
+      //   (A, perm_, iperm_, opts.ND_options());
+      // break;
     }
     default:
       std::cerr << "# ERROR: parallel matrix reorderings are"

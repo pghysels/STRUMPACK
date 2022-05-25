@@ -1230,15 +1230,14 @@ namespace strumpack {
     return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
   }
 
-  template<typename scalar_t,typename integer_t>
-  ordering::Graph<integer_t>
-  CSRMatrix<scalar_t,integer_t>::graph() const {
-    std::cout << "TODO remove self loops???" << std::endl;
-    ordering::Graph<integer_t> g(n_, nnz_);
-    std::copy(ptr_.begin(), ptr_.end(), g.ptr());
-    std::copy(ind_.begin(), ind_.end(), g.ind());
-    return g;
-  }
+  // template<typename scalar_t,typename integer_t>
+  // ordering::Graph<integer_t>
+  // CSRMatrix<scalar_t,integer_t>::graph() const {
+  //   std::cout << "TODO remove self loops???" << std::endl;
+  //   std::copy(ptr_.begin(), ptr_.end(), g.ptr());
+  //   std::copy(ind_.begin(), ind_.end(), g.ind());
+  //   return g;
+  // }
 
 
   // explicit template instantiations

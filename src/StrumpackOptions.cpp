@@ -49,8 +49,8 @@ namespace strumpack {
     case ReorderingStrategy::GEOMETRIC: return "Geometric";
     case ReorderingStrategy::AMD: return "AMD";
     case ReorderingStrategy::MMD: return "MMD";
-    case ReorderingStrategy::MLF: return "MLF";
     case ReorderingStrategy::AND: return "AND";
+    case ReorderingStrategy::MLF: return "MLF";
     case ReorderingStrategy::SPECTRAL: return "Spectral";
     }
     return "UNKNOWN";
@@ -67,8 +67,8 @@ namespace strumpack {
     case ReorderingStrategy::GEOMETRIC: return true;
     case ReorderingStrategy::AMD: return false;
     case ReorderingStrategy::MMD: return false;
-    case ReorderingStrategy::MLF: return false;
     case ReorderingStrategy::AND: return false;
+    case ReorderingStrategy::MLF: return false;
     case ReorderingStrategy::SPECTRAL: return false;
     }
     return false;
@@ -434,7 +434,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_BPACK)
     HODLR_options().set_from_command_line(argc, cargv);
 #endif
-    ND_options().set_from_command_line(argc, cargv);
+    // ND_options().set_from_command_line(argc, cargv);
 #else
     std::cerr << "WARNING: no support for getopt.h, "
       "not parsing command line options." << std::endl;

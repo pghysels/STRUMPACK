@@ -1,8 +1,5 @@
 target_sources(strumpack
   PRIVATE
-  ${CMAKE_CURRENT_LIST_DIR}/PPt.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/Graph.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKWrapper.hpp
   ${CMAKE_CURRENT_LIST_DIR}/GeometricReordering.cpp
   ${CMAKE_CURRENT_LIST_DIR}/GeometricReordering.hpp
   ${CMAKE_CURRENT_LIST_DIR}/MatrixReordering.cpp
@@ -14,9 +11,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/MetisReordering.hpp)
 
 install(FILES
-  Graph.hpp
-  PPt.hpp
-  BLASLAPACKWrapper.hpp
   DESTINATION include/sparse/ordering)
 
 if(STRUMPACK_USE_MPI)
@@ -32,4 +26,3 @@ endif()
 
 add_subdirectory(rcm)
 add_subdirectory(minimum_degree)
-add_subdirectory(spectral)

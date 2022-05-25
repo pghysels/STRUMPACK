@@ -30,7 +30,7 @@
 #define STRUMPACK_ORDERING_MMD_HPP
 
 #include "StrumpackFortranCInterface.h"
-#include "sparse/ordering/Graph.hpp"
+// #include "sparse/ordering/Graph.hpp"
 
 #if MMDIDXSIZE==64
 typedef std::int64_t MMDInt;
@@ -69,23 +69,23 @@ namespace strumpack {
       assert(iflag == 0);
     }
 
-    template<typename intt> PPt<intt> mmd(const Graph<intt>& g) {
-      auto g1 = g.get_1_based();
-      PPt<intt> p(g1.n());
-      WRAPPER_mmd(g1.n(), g1.ptr(), g1.ind(), p.Pt(), p.P());
-      p.to_0_based();
-      assert(p.valid());
-      return p;
-    }
+    // template<typename intt> PPt<intt> mmd(const Graph<intt>& g) {
+    //   auto g1 = g.get_1_based();
+    //   PPt<intt> p(g1.n());
+    //   WRAPPER_mmd(g1.n(), g1.ptr(), g1.ind(), p.Pt(), p.P());
+    //   p.to_0_based();
+    //   assert(p.valid());
+    //   return p;
+    // }
 
-    template<typename intt> PPt<intt> mmd(Graph<intt>&& g) {
-      g.to_1_based(); // no need to make a copy here!
-      PPt<intt> p(g.n());
-      WRAPPER_mmd(g.n(), g.ptr(), g.ind(), p.Pt(), p.P());
-      p.to_0_based();
-      assert(p.valid());
-      return p;
-    }
+    // template<typename intt> PPt<intt> mmd(Graph<intt>&& g) {
+    //   g.to_1_based(); // no need to make a copy here!
+    //   PPt<intt> p(g.n());
+    //   WRAPPER_mmd(g.n(), g.ptr(), g.ind(), p.Pt(), p.P());
+    //   p.to_0_based();
+    //   assert(p.valid());
+    //   return p;
+    // }
 
 
     template<typename integer_t> inline void

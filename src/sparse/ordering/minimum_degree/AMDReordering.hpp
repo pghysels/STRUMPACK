@@ -30,7 +30,7 @@
 #define STRUMPACK_ORDERING_AMD_HPP
 
 #include "StrumpackFortranCInterface.h"
-#include "sparse/ordering/Graph.hpp"
+// #include "sparse/ordering/Graph.hpp"
 
 #if AMDIDXSIZE==64
   typedef int64_t AMDInt;
@@ -85,23 +85,23 @@ namespace strumpack {
                 perm, iwork.get(), iperm, vtxdeg, &ncmpa, marker, &iovflo);
     }
 
-    template<typename intt> PPt<intt> amd(const Graph<intt>& g) {
-      auto g1 = g.get_1_based();
-      PPt<intt> p(g1.n());
-      WRAPPER_amd(g1.n(), g1.ptr(), g1.ind(), p.Pt(), p.P());
-      p.to_0_based();
-      assert(p.valid());
-      return p;
-    }
+    // template<typename intt> PPt<intt> amd(const Graph<intt>& g) {
+    //   auto g1 = g.get_1_based();
+    //   PPt<intt> p(g1.n());
+    //   WRAPPER_amd(g1.n(), g1.ptr(), g1.ind(), p.Pt(), p.P());
+    //   p.to_0_based();
+    //   assert(p.valid());
+    //   return p;
+    // }
 
-    template<typename intt> PPt<intt> amd(Graph<intt>&& g) {
-      g.to_1_based();
-      PPt<intt> p(g.n());
-      WRAPPER_amd(g.n(), g.ptr(), g.ind(), p.Pt(), p.P());
-      p.to_0_based();
-      assert(p.valid());
-      return p;
-    }
+    // template<typename intt> PPt<intt> amd(Graph<intt>&& g) {
+    //   g.to_1_based();
+    //   PPt<intt> p(g.n());
+    //   WRAPPER_amd(g.n(), g.ptr(), g.ind(), p.Pt(), p.P());
+    //   p.to_0_based();
+    //   assert(p.valid());
+    //   return p;
+    // }
 
     template<typename integer_t> inline void
     WRAPPER_amd(AMDInt n, std::vector<AMDInt>& xadj,
