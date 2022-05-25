@@ -338,6 +338,36 @@ extern "C" {
     switch_precision_return_as(factor(), STRUMPACK_RETURN_CODE);
   }
 
+  STRUMPACK_RETURN_CODE STRUMPACK_inertia(STRUMPACK_SparseSolver S,
+                                          int* neg, int* zero, int* pos) {
+    auto ierr = strumpack::ReturnCode::SUCCESS;
+    int64_t neg64, zero64, pos64;
+    switch (S.precision) {
+    case STRUMPACK_FLOAT:            ierr = CASTSMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_DOUBLE:           ierr = CASTDMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_FLOATCOMPLEX:     ierr = CASTCMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_DOUBLECOMPLEX:    ierr = CASTZMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_FLOAT_64:         ierr = CASTS64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_DOUBLE_64:        ierr = CASTD64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_FLOATCOMPLEX_64:  ierr = CASTC64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_DOUBLECOMPLEX_64: ierr = CASTZ64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
+    }
+    switch (S.precision) {
+    case STRUMPACK_FLOAT:
+    case STRUMPACK_DOUBLE:
+    case STRUMPACK_FLOATCOMPLEX:
+    case STRUMPACK_DOUBLECOMPLEX:
+      break;
+    case STRUMPACK_FLOAT_64:
+    case STRUMPACK_DOUBLE_64:
+    case STRUMPACK_FLOATCOMPLEX_64:
+    case STRUMPACK_DOUBLECOMPLEX_64:
+      *neg = neg64; *zero = zero64; *pos = pos64;
+      break;
+    }
+    return static_cast<STRUMPACK_RETURN_CODE>(ierr);
+  }
+
   void STRUMPACK_move_to_gpu(STRUMPACK_SparseSolver S) {
     switch_precision(move_to_gpu());
   }

@@ -59,10 +59,10 @@ namespace strumpack {
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
 
-    void multifrontal_factorization(const SpMat_t& A,
-                                    const Opts_t& opts,
-                                    int etree_level=0,
-                                    int task_depth=0) override;
+    ReturnCode multifrontal_factorization(const SpMat_t& A,
+					  const Opts_t& opts,
+					  int etree_level=0,
+					  int task_depth=0) override;
 
     void multifrontal_solve(DenseM_t& b,
                             const GPUFactors<scalar_t>* gpu_factors)
@@ -101,8 +101,8 @@ namespace strumpack {
                         char* hea_mem, char* dea_mem);
     void factor_batch(cl::sycl::queue& q, const LInfo_t& L,
                       Batch_t& batch, const Opts_t& opts);
-    void split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
-                       int etree_level=0, int task_depth=0);
+    ReturnCode split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+			     int etree_level=0, int task_depth=0);
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const;
