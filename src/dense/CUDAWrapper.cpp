@@ -98,6 +98,19 @@ namespace strumpack {
       if (code != CUBLAS_STATUS_SUCCESS) {
         std::cerr << "cuBLAS assertion failed: " << code << " "
                   <<  file << " " << line << std::endl;
+        switch (code) {
+        case CUBLAS_STATUS_SUCCESS:          std::cerr << "CUBLAS_STATUS_SUCCESS" << std::endl; break;
+        case CUBLAS_STATUS_NOT_INITIALIZED:  std::cerr << "CUBLAS_STATUS_NOT_INITIALIZED" << std::endl; break;
+        case CUBLAS_STATUS_ALLOC_FAILED:     std::cerr << "CUBLAS_STATUS_ALLOC_FAILED" << std::endl; break;
+        case CUBLAS_STATUS_INVALID_VALUE:    std::cerr << "CUBLAS_STATUS_INVALID_VALUE" << std::endl; break;
+        case CUBLAS_STATUS_ARCH_MISMATCH:    std::cerr << "CUBLAS_STATUS_ARCH_MISMATCH" << std::endl; break;
+        case CUBLAS_STATUS_MAPPING_ERROR:    std::cerr << "CUBLAS_STATUS_MAPPING_ERROR" << std::endl; break;
+        case CUBLAS_STATUS_EXECUTION_FAILED: std::cerr << "CUBLAS_STATUS_EXECUTION_FAILED" << std::endl; break;
+        case CUBLAS_STATUS_INTERNAL_ERROR:   std::cerr << "CUBLAS_STATUS_INTERNAL_ERROR" << std::endl; break;
+        case CUBLAS_STATUS_NOT_SUPPORTED:    std::cerr << "CUBLAS_STATUS_NOT_SUPPORTED" << std::endl; break;
+        case CUBLAS_STATUS_LICENSE_ERROR:    std::cerr << "CUBLAS_STATUS_LICENSE_ERROR" << std::endl; break;
+        default: std::cerr << "unknown cublas error" << std::endl;
+        }
         if (abrt) exit(code);
       }
     }
