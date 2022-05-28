@@ -127,6 +127,19 @@ namespace strumpack {
       cusolverDnHandle_t h_;
     };
 
+    class Event {
+    public:
+      Event() { gpu_check(cudaEventCreateWithFlags
+                          (&e_, cudaEventDisableTiming)); }
+      ~Event() { gpu_check(cudaEventDestroy(e_)); }
+      void record() { gpu_check(cudaEventRecord(e_)); }
+      void record(Stream& s) { gpu_check(cudaEventRecord(e_, s)); }
+      void wait(Stream& s) { gpu_check(cudaStreamWaitEvent(s, e_, 0)); }
+      void synchronize() { gpu_check(cudaEventSynchronize(e_));}
+    private:
+      cudaEvent_t e_;
+    };
+
     template<typename T> void memset
     (void* dptr, int value, std::size_t count) {
       gpu_check(cudaMemset(dptr, value, count*sizeof(T)));

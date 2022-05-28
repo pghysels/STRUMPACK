@@ -125,13 +125,19 @@ namespace strumpack {
 #endif
 
       void move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned = NULL) override {
+        gpu::Event event;
         DenseM_t hD(D().rows(), D().cols());
         if (pinned == NULL){
           gpu::copy_device_to_host_async(hD, D(), s);
         } else {
           gpu::copy_device_to_host_async(pinned, D().data(), D().rows()*D().cols(), s);
-          gpu_check(cudaMemcpy(hD.data(), pinned, D().rows()*D().cols()*sizeof(scalar_t),
-                           cudaMemcpyHostToHost));
+          event.record(s);
+          event.synchronize();
+          for (std::size_t i=0; i<D().rows(); i++) {
+            for (std::size_t j=0; j<D().cols(); j++) {             
+              hD(i, j) = pinned[i+D().ld()*j];
+            }
+          }
         }
         D_.reset(new DenseM_t(hD));
       }

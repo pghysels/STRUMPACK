@@ -555,12 +555,12 @@ namespace strumpack {
             }
           }
           std::size_t lwork = sVU11+sUVU11;
-          auto bdwork11 = VBatchedGEMM<scalar_t>::dwork_bytes((rb-i)*(rb-i));
+          auto bdwork11 = VBatchedGEMM<scalar_t>::dwork_bytes((rb-i-1)*(rb-i-1));
           gpu::DeviceMemory<char> bdmem11(bdwork11*3 + 2*lwork*sizeof(scalar_t));
           scalar_t *dVU = reinterpret_cast<scalar_t*>(bdmem11 + bdwork11*3), 
                    *dUVU = dVU + sVU11;
-          VBatchedGEMM<scalar_t> b1((rb-i)*(rb-i), bdmem11),
-            b2((rb-i)*(rb-i), bdmem11+bdwork11), b3((rb-i)*(rb-i), bdmem11+2*bdwork11);
+          VBatchedGEMM<scalar_t> b1((rb-i-1)*(rb-i-1), bdmem11),
+            b2((rb-i-1)*(rb-i-1), bdmem11+bdwork11), b3((rb-i-1)*(rb-i-1), bdmem11+2*bdwork11);
           for (std::size_t j=i+1; j<rb; j++) {
             auto& Tij = B11.tile(i, j);
             for (std::size_t k=i+1; k<rb; k++) {
@@ -730,7 +730,6 @@ namespace strumpack {
 #endif
           }
         }
-        gpu::synchronize();
         std::size_t max_pinned = 0;
         for (std::size_t i=0; i<rb; i++) {
           for (std::size_t j=0; j<rb; j++){
@@ -738,13 +737,9 @@ namespace strumpack {
             max_pinned = std::max(max_pinned, ts);
           }
         }
+        gpu::synchronize();
         gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), dsep);
         gpu::HostMemory<scalar_t> pinned(max_pinned);
-        for (std::size_t i=0; i<rb; i++) {
-          for (std::size_t j=0; j<rb; j++){
-            B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream, pinned);
-          }
-        }
         //GEMM B22
         std::size_t sVU22 = 0, sUVU22 = 0;
         // count how much device memory will be required for F22 gemm
@@ -808,15 +803,41 @@ namespace strumpack {
               }
             }
           }
+          if (i==0) {
+#pragma omp parallel
+#pragma omp single
+{
+  #pragma omp task
+            for (std::size_t r=0; r<rb; r++) {
+              for (std::size_t c=0; c<rb; c++){
+                B11.tile(r, c).move_gpu_tile_to_cpu(copy_stream, pinned);
+              }
+            }
+  #pragma omp task
+  {
 #if defined(STRUMPACK_USE_MAGMA)
-          b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-          b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-          b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
+            b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+            b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+            b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
 #else
-          b1.run(scalar_t(1.), scalar_t(0.), handle);
-          b2.run(scalar_t(1.), scalar_t(0.), handle);
-          b3.run(scalar_t(-1.), scalar_t(1.), handle);
+            b1.run(scalar_t(1.), scalar_t(0.), handle);
+            b2.run(scalar_t(1.), scalar_t(0.), handle);
+            b3.run(scalar_t(-1.), scalar_t(1.), handle);
 #endif
+  }
+}
+          } else {
+#if defined(STRUMPACK_USE_MAGMA)
+            b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+            b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
+            b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
+#else
+            b1.run(scalar_t(1.), scalar_t(0.), handle);
+            b2.run(scalar_t(1.), scalar_t(0.), handle);
+            b3.run(scalar_t(-1.), scalar_t(1.), handle);
+#endif
+          }
+          comp_stream.synchronize();
         }
         gpu::synchronize();
         for (std::size_t i=0; i<rb; i++)
