@@ -222,6 +222,7 @@ namespace strumpack {
                          magma_int_t batchCount,
                          magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
                          magma_queue_t queue ) {
+        if (!batchCount) return;
         magmablas_sgemm_vbatched_max_nocheck
           (transA, transB, m, n, k, alpha, dA_array, ldda, dB_array, lddb,
            beta, dC_array, lddc, batchCount, max_m, max_n, max_k, queue);
@@ -235,9 +236,10 @@ namespace strumpack {
                          magma_int_t batchCount,
                          magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
                          magma_queue_t queue) {
-        magmablas_dgemm_vbatched
+        if (!batchCount) return;
+        magmablas_dgemm_vbatched_max_nocheck
           (transA, transB, m, n, k, alpha, dA_array, ldda, dB_array, lddb,
-           beta, dC_array, lddc, batchCount, queue);
+           beta, dC_array, lddc, batchCount, max_m, max_n, max_k, queue);
       }
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
@@ -249,16 +251,15 @@ namespace strumpack {
                          magma_int_t batchCount,
                          magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
                          magma_queue_t queue) {
-        magmaFloatComplex m_alpha, m_beta;
-        memcpy(&m_alpha, &alpha, sizeof(magmaFloatComplex));
-        memcpy(&m_beta, &beta, sizeof(magmaFloatComplex));
-        magmablas_cgemm_vbatched
-          (transA, transB, m, n, k, m_alpha,
-           reinterpret_cast<const magmaFloatComplex* const*>(dA_array), ldda,
-           reinterpret_cast<const magmaFloatComplex* const*>(dB_array), lddb,
-           m_beta,
-           reinterpret_cast<magmaFloatComplex* *>(dC_array), lddc,
-           batchCount, queue);
+        if (!batchCount) return;
+        magmaFloatComplex alpha_ = {alpha.real(), alpha.imag()},
+          beta_ = {beta.real(), beta.imag()};
+        magmablas_cgemm_vbatched_max_nocheck
+          (transA, transB, m, n, k, alpha_,
+           (magmaFloatComplex**)dA_array, ldda,
+           (magmaFloatComplex**)dB_array, lddb, beta_,
+           (magmaFloatComplex**)dC_array, lddc, batchCount, 
+           max_m, max_n, max_k, queue);
       }
       void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
                          magma_int_t * m, magma_int_t * n, magma_int_t * k,
@@ -270,16 +271,15 @@ namespace strumpack {
                          magma_int_t batchCount,
                          magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
                          magma_queue_t queue) {
-        magmaDoubleComplex m_alpha, m_beta;
-        memcpy(&m_alpha, &alpha, sizeof(magmaDoubleComplex));
-        memcpy(&m_beta, &beta, sizeof(magmaDoubleComplex));
-        magmablas_zgemm_vbatched
-          (transA, transB, m, n, k, m_alpha,
-           reinterpret_cast<const magmaDoubleComplex* const*>(dA_array), ldda,
-           reinterpret_cast<const magmaDoubleComplex* const*>(dB_array), lddb,
-           m_beta,
-           reinterpret_cast<magmaDoubleComplex* *>(dC_array), lddc,
-           batchCount, queue);
+        if (!batchCount) return;
+        magmaDoubleComplex alpha_ = {alpha.real(), alpha.imag()},
+          beta_ = {beta.real(), beta.imag()};
+        magmablas_zgemm_vbatched_max_nocheck
+          (transA, transB, m, n, k, alpha_,
+           (magmaDoubleComplex**)dA_array, ldda,
+           (magmaDoubleComplex**)dB_array, lddb, beta_,
+           (magmaDoubleComplex**)dC_array, lddc, batchCount,
+           max_m, max_n, max_k, queue);
       }
 
     } // end namespace magma
