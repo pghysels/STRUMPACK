@@ -140,6 +140,7 @@ namespace strumpack {
       void gesvd(magma_vec_t jobu, magma_vec_t jobvt, DenseMatrix<float>& A, float* S, 
                  DenseMatrix<float>& U, DenseMatrix<float>& V, float* Workspace, 
                  int lwork, float* E, int *info){
+        STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
         magma_sgesvd(jobu, jobvt, A.rows(), A.cols(),	A.data(), A.ld(), S,
                    	 U.data(), U.ld(), V.data(), V.ld(), Workspace, lwork, 
                      info);
@@ -148,6 +149,7 @@ namespace strumpack {
       void gesvd(magma_vec_t jobu, magma_vec_t jobvt, DenseMatrix<double>& A, double* S, 
                  DenseMatrix<double>& U, DenseMatrix<double>& V, double* Workspace, 
                  int lwork, double* E, int* info){
+        STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
         magma_dgesvd(jobu, jobvt, A.rows(), A.cols(),	A.data(), A.ld(), S,
                    	 U.data(), U.ld(), V.data(), V.ld(), Workspace, lwork, 
                      info);
@@ -157,6 +159,7 @@ namespace strumpack {
                  float* S, DenseMatrix<std::complex<float>>& U, 
                  DenseMatrix<std::complex<float>>& V, std::complex<float>* Workspace, int lwork, float* E, 
                  int *info){
+        STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
         magma_cgesvd(jobu, jobvt, A.rows(), A.cols(),	
                      reinterpret_cast<magmaFloatComplex*>(A.data()), A.ld(), S,
                    	 reinterpret_cast<magmaFloatComplex*>(U.data()), U.ld(), 
@@ -169,6 +172,7 @@ namespace strumpack {
                  DenseMatrix<std::complex<double>>& U, 
                  DenseMatrix<std::complex<double>>& V, std::complex<double>* Workspace, 
                  int lwork, double* E, int* info){
+        STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
         magma_zgesvd(jobu, jobvt, A.rows(), A.cols(),	
                      reinterpret_cast<magmaDoubleComplex*>(A.data()), A.ld(), S,
                    	 reinterpret_cast<magmaDoubleComplex*>(U.data()), U.ld(), 

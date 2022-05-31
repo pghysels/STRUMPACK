@@ -876,6 +876,11 @@ namespace strumpack {
               std::complex<double>* s, std::complex<double>* u, int ldu,
               std::complex<double>* vt, int ldvt);
 
+    inline long long ara_flops(long long m, long long n, long long k, long long r) {
+      return 2 * m*n * (r + k) + m*k * (3 + 4*r + 4*k);
+      //m: rows, n: columns, k: resulting rank, r: oversampling parameter 
+    }
+
     int syevx(char jobz, char range, char uplo, int n, float* a, int lda,
               float vl, float vu, int il, int iu, float abstol, int& m,
               float* w, float* z, int ldz);

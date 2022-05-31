@@ -266,6 +266,7 @@ namespace strumpack {
                         dcols.as<int>(), drank.as<int>(), tol, rows, cols, 
                         minmn, 32, 10, blashandle.kblas_rand_state(), 1, 1);
         gpu::copy_device_to_host(&rank, drank.as<int>(), 1);
+        STRUMPACK_FLOPS(blas::ara_flops(rows, cols, rank, 10));
         if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
           gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
