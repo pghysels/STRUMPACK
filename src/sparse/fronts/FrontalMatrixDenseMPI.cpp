@@ -302,6 +302,7 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::fwd_solve_phase2
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& b, DistM_t& bupd) const {
+    if (!grid()->active()) return;
     TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
     if (this->dim_sep()) {
@@ -367,6 +368,7 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::bwd_solve_phase1
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& y, DistM_t& yupd) const {
+    if (!grid()->active()) return;
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
     if (this->dim_sep()) {
       if (this->dim_upd()) {
