@@ -54,6 +54,14 @@ namespace strumpack {
     if (opts_.verbose() && is_root_)
       std::cout << "# using " << comm_.size()
                 << " MPI processes" << std::endl;
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    int thread_level;
+    MPI_Query_thread(&thread_level);
+    if (thread_level != MPI_THREAD_MULTIPLE &&
+        mpi_rank(comm) == 0)
+      std::cerr << "MPI_THREAD_MULTIPLE is requires for SLATE"
+                << std::endl;
+#endif
     // Set the default reordering to PARMETIS?
     //opts_.set_reordering_method(ReorderingStrategy::PARMETIS);
   }
