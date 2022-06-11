@@ -95,17 +95,12 @@ test(int argc, char* argv[], CSRMatrix<scalar,integer>& A) {
 }
 
 int main(int argc, char* argv[]) {
-  int thread_level;
-  //MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
-  int rank;
+  int thread_level, rank;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
-    std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED"
-              << std::endl;
-  // if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
-  //   std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE,"
-  //     " which might be needed for pt-scotch!" << std::endl;
+  if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
+    std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE,"
+      " which might be needed for pt-scotch and/or SLATE!" << std::endl;
 
   if (argc < 2) {
     if (!rank)
