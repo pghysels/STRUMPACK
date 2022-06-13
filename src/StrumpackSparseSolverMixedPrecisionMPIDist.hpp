@@ -110,8 +110,11 @@ namespace strumpack {
 
     void set_matrix(const CSRMatrixMPI<refine_t,integer_t>& A);
 
+    void update_matrix_values(const CSRMatrixMPI<refine_t,integer_t>& A);
+
     ReturnCode factor();
     ReturnCode reorder(int nx=1, int ny=1, int nz=1);
+
     ReturnCode solve(const DenseMatrix<refine_t>& b,
                      DenseMatrix<refine_t>& x,
                      bool use_initial_guess=false);

@@ -160,8 +160,21 @@ namespace strumpack {
     solver_.set_matrix(cast_matrix<refine_t,integer_t,factor_t>(A));
   }
 
+  template<typename factor_t,typename refine_t,typename integer_t> void
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  update_matrix_values(const CSRMatrixMPI<refine_t,integer_t>& A) {
+    mat_ = A;
+    solver_.update_matrix_values(cast_matrix<refine_t,integer_t,factor_t>(A));
+  }
+
   // explicit template instantiations
   template class SparseSolverMixedPrecisionMPIDist<float,double,int>;
   template class SparseSolverMixedPrecisionMPIDist<std::complex<float>,std::complex<double>,int>;
+
+  template class SparseSolverMixedPrecisionMPIDist<float,double,long int>;
+  template class SparseSolverMixedPrecisionMPIDist<std::complex<float>,std::complex<double>,long int>;
+
+  template class SparseSolverMixedPrecisionMPIDist<float,double,long long int>;
+  template class SparseSolverMixedPrecisionMPIDist<std::complex<float>,std::complex<double>,long long int>;
 
 } //end namespace strumpack
