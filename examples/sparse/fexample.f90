@@ -133,7 +133,7 @@ program fexample
        (S, c_loc(n), c_loc(rptr), c_loc(cind), c_loc(val), 1);
 
   ! use geometric nested dissection
-  ierr = STRUMPACK_reorder_regular(S, k, k, 1)
+  ierr = STRUMPACK_reorder_regular(S, k, k, 1, 1, 1)
 
   ! Solve will internally call factor (and reorder if necessary).
   ierr = STRUMPACK_solve(S, c_loc(b), c_loc(x), 0);
