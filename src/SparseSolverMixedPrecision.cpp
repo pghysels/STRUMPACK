@@ -138,6 +138,15 @@ namespace strumpack {
     return solve(*B, X, use_initial_guess);
   }
 
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  solve(int nrhs, const refine_t* b, int ldb, refine_t* x, int ldx,
+        bool use_initial_guess) {
+    auto N = mat_.size();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMatrixWrapper<refine_t> X(N, nrhs, x, ldx);
+    return solve(*B, X, use_initial_guess);
+  }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
@@ -161,6 +170,15 @@ namespace strumpack {
     return solve(*B, X, use_initial_guess);
   }
 
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  solve(int nrhs, const factor_t* b, int ldb, factor_t* x, int ldx,
+        bool use_initial_guess) {
+    auto N = mat_.size();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMatrixWrapper<factor_t> X(N, nrhs, x, ldx);
+    return solve(*B, X, use_initial_guess);
+  }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
