@@ -759,6 +759,7 @@ namespace strumpack {
      * every all precisions. See StructuredMatrix::Type.
      *
      * \param comm MPI communicator (wrapper class)
+     * \param grid Only used for HSS construction, can be NULL otherwise
      * \param rows Number of rows of matrix to be constructed.
      * \param cols Number of columns of matrix to be constructed.
      * \param A Matrix element extraction routine.
@@ -784,7 +785,8 @@ namespace strumpack {
      * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
-    construct_from_elements(const MPIComm& comm, int rows, int cols,
+    construct_from_elements(const MPIComm& comm, const BLACSGrid* grid,
+                            int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,
@@ -799,6 +801,7 @@ namespace strumpack {
      * every all precisions. See StructuredMatrix::Type.
      *
      * \param comm MPI communicator (wrapper class)
+     * \param grid Only used for HSS construction, can be NULL otherwise
      * \param rows Number of rows of matrix to be constructed.
      * \param cols Number of columns of matrix to be constructed.
      * \param A Matrix sub-block extraction routine.
@@ -824,7 +827,8 @@ namespace strumpack {
      * construct_partially_matrix_free
      */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
-    construct_from_elements(const MPIComm& comm, int rows, int cols,
+    construct_from_elements(const MPIComm& comm, const BLACSGrid* grid,
+                            int rows, int cols,
                             const extract_dist_block_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,
