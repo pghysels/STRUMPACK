@@ -120,6 +120,9 @@ namespace strumpack {
                      bool use_initial_guess=false);
     ReturnCode solve(const refine_t* b, refine_t* x,
                      bool use_initial_guess=false);
+    ReturnCode solve(int nrhs, const refine_t* b, int ldb,
+                     refine_t* x, int ldx,
+                     bool use_initial_guess=false);
 
     SPOptions<refine_t>& options() { return opts_; }
     const SPOptions<refine_t>& options() const { return opts_; }

@@ -143,6 +143,16 @@ namespace strumpack {
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  solve(int nrhs, const refine_t* b, int ldb, refine_t* x, int ldx,
+        bool use_initial_guess) {
+    auto N = mat_.local_rows();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMatrixWrapper<refine_t> X(N, nrhs, x, ldx);
+    return solve(*B, X, use_initial_guess);
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
   factor() {
     return solver_.factor();
   }
