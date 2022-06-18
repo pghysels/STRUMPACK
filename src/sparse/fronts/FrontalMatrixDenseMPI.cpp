@@ -224,7 +224,7 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::slate_matrix(const DistM_t& M) const {
     return slate::Matrix<scalar_t>::fromScaLAPACK
       (M.rows(), M.cols(), const_cast<scalar_t*>(M.data()), M.ld(),
-       M.MB(), M.nprows(), M.npcols(), M.comm());
+       M.MB(), M.nprows(), M.npcols(), M.grid()->Comm_active().comm());
   }
 #endif
 

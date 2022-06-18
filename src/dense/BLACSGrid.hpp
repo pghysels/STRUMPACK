@@ -295,6 +295,11 @@ namespace strumpack {
       return g;
     }
 
+    const MPIComm& Comm_active() const {
+      if (active_comm_) return *active_comm_;
+      else return Comm();
+    }
+
   private:
     MPIComm comm_;
     int P_ = -1;
@@ -305,6 +310,7 @@ namespace strumpack {
     int npcols_ = -1;
     int prow_ = -1;
     int pcol_ = -1;
+    std::unique_ptr<MPIComm> active_comm_;
 
     void setup() {
       layout(P_, nprows_, npcols_);
@@ -314,11 +320,11 @@ namespace strumpack {
       } else {
         int active_procs = nprows_ * npcols_;
         if (active_procs < P_) {
-          auto active_comm = comm_.sub(0, active_procs);
+          active_comm_.reset(new MPIComm(comm_.sub(0, active_procs)));
           if (comm_.rank() < active_procs) {
-            ctxt_ = scalapack::Csys2blacs_handle(active_comm.comm());
+            ctxt_ = scalapack::Csys2blacs_handle(active_comm_->comm());
             scalapack::Cblacs_gridinit(&ctxt_, "C", nprows_, npcols_);
-            ctxt_T_ = scalapack::Csys2blacs_handle(active_comm.comm());
+            ctxt_T_ = scalapack::Csys2blacs_handle(active_comm_->comm());
             scalapack::Cblacs_gridinit(&ctxt_T_, "R", npcols_, nprows_);
           } else ctxt_ = ctxt_T_ = -1;
         } else {
