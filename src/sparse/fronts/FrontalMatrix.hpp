@@ -148,6 +148,8 @@ namespace strumpack {
     ReturnCode inertia(integer_t& neg,
                        integer_t& zero,
                        integer_t& pos) const;
+    ReturnCode subnormals(std::size_t& sn) const;
+
 
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
@@ -224,6 +226,7 @@ namespace strumpack {
     virtual integer_t front_rank(int task_depth=0) const { return 0; }
 
     virtual long long factor_nonzeros(int task_depth=0) const;
+
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual bool isHSS() const { return false; }
     virtual bool isMPI() const { return false; }
@@ -386,6 +389,10 @@ namespace strumpack {
     virtual ReturnCode node_inertia(integer_t& neg,
                                     integer_t& zero,
                                     integer_t& pos) const {
+      return ReturnCode::INACCURATE_INERTIA;
+    }
+
+    virtual ReturnCode node_subnormals(std::size_t& sn) const {
       return ReturnCode::INACCURATE_INERTIA;
     }
 

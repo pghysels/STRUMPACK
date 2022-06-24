@@ -359,6 +359,8 @@ namespace strumpack {
      */
     ReturnCode inertia(integer_t& neg, integer_t& zero, integer_t& pos);
 
+    ReturnCode subnormals(std::size_t& sn);
+
     /**
      * Create a gnuplot script to draw/plot the sparse factors. Only
      * do this for small matrices! It is very slow!

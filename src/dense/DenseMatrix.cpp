@@ -845,6 +845,19 @@ namespace strumpack {
       (char(job), char(ul), rows(), data(), ld(), lambda.data());
   }
 
+  template<typename scalar_t> std::size_t
+  DenseMatrix<scalar_t>::subnormals() const {
+    std::size_t sn = 0;
+    for (std::size_t c=0; c<cols(); c++)
+      for (std::size_t r=0; r<rows(); r++) {
+        // TODO complex?
+        auto Aij = std::real(operator()(r, c));
+        if (Aij != scalar_t(0.) && !std::isnormal(Aij))
+          sn++;
+      }
+    return sn;
+  }
+
   template<typename scalar_t> void
   DenseMatrix<scalar_t>::write(const std::string& fname) const {
     std::ofstream f(fname, std::ios::out | std::ios::trunc);

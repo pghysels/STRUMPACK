@@ -61,6 +61,11 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   }
   spss.solve(b.data(), x.data());
 
+  std::size_t subs = 0;
+  auto err0 = spss.subnormals(subs);
+  std::cout << "# SUBNORMALS = " << subs
+            <<  " (" << err0 << ")" << std::endl;
+
   integer_t neg, zero, pos;
   auto err = spss.inertia(neg, zero, pos);
   std::cout << "# INERTIA neg,zero,pos = "

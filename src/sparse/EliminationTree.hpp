@@ -79,6 +79,7 @@ namespace strumpack {
     virtual ReturnCode inertia(integer_t& neg,
                                integer_t& zero,
                                integer_t& pos) const;
+    virtual ReturnCode subnormals(std::size_t& sn) const;
 
     void print_rank_statistics(std::ostream &out) const;
 

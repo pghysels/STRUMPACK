@@ -354,6 +354,16 @@ namespace strumpack {
     return node_inertia(neg, zero, pos);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrix<scalar_t,integer_t>::subnormals(std::size_t& sn) const {
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
+    if (lchild_) el = lchild_->subnormals(sn);
+    if (rchild_) er = rchild_->subnormals(sn);
+    if (el != ReturnCode::SUCCESS) return el;
+    if (er != ReturnCode::SUCCESS) return er;
+    return node_subnormals(sn);
+  }
+
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve

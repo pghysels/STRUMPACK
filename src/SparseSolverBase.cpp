@@ -76,23 +76,7 @@ namespace strumpack {
 #else
       std::cout << "# running serially, no OpenMP support!" << std::endl;
 #endif
-      // a heuristic to set the recursion task cutoff level based on
-      // the number of threads
-      if (params::num_threads == 1)
-        params::task_recursion_cutoff_level = 0;
-      else {
-        params::task_recursion_cutoff_level =
-          std::log2(params::num_threads) + 3;
-        std::cout << "# number of tasking levels = "
-                  << params::task_recursion_cutoff_level
-                  << " = log_2(#threads) + 3"<< std::endl;
-      }
     }
-#if defined(STRUMPACK_COUNT_FLOPS)
-    // if (!params::flops.is_lock_free())
-    //   std::cerr << "# WARNING: the flop counter is not lock free"
-    //             << std::endl;
-#endif
     opts_.HSS_options().set_synchronized_compression(true);
   }
 
@@ -165,6 +149,17 @@ namespace strumpack {
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
     return tree()->inertia(neg, zero, pos);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::subnormals
+  (std::size_t& sn) {
+    sn = 0;
+    if (!this->factored_) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    return tree()->subnormals(sn);
   }
 
   template<typename scalar_t,typename integer_t> void
