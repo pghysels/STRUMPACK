@@ -28,6 +28,8 @@ include(CheckLibraryExists)
 # include(CMakePushCheckState)
 include(CheckCXXSourceCompiles)
 
+include(GNUInstallDirs)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 # figure out Fortran/C name mangling
@@ -723,7 +725,8 @@ install(FILES
   DESTINATION include)
 
 install(TARGETS strumpack EXPORT STRUMPACKTargets
-  LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 
 # export targets and all
