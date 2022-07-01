@@ -104,6 +104,27 @@ namespace strumpack {
      */
     std::string get_name(CompressionAlgorithm a);
 
+    /**
+     * Enumeration of possible versions of the randomized sampling HSS
+     * sketching matrices.
+     * \ingroup Enumerations
+     */
+    enum class CompressionSketch {
+      GAUSSIAN,    /*!< Sketch using iid gaussian entries mean 0
+                        variance 1. */
+      SJLT      /*!< Sketch using the sparse Johnson-Lindenstrauss
+                      transform, with nnz entries per row randomly selected each
+                      with a value of 1/sqrt(nnz) with pr = 0.5 or -1/sqrt(nnz)
+                      with pr = 0.5. */
+    };
+
+    /**
+     * Return a string with the name of the compression algorithm.
+     * \param a type of the randomized compression algorihtm
+     * \return name, string with a short description
+     */
+    std::string get_name(CompressionSketch a);
+
 
     /**
      * \class HSSOptions
@@ -158,6 +179,17 @@ namespace strumpack {
       void set_p(int p) { assert(p >= 0); p_ = p; }
 
       /**
+       * Set the initial number of nonzeros per row to be used in SJLT sketch.
+       */
+      void set_nnz0(int nnz0) { assert(nnz0 > 0); nnz0_ = nnz0; }
+
+      /**
+       * Set the number of nonzeros per row added each time dd columns are
+       * added to the SJLT sketch.
+       */
+      void set_nnz(int nnz) { assert(nnz > 0); nnz_ = nnz; }
+
+      /**
        * Set the random engine, used in randomized compression.
        * \see RandomEngine, RandomDistribution, set_random_distribution()
        */
@@ -182,6 +214,15 @@ namespace strumpack {
        */
       void set_compression_algorithm(CompressionAlgorithm a) {
         compress_algo_ = a;
+      }
+
+      /**
+       * Specify the variant of the sketching matrix.
+       *
+       * \param a Type of sketching matrix
+       */
+      void set_compression_sketch(CompressionSketch a) {
+        compress_sketch_ = a;
       }
 
       /**
@@ -253,6 +294,25 @@ namespace strumpack {
       int d0() const { return d0_; }
 
       /**
+       * Get the initial number of nonzero entries per row in the SJLT sketch.
+       *
+       * \return initial number of nonzeros per row, used in adaptive
+       * compression with SJLT
+       * \see set_nnz0(), set_nnz()
+       */
+      int nnz0() const { return nnz0_; }
+
+      /**
+       * Get the increment number of nonzero entries per row in the SJLT sketch
+       * when incrementing by size dd
+       *
+       * \return additional number of nonzeros per row, added in adaptive
+       * compression step with SJLT
+       * \see set_nnz0(), set_nnz()
+       */
+       int nnz() const { return nnz_; }
+
+      /**
        * Increment for the number of random vectors during adaptive
        * compression.
        *
@@ -295,6 +355,9 @@ namespace strumpack {
         return compress_algo_;
       }
 
+      CompressionSketch compression_sketch() const {
+          return compress_sketch_;
+      }
       /**
        * Get the clustering algorithm to be used. This is used when
        * constructing an HSS approximation of a kernel matrix.
@@ -373,6 +436,8 @@ namespace strumpack {
     private:
       int d0_ = 128;
       int dd_ = 64;
+      int nnz0_ = 3;
+      int nnz_ = 3;
       int p_ = 10;
       random::RandomEngine random_engine_ =
         random::RandomEngine::LINEAR;
@@ -381,6 +446,7 @@ namespace strumpack {
       bool user_defined_random_ = false;
       bool log_ranks_ = false;
       CompressionAlgorithm compress_algo_ = CompressionAlgorithm::STABLE;
+      CompressionSketch compress_sketch_ = CompressionSketch::GAUSSIAN;
       bool sync_ = false;
       ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::TWO_MEANS;
       int approximate_neighbors_ = 64;

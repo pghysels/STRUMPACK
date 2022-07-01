@@ -15,6 +15,7 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/HSSExtra.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HSSMatrixBase.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HSSOptions.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/HSSMatrix.Sketches.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HSSOptions.cpp)
 
 install(FILES
