@@ -533,4 +533,3 @@ namespace strumpack {
 
   } // end namespace HSS
 } // end namespace strumpack
-

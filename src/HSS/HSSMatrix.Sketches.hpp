@@ -72,7 +72,7 @@ namespace strumpack {
          template<typename scalar_t>  void multiplySJLT
          (DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& S,
          DenseMatrix<scalar_t>& AS){
-
+             //TODO
          }
 
      private:
