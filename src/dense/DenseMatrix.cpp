@@ -848,6 +848,7 @@ namespace strumpack {
 
   template<typename scalar_t> std::size_t
   DenseMatrix<scalar_t>::subnormals() const {
+    if (!data_) return 0;
     std::size_t ns = 0;
     for (std::size_t c=0; c<cols(); c++)
       for (std::size_t r=0; r<rows(); r++)
@@ -859,6 +860,7 @@ namespace strumpack {
 
   template<typename scalar_t> std::size_t
   DenseMatrix<scalar_t>::zeros() const {
+    if (!data_) return 0;
     std::size_t nz = 0;
     for (std::size_t c=0; c<cols(); c++)
       for (std::size_t r=0; r<rows(); r++)

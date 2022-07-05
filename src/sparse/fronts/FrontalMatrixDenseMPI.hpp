@@ -158,6 +158,8 @@ namespace strumpack {
     ReturnCode node_inertia(integer_t& neg,
                             integer_t& zero,
                             integer_t& pos) const override;
+    ReturnCode node_subnormals(std::size_t& ns,
+                               std::size_t& nz) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;

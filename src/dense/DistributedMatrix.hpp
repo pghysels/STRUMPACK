@@ -256,6 +256,9 @@ namespace strumpack {
                 std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
                 int max_rank, const BLACSGrid* grid_T);
 
+    std::size_t subnormals() const;
+    std::size_t zeros() const;
+
     static const int default_MB = STRUMPACK_PBLAS_BLOCKSIZE;
     static const int default_NB = STRUMPACK_PBLAS_BLOCKSIZE;
   };

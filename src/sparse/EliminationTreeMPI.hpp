@@ -64,6 +64,8 @@ namespace strumpack {
     ReturnCode inertia(integer_t& neg,
                        integer_t& zero,
                        integer_t& pos) const override;
+    virtual ReturnCode subnormals(std::size_t& ns,
+                                  std::size_t& nz) const;
 
   protected:
     const MPIComm& comm_;
