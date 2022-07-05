@@ -976,11 +976,12 @@ namespace strumpack {
      */
     static DenseMatrix<scalar_t> read(const std::string& fname);
 
+
     /**
-     * Return number of subnormal (but not zero) elements in the
-     * matrix.
+     * Return number of subnormal elements in the matrix.
      */
     std::size_t subnormals() const;
+    std::size_t zeros() const;
 
   private:
     void ID_column_GEQP3

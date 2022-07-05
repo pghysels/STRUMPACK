@@ -148,7 +148,7 @@ namespace strumpack {
     ReturnCode inertia(integer_t& neg,
                        integer_t& zero,
                        integer_t& pos) const;
-    ReturnCode subnormals(std::size_t& sn) const;
+    ReturnCode subnormals(std::size_t& ns, std::size_t& nz) const;
 
 
     virtual void
@@ -392,7 +392,8 @@ namespace strumpack {
       return ReturnCode::INACCURATE_INERTIA;
     }
 
-    virtual ReturnCode node_subnormals(std::size_t& sn) const {
+    virtual ReturnCode node_subnormals(std::size_t& ns,
+                                       std::size_t& nz) const {
       return ReturnCode::INACCURATE_INERTIA;
     }
 

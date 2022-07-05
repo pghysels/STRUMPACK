@@ -78,8 +78,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDense<scalar_t,integer_t>::node_subnormals
-  (std::size_t& sn) const {
-    sn += F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
+  (std::size_t& ns, std::size_t& nz) const {
+    ns += F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
+    nz += F11_.zeros() + F12_.zeros() + F21_.zeros();
     return ReturnCode::SUCCESS;
   }
 

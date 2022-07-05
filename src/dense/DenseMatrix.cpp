@@ -830,8 +830,9 @@ namespace strumpack {
     DenseMatrix tmp(*this);
     auto minmn = std::min(rows(), cols());
     std::vector<scalar_t> S(minmn);
-    int info = blas::gesvd('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
-                           S.data(), NULL, 1, NULL, 1);
+    int info = blas::gesvd
+      ('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
+       S.data(), NULL, 1, NULL, 1);
     if (info)
       std::cout << "ERROR in gesvd: info = " << info << std::endl;
     return S;
@@ -847,15 +848,22 @@ namespace strumpack {
 
   template<typename scalar_t> std::size_t
   DenseMatrix<scalar_t>::subnormals() const {
-    std::size_t sn = 0;
+    std::size_t ns = 0;
     for (std::size_t c=0; c<cols(); c++)
-      for (std::size_t r=0; r<rows(); r++) {
-        // TODO complex?
-        auto Aij = std::real(operator()(r, c));
-        if (Aij != scalar_t(0.) && !std::isnormal(Aij))
-          sn++;
-      }
-    return sn;
+      for (std::size_t r=0; r<rows(); r++)
+        if (!std::isnormal(std::real(operator()(r, c))) &&
+            !std::isnormal(std::imag(operator()(r, c))))
+          ns++;
+    return ns;
+  }
+
+  template<typename scalar_t> std::size_t
+  DenseMatrix<scalar_t>::zeros() const {
+    std::size_t nz = 0;
+    for (std::size_t c=0; c<cols(); c++)
+      for (std::size_t r=0; r<rows(); r++)
+        if (operator()(r, c) == scalar_t(0.)) nz++;
+    return nz;
   }
 
   template<typename scalar_t> void

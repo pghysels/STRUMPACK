@@ -359,7 +359,7 @@ namespace strumpack {
      */
     ReturnCode inertia(integer_t& neg, integer_t& zero, integer_t& pos);
 
-    ReturnCode subnormals(std::size_t& sn);
+    ReturnCode subnormals(std::size_t& ns, std::size_t& nz);
 
     /**
      * Create a gnuplot script to draw/plot the sparse factors. Only
