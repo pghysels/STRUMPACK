@@ -64,6 +64,24 @@ namespace strumpack {
   template class GPUFactors<std::complex<double>>;
 
 
+  std::size_t round_up(std::size_t n) {
+    static int k = -1;
+    if (k == -1) {
+      auto m = sizeof(std::complex<double>);
+      m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
+      m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
+      m = std::max(m, sizeof(Triplet<std::complex<double>>));
+      k = 16;
+      while (k < int(m)) k *= 2;
+    }
+    return std::size_t( (n + k - 1) / k ) * k;
+  }
+  template<typename T>
+  T* aligned_ptr(void* p) {
+    return (T*)(round_up(uintptr_t(p)));
+  }
+
+  // TODO remove these! use round_up
   uintptr_t round_to_16(uintptr_t p) { return (p + 15) & ~15; }
   uintptr_t round_to_16(void* p) {
     return round_to_16(reinterpret_cast<uintptr_t>(p));
@@ -135,16 +153,23 @@ namespace strumpack {
       }
       factor_size = L_size + U_size;
       getrf_work_size = gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
-      work_bytes =
-        round_to_16(sizeof(scalar_t) *
-                   (Schur_size + getrf_work_size * max_streams)) +
-        round_to_16(sizeof(int) * (piv_size + f.size())) +  // pivots and ierr from getrf
-        round_to_16(sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N24 + N32));
-      ea_bytes =
-        round_to_16(sizeof(gpu::AssembleData<scalar_t>) * f.size()) +
-        round_to_16(sizeof(std::size_t) * Isize.back()) +
-        round_to_16(sizeof(Triplet<scalar_t>) *
-                    (elems11.back() + elems12.back() + elems21.back()));
+
+      factor_bytes = sizeof(scalar_t) * factor_size;
+      factor_bytes = round_up(factor_bytes);
+
+      work_bytes = sizeof(scalar_t) * (Schur_size + getrf_work_size * max_streams);
+      work_bytes = round_up(work_bytes);
+      work_bytes += sizeof(int) * (piv_size + f.size());
+      work_bytes = round_up(work_bytes);
+      work_bytes += sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N24 + N32);
+      work_bytes = round_up(work_bytes);
+
+      ea_bytes = sizeof(gpu::AssembleData<scalar_t>) * f.size();
+      ea_bytes = round_up(ea_bytes);
+      ea_bytes += sizeof(std::size_t) * Isize.back();
+      ea_bytes = round_up(ea_bytes);
+      ea_bytes += sizeof(Triplet<scalar_t>) * (elems11.back() + elems12.back() + elems21.back());
+      ea_bytes = round_up(ea_bytes);
     }
 
     void print_info(int l, int lvls) {
@@ -152,7 +177,7 @@ namespace strumpack {
                 << " has " << f.size() << " nodes and "
                 << N8 << " <=8, " << N16 << " <=16, "
                 << N24 << " <=24, " << N32 << " <=32, needs "
-                << factor_size * sizeof(scalar_t) / 1.e6
+                << factor_bytes / 1.e6
                 << " MB for factors, "
                 << Schur_size * sizeof(scalar_t) / 1.e6
                 << " MB for Schur complements" << std::endl;
@@ -196,7 +221,7 @@ namespace strumpack {
     }
 
     void set_work_pointers(void* wmem, int max_streams) {
-      auto schur = reinterpret_cast<scalar_t*>(wmem);
+      auto schur = aligned_ptr<scalar_t>(wmem);
       for (auto F : f) {
         const int dupd = F->dim_upd();
         if (dupd) {
@@ -206,25 +231,26 @@ namespace strumpack {
       }
       dev_getrf_work = schur;
       schur += max_streams * getrf_work_size;
-      auto imem = reinterpret_cast<int*>(round_to_16(schur));
+      auto imem = aligned_ptr<int>(schur);
       for (auto F : f) {
         F->piv_ = imem;
         imem += F->dim_sep();
       }
       dev_getrf_err = imem;   imem += f.size();
-      auto fdat = reinterpret_cast<gpu::FrontData<scalar_t>*>
-        (round_to_16(imem));
-      f8 = fdat;   fdat += N8;
+      auto fdat = aligned_ptr<gpu::FrontData<scalar_t>>(imem);
+      f8  = fdat;  fdat += N8;
       f16 = fdat;  fdat += N16;
       f24 = fdat;  fdat += N24;
       f32 = fdat;  fdat += N32;
     }
 
+    int align = 0;
     std::vector<FG_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
       factors_small = 0, Schur_size = 0, piv_size = 0,
-      total_upd_size = 0,  work_bytes = 0, ea_bytes = 0,
-      N8 = 0, N16 = 0, N24 = 0, N32 = 0, small_fronts = 0;
+      total_upd_size = 0;
+    std::size_t N8 = 0, N16 = 0, N24 = 0, N32 = 0, small_fronts = 0;
+    std::size_t work_bytes = 0, ea_bytes = 0, factor_bytes = 0;
     std::vector<std::size_t> elems11, elems12, elems21, Isize;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
@@ -305,9 +331,7 @@ namespace strumpack {
       // memory needed on this level: factors,
       // schur updates, pivot vectors, cuSOLVER work space,
       // assembly data (indices, sparse elements)
-      std::size_t level_mem =
-        round_to_16(L.factor_size*sizeof(scalar_t))
-        + L.work_bytes + L.ea_bytes;
+      std::size_t level_mem = L.factor_bytes + L.work_bytes + L.ea_bytes;
       // the contribution blocks of the previous level are still
       // needed for the extend-add
       if (l+1 < ldata.size())
@@ -322,16 +346,17 @@ namespace strumpack {
   (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
-    auto hasmbl = reinterpret_cast<gpu::AssembleData<scalar_t>*>(hea_mem);
-    auto Iptr = reinterpret_cast<std::size_t*>(round_to_16(hasmbl + N));
-    auto e11 = reinterpret_cast<Trip_t*>(round_to_16(Iptr + L.Isize.back()));
-    auto e12 = e11 + L.elems11.back();
-    auto e21 = e12 + L.elems12.back();
-    auto dasmbl = reinterpret_cast<gpu::AssembleData<scalar_t>*>(dea_mem);
-    auto dIptr = reinterpret_cast<std::size_t*>(round_to_16(dasmbl + N));
-    auto de11 = reinterpret_cast<Trip_t*>(round_to_16(dIptr + L.Isize.back()));
-    auto de12 = de11 + L.elems11.back();
-    auto de21 = de12 + L.elems12.back();
+    auto hasmbl = aligned_ptr<gpu::AssembleData<scalar_t>>(hea_mem);
+    auto Iptr   = aligned_ptr<std::size_t>(hasmbl + N);
+    auto e11    = aligned_ptr<Trip_t>(Iptr + L.Isize.back());
+    auto e12    = e11 + L.elems11.back();
+    auto e21    = e12 + L.elems12.back();
+    auto dasmbl = aligned_ptr<gpu::AssembleData<scalar_t>>(dea_mem);
+    auto dIptr  = aligned_ptr<std::size_t>(dasmbl + N);
+    auto de11   = aligned_ptr<Trip_t>(dIptr + L.Isize.back());
+    auto de12   = de11 + L.elems11.back();
+    auto de21   = de12 + L.elems12.back();
+
 #pragma omp parallel for
     for (std::size_t n=0; n<N; n++) {
       auto& f = *(L.f[n]);
@@ -550,12 +575,11 @@ namespace strumpack {
         if (l % 2) {
           work_mem = all_dmem;
           dea_mem = work_mem + L.work_bytes;
-          dev_factors = reinterpret_cast<scalar_t*>(dea_mem + L.ea_bytes);
+          dev_factors = aligned_ptr<scalar_t>(dea_mem + L.ea_bytes);
         } else {
           work_mem = all_dmem + peak_dmem - L.work_bytes;
           dea_mem = work_mem - L.ea_bytes;
-          dev_factors = reinterpret_cast<scalar_t*>
-            (dea_mem - round_to_16(L.factor_size * sizeof(scalar_t)));
+          dev_factors = aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
         }
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
@@ -604,7 +628,7 @@ namespace strumpack {
         gpu::copy_device_to_host_async<scalar_t>
           (pinned, dev_factors, L.factors_small, copy_stream);
 
-        STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
+        STRUMPACK_ADD_MEMORY(L.factor_bytes);
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         scalar_t* host_factors = L.f[0]->host_factors_.get();
         copy_stream.synchronize();
