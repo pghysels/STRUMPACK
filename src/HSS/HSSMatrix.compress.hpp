@@ -46,7 +46,7 @@ namespace strumpack {
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-      SJLT* sketch = 0;
+      SJLTGenerator<scalar_t, int> g;// make this pointer? to not initialize this
       // here
       if (!opts.user_defined_random()){
           if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
@@ -55,8 +55,8 @@ namespace strumpack {
           }
 
          else if(opts.compression_sketch() == CompressionSketch::SJLT){
-             //initialize SJLT class with RNG
-             sketch = new SJLT();
+             //initialize SJLTGenerator class with RNG
+             //sketch = new SJLTGenerator<double,int>();
              std::cout<< "compressing with sjlt \n";
          }
          else{
@@ -85,11 +85,11 @@ namespace strumpack {
            else if(opts.compression_sketch() == CompressionSketch::SJLT){
                if(d_old == 0){
                    //use nnz0
-                   sketch ->SJLTSketch(Rr_new, opts.nnz0());
+                   g.SJLTDenseSketch(Rr_new, opts.nnz0());
                    total_nnz += opts.nnz0();
                } else{
                    //use nnz
-                   sketch -> SJLTSketch(Rr_new, opts.nnz());
+                   g.SJLTDenseSketch(Rr_new, opts.nnz());
                    total_nnz += opts.nnz();
                }
            }
