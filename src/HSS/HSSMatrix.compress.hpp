@@ -79,25 +79,21 @@ namespace strumpack {
                Rr_new.random(*rgen);
                STRUMPACK_RANDOM_FLOPS
                 (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-               Rc_new.copy(Rr_new);
+
 
            }
 
            else if(opts.compression_sketch() == CompressionSketch::SJLT){
                if(d_old == 0){
-                   //use nnz0
 
                    g.SJLTDenseSketch(Rr_new, opts.nnz0());
-                   Rc_new.copy(Rr_new);
                    total_nnz += opts.nnz0();
                } else{
-                   //use nnz
                    g.SJLTDenseSketch(Rr_new,  opts.nnz());
-                   Rc_new.copy(Rr_new);
                    total_nnz += opts.nnz();
                }
            }
-
+            Rc_new.copy(Rr_new);
         }
         //
         DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
