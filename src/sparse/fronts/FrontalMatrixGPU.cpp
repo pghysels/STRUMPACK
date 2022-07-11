@@ -63,18 +63,19 @@ namespace strumpack {
   template class GPUFactors<std::complex<float>>;
   template class GPUFactors<std::complex<double>>;
 
+  constexpr int align_max_struct() {
+    auto m = sizeof(std::complex<double>);
+    m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
+    m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
+    m = std::max(m, sizeof(Triplet<std::complex<double>>));
+    int k = 16;
+    while (k < int(m)) k *= 2;
+    return k;
+  }
 
   std::size_t round_up(std::size_t n) {
-    static int k = -1;
-    if (k == -1) {
-      auto m = sizeof(std::complex<double>);
-      m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
-      m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
-      m = std::max(m, sizeof(Triplet<std::complex<double>>));
-      k = 16;
-      while (k < int(m)) k *= 2;
-    }
-    return std::size_t( (n + k - 1) / k ) * k;
+    int k = align_max_struct();
+    return std::size_t((n + k - 1) / k) * k;
   }
   template<typename T>
   T* aligned_ptr(void* p) {
