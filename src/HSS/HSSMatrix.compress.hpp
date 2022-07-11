@@ -80,16 +80,20 @@ namespace strumpack {
                STRUMPACK_RANDOM_FLOPS
                 (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
                Rc_new.copy(Rr_new);
+
            }
 
            else if(opts.compression_sketch() == CompressionSketch::SJLT){
                if(d_old == 0){
                    //use nnz0
+
                    g.SJLTDenseSketch(Rr_new, opts.nnz0());
+                   Rc_new.copy(Rr_new);
                    total_nnz += opts.nnz0();
                } else{
                    //use nnz
-                   g.SJLTDenseSketch(Rr_new, opts.nnz());
+                   g.SJLTDenseSketch(Rr_new,  opts.nnz());
+                   Rc_new.copy(Rr_new);
                    total_nnz += opts.nnz();
                }
            }
@@ -102,6 +106,10 @@ namespace strumpack {
         if (opts.verbose())
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original)" << std::endl;
+       if (opts.verbose() && opts.compression_sketch()
+       == CompressionSketch::SJLT)
+       std::cout << "# nnz total = " << total_nnz << std::endl;
+
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
@@ -112,7 +120,7 @@ namespace strumpack {
           d = 2 * (d_old - opts.p()) + opts.p();
         }
       }
-      if(opts.verbose() && total_nnz != 0){
+      if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
       std::cout<<"total nnz in each row: " << total_nnz << std::endl;
       std::cout<<"length of row: " << d << std::endl;
       }

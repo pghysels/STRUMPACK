@@ -189,8 +189,10 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
        (DenseMatrix<scalar_t>& B, std::size_t nnz) {
 
 
-           if (nnz >= B.cols()) {
+           if (nnz > B.cols()) {
                std::cout << "nnz too large \n";
+               std::cout <<"n_cols = " << B.cols() << std::endl;
+               std::cout <<"nnz = " << nnz << std::endl;
                return; //either make error or make nnz - B.cols()
            }
            //set initial B to zero:
@@ -200,10 +202,11 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
            for (unsigned int j = 0; j < B.cols(); j++) {
                col_inds.push_back(j);
            }
+           //std::vector<scalar_t> nums = {-1,1};
 
            std::vector<scalar_t> nums = {
-               scalar_t(1. / std::sqrt(double(nnz))),
-               scalar_t(-1. / std::sqrt(double(nnz))) };
+               scalar_t(1.),
+               scalar_t(-1.) };
 
            for (std::size_t i = 0; i < B.rows(); i++) {
                //sample nnz column indices breaks in second loop here
@@ -215,6 +218,9 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
                    B(i, col_inds[j]) = nums[0];
                }
            }
+
+
+
        }
 
 
