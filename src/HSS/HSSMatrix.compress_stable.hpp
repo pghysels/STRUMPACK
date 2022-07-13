@@ -43,13 +43,25 @@ namespace strumpack {
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
+      auto total_nnz = opts.nnz0();
       // assert(dd <= d);
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-      if (!opts.user_defined_random()) {
-        rgen = random::make_random_generator<real_t>
-          (opts.random_engine(), opts.random_distribution());
+      SJLTGenerator<scalar_t, int> g;
+      if (!opts.user_defined_random()){
+          if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
+            rgen = random::make_random_generator<real_t>
+                (opts.random_engine(), opts.random_distribution());
+          }
+
+         else if(opts.compression_sketch() == CompressionSketch::SJLT){
+
+             std::cout<< "compressing with sjlt \n";
+         }
+         else{
+             std::cout<< "unknown compression sketch \n";
+         }
       }
       WorkCompress<scalar_t> w;
       while (!this->is_compressed()) {
@@ -64,15 +76,32 @@ namespace strumpack {
         DenseMW_t Sr_new(n, dnew, Sr, 0, c);
         DenseMW_t Sc_new(n, dnew, Sc, 0, c);
         if (!opts.user_defined_random()) {
-          Rr_new.random(*rgen);
-          STRUMPACK_RANDOM_FLOPS
-            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-          Rc_new.copy(Rr_new);
+           if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
+               Rr_new.random(*rgen);
+               STRUMPACK_RANDOM_FLOPS
+                (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+
+
+           }
+
+           else if(opts.compression_sketch() == CompressionSketch::SJLT){
+               if(c == 0){
+
+                   g.SJLTDenseSketch(Rr_new,total_nnz);
+               } else{
+                   g.SJLTDenseSketch(Rr_new,  opts.nnz());
+                   total_nnz += opts.nnz();
+               }
+           }
+            Rc_new.copy(Rr_new);
         }
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
         if (opts.verbose())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
+        if (opts.verbose() && opts.compression_sketch()
+        == CompressionSketch::SJLT)
+            std::cout << "# nnz total = " << total_nnz << std::endl;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_stable
@@ -83,6 +112,13 @@ namespace strumpack {
           dd = std::min(dd, opts.max_rank()-d);
         }
       }
+
+      if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
+      std::cout<<"# Final length of row: " << d << std::endl
+               <<"total nnz in each row: "
+               << total_nnz << std::endl;
+      }
+
     }
 
     template<typename scalar_t> void

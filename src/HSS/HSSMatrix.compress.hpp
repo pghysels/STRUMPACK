@@ -116,8 +116,9 @@ namespace strumpack {
         }
       }
       if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
-      std::cout<<"total nnz in each row: " << total_nnz << std::endl;
-      std::cout<<"length of row: " << d << std::endl;
+          std::cout<<"# Final length of row: " << d << std::endl
+                   <<"total nnz in each row: "
+                   << total_nnz << std::endl;
       }
 
     }
@@ -170,8 +171,6 @@ namespace strumpack {
                Rr_new.random(*rgen);
                STRUMPACK_RANDOM_FLOPS
                 (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-
-
            }
 
            else if(opts.compression_sketch() == CompressionSketch::SJLT){
@@ -211,8 +210,9 @@ namespace strumpack {
         }
       }
       if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
-      std::cout<<"total nnz in each row: " << total_nnz << std::endl;
-      std::cout<<"length of row: " << d << std::endl;
+          std::cout<<"# Final length of row: " << d << std::endl
+                   <<"total nnz in each row: "
+                   << total_nnz << std::endl;
       }
     }
 
