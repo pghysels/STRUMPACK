@@ -46,7 +46,7 @@ namespace strumpack {
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-      SJLTGenerator<scalar_t, int> g;// make this pointer? to not initialize this
+      SJLTGenerator<scalar_t, int> g;
       // here
       if (!opts.user_defined_random()){
           if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
@@ -55,8 +55,7 @@ namespace strumpack {
           }
 
          else if(opts.compression_sketch() == CompressionSketch::SJLT){
-             //initialize SJLTGenerator class with RNG
-             //sketch = new SJLTGenerator<double,int>();
+
              std::cout<< "compressing with sjlt \n";
          }
          else{
@@ -133,13 +132,27 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_hard_restart
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
-      int d_old = 0, d = opts.d0() + opts.p();
+      int d_old = 0, d = opts.d0() + opts.p(), total_nnz = opts.nnz0();
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc, R2, Sr2, Sc2;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-      if (!opts.user_defined_random())
-        rgen = random::make_random_generator<real_t>
-          (opts.random_engine(), opts.random_distribution());
+      SJLTGenerator<scalar_t, int> g;
+      if (!opts.user_defined_random()){
+          if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
+            rgen = random::make_random_generator<real_t>
+                (opts.random_engine(), opts.random_distribution());
+          }
+
+         else if(opts.compression_sketch() == CompressionSketch::SJLT){
+
+             std::cout<< "compressing with sjlt \n";
+         }
+         else{
+             std::cout<< "unknown compression sketch \n";
+         }
+      }
+
+      //
       while (!this->is_compressed()) {
         WorkCompress<scalar_t> w;
         Rr = DenseM_t(n, d);
@@ -153,10 +166,25 @@ namespace strumpack {
         DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
         DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
         if (!opts.user_defined_random()) {
-          Rr_new.random(*rgen);
-          STRUMPACK_RANDOM_FLOPS
-            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-          Rc_new.copy(Rr_new);
+           if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
+               Rr_new.random(*rgen);
+               STRUMPACK_RANDOM_FLOPS
+                (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+
+
+           }
+
+           else if(opts.compression_sketch() == CompressionSketch::SJLT){
+               if(d_old == 0){
+
+                   g.SJLTDenseSketch(Rr_new, total_nnz);
+
+               } else{
+                   g.SJLTDenseSketch(Rr_new,  total_nnz);
+
+               }
+           }
+            Rc_new.copy(Rr_new);
         }
         DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
         DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
@@ -166,6 +194,10 @@ namespace strumpack {
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original, hard restart)"
                     << std::endl;
+        //add nnz print here:
+       if (opts.verbose() && opts.compression_sketch() ==
+       CompressionSketch::SJLT)
+        std::cout << "# compressing with nnz = " << total_nnz << std::endl;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
@@ -174,8 +206,13 @@ namespace strumpack {
         if (!this->is_compressed()) {
           d_old = d;
           d = 2 * (d_old - opts.p()) + opts.p();
+          total_nnz += opts.nnz();
           reset();
         }
+      }
+      if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
+      std::cout<<"total nnz in each row: " << total_nnz << std::endl;
+      std::cout<<"length of row: " << d << std::endl;
       }
     }
 

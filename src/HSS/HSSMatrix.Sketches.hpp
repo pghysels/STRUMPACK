@@ -202,10 +202,9 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
            for (unsigned int j = 0; j < B.cols(); j++) {
                col_inds.push_back(j);
            }
-           //std::vector<scalar_t> nums = {-1,1};
 
            std::vector<scalar_t> nums = {
-               scalar_t(1.),
+              scalar_t(1.),
                scalar_t(-1.) };
 
            for (std::size_t i = 0; i < B.rows(); i++) {
@@ -230,13 +229,13 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
    };
 
 
-
-
-
-
-template<typename scalar_t,typename integer_t> class SJLT_Matrix{
+/*
+* SJLT matrix S = (1/sqrt(nnz))(A - B)
+*/
+template<typename scalar_t> class SJLT_Matrix{
 public:
-
+SJLT_Matrix(){
+}
 // Print A
 // print B
 // print sjlt
