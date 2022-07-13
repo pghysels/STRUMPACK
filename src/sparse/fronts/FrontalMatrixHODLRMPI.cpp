@@ -642,16 +642,17 @@ namespace strumpack {
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
-    auto g = A.extract_graph
-      (opts.separator_ordering_level(), sep_begin_, sep_end_);
-    sep_tree_ = g.recursive_bisection
-      (opts.HODLR_options().leaf_size(), 0,
-       sorder+sep_begin_, nullptr, 0, 0, dim_sep());
-    std::vector<integer_t> siorder(dim_sep());
-    for (integer_t i=sep_begin_; i<sep_end_; i++)
-      siorder[sorder[i]] = i - sep_begin_;
-    for (integer_t i=sep_begin_; i<sep_end_; i++)
-      sorder[i] += sep_begin_;
+    if (Comm().is_root()) {
+      auto g = A.extract_graph
+        (opts.separator_ordering_level(), sep_begin_, sep_end_);
+      sep_tree_ = g.recursive_bisection
+        (opts.HODLR_options().leaf_size(), 0,
+         sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] += sep_begin_;
+    }
+    sep_tree_.broadcast(Comm());
+    Comm().broadcast(sorder+sep_begin_, dim_sep());
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -659,6 +660,11 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts) {
     TIMER_TIME(TaskType::CONSTRUCT_HIERARCHY, 0, t_construct_h);
     TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_11);
+    // g could be different on different ranks because of the length 2
+    // edges, which are not all available on every rank. This is why
+    // the sep_tree is broadcast (above in partition). Could this be
+    // an issue in the HODLR code if the neighbors are not all the
+    // same???
     auto g = A.extract_graph
       (opts.separator_ordering_level(), sep_begin_, sep_end_);
     TIMER_STOP(t_graph_11);
