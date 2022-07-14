@@ -86,7 +86,8 @@ namespace strumpack {
 
 
                /*
-                * apends the cols of a second B-CRS matix to the end of this matrix:
+                * apends the cols of a second B-CRS
+                * matrix to the end of this matrix:
                 */
               void append_cols(BinaryCRSMarix<scalar_t> T) {
                   if (T.size() != n_rows_) {
@@ -102,13 +103,16 @@ namespace strumpack {
                   //update col indices
                   for(std::size_t i = 0; i < row_ptr_.size() - 1; i++) {
 
-                      for (std::size_t j = row_ptr_[i] - 1; j < row_ptr_[i+1] - 1; j++) {
+                      for (std::size_t j = row_ptr_[i] - 1;
+                          j < row_ptr_[i+1] - 1; j++) {
                           new_col_inds.push_back(col_ind_[j]);
                       }
-                      for (std::size_t j = (*rows_T)[i] - 1; j < (*rows_T)[i + 1] - 1; j++) {
+                      for (std::size_t j = (*rows_T)[i] - 1; j <
+                      (*rows_T)[i + 1] - 1; j++) {
                           new_col_inds.push_back((*col_T)[j]+n_cols());
                       }
-                      new_row_ptr_.push_back(row_ptr_[i + 1] + (*rows_T)[i + 1] - 1);
+                      new_row_ptr_.push_back(row_ptr_[i + 1] +
+                          (*rows_T)[i + 1] - 1);
                   }
 
                   nnz_ += T.nnz();
@@ -280,27 +284,86 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
 /*
 * SJLT matrix S = (1/sqrt(nnz))(A - B)
 */
-template<typename scalar_t> class SJLT_Matrix{
-public:
+template<typename scalar_t, typename integer_t> class SJLT_Matrix {
+   public:
+       SJLT_Matrix(SJLTGenerator<scalar_t, integer_t> g,
+           std::size_t nnz, std::size_t n_rows, std::size_t n_cols):
+       g_(g), nnz_(nnz), n_rows_(n_rows), n_cols_(n_cols),
+       A_(BinaryCRSMarix<scalar_t>(n_cols)),
+       B_(BinaryCRSMarix<scalar_t>(n_cols))
+       {
+           g_.createSJLTCRS(A_, B_, nnz_, n_rows_, n_cols_);
 
-SJLT_Matrix(std::size_t nnz, std::size_t n_rows, std::size_t n_cols){
+       }
 
-}
+       void add_columns(std::size_t new_cols, std::size_t nnz) {
+
+           BinaryCRSMarix<scalar_t> A_temp(new_cols);
+           BinaryCRSMarix<scalar_t> B_temp(new_cols);
+           g_.createSJLTCRS(A_temp, B_temp, nnz, get_n_rows(), new_cols);
+            A_.append_cols(A_temp);
+            B_.append_cols(B_temp);
+            n_cols_ += new_cols;
+       }
+
+       void print_SJLT_As_Dense() {
+           const std::vector<std::size_t>* rows_A = A_.get_row_ptr();
+           const std::vector<std::size_t>* col_A = A_.get_col_inds();
+           const std::vector<std::size_t>* rows_B = B_.get_row_ptr();
+           const std::vector<std::size_t>* col_B = B_.get_col_inds();
+
+           for (std::size_t i = 0; i < n_rows_ ; i++) {
+
+               std::size_t startA = (*rows_A)[i] - 1,
+                endA = (*rows_A)[i + 1] - 1;
+               std::size_t startB = (*rows_B)[i] - 1,
+               endB = (*rows_B)[i + 1] - 1;
+
+               for (std::size_t j = 0; j < n_cols_; j++) {
+
+                   if (std::find((*col_A).begin() + startA, (*col_A).begin() +
+                   endA, j) != (*col_A).begin() + endA) {
+                       std::cout << "1 ";
+                   }
+                   else if (std::find((*col_B).begin() +
+                   startB, (*col_B).begin() + endB, j) != (*col_B).begin() +
+                    endB) {
+                       std::cout << "-1 ";
+                   }
+                   else {
+                       std::cout << "0 ";
+                   }
+
+               }
+               std::cout << std::endl;
+           }
+
+       }
+
+       BinaryCRSMarix<scalar_t> get_A() {
+           return A_;
+       }
+
+       BinaryCRSMarix<scalar_t> get_B() {
+           return B_;
+       }
+
+       std::size_t get_n_rows() {
+           return n_rows_;
+       }
+
+   private:
+       SJLTGenerator<scalar_t, integer_t> g_;
+       BinaryCRSMarix< scalar_t> A_;
+       BinaryCRSMarix< scalar_t> B_;
+       std::size_t nnz_;
+       std::size_t n_rows_;
+       std::size_t n_cols_;
+   };
 
 
-// Print A
-// print B
-// print sjlt
-// apply SJLT_matrix to A*SJLT
-private:
-    // 1 will be cast as scalar_t 1
-    //integer_t for size of row/column indices
-    BinaryCRSMarix<scalar_t> A_row_wise;
-    BinaryCRSMarix<scalar_t> B_row_wise;
-    scalar_t nnz;
-};
 
 
-  }
-}
+        }
+    }
 #endif
