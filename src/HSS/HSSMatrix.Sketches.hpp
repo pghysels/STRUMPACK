@@ -83,6 +83,41 @@ namespace strumpack {
               n_rows_ += 1;
           }
 
+
+
+               /*
+                * apends the cols of a second B-CRS matix to the end of this matrix:
+                */
+              void append_cols(BinaryCRSMarix<scalar_t> T) {
+                  if (T.size() != n_rows_) {
+                      std::cout << "# Cannot append a matrix with"
+                          << " the wrong number of rows" << std::endl;
+                      return;
+                  }
+
+                  std::vector<std::size_t> new_row_ptr_ = { std::size_t(1) };
+                  std::vector<std::size_t> new_col_inds;
+                  const std::vector<std::size_t>* rows_T = T.get_row_ptr();
+                  const std::vector<std::size_t>* col_T = T.get_col_inds();
+                  //update col indices
+                  for(std::size_t i = 0; i < row_ptr_.size() - 1; i++) {
+
+                      for (std::size_t j = row_ptr_[i] - 1; j < row_ptr_[i+1] - 1; j++) {
+                          new_col_inds.push_back(col_ind_[j]);
+                      }
+                      for (std::size_t j = (*rows_T)[i] - 1; j < (*rows_T)[i + 1] - 1; j++) {
+                          new_col_inds.push_back((*col_T)[j]+n_cols());
+                      }
+                      new_row_ptr_.push_back(row_ptr_[i + 1] + (*rows_T)[i + 1] - 1);
+                  }
+
+                  nnz_ += T.nnz();
+                  n_cols_ += T.n_cols();
+                  col_ind_ = new_col_inds;
+                  row_ptr_ = new_row_ptr_;
+
+              }
+
           void set_nnz_value(scalar_t one) {
               one_ = one;
           }
@@ -98,6 +133,19 @@ namespace strumpack {
           std::size_t size() {
               return n_rows_;
           }
+
+          std::size_t n_cols() {
+              return n_cols_;
+          }
+
+          const  std::vector<std::size_t>* get_row_ptr() {
+              return &row_ptr_;
+          }
+
+          const  std::vector<std::size_t>* get_col_inds() {
+              return &col_ind_;
+          }
+
       private:
           std::size_t nnz_ = std::size_t(0);
           std::size_t n_cols_;
@@ -234,8 +282,12 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
 */
 template<typename scalar_t> class SJLT_Matrix{
 public:
-SJLT_Matrix(){
+
+SJLT_Matrix(std::size_t nnz, std::size_t n_rows, std::size_t n_cols){
+
 }
+
+
 // Print A
 // print B
 // print sjlt
