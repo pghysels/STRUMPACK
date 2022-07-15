@@ -115,7 +115,8 @@ namespace strumpack {
           d = 2 * (d_old - opts.p()) + opts.p();
         }
       }
-      if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
+      if(opts.verbose() &&
+      opts.compression_sketch() == CompressionSketch::SJLT){
           std::cout<<"# Final length of row: " << d << std::endl
                    <<"total nnz in each row: "
                    << total_nnz << std::endl;
@@ -209,7 +210,8 @@ namespace strumpack {
           reset();
         }
       }
-      if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
+      if(opts.verbose() &&
+       opts.compression_sketch() == CompressionSketch::SJLT){
           std::cout<<"# Final length of row: " << d << std::endl
                    <<"total nnz in each row: "
                    << total_nnz << std::endl;
