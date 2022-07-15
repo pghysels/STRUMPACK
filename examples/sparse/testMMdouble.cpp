@@ -117,10 +117,10 @@ int main(int argc, char* argv[]) {
 
   CSRMatrix<double,int> A;
   if (A.read_matrix_market(f) == 0)
-    test<double,int>(argc, argv, A);
+    test(argc, argv, A);
   else {
     CSRMatrix<std::complex<double>,int> A;
     A.read_matrix_market(f);
-    test<std::complex<double>,int>(argc, argv, A);
+    test(argc, argv, A);
   }
 }
