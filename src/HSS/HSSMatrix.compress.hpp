@@ -37,6 +37,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const DenseM_t& A, const opts_t& opts) {
       AFunctor<scalar_t> afunc(A);
+      //add SJLT code here:
       compress_original(afunc, afunc, opts);
     }
 
@@ -47,6 +48,7 @@ namespace strumpack {
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       SJLTGenerator<scalar_t, int> g;
+      SJLT_Matrix<scalar_t, int> S(g,0,n,0);
       // here
       if (!opts.user_defined_random()){
           if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
@@ -55,15 +57,12 @@ namespace strumpack {
           }
 
          else if(opts.compression_sketch() == CompressionSketch::SJLT){
-
              std::cout<< "compressing with sjlt \n";
          }
          else{
              std::cout<< "unknown compression sketch \n";
          }
       }
-
-      //
       WorkCompress<scalar_t> w;
       while (!this->is_compressed()) {
         Rr.resize(n, d);
@@ -78,23 +77,30 @@ namespace strumpack {
                Rr_new.random(*rgen);
                STRUMPACK_RANDOM_FLOPS
                 (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-
-
            }
-
            else if(opts.compression_sketch() == CompressionSketch::SJLT){
                if(d_old == 0){
 
-                   g.SJLTDenseSketch(Rr_new, opts.nnz0());
+                   //New: sjlt class to fille Rr_new
+                   S.add_columns(d,opts.nnz0());
+                   Rr_new.copy(S.SJLT_to_dense());
+
+                   //old
+                   //g.SJLTDenseSketch(Rr_new, opts.nnz0());
                    total_nnz += opts.nnz0();
                } else{
-                   g.SJLTDenseSketch(Rr_new,  opts.nnz());
+                   //new, verify that g is new random not the same as old
+                   SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
+                   opts.nnz(),n,d-d_old);
+                   S.append_sjlt_matrix(Temp);
+                   Rr_new.copy(Temp.SJLT_to_dense());
+                  //old
+                   //g.SJLTDenseSketch(Rr_new,  opts.nnz());
                    total_nnz += opts.nnz();
                }
            }
             Rc_new.copy(Rr_new);
         }
-        //
         DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
         DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
@@ -104,7 +110,6 @@ namespace strumpack {
        if (opts.verbose() && opts.compression_sketch()
        == CompressionSketch::SJLT)
        std::cout << "# nnz total = " << total_nnz << std::endl;
-
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
@@ -117,11 +122,10 @@ namespace strumpack {
       }
       if(opts.verbose() &&
       opts.compression_sketch() == CompressionSketch::SJLT){
-          std::cout<<"# Final length of row: " << d << std::endl
-                   <<"total nnz in each row: "
+          std::cout<<"# final length of row: " << d << std::endl
+                   <<"# total nnz in each row: "
                    << total_nnz << std::endl;
       }
-
     }
 
     template<typename scalar_t> void
