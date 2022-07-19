@@ -36,9 +36,87 @@ namespace strumpack {
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const DenseM_t& A, const opts_t& opts) {
-      AFunctor<scalar_t> afunc(A);
-      //add SJLT code here:
-      compress_original(afunc, afunc, opts);
+    AFunctor<scalar_t> afunc(A);
+
+        if(opts.compression_sketch() == CompressionSketch::SJLT){
+            if (opts.verbose())
+               std::cout << "# Multiplying fast with SJLT format"  << std::endl;
+              //do a fast SJLT multiply:
+        int d_old = 0, d = opts.d0() + opts.p(), total_nnz = 0;
+        auto n = this->cols();
+        DenseM_t Rr, Rc, Sr, Sc;
+        SJLTGenerator<scalar_t, int> g;
+        SJLT_Matrix<scalar_t, int> S(g,0,n,0);
+
+        WorkCompress<scalar_t> w;
+        while (!this->is_compressed()) {
+          Rr.resize(n, d);
+          Rc.resize(n, d);
+          Sr.resize(n, d);
+          Sc.resize(n, d);
+          DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
+          DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
+          DenseMW_t Sr_new(n, d-d_old, Sc, 0, d_old);
+          DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
+          // here
+
+     if(d_old == 0){
+
+         //New: sjlt class to fille Rr_new
+         S.add_columns(d,opts.nnz0());
+         Rr_new.copy(S.SJLT_to_dense());
+
+         //old
+         //g.SJLTDenseSketch(Rr_new, opts.nnz0());
+         if (opts.verbose())
+            std::cout << "# Fast multiplies"  << std::endl;
+
+        Sr_new = Matrix_times_SJLT(A,S);
+        Sc_new = Matrix_times_SJLT(A.transpose(),S);
+        total_nnz += opts.nnz0();
+     } else{
+         SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
+         opts.nnz(),n,d-d_old);
+         S.append_sjlt_matrix(Temp);
+
+         Rr_new.copy(Temp.SJLT_to_dense());
+         total_nnz += opts.nnz();
+         if (opts.verbose())
+            std::cout << "# Fast multiplies"  << std::endl;
+         Sr_new = Matrix_times_SJLT(A,Temp);
+         Sc_new = Matrix_times_SJLT(A.transpose(),Temp);
+     }
+
+      Rc_new.copy(Rr_new);
+
+
+      if (opts.verbose())
+        std::cout << "# compressing with d = " << d-opts.p()
+                  << " + " << opts.p() << " (original)" << std::endl;
+     if (opts.verbose() && opts.compression_sketch()
+     == CompressionSketch::SJLT)
+     std::cout << "# nnz total = " << total_nnz << std::endl;
+    #pragma omp parallel if(!omp_in_parallel())
+    #pragma omp single nowait
+      compress_recursive_original
+        (Rr, Rc, Sr, Sc, afunc, opts, w, d-d_old,
+         this->openmp_task_depth_);
+      if (!this->is_compressed()) {
+        d_old = d;
+        d = 2 * (d_old - opts.p()) + opts.p();
+      }
+    }
+    if(opts.verbose() &&
+    opts.compression_sketch() == CompressionSketch::SJLT){
+        std::cout<<"# final length of row: " << d << std::endl
+                 <<"# total nnz in each row: "
+                 << total_nnz << std::endl;
+    }
+
+        }else{
+
+            compress_original(afunc, afunc, opts);
+        }
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
