@@ -440,7 +440,7 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
     SJLT_Matrix<scalar_t, integer_t>& S)
          {
              DenseMatrix<scalar_t> D(S.get_n_rows(), S.get_n_cols());
-
+             D.zero();
              const auto rows_A = S.get_A().get_row_ptr();
              const auto col_A = S.get_A().get_col_inds();
              const auto rows_B = S.get_B().get_row_ptr();
