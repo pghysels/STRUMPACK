@@ -56,7 +56,7 @@ namespace strumpack {
           Sc.resize(n, d);
           DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
           DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
-          DenseMW_t Sr_new(n, d-d_old, Sc, 0, d_old);
+          DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
           DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
           // here
 
@@ -71,8 +71,8 @@ namespace strumpack {
          if (opts.verbose())
             std::cout << "# Fast multiplies"  << std::endl;
 
-        Sr_new = Matrix_times_SJLT(A,S);
-        Sc_new = Matrix_times_SJLT(A.transpose(),S);
+        Matrix_times_SJLT(A,S,Sr_new);
+        Matrix_times_SJLT(A.transpose(),S,Sc_new);
         total_nnz += opts.nnz0();
      } else{
          SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
@@ -83,8 +83,8 @@ namespace strumpack {
          total_nnz += opts.nnz();
          if (opts.verbose())
             std::cout << "# Fast multiplies"  << std::endl;
-         Sr_new = Matrix_times_SJLT(A,Temp);
-         Sc_new = Matrix_times_SJLT(A.transpose(),Temp);
+         Matrix_times_SJLT(A,Temp,Sr_new);
+         Matrix_times_SJLT(A.transpose(),Temp,Sc_new);
      }
 
       Rc_new.copy(Rr_new);

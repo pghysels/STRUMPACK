@@ -435,12 +435,11 @@ template<typename scalar_t, typename integer_t> class SJLT_Matrix {
  }
 
  //multiplication
-template<typename scalar_t, typename integer_t> DenseMatrix<scalar_t>
+template<typename scalar_t, typename integer_t> void
 Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
-    SJLT_Matrix<scalar_t, integer_t>& S)
+    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
          {
-             DenseMatrix<scalar_t> D(S.get_n_rows(), S.get_n_cols());
-             D.zero();
+             A.zero();
              const auto rows_A = S.get_A().get_row_ptr();
              const auto col_A = S.get_A().get_col_inds();
              const auto rows_B = S.get_B().get_row_ptr();
@@ -452,19 +451,18 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
                   for(std::size_t j =start_A;j < end_A; j++){
 
-                      pm_column<scalar_t>(M,i, D, col_A[j], true);
+                      pm_column<scalar_t>(M,i, A, col_A[j], true);
                   }
 
                   //subtract cols
                  std::size_t startB = rows_B[i] - 1,endB = rows_B[i + 1] - 1;
 
                  for(std::size_t j =startB; j < endB; j++){
-                     pm_column<scalar_t>(M,i, D, col_B[j], false);
+                     pm_column<scalar_t>(M,i, A, col_B[j], false);
                  }
 
              }
 
-         return D;
         }
 
 
