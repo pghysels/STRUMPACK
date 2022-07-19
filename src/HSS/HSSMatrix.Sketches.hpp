@@ -94,8 +94,8 @@ namespace strumpack {
 
                   std::vector<std::size_t> new_row_ptr_ = { std::size_t(1) };
                   std::vector<std::size_t> new_col_inds;
-                  const std::vector<std::size_t>* rows_T = T.get_row_ptr();
-                  const std::vector<std::size_t>* col_T = T.get_col_inds();
+                  const auto rows_T = T.get_row_ptr();
+                  const auto col_T = T.get_col_inds();
                   //update col indices
                   for(std::size_t i = 0; i < row_ptr_.size() - 1; i++) {
 
@@ -103,12 +103,12 @@ namespace strumpack {
                           j < row_ptr_[i+1] - 1; j++) {
                           new_col_inds.push_back(col_ind_[j]);
                       }
-                      for (std::size_t j = (*rows_T)[i] - 1; j <
-                      (*rows_T)[i + 1] - 1; j++) {
-                          new_col_inds.push_back((*col_T)[j]+n_cols());
+                      for (std::size_t j = rows_T[i] - 1; j <
+                      rows_T[i + 1] - 1; j++) {
+                          new_col_inds.push_back(col_T[j]+n_cols());
                       }
                       new_row_ptr_.push_back(row_ptr_[i + 1] +
-                          (*rows_T)[i + 1] - 1);
+                          rows_T[i + 1] - 1);
                   }
 
                   nnz_ += T.nnz();
@@ -138,12 +138,12 @@ namespace strumpack {
               return n_cols_;
           }
 
-          const  std::vector<std::size_t>* get_row_ptr() const{
-              return &row_ptr_;
+          const  std::vector<std::size_t>& get_row_ptr() const{
+              return row_ptr_;
           }
 
-          const  std::vector<std::size_t>* get_col_inds() const{
-              return &col_ind_;
+          const  std::vector<std::size_t>& get_col_inds() const{
+              return col_ind_;
           }
 
       private:
@@ -316,26 +316,26 @@ template<typename scalar_t, typename integer_t> class SJLT_Matrix {
        }
 
        void print_SJLT_As_Dense() {
-           const std::vector<std::size_t>* rows_A = A_.get_row_ptr();
-           const std::vector<std::size_t>* col_A = A_.get_col_inds();
-           const std::vector<std::size_t>* rows_B = B_.get_row_ptr();
-           const std::vector<std::size_t>* col_B = B_.get_col_inds();
+           const auto rows_A = A_.get_row_ptr();
+           const auto col_A = A_.get_col_inds();
+           const auto rows_B = B_.get_row_ptr();
+           const auto col_B = B_.get_col_inds();
 
            for (std::size_t i = 0; i < n_rows_ ; i++) {
 
-               std::size_t startA = (*rows_A)[i] - 1,
-                endA = (*rows_A)[i + 1] - 1;
-               std::size_t startB = (*rows_B)[i] - 1,
-               endB = (*rows_B)[i + 1] - 1;
+               std::size_t startA = rows_A[i] - 1,
+                endA = rows_A[i + 1] - 1;
+               std::size_t startB = rows_B[i] - 1,
+               endB = rows_B[i + 1] - 1;
 
                for (std::size_t j = 0; j < n_cols_; j++) {
 
-                   if (std::find((*col_A).begin() + startA, (*col_A).begin() +
-                   endA, j) != (*col_A).begin() + endA) {
+                   if (std::find(col_A.begin() + startA, col_A.begin() +
+                   endA, j) != col_A.begin() + endA) {
                        std::cout << "1 ";
                    }
-                   else if (std::find((*col_B).begin() +
-                   startB, (*col_B).begin() + endB, j) != (*col_B).begin() +
+                   else if (std::find(col_B.begin() +
+                   startB, col_B.begin() + endB, j) != col_B.begin() +
                     endB) {
                        std::cout << "-1 ";
                    }
@@ -374,26 +374,26 @@ template<typename scalar_t, typename integer_t> class SJLT_Matrix {
        DenseMatrix<scalar_t> SJLT_to_dense(){
             DenseMatrix<scalar_t> S(n_rows_, n_cols_);
 
-            const std::vector<std::size_t>* rows_A = A_.get_row_ptr();
-            const std::vector<std::size_t>* col_A = A_.get_col_inds();
-            const std::vector<std::size_t>* rows_B = B_.get_row_ptr();
-            const std::vector<std::size_t>* col_B = B_.get_col_inds();
+            const auto rows_A = A_.get_row_ptr();
+            const auto col_A = A_.get_col_inds();
+            const auto rows_B = B_.get_row_ptr();
+            const auto col_B = B_.get_col_inds();
 
             for (std::size_t i = 0; i < n_rows_ ; i++) {
 
-                std::size_t startA = (*rows_A)[i] - 1,
-                 endA = (*rows_A)[i + 1] - 1;
-                std::size_t startB = (*rows_B)[i] - 1,
-                endB = (*rows_B)[i + 1] - 1;
+                std::size_t startA = rows_A[i] - 1,
+                 endA = rows_A[i + 1] - 1;
+                std::size_t startB = rows_B[i] - 1,
+                endB = rows_B[i + 1] - 1;
 
                 for (std::size_t j = 0; j < n_cols_; j++) {
 
-                    if (std::find((*col_A).begin() + startA, (*col_A).begin() +
-                    endA, j) != (*col_A).begin() + endA) {
+                    if (std::find(col_A.begin() + startA, col_A.begin() +
+                    endA, j) != col_A.begin() + endA) {
                         S(i,j) = 1;
                     }
-                    else if (std::find((*col_B).begin() +
-                    startB, (*col_B).begin() + endB, j) != (*col_B).begin() +
+                    else if (std::find(col_B.begin() +
+                    startB, col_B.begin() + endB, j) != col_B.begin() +
                      endB) {
                         S(i,j) = -1;
                     }
@@ -441,25 +441,25 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
          {
              DenseMatrix<scalar_t> D(S.get_n_rows(), S.get_n_cols());
 
-             const std::vector<std::size_t>* rows_A = S.get_A().get_row_ptr();
-             const std::vector<std::size_t>* col_A = S.get_A().get_col_inds();
-             const std::vector<std::size_t>* rows_B = S.get_B().get_row_ptr();
-             const std::vector<std::size_t>* col_B = S.get_B().get_col_inds();
+             const auto rows_A = S.get_A().get_row_ptr();
+             const auto col_A = S.get_A().get_col_inds();
+             const auto rows_B = S.get_B().get_row_ptr();
+             const auto col_B = S.get_B().get_col_inds();
 
-             for(size_t i = 0; i <(*rows_A).size() - 1 ;i++){
+             for(size_t i = 0; i <rows_A.size() - 1 ;i++){
 
-                    size_t start_A = (*rows_A)[i] - 1, end_A = (*rows_A)[i+1] -1;
+                    size_t start_A = rows_A[i] - 1, end_A = rows_A[i+1] -1;
 
                   for(std::size_t j =start_A;j < end_A; j++){
 
-                      pm_column<scalar_t>(M,i, D, (*col_A)[j], true);
+                      pm_column<scalar_t>(M,i, D, col_A[j], true);
                   }
 
                   //subtract cols
-                 std::size_t startB = (*rows_B)[i] - 1,endB = (*rows_B)[i + 1] - 1;
+                 std::size_t startB = rows_B[i] - 1,endB = rows_B[i + 1] - 1;
 
                  for(std::size_t j =startB; j < endB; j++){
-                     pm_column<scalar_t>(M,i, D, (*col_B)[j], false);
+                     pm_column<scalar_t>(M,i, D, col_B[j], false);
                  }
 
              }
