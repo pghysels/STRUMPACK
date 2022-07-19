@@ -20,18 +20,14 @@ namespace strumpack {
 
       public:
 
-          BinaryCRSMarix(std::size_t n_cols) {
-              n_cols_ = n_cols;
-          }
+          BinaryCRSMarix(std::size_t n_cols): nnz_(std::size_t(0)),
+          n_cols_(n_cols), n_rows_(std::size_t(0)),
+          one_(scalar_t(1.)), col_ind_({}), row_ptr_({ std::size_t(1)}){}
 
           BinaryCRSMarix(std::vector<std::size_t> col_ind,
-              std::vector<std::size_t>row_ptr, std::size_t n_cols) {
-              n_cols_ = n_cols;
-              //TODO these probably get overridden
-              std::size_t nnz_ = col_ind.size();
-              std::size_t n_cols_ = row_ptr.size() - 1;
-              std::vector< std::size_t> col_ind_(col_ind);
-              std::vector< std::size_t> row_ptr_(row_ptr);
+              std::vector<std::size_t>row_ptr, std::size_t n_cols):
+              nnz_(col_ind.size()), n_cols_(n_cols), n_rows_(row_ptr.size() - 1),
+              one_(scalar_t(1.)), col_ind_(col_ind), row_ptr_(row_ptr) {
 
           }
 
@@ -151,12 +147,12 @@ namespace strumpack {
           }
 
       private:
-          std::size_t nnz_ = std::size_t(0);
+          std::size_t nnz_;
           std::size_t n_cols_;
-          std::size_t n_rows_ = std::size_t(0);
-          scalar_t one_ = scalar_t(1.);
-          std::vector<std::size_t> col_ind_ = {};
-          std::vector<std::size_t> row_ptr_ = { std::size_t(1) };
+          std::size_t n_rows_;
+          scalar_t one_;
+          std::vector<std::size_t> col_ind_;
+          std::vector<std::size_t> row_ptr_;
       };
 
 
