@@ -103,6 +103,12 @@ namespace strumpack {
       std::size_t nonzeros() const override;
       std::size_t rank() const override;
 
+      /**
+       * Return number of subnormal elements in the matrix.
+       */
+      std::size_t subnormals() const;
+      std::size_t zeros() const;
+
       DenseM_t dense() const;
       void dense(DenseM_t& A) const;
 

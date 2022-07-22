@@ -59,6 +59,10 @@ namespace strumpack {
       virtual std::size_t memory() const = 0;
       virtual std::size_t nonzeros() const = 0;
       virtual std::size_t maximum_rank() const = 0;
+
+      virtual std::size_t subnormals() const = 0;
+      virtual std::size_t zeros() const = 0;
+
       virtual bool is_low_rank() const = 0;
       virtual void dense(DenseM_t& A) const = 0;
       virtual DenseM_t dense() const = 0;

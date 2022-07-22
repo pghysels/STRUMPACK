@@ -618,6 +618,21 @@ namespace strumpack {
     return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixBLR<scalar_t,integer_t>::node_subnormals
+  (std::size_t& ns, std::size_t& nz) const {
+    auto dns = F11blr_.subnormals() + F12blr_.subnormals() + F21blr_.subnormals();
+    auto dnz = F11blr_.zeros() + F12blr_.zeros() + F21blr_.zeros();
+    if (dns || dnz)
+      std::cout << "BLR front ds= " << this->dim_sep()
+                << " du= " << this->dim_upd()
+                << " subnormals= " << dns
+                << " zeros= " << dnz << std::endl;
+    ns += dns;
+    nz += dnz;
+    return ReturnCode::SUCCESS;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::partition
   (const Opts_t& opts, const SpMat_t& A,
