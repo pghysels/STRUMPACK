@@ -30,6 +30,8 @@
 
 #include "misc/RandomWrapper.hpp"
 #include "HSS/HSSMatrix.Sketches.hpp"
+#include <chrono>
+
 
 namespace strumpack {
   namespace HSS {
@@ -37,7 +39,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const DenseM_t& A, const opts_t& opts) {
     AFunctor<scalar_t> afunc(A);
-
+    
         if(opts.compression_sketch() == CompressionSketch::SJLT){
             if (opts.verbose())
                std::cout << "# Multiplying fast with SJLT format"  << std::endl;
@@ -59,11 +61,15 @@ namespace strumpack {
           DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
           DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
           // here
-
+           std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+           std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
      if(d_old == 0){
 
          //New: sjlt class to fille Rr_new
+         begin = std::chrono::steady_clock::now();
          S.add_columns(d,opts.nnz0());
+         end = std::chrono::steady_clock::now();
+         std::cout << "S init creation time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
          Rr_new.copy(S.SJLT_to_dense());
 
          //old
@@ -71,24 +77,49 @@ namespace strumpack {
          if (opts.verbose())
             std::cout << "# Fast multiplies"  << std::endl;
 
+        begin = std::chrono::steady_clock::now();
         Matrix_times_SJLT(A,S,Sr_new);
+        end = std::chrono::steady_clock::now();
+        std::cout << "A*S time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
+        begin = std::chrono::steady_clock::now();
         Matrix_times_SJLT(A.transpose(),S,Sc_new);
+        end = std::chrono::steady_clock::now();
+        std::cout << "AT*S time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
         total_nnz += opts.nnz0();
      } else{
+
+         begin = std::chrono::steady_clock::now();
          SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
          opts.nnz(),n,d-d_old);
          S.append_sjlt_matrix(Temp);
+         end = std::chrono::steady_clock::now();
+         std::cout << "S append creation time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
 
          Rr_new.copy(Temp.SJLT_to_dense());
          total_nnz += opts.nnz();
          if (opts.verbose())
             std::cout << "# Fast multiplies"  << std::endl;
+
+         begin = std::chrono::steady_clock::now();
          Matrix_times_SJLT(A,Temp,Sr_new);
+         end = std::chrono::steady_clock::now();
+         std::cout << "A*S append = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
+         begin = std::chrono::steady_clock::now();
          Matrix_times_SJLT(A.transpose(),Temp,Sc_new);
+         end = std::chrono::steady_clock::now();
+         std::cout << "AT*S append= " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
      }
 
       Rc_new.copy(Rr_new);
-
+      begin = std::chrono::steady_clock::now();
+      afunc(Rr_new, Rc_new, Sr_new, Sc_new);
+      end = std::chrono::steady_clock::now();
+      std::cout << "A*S and AT*S old = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
 
       if (opts.verbose())
         std::cout << "# compressing with d = " << d-opts.p()

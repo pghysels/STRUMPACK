@@ -22,7 +22,7 @@ namespace strumpack {
 
           BinaryCRSMarix(std::size_t n_cols): nnz_(std::size_t(0)),
           n_cols_(n_cols), n_rows_(std::size_t(0)),
-          one_(scalar_t(1.)), col_ind_({}), row_ptr_({ std::size_t(1)}){}
+          one_(scalar_t(1.)), col_ind_({}), row_ptr_({ std::size_t(0)}){}
 
           BinaryCRSMarix(std::vector<std::size_t> col_ind,
               std::vector<std::size_t>row_ptr, std::size_t n_cols):
@@ -46,8 +46,8 @@ namespace strumpack {
 
           void print_as_dense() {
               for (std::size_t i = 0; i < row_ptr_.size() - 1; i++) {
-                  std::size_t start = row_ptr_[i] - 1,
-                   end = row_ptr_[i + 1] - 1;
+                  std::size_t start = row_ptr_[i],
+                   end = row_ptr_[i + 1];
 
 
                   for (std::size_t j = 0; j < n_cols_; j++) {
@@ -74,7 +74,7 @@ namespace strumpack {
               //update nnz_
               nnz_ += added_nnz_;
               //update row_ptr
-              row_ptr_.push_back(nnz_ + 1);
+              row_ptr_.push_back(nnz_);
               //update n_rows
               n_rows_ += 1;
           }
@@ -92,23 +92,23 @@ namespace strumpack {
                       return;
                   }
 
-                  std::vector<std::size_t> new_row_ptr_ = { std::size_t(1) };
+                  std::vector<std::size_t> new_row_ptr_ = { std::size_t(0) };
                   std::vector<std::size_t> new_col_inds;
                   const auto rows_T = T.get_row_ptr();
                   const auto col_T = T.get_col_inds();
                   //update col indices
                   for(std::size_t i = 0; i < row_ptr_.size() - 1; i++) {
 
-                      for (std::size_t j = row_ptr_[i] - 1;
-                          j < row_ptr_[i+1] - 1; j++) {
+                      for (std::size_t j = row_ptr_[i];
+                          j < row_ptr_[i + 1]; j++) {
                           new_col_inds.push_back(col_ind_[j]);
                       }
-                      for (std::size_t j = rows_T[i] - 1; j <
-                      rows_T[i + 1] - 1; j++) {
+                      for (std::size_t j = rows_T[i]; j <
+                      rows_T[i + 1]; j++) {
                           new_col_inds.push_back(col_T[j]+n_cols());
                       }
                       new_row_ptr_.push_back(row_ptr_[i + 1] +
-                          rows_T[i + 1] - 1);
+                          rows_T[i + 1]);
                   }
 
                   nnz_ += T.nnz();
@@ -266,8 +266,6 @@ template<typename scalar_t, typename integer_t>  class SJLTGenerator {
                }
            }
 
-
-
        }
 
 
@@ -323,10 +321,10 @@ template<typename scalar_t, typename integer_t> class SJLT_Matrix {
 
            for (std::size_t i = 0; i < n_rows_ ; i++) {
 
-               std::size_t startA = rows_A[i] - 1,
-                endA = rows_A[i + 1] - 1;
-               std::size_t startB = rows_B[i] - 1,
-               endB = rows_B[i + 1] - 1;
+               std::size_t startA = rows_A[i],
+                endA = rows_A[i + 1];
+               std::size_t startB = rows_B[i],
+               endB = rows_B[i + 1];
 
                for (std::size_t j = 0; j < n_cols_; j++) {
 
@@ -381,10 +379,10 @@ template<typename scalar_t, typename integer_t> class SJLT_Matrix {
 
             for (std::size_t i = 0; i < n_rows_ ; i++) {
 
-                std::size_t startA = rows_A[i] - 1,
-                 endA = rows_A[i + 1] - 1;
-                std::size_t startB = rows_B[i] - 1,
-                endB = rows_B[i + 1] - 1;
+                std::size_t startA = rows_A[i],
+                 endA = rows_A[i + 1];
+                std::size_t startB = rows_B[i],
+                endB = rows_B[i + 1];
 
                 for (std::size_t j = 0; j < n_cols_; j++) {
 
@@ -447,15 +445,14 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
              for(size_t i = 0; i <rows_A.size() - 1 ;i++){
 
-                    size_t start_A = rows_A[i] - 1, end_A = rows_A[i+1] -1;
+                    size_t start_A = rows_A[i], end_A = rows_A[i + 1];
 
                   for(std::size_t j =start_A;j < end_A; j++){
-
                       pm_column<scalar_t>(M,i, A, col_A[j], true);
                   }
 
                   //subtract cols
-                 std::size_t startB = rows_B[i] - 1,endB = rows_B[i + 1] - 1;
+                 std::size_t startB = rows_B[i],endB = rows_B[i + 1];
 
                  for(std::size_t j =startB; j < endB; j++){
                      pm_column<scalar_t>(M,i, A, col_B[j], false);
