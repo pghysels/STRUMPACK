@@ -75,8 +75,7 @@ namespace strumpack {
 
   constexpr int align_max_struct() {
     auto m = sizeof(std::complex<double>);
-    m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
-    m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
+    m = std::max(m, sizeof(AssembleData<std::complex<double>>));
     m = std::max(m, sizeof(Triplet<std::complex<double>>));
     int k = 16;
     while (k < int(m)) k *= 2;
@@ -379,12 +378,12 @@ namespace strumpack {
     using FSYCL_t = FrontSYCL<scalar_t,integer_t>;
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
-    auto hasmbl = aligned_ptr<gpu::AssembleData<scalar_t>>(hea_mem);
+    auto hasmbl = aligned_ptr<AssembleData<scalar_t>>(hea_mem);
     auto Iptr   = aligned_ptr<std::size_t>(hasmbl + N);
     auto e11    = aligned_ptr<Trip_t>(Iptr + L.Isize.back());
     auto e12    = e11 + L.elems11.back();
     auto e21    = e12 + L.elems12.back();
-    auto dasmbl = aligned_ptr<gpu::AssembleData<scalar_t>>(dea_mem);
+    auto dasmbl = aligned_ptr<AssembleData<scalar_t>>(dea_mem);
     auto dIptr  = aligned_ptr<std::size_t>(dasmbl + N);
     auto de11   = aligned_ptr<Trip_t>(dIptr + L.Isize.back());
     auto de12   = de11 + L.elems11.back();
@@ -916,7 +915,7 @@ namespace strumpack {
         if (l % 2) {
           work_mem = all_dmem;
           dea_mem = work_mem + L.work_bytes;
-          dev_factors = aligned_ptr(dea_mem + L.ea_bytes);
+          dev_factors = aligned_ptr<scalar_t>(dea_mem + L.ea_bytes);
         } else {
           work_mem = all_dmem + peak_dmem - L.work_bytes;
           dea_mem = work_mem - L.ea_bytes;
