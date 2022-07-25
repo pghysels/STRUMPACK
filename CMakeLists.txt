@@ -616,7 +616,7 @@ endif()
 
 if(MKL_FOUND)
   target_link_libraries(strumpack PUBLIC MKL::MKL)
-  target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
+  # target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
 endif()
 
 # the order is important
