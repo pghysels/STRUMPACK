@@ -77,8 +77,7 @@ namespace strumpack {
     int k = align_max_struct();
     return std::size_t((n + k - 1) / k) * k;
   }
-  template<typename T>
-  T* aligned_ptr(void* p) {
+  template<typename T> T* aligned_ptr(void* p) {
     return (T*)(round_up(uintptr_t(p)));
   }
 
