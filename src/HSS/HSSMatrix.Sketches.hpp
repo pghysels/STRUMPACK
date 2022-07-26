@@ -34,7 +34,7 @@ namespace strumpack {
 
           void print() {
               std::cout << "row ptr: ";
-              for (std::size_t i = 0; i <= size(); i++)
+              for (std::size_t i = 0; i <= n_rows(); i++)
                   std::cout << row_ptr_[i] << " ";
               std::cout << std::endl << "col ind: ";
               for (std::size_t i = 0; i < nnz(); i++)
@@ -85,17 +85,23 @@ namespace strumpack {
                 * apends the cols of a second B-CRS
                 * matrix to the end of this matrix:
                 */
-              void append_cols(BinaryCRSMarix<scalar_t> T) {
-                  if (T.size() != n_rows_) {
+              void append_cols(BinaryCRSMarix<scalar_t>& T) {
+                  if (T.n_rows() != n_rows_) {
                       std::cout << "# Cannot append a matrix with"
                           << " the wrong number of rows" << std::endl;
                       return;
                   }
 
-                  std::vector<std::size_t> new_row_ptr_ = { std::size_t(0) };
-                  std::vector<std::size_t> new_col_inds;
                   const auto rows_T = T.get_row_ptr();
                   const auto col_T = T.get_col_inds();
+
+                  std::vector<std::size_t> new_row_ptr_;
+                  new_row_ptr_.reserve(rows_T.size());
+                  new_row_ptr_.push_back(std::size_t(0));
+
+                  std::vector<std::size_t> new_col_inds;
+                  new_col_inds.reserve(col_T.size()+col_ind_.size());
+
                   //update col indices
                   for(std::size_t i = 0; i < row_ptr_.size() - 1; i++) {
 
@@ -130,7 +136,7 @@ namespace strumpack {
               return nnz_;
           }
 
-          std::size_t size() {
+          std::size_t n_rows() {
               return n_rows_;
           }
 
@@ -156,6 +162,137 @@ namespace strumpack {
       };
 
 
+      template<typename scalar_t> class BinaryCCSMarix {
+      public:
+
+          BinaryCCSMarix(std::size_t n_rows) : nnz_(std::size_t(0)),
+              n_cols_(std::size_t(0)), n_rows_(n_rows), one_(scalar_t(1.)),
+              row_ind_({}), col_ptr_({ std::size_t (0)}) {}
+
+          BinaryCCSMarix(std::vector<std::size_t> row_ind,
+              std::vector<std::size_t>col_ptr, std::size_t n_rows):
+              nnz_(row_ind.size()), n_cols_(col_ptr.size()-1), n_rows_(n_rows),
+              one_(scalar_t(1.)), row_ind_(row_ind), col_ptr_(col_ptr) {}
+
+
+          void print() {
+              std::cout << "col ptr: ";
+              for (std::size_t i = 0; i <= n_cols(); i++)
+                  std::cout << col_ptr_[i] << " ";
+              std::cout << std::endl << "row ind: ";
+              for (std::size_t i = 0; i < nnz(); i++)
+                  std::cout << row_ind_[i] << " ";
+              std::cout << std::endl << "val: ";
+              std::cout << one_ << " ";
+              std::cout << std::endl;
+          }
+
+          void print_as_dense() {
+              std::vector<std::string> vec(n_rows(), "");
+
+              for (std::size_t i = 0; i < col_ptr_.size() - 1; i++) {
+                  std::size_t start = col_ptr_[i], end = col_ptr_[i + 1];
+
+                  for (std::size_t j = 0; j < n_rows(); j++) {
+
+                      if (std::find(row_ind_.begin() + start,
+                      row_ind_.begin() + end, j) != row_ind_.begin() + end) {
+                          vec[j] += std::to_string(one_) + " ";
+                      }
+                      else {
+                          vec[j] += "0 ";
+                      }
+
+                  }
+
+              }
+
+              for (std::size_t i = 0; i < n_rows(); i++) {
+                  std::cout << vec[i] << std::endl;
+              }
+
+          }
+
+         void append_cols(BinaryCCSMarix<scalar_t> &T) {
+
+             if (T.n_rows() != n_rows_) {
+                 std::cout << "# Cannot append a matrix with"
+                     << " the wrong number of rows" << std::endl;
+                 return;
+             }
+
+             const auto new_cols = T.get_col_ptr();
+             const auto new_row_inds = T.get_row_inds();
+
+             row_ind_.reserve(row_ind_.size() + new_row_inds.size());
+             row_ind_.insert(row_ind_.end(),
+             new_row_inds.begin(), new_row_inds.end());
+
+             //add new columns:
+             col_ptr_.reserve(col_ptr_.size() + new_cols.size());
+
+            for (auto i : new_cols){
+                if(i != std::size_t(0))
+                 col_ptr_.push_back(i + nnz_);
+             }
+
+
+             //one and n_rows_ does not change
+             nnz_ += T.nnz();
+             n_cols_ += T.n_cols();
+         }
+
+         void add_col(
+             std::vector<std::size_t> new_row_ind_) {
+             std::size_t added_nnz_ = new_row_ind_.size();
+             //append col_inds
+             row_ind_.insert(std::end(row_ind_),
+                 std::begin(new_row_ind_), std::end(new_row_ind_));
+             //update nnz_
+             nnz_ += added_nnz_;
+             //update row_ptr
+             col_ptr_.push_back(nnz_);
+             //update n_rows
+             n_cols_ += 1;
+         }
+
+
+          void set_nnz_value(scalar_t one) {
+              one_ = one;
+          }
+
+          scalar_t nnz_value() {
+              return one_;
+          }
+
+          std::size_t nnz() {
+              return nnz_;
+          }
+
+          std::size_t n_cols() {
+              return n_cols_;
+          }
+
+          std::size_t n_rows() {
+              return n_rows_;
+          }
+
+          const  std::vector<std::size_t>& get_col_ptr() const {
+              return col_ptr_;
+          }
+
+          const  std::vector<std::size_t>& get_row_inds() const {
+              return row_ind_;
+          }
+
+      private:
+          std::size_t nnz_;
+          std::size_t n_cols_;
+          std::size_t n_rows_;
+          scalar_t one_;
+          std::vector<std::size_t> row_ind_;
+          std::vector<std::size_t> col_ptr_;
+      };
 
 
 template<typename scalar_t, typename integer_t>  class SJLTGenerator {
@@ -432,7 +569,7 @@ template<typename scalar_t, typename integer_t> class SJLT_Matrix {
      }
  }
 
- //multiplication
+ //multiplication AS
 template<typename scalar_t, typename integer_t> void
 Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
     SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
@@ -462,8 +599,37 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
         }
 
+/*
+        //multiplication M^TS, A <- answer
+       template<typename scalar_t, typename integer_t> void
+       MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
+           SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
+                {
+                    A.zero();
+                    const auto rows_A = S.get_A().get_row_ptr();
+                    const auto col_A = S.get_A().get_col_inds();
+                    const auto rows_B = S.get_B().get_row_ptr();
+                    const auto col_B = S.get_B().get_col_inds();
 
+                    for(size_t i = 0; i <rows_A.size() - 1 ;i++){
 
+                           size_t start_A = rows_A[i], end_A = rows_A[i + 1];
+
+                         for(std::size_t j =start_A;j < end_A; j++){
+                             pm_column<scalar_t>(M,i, A, col_A[j], true);
+                         }
+
+                         //subtract cols
+                        std::size_t startB = rows_B[i],endB = rows_B[i + 1];
+
+                        for(std::size_t j =startB; j < endB; j++){
+                            pm_column<scalar_t>(M,i, A, col_B[j], false);
+                        }
+
+                    }
+
+               }
+*/
 
     }
     }

@@ -39,7 +39,7 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const DenseM_t& A, const opts_t& opts) {
     AFunctor<scalar_t> afunc(A);
-    
+
         if(opts.compression_sketch() == CompressionSketch::SJLT){
             if (opts.verbose())
                std::cout << "# Multiplying fast with SJLT format"  << std::endl;
