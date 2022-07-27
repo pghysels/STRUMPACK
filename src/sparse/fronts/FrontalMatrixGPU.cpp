@@ -36,12 +36,6 @@
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
 #endif
-#if defined(STRUMPACK_USE_KBLAS)
-#include "kblas_operators.h"
-#include "batch_getrf.h"
-#endif
-
-// #define VBATCHED_STATS
 
 namespace strumpack {
 
@@ -95,9 +89,6 @@ namespace strumpack {
     LevelInfo() {}
     LevelInfo(const std::vector<F_t*>& fronts,
               gpu::SOLVERHandle& handle,
-#if defined(STRUMPACK_USE_KBLAS)
-              kblasHandle_t& kblas_handle,
-#endif
               const SpMat_t* A=nullptr) {
       auto N = fronts.size();
       f.reserve(N);
@@ -166,11 +157,7 @@ namespace strumpack {
 
       std::size_t getrf_work_cusolver =
         gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
-#if defined(STRUMPACK_USE_KBLAS)
-      typedef typename kblas_base_type<scalar_t>::device_type kblas_type;
-      getrf_work_bytes = kblas_getrf_vbatch_workspace_host<kblas_type>
-        (kblas_handle, d1_batch.data(), d1_batch.data(), Nsmall);
-#else
+
       getrf_work_bytes = -1;
       magma_queue_t magma_q = nullptr;
       gpu::magma::getrf_vbatched_max_nocheck_work
@@ -178,7 +165,7 @@ namespace strumpack {
          max_d1_small, max_d1_small*max_d1_small,
          (scalar_t**)nullptr, nullptr, nullptr, nullptr, nullptr,
          &getrf_work_bytes, Nsmall, magma_q);
-#endif
+
       getrf_work_bytes =
         std::max(std::size_t(getrf_work_bytes),
                  sizeof(scalar_t) * getrf_work_cusolver);
@@ -529,12 +516,6 @@ namespace strumpack {
   FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-#if defined(STRUMPACK_USE_KBLAS)
-    kblasHandle_t kblas_handle;
-    // TODO need to free this handle!!
-    kblasCreate(&kblas_handle);
-#endif
-
     gpu::SOLVERHandle solver_handle;
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
@@ -542,11 +523,7 @@ namespace strumpack {
       std::vector<F_t*> fp;
       this->get_level_fronts(fp, l);
       auto& L = ldata[l];
-      L = LInfo_t(fp, solver_handle,
-#if defined(STRUMPACK_USE_KBLAS)
-                  kblas_handle,
-#endif
-                  &A);
+      L = LInfo_t(fp, solver_handle, &A);
     }
     auto peak_dmem = peak_device_memory(ldata);
     if (peak_dmem >= 0.9 * gpu::available_memory()) {
@@ -567,14 +544,6 @@ namespace strumpack {
 #elif defined(STRUMPACK_USE_HIP)
     magma_queue_create_from_hip
       (0, comp_stream, blas_handle, NULL, &magma_q);
-    // magma_queue_create(0, &magma_q);
-#endif
-
-#if defined(STRUMPACK_USE_KBLAS)
-    kblasSetStream(kblas_handle, comp_stream);
-    kblasEnableMagma(kblas_handle);
-    kblas_gemm_batch_nonuniform_wsquery(kblas_handle);
-    kblasAllocateWorkspace(kblas_handle);
 #endif
 
     std::size_t pinned_size = 0;
@@ -588,52 +557,6 @@ namespace strumpack {
     gpu::HostMemory<char> hea_mem(peak_hea_mem);
     gpu::DeviceMemory<char> all_dmem(peak_dmem);
     char* old_work = nullptr;
-
-#if defined(VBATCHED_STATS)
-    TaskTimer t_getrf_small("getrf_vbatched"),
-      t_getrf_large("getrf_large"),
-      t_laswp("laswp_vbatched"),
-      t_getrs("getrs_large"),
-      t_trsm_L("trsm_L_vbatched"),
-      t_trsm_U("trsm_U_vbatched"),
-      t_gemm_small("gemm_small"),
-      t_gemm("gemm");
-    {
-      std::ofstream fls("level_sizes.log");
-      for (int l=lvls-1; l>=0; l--) {
-        auto& L = ldata[l];
-        for (std::size_t i=0; i<L.f.size(); i++) {
-          auto& F = *(L.f[i]);
-          fls << F.dim_sep() << " " << F.dim_upd() << std::endl;
-        }
-        fls << std::endl << std::endl;
-      }
-
-      std::ofstream ld1("ld1.log"), ld2("ld2.log"), lmax("lmax.log");
-      for (int l=lvls-1; l>=0; l--) {
-        auto& L = ldata[l];
-        std::vector<integer_t> d1sizes, d2sizes;
-        auto N = L.f.size();
-        for (std::size_t i=0; i<N; i++) {
-          auto& F = *(L.f[i]);
-          if (F.dim_sep() || F.dim_upd()) {
-            d1sizes.push_back(F.dim_sep());
-            d2sizes.push_back(F.dim_upd());
-          }
-        }
-        std::sort(d1sizes.begin(), d1sizes.end());
-        std::sort(d2sizes.begin(), d2sizes.end());
-        auto N1 = d1sizes.size();
-        auto N2 = d2sizes.size();
-        ld1 << std::max(d1sizes[0], integer_t(1)) << " " << d1sizes[N1/4] << " " << d1sizes[N1/2] << " " << d1sizes[3*N1/4] << " " << d1sizes[N1-1];
-        ld2 << std::max(d2sizes[0], integer_t(1)) << " " << d2sizes[N2/4] << " " << d2sizes[N2/2] << " " << d2sizes[3*N2/4] << " " << d2sizes[N2-1];
-        lmax << N1;
-        ld1 << std::endl;
-        ld2 << std::endl;
-        lmax << std::endl;
-      }
-    }
-#endif
 
     for (int l=lvls-1; l>=0; l--) {
       TaskTimer tl("");
@@ -683,36 +606,15 @@ namespace strumpack {
         gpu::copy_host_to_device(F11, L.F_batch.data(),   4*Nsmall);
         gpu::copy_host_to_device(L.dev_ipiv_batch, L.ipiv_batch.data(), Nsmall);
 
-#if defined(VBATCHED_STATS)
-        t_getrf_small.start();
-#endif
-#if defined(STRUMPACK_USE_KBLAS)
-        typedef typename kblas_base_type<scalar_t>::device_type kblas_type;
-        kblas_getrf_vbatch
-          (kblas_handle, d1, d1, L.max_d1_small, L.max_d1_small,
-           (kblas_type**)F11, d1, L.dev_ipiv_batch,
-           L.dev_getrf_work, L.getrf_work_bytes, L.dev_getrf_err, Nsmall);
-        comp_stream.synchronize();
-#else
         gpu::magma::getrf_vbatched_max_nocheck_work
           (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
            L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dev_getrf_err, L.dev_getrf_work, &L.getrf_work_bytes,
            Nsmall, magma_q);
-#endif
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_getrf_small.stop();
-        t_getrf_large.start();
-#endif
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
              L.f[i]->piv_, L.dev_getrf_err+i);
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_getrf_large.stop();
-#endif
 
         // TODO
         // if (opts.replace_tiny_pivots())
@@ -720,42 +622,19 @@ namespace strumpack {
         //     (f.dim_sep(), f.F11_.data(),
         //      opts.pivot_threshold(), comp_stream);
 
-
-#if defined(VBATCHED_STATS)
-        t_laswp.start();
-#endif
         gpu::laswp_fwd_vbatched
           (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_laswp.stop();
-        t_trsm_L.start();
-#endif
         gpu::magma::trsm_vbatched
           (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
            d1, d2, scalar_t(1.), F11, ld1, F12, ld1, Nsmall, magma_q);
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_trsm_L.stop();
-        t_trsm_U.start();
-#endif
         gpu::magma::trsm_vbatched
           (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            d1, d2, scalar_t(1.), F11, ld1, F12, ld1, Nsmall, magma_q);
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_trsm_U.stop();
-        t_getrs.start();
-#endif
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrs
             (solver_handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
              L.f[i]->F12_, L.dev_getrf_err+i);
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_getrs.stop();
-#endif
 
         STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
@@ -766,26 +645,14 @@ namespace strumpack {
           (pinned, dev_factors, L.factor_size, copy_stream);
 
         // use max_nocheck to overlap this with copy above
-#if defined(VBATCHED_STATS)
-        t_gemm_small.start();
-#endif
         gpu::magma::gemm_vbatched_max_nocheck
           (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
            F21, ld2, F12, ld1, scalar_t(1.), F22, ld2, Nsmall,
            L.max_d2_small, L.max_d2_small, L.max_d1_small, magma_q);
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_gemm_small.stop();
-        t_gemm.start();
-#endif
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::gemm
             (blas_handle, Trans::N, Trans::N, scalar_t(-1.),
              L.f[i]->F21_, L.f[i]->F12_, scalar_t(1.), L.f[i]->F22_);
-#if defined(VBATCHED_STATS)
-        comp_stream.synchronize();
-        t_gemm.stop();
-#endif
         copy_stream.synchronize();
         auto host_factors = L.f[0]->host_factors_.get();
 #pragma omp parallel for
@@ -806,50 +673,12 @@ namespace strumpack {
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
       if (opts.verbose()) {
-
-#if defined(VBATCHED_STATS)
-        long long flops_LU_small = 0, flops_LU_large = 0,
-          flops_trsm_L_small = 0, flops_trsm_L_large = 0,
-          flops_trsm_U_small = 0, flops_trsm_U_large = 0,
-          flops_gemm_small = 0, flops_gemm_large = 0;
-#if defined(VBATCHED_STATS)
-        for (std::size_t i=0; i<L.f.size(); i++) {
-          auto F = L.f[i];
-          if (F->dim_sep() <= L.FRONT_SMALL) {
-            flops_LU_small += LU_flops(F->F11_);
-            flops_gemm_small += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F->F21_, F->F12_, scalar_t(1.));
-            flops_trsm_L_small += trsm_flops(Side::L, scalar_t(1.), F->F11_, F->F12_);
-            flops_trsm_U_small += trsm_flops(Side::R, scalar_t(1.), F->F11_, F->F21_);
-          } else {
-            flops_LU_large += LU_flops(F->F11_);
-            flops_gemm_large += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F->F21_, F->F12_, scalar_t(1.));
-            flops_trsm_L_large += trsm_flops(Side::L, scalar_t(1.), F->F11_, F->F12_);
-            flops_trsm_U_large += trsm_flops(Side::R, scalar_t(1.), F->F11_, F->F21_);
-          }
-        }
-#endif
-        auto flops_getrs_large = flops_trsm_L_large + flops_trsm_U_large;
-#endif
         auto level_time = tl.elapsed();
         std::cout << "#   GPU Factorization complete, took: "
                   << level_time << " seconds, "
                   << level_flops / 1.e9 << " GFLOPS, "
                   << (float(level_flops) / level_time) / 1.e9
                   << " GFLOP/s" << std::endl;
-#if defined(VBATCHED_STATS)
-        std::cout << "#          LU_vb:       " << t_getrf_small.elapsed() << "  " << flops_LU_small/1.e9 << " GFlop " << (float(flops_LU_small)/t_getrf_small.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          LU_large:    " << t_getrf_large.elapsed() << "  " << flops_LU_large/1.e9 << " GFlop " << (float(flops_LU_large)/t_getrf_large.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          LU_total:    " << (t_getrf_small.elapsed()+t_getrf_large.elapsed()) << "  " << (flops_LU_small+flops_LU_large)/1.e9 << " GFlop " << ((float(flops_LU_small)+float(flops_LU_large))/(t_getrf_small.elapsed()+t_getrf_large.elapsed()))/1.e9 << " GFlop/s" << std::endl
-                  << "#          laswp_vb:    " << t_laswp.elapsed() << std::endl
-                  << "#          getrs_large: " << t_getrs.elapsed() << "  " << flops_getrs_large/1.e9 << " GFlop " << (float(flops_getrs_large)/t_getrs.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          trsm_L_vb    " << t_trsm_L.elapsed() << "  " << flops_trsm_L_small/1.e9 << " GFlop " << (float(flops_trsm_L_small)/t_trsm_L.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          trsm_U_vb:   " <<t_trsm_U.elapsed() << "  " << flops_trsm_U_small/1.e9 << " GFlop " << (float(flops_trsm_U_small)/t_trsm_U.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          getrs_total: " << (t_getrs.elapsed()+t_trsm_L.elapsed()+t_trsm_U.elapsed()) << "  " << (flops_getrs_large+flops_trsm_L_small+flops_trsm_U_small)/1.e9 << " GFlop " << ((float(flops_getrs_large)+float(flops_trsm_L_small)+float(flops_trsm_U_small))/(t_getrs.elapsed()+t_trsm_L.elapsed()+t_trsm_U.elapsed()))/1.e9 << " GFlop/s" << std::endl
-                  << "#          gemm_vb:     " << t_gemm_small.elapsed() << "  " << flops_gemm_small/1.e9 << " GFlop " << (float(flops_gemm_small)/t_gemm_small.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          gemm_large:  " << t_gemm.elapsed() << "  " << flops_gemm_large/1.e9 << " GFlop " << (float(flops_gemm_large)/t_gemm.elapsed())/1.e9 << " GFlop/s" << std::endl
-                  << "#          gemm_total:  " << (t_gemm_small.elapsed()+t_gemm.elapsed()) << "  " << (flops_gemm_small+flops_gemm_large)/1.e9 << " GFlop " << ((float(flops_gemm_small)+float(flops_gemm_large))/(t_gemm_small.elapsed()+t_gemm.elapsed()))/1.e9 << " GFlop/s" << std::endl;
-#endif
-
       }
     }
     const std::size_t dupd = dim_upd();
