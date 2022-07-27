@@ -83,9 +83,10 @@ namespace strumpack {
         std::cout << "A*S time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
 
         begin = std::chrono::steady_clock::now();
-        Matrix_times_SJLT(A.transpose(),S,Sc_new);
+        MatrixT_times_SJLT(A,S,Sc_new);
         end = std::chrono::steady_clock::now();
         std::cout << "AT*S time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
 
         total_nnz += opts.nnz0();
      } else{
@@ -109,20 +110,19 @@ namespace strumpack {
          std::cout << "A*S append = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
 
          begin = std::chrono::steady_clock::now();
-         Matrix_times_SJLT(A.transpose(),Temp,Sc_new);
+         MatrixT_times_SJLT(A,Temp,Sc_new);
          end = std::chrono::steady_clock::now();
          std::cout << "AT*S append= " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
 
      }
 
       Rc_new.copy(Rr_new);
-      /*
       //temp code
       begin = std::chrono::steady_clock::now();
       afunc(Rr_new, Rc_new, Sr_new, Sc_new);
       end = std::chrono::steady_clock::now();
       std::cout << "A*S and AT*S old = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
-*/
+
       if (opts.verbose()){
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original)" << std::endl;

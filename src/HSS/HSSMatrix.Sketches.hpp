@@ -707,56 +707,93 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
              const auto rows_B = S.get_B().get_row_ptr();
              const auto col_B = S.get_B().get_col_inds();
 
+             std::size_t rows = M.rows();
+             std::vector<scalar_t> col_i;
+             col_i.reserve(rows);
+
+            
              for(size_t i = 0; i <rows_A.size() - 1 ;i++){
 
-                    size_t start_A = rows_A[i], end_A = rows_A[i + 1];
+                 for(size_t r = 0; r < rows; r++)
+                     col_i[r] = M(r,i);
 
+
+                  size_t start_A = rows_A[i], end_A = rows_A[i + 1];
                   for(std::size_t j =start_A;j < end_A; j++){
-                      pm_column<scalar_t>(M,i, A, col_A[j], true);
+
+                      for(size_t r = 0; r < rows; r++)
+                          A(r,col_A[j])  +=   col_i[r];
+
+
+                      //pm_column<scalar_t>(M,i, A, col_A[j], true);
                   }
 
                   //subtract cols
                  std::size_t startB = rows_B[i],endB = rows_B[i + 1];
 
                  for(std::size_t j =startB; j < endB; j++){
-                     pm_column<scalar_t>(M,i, A, col_B[j], false);
+
+                     for(size_t r = 0; r < rows; r++)
+                         A(r, col_B[j])  -=   col_i[r];
+
+                     //pm_column<scalar_t>(M,i, A, col_B[j], false);
                  }
 
              }
 
         }
 
-/*
+
         //multiplication M^TS, A <- answer
        template<typename scalar_t, typename integer_t> void
        MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
            SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
                 {
                     A.zero();
-                    const auto rows_A = S.get_A().get_row_ptr();
-                    const auto col_A = S.get_A().get_col_inds();
-                    const auto rows_B = S.get_B().get_row_ptr();
-                    const auto col_B = S.get_B().get_col_inds();
+                    const auto col_ptr_A = S.get_Ac().get_col_ptr();
+                    const auto row_ind_A = S.get_Ac().get_row_inds();
 
-                    for(size_t i = 0; i <rows_A.size() - 1 ;i++){
+                    const auto col_ptr_B = S.get_Bc().get_col_ptr();
+                    const auto row_ind_B = S.get_Bc().get_row_inds();
 
-                           size_t start_A = rows_A[i], end_A = rows_A[i + 1];
 
-                         for(std::size_t j =start_A;j < end_A; j++){
-                             pm_column<scalar_t>(M,i, A, col_A[j], true);
-                         }
+                    std::size_t rows = M.rows(), cols = M.cols(),
+                    s_cols = col_ptr_A.size()-1;
+                    std::vector<scalar_t> rowT_i;
+                    rowT_i.reserve(rows);
 
-                         //subtract cols
-                        std::size_t startB = rows_B[i],endB = rows_B[i + 1];
+                    #pragma omp parallel for
+                    for(std::size_t i = 0; i < cols; i++){
 
-                        for(std::size_t j =startB; j < endB; j++){
-                            pm_column<scalar_t>(M,i, A, col_B[j], false);
+                        //grab column rowT_i
+                        for(size_t r = 0; r < rows; r++)
+                            rowT_i[r] = M(r,i);
+
+                            //iterate through the columns of A, B
+                        for(size_t c = 0; c < s_cols; c++){
+
+                             std::size_t startA = col_ptr_A[c],
+                             endA = col_ptr_A[c + 1];
+
+                            for(std::size_t j =startA; j < endA; j++){
+                                A(i,c) += rowT_i[row_ind_A[j]];
+                            }
+
+                            std::size_t startB = col_ptr_B[c],
+                            endB = col_ptr_B[c + 1];
+                            for(std::size_t j = startB; j < endB; j++){
+                                 A(i,c) -= rowT_i[row_ind_B[j]];
+                            }
+
+
                         }
+
 
                     }
 
+
                }
-*/
+
 
     }
     }
