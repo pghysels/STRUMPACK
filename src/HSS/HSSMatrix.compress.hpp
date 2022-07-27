@@ -65,7 +65,7 @@ namespace strumpack {
            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
      if(d_old == 0){
 
-         //New: sjlt class to fille Rr_new
+
          begin = std::chrono::steady_clock::now();
          S.add_columns(d,opts.nnz0());
          end = std::chrono::steady_clock::now();
@@ -116,17 +116,18 @@ namespace strumpack {
      }
 
       Rc_new.copy(Rr_new);
+      /*
+      //temp code
       begin = std::chrono::steady_clock::now();
       afunc(Rr_new, Rc_new, Sr_new, Sc_new);
       end = std::chrono::steady_clock::now();
       std::cout << "A*S and AT*S old = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
-
-      if (opts.verbose())
-        std::cout << "# compressing with d = " << d-opts.p()
-                  << " + " << opts.p() << " (original)" << std::endl;
-     if (opts.verbose() && opts.compression_sketch()
-     == CompressionSketch::SJLT)
-     std::cout << "# nnz total = " << total_nnz << std::endl;
+*/
+      if (opts.verbose()){
+          std::cout << "# compressing with d = " << d-opts.p()
+                    << " + " << opts.p() << " (original)" << std::endl;
+       std::cout << "# nnz total = " << total_nnz << std::endl;
+      }
     #pragma omp parallel if(!omp_in_parallel())
     #pragma omp single nowait
       compress_recursive_original
