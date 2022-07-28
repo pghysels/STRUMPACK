@@ -711,7 +711,7 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
              std::vector<scalar_t> col_i;
              col_i.reserve(rows);
 
-            
+
              for(size_t i = 0; i <rows_A.size() - 1 ;i++){
 
                  for(size_t r = 0; r < rows; r++)
@@ -723,8 +723,6 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
                       for(size_t r = 0; r < rows; r++)
                           A(r,col_A[j])  +=   col_i[r];
-
-
                       //pm_column<scalar_t>(M,i, A, col_A[j], true);
                   }
 
@@ -735,7 +733,6 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
                      for(size_t r = 0; r < rows; r++)
                          A(r, col_B[j])  -=   col_i[r];
-
                      //pm_column<scalar_t>(M,i, A, col_B[j], false);
                  }
 
@@ -749,6 +746,9 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
        MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
            SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
                 {
+                    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+                    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+                     begin = std::chrono::steady_clock::now();
                     A.zero();
                     const auto col_ptr_A = S.get_Ac().get_col_ptr();
                     const auto row_ind_A = S.get_Ac().get_row_inds();
@@ -757,17 +757,15 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                     const auto row_ind_B = S.get_Bc().get_row_inds();
 
 
-                    std::size_t rows = M.rows(), cols = M.cols(),
-                    s_cols = col_ptr_A.size()-1;
-                    std::vector<scalar_t> rowT_i;
-                    rowT_i.reserve(rows);
+                    std::size_t cols = M.cols(), s_cols = col_ptr_A.size()-1;
+                    end = std::chrono::steady_clock::now();
+                    std::cout << "structure access ATS = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
+                    begin = std::chrono::steady_clock::now();
 
                     #pragma omp parallel for
                     for(std::size_t i = 0; i < cols; i++){
 
-                        //grab column rowT_i
-                        for(size_t r = 0; r < rows; r++)
-                            rowT_i[r] = M(r,i);
 
                             //iterate through the columns of A, B
                         for(size_t c = 0; c < s_cols; c++){
@@ -776,13 +774,13 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                              endA = col_ptr_A[c + 1];
 
                             for(std::size_t j =startA; j < endA; j++){
-                                A(i,c) += rowT_i[row_ind_A[j]];
+                                A(i,c) += M(row_ind_A[j],i);
                             }
 
                             std::size_t startB = col_ptr_B[c],
                             endB = col_ptr_B[c + 1];
                             for(std::size_t j = startB; j < endB; j++){
-                                 A(i,c) -= rowT_i[row_ind_B[j]];
+                                 A(i,c) -=  M(row_ind_B[j],i) ;
                             }
 
 
@@ -791,6 +789,9 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
                     }
 
+
+                    end = std::chrono::steady_clock::now();
+                    std::cout << "for loop ATS = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
 
                }
 
