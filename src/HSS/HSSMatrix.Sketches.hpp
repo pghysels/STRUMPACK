@@ -4,11 +4,16 @@
 
 
 #include "misc/RandomWrapper.hpp"
+#include "misc/Tools.hpp"
 #include <vector>
 #include <algorithm>
 #include <random>
 #include <chrono>
 #include <stdexcept>
+
+#if defined(STRUMPACK_USE_MKL)
+#include "mkl_spblas.h"
+#endif
 
 namespace strumpack {
   namespace HSS {
@@ -740,30 +745,173 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
         }
 
+#if defined(STRUMPACK_USE_MKL)
+    sparse_status_t
+    wrapper_mkl_sparse_create_csr(sparse_matrix_t *A,
+                                  const sparse_index_base_t indexing,
+                                  const MKL_INT rows, const MKL_INT cols,
+                                  MKL_INT *rows_start, MKL_INT *rows_end,
+                                  MKL_INT *col_indx, float *values) {
+      return mkl_sparse_s_create_csr
+        (A, indexing, rows, cols, rows_start, rows_end, col_indx, values);
+    }
+    sparse_status_t
+    wrapper_mkl_sparse_create_csr(sparse_matrix_t *A,
+                                  const sparse_index_base_t indexing,
+                                  const MKL_INT rows, const MKL_INT cols,
+                                  MKL_INT *rows_start, MKL_INT *rows_end,
+                                  MKL_INT *col_indx, double *values) {
+      return mkl_sparse_d_create_csr
+        (A, indexing, rows, cols, rows_start, rows_end, col_indx, values);
+    }
+    sparse_status_t
+    wrapper_mkl_sparse_create_csr(sparse_matrix_t *A,
+                                  const sparse_index_base_t indexing,
+                                  const MKL_INT rows, const MKL_INT cols,
+                                  MKL_INT *rows_start, MKL_INT *rows_end,
+                                  MKL_INT *col_indx,
+                                  std::complex<float> *values) {
+      return mkl_sparse_c_create_csr
+        (A, indexing, rows, cols, rows_start, rows_end, col_indx,
+         (MKL_Complex8*)values);
+    }
+    sparse_status_t
+    wrapper_mkl_sparse_create_csr(sparse_matrix_t *A,
+                                  const sparse_index_base_t indexing,
+                                  const MKL_INT rows, const MKL_INT cols,
+                                  MKL_INT *rows_start, MKL_INT *rows_end,
+                                  MKL_INT *col_indx,
+                                  std::complex<double> *values) {
+      return mkl_sparse_z_create_csr
+        (A, indexing, rows, cols, rows_start, rows_end, col_indx,
+         (MKL_Complex16*)values);
+    }
 
-        //multiplication M^TS, A <- answer
+
+    sparse_status_t
+    wrapper_mkl_sparse_mm(const sparse_operation_t operation,
+                          const float alpha, const sparse_matrix_t A,
+                          const struct matrix_descr descr,
+                          const sparse_layout_t layout, const float *B,
+                          const MKL_INT columns, const MKL_INT ldb,
+                          const float beta, float *C, const MKL_INT ldc) {
+      return mkl_sparse_s_mm
+        (operation, alpha, A, descr, layout, B, columns, ldb, beta, C, ldc);
+    }
+    sparse_status_t
+    wrapper_mkl_sparse_mm(const sparse_operation_t operation,
+                          const double alpha, const sparse_matrix_t A,
+                          const struct matrix_descr descr,
+                          const sparse_layout_t layout, const double *B,
+                          const MKL_INT columns, const MKL_INT ldb,
+                          const double beta, double *C, const MKL_INT ldc) {
+      return mkl_sparse_d_mm
+        (operation, alpha, A, descr, layout, B, columns, ldb, beta, C, ldc);
+    }
+    sparse_status_t
+    wrapper_mkl_sparse_mm(const sparse_operation_t operation,
+                          const std::complex<float> alpha,
+                          const sparse_matrix_t A,
+                          const struct matrix_descr descr,
+                          const sparse_layout_t layout,
+                          const std::complex<float> *B,
+                          const MKL_INT columns, const MKL_INT ldb,
+                          const std::complex<float> beta,
+                          std::complex<float> *C, const MKL_INT ldc) {
+      MKL_Complex8 alpha_mkl{alpha.real(), alpha.imag()},
+        beta_mkl{beta.real(), beta.imag()};
+      return mkl_sparse_c_mm
+        (operation, alpha_mkl, A, descr, layout, (MKL_Complex8*)B,
+         columns, ldb, beta_mkl, (MKL_Complex8*)C, ldc);
+    }
+    sparse_status_t
+    wrapper_mkl_sparse_mm(const sparse_operation_t operation,
+                          const std::complex<double> alpha,
+                          const sparse_matrix_t A,
+                          const struct matrix_descr descr,
+                          const sparse_layout_t layout,
+                          const std::complex<double> *B,
+                          const MKL_INT columns, const MKL_INT ldb,
+                          const std::complex<double> beta,
+                          std::complex<double> *C, const MKL_INT ldc) {
+      MKL_Complex16 alpha_mkl{alpha.real(), alpha.imag()},
+        beta_mkl{beta.real(), beta.imag()};
+      return mkl_sparse_z_mm
+        (operation, alpha_mkl, A, descr, layout, (MKL_Complex16*)B,
+         columns, ldb, beta_mkl, (MKL_Complex16*)C, ldc);
+    }
+#endif
+
+
+
+    //multiplication M^TS, A <- answer
        template<typename scalar_t, typename integer_t> void
        MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
            SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
                 {
-                    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-                    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-                     begin = std::chrono::steady_clock::now();
-                    A.zero();
+
+                    std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
+
+                    std::size_t rows = M.rows(), cols = M.cols(),
+                      s_cols = A.cols();
+
+#if defined(STRUMPACK_USE_MKL)
+                    const auto rows_A = S.get_A().get_row_ptr();
+                    const auto col_A = S.get_A().get_col_inds();
+                    const auto rows_B = S.get_B().get_row_ptr();
+                    const auto col_B = S.get_B().get_col_inds();
+
+                    std::vector<MKL_INT> rows_start(rows+1),
+                      col_indx(S.get_A().nnz() + S.get_B().nnz());
+                    std::vector<scalar_t> values(col_indx.size());
+                    for (std::size_t r=0, i=0; r<cols; r++) {
+                      for (std::size_t j=rows_A[r]; j<rows_A[r+1]; j++, i++) {
+                        col_indx[i] = col_A[j];
+                        values[i] = scalar_t(1.);
+                      }
+                      for (std::size_t j=rows_B[r]; j<rows_B[r+1]; j++, i++) {
+                        col_indx[i] = col_B[j];
+                        values[i] = scalar_t(-1.);
+                      }
+                      rows_start[r+1] = i;
+                    }
+
+                    sparse_matrix_t mkl_S;
+                    sparse_status_t stat = wrapper_mkl_sparse_create_csr
+                      (&mkl_S, SPARSE_INDEX_BASE_ZERO, rows, s_cols,
+                       rows_start.data(), rows_start.data()+1,
+                       col_indx.data(), values.data());
+                    if (stat == SPARSE_STATUS_SUCCESS)
+                      std::cout << "# created MKL sparse matrix" << std::endl;
+                    else
+                      std::cout << "# ERROR constructing MKL sparse matrix!"
+                                << std::endl;
+                    matrix_descr mkl_S_descr;
+                    mkl_S_descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+                    stat = wrapper_mkl_sparse_mm
+                      (SPARSE_OPERATION_CONJUGATE_TRANSPOSE,
+                       scalar_t(1.), mkl_S, mkl_S_descr,
+                       SPARSE_LAYOUT_COLUMN_MAJOR, M.data(), s_cols, M.ld(),
+                       scalar_t(0.), A.data(), A.ld());
+                    if (stat == SPARSE_STATUS_SUCCESS)
+                      std::cout << "# MKL sparse matrix mult success!" << std::endl;
+                    else
+                      std::cout << "# ERROR MKL sparse matrix multiply failed!"
+                                << std::endl;
+
+#else
                     const auto col_ptr_A = S.get_Ac().get_col_ptr();
                     const auto row_ind_A = S.get_Ac().get_row_inds();
 
                     const auto col_ptr_B = S.get_Bc().get_col_ptr();
                     const auto row_ind_B = S.get_Bc().get_row_inds();
 
+                    A.zero();
 
-                    std::size_t cols = M.cols(), s_cols = col_ptr_A.size()-1;
-                    end = std::chrono::steady_clock::now();
-                    std::cout << "structure access ATS = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+                    std::vector<scalar_t> rowT_i;
+                    rowT_i.reserve(rows);
 
-                    begin = std::chrono::steady_clock::now();
-
-                    #pragma omp parallel for
+#pragma omp parallel for
                     for(std::size_t i = 0; i < cols; i++){
 
 
@@ -782,17 +930,12 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                             for(std::size_t j = startB; j < endB; j++){
                                  A(i,c) -=  M(row_ind_B[j],i) ;
                             }
-
-
                         }
-
-
                     }
 
-
+#endif
                     end = std::chrono::steady_clock::now();
                     std::cout << "for loop ATS = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
-
                }
 
 

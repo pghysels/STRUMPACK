@@ -55,6 +55,7 @@
 #cmakedefine STRUMPACK_USE_SLATE_SCALAPACK
 #cmakedefine STRUMPACK_USE_GETOPT
 #cmakedefine STRUMPACK_USE_MAGMA
+#cmakedefine STRUMPACK_USE_MKL
 
 #cmakedefine STRUMPACK_USE_MATLAB
 

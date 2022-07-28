@@ -176,11 +176,12 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export COMBBLAS_DIR=/home/pieterg/local/CombBLAS/install
     export COMBBLASAPP_DIR=/home/pieterg/local/CombBLAS/Applications
 
+    # -DBLA_VENDOR=OpenBLAS \
     cmake ../ \
-          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBLA_VENDOR=Intel10_64lp \
           -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
-          -DBLA_VENDOR=OpenBLAS \
           -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
@@ -189,7 +190,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DSTRUMPACK_USE_HIP=OFF \
           -DTPL_ENABLE_MAGMA=OFF \
           -DTPL_ENABLE_SLATE=OFF \
-          -DTPL_ENABLE_COMBBLAS=ON \
+          -DTPL_ENABLE_COMBBLAS=OFF \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 
 fi
