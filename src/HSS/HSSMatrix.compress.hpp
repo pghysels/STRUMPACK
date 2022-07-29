@@ -117,12 +117,13 @@ namespace strumpack {
      }
 
       Rc_new.copy(Rr_new);
+      /*
       //temp code
       begin = std::chrono::steady_clock::now();
       afunc(Rr_new, Rc_new, Sr_new, Sc_new);
       end = std::chrono::steady_clock::now();
       std::cout << "A*S and AT*S old = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
-
+*/
       if (opts.verbose()){
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original)" << std::endl;

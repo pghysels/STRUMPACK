@@ -247,9 +247,8 @@ namespace strumpack {
               //add new columns:
               col_ptr_.reserve(col_ptr_.size() + new_cols.size());
 
-              for (auto i : new_cols) {
-                  if (i != std::size_t(0))
-                      col_ptr_.push_back(i + nnz_);
+              for (size_t i = 1; i < new_cols.size(); i++) {
+                      col_ptr_.push_back(new_cols[i] + nnz_);
               }
 
 
@@ -900,6 +899,7 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                                 << std::endl;
 
 #else
+
                     const auto col_ptr_A = S.get_Ac().get_col_ptr();
                     const auto row_ind_A = S.get_Ac().get_row_inds();
 
