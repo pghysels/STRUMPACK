@@ -948,7 +948,7 @@ std::cout << "old setup time = " << std::chrono::duration_cast<std::chrono::mill
                     std::cout << "old mult = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
                     A.sub(temp.transpose());
-                    std::cout << "compression integrity: " << A.normF() << std::endl;
+                    std::cout << "MKL vs. for loop norm: " << A.normF() << std::endl;
                     A.copy(temp.transpose());
                }
 

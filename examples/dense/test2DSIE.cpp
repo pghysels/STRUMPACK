@@ -3,6 +3,18 @@
 #include <complex>
 #include <vector>
 
+
+
+#include <random>
+using namespace std;
+
+#include "HSS/HSSMatrix.hpp"
+using namespace strumpack::HSS;
+
+#define ERROR_TOLERANCE 1e2
+#define SOLVE_TOLERANCE 1e-12
+
+
 #include "dense/DenseMatrix.hpp"
 #include "misc/TaskTimer.hpp"
 using namespace strumpack;
@@ -25,11 +37,14 @@ template<typename T> std::complex<T> BesselH0(T x) {
 }
 
 int main(int argc, char* argv[]) {
+  HSSOptions<std::complex<double>> hss_opts;
+  hss_opts.set_from_command_line(argc, argv);
+
   int shape = 1;
   double pos_src[] = {1.8, 1.8};
   int order = 2;
   double w = M_PI * 8;
-  int N = 500;
+  int N = 10000;
   int center[] = {1, 1};
   int nquad = 4;
   double gamma = 1.781072418;
@@ -99,6 +114,34 @@ int main(int argc, char* argv[]) {
     }
   }
   std::cout << "# SIE assembly time: " << tassmbly.elapsed() << std::endl;
+
+
+  HSSMatrix<std::complex<double>> H(Lop, hss_opts);
+  if (H.is_compressed()) {
+    cout << "# created Lop matrix of dimension "
+         << H.rows() << " x " << H.cols()
+         << " with " << H.levels() << " levels" << endl;
+    cout << "# compression succeeded!" << endl;
+  } else {
+    cout << "# compression failed!!!!!!!!" << endl;
+    return 1;
+  }
+  cout << "# rank(H) = " << H.rank() << endl;
+  cout << "# memory(H) = " << H.memory()/1e6 << " MB, "
+       << 100. * H.memory() / Lop.memory() << "% of dense" << endl;
+
+  // H.print_info();
+  auto Hdense = H.dense();
+  Hdense.scaled_add(-1., Lop);
+  cout << "# relative error = ||A-H*I||_F/||A||_F = "
+       << Hdense.normF() / Lop.normF() << endl;
+  cout << "# absolute error = ||A-H*I||_F = " << Hdense.normF() << endl;
+  if (Hdense.normF() / Lop.normF() > ERROR_TOLERANCE
+      * max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
+    cout << "ERROR: compression error too big!!" << endl;
+    return 1;
+  }
+
 
   TaskTimer tfactor("");
   tfactor.start();

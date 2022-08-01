@@ -82,10 +82,10 @@ namespace strumpack {
         end = std::chrono::steady_clock::now();
         std::cout << "A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
-        begin = std::chrono::steady_clock::now();
+        //begin = std::chrono::steady_clock::now();
         MatrixT_times_SJLT(A,S,Sc_new);
-        end = std::chrono::steady_clock::now();
-        std::cout << "AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+        //end = std::chrono::steady_clock::now();
+        //std::cout << "AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
 
         total_nnz += opts.nnz0();
