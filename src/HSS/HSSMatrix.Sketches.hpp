@@ -852,9 +852,11 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                     std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
 
                     std::size_t rows = M.rows(), cols = M.cols(),
-                      s_cols = A.cols();
+                    s_cols = A.cols();
+                    DenseMatrix<scalar_t> temp(s_cols,rows);
 
-#if defined(STRUMPACK_USE_MKL)
+//#if defined(STRUMPACK_USE_MKL)
+    begin = std::chrono::steady_clock::now();
                     const auto rows_A = S.get_A().get_row_ptr();
                     const auto col_A = S.get_A().get_col_inds();
                     const auto rows_B = S.get_B().get_row_ptr();
@@ -887,19 +889,28 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                                 << std::endl;
                     matrix_descr mkl_S_descr;
                     mkl_S_descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+
+end = std::chrono::steady_clock::now();
+  std::cout << "MKL creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+  begin = std::chrono::steady_clock::now();
+
                     stat = wrapper_mkl_sparse_mm
                       (SPARSE_OPERATION_CONJUGATE_TRANSPOSE,
                        scalar_t(1.), mkl_S, mkl_S_descr,
-                       SPARSE_LAYOUT_COLUMN_MAJOR, M.data(), s_cols, M.ld(),
-                       scalar_t(0.), A.data(), A.ld());
+                       SPARSE_LAYOUT_COLUMN_MAJOR, M.data(), cols, M.ld(),
+                       scalar_t(0.), temp.data(), temp.ld());
+
+                       A.copy(temp.transpose());
                     if (stat == SPARSE_STATUS_SUCCESS)
                       std::cout << "# MKL sparse matrix mult success!" << std::endl;
                     else
                       std::cout << "# ERROR MKL sparse matrix multiply failed!"
                                 << std::endl;
+  end = std::chrono::steady_clock::now();
+  std::cout << "MKL mult+copy time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
-#else
-
+//#else
+  begin = std::chrono::steady_clock::now();
                     const auto col_ptr_A = S.get_Ac().get_col_ptr();
                     const auto row_ind_A = S.get_Ac().get_row_inds();
 
@@ -907,17 +918,16 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                     const auto row_ind_B = S.get_Bc().get_row_inds();
 
                     A.zero();
+ end = std::chrono::steady_clock::now();
+std::cout << "old setup time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
-                    std::vector<scalar_t> rowT_i;
-                    rowT_i.reserve(rows);
-
+ begin = std::chrono::steady_clock::now();
 #pragma omp parallel for
                     for(std::size_t i = 0; i < cols; i++){
 
 
                             //iterate through the columns of A, B
                         for(size_t c = 0; c < s_cols; c++){
-
                              std::size_t startA = col_ptr_A[c],
                              endA = col_ptr_A[c + 1];
 
@@ -932,10 +942,14 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                             }
                         }
                     }
-
-#endif
+//#endif
                     end = std::chrono::steady_clock::now();
-                    std::cout << "for loop ATS = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
+                    std::cout << "old mult = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+
+                    A.sub(temp.transpose());
+                    std::cout << "compression integrity: " << A.normF() << std::endl;
+                    A.copy(temp.transpose());
                }
 
 

@@ -69,7 +69,7 @@ namespace strumpack {
          begin = std::chrono::steady_clock::now();
          S.add_columns(d,opts.nnz0());
          end = std::chrono::steady_clock::now();
-         std::cout << "S init creation time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+         std::cout << "S init creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
          Rr_new.copy(S.SJLT_to_dense());
 
          //old
@@ -80,12 +80,12 @@ namespace strumpack {
         begin = std::chrono::steady_clock::now();
         Matrix_times_SJLT(A,S,Sr_new);
         end = std::chrono::steady_clock::now();
-        std::cout << "A*S time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+        std::cout << "A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
         begin = std::chrono::steady_clock::now();
         MatrixT_times_SJLT(A,S,Sc_new);
         end = std::chrono::steady_clock::now();
-        std::cout << "AT*S time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+        std::cout << "AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
 
         total_nnz += opts.nnz0();
@@ -96,7 +96,7 @@ namespace strumpack {
          opts.nnz(),n,d-d_old);
          S.append_sjlt_matrix(Temp);
          end = std::chrono::steady_clock::now();
-         std::cout << "S append creation time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+         std::cout << "S append creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
 
          Rr_new.copy(Temp.SJLT_to_dense());
@@ -107,23 +107,27 @@ namespace strumpack {
          begin = std::chrono::steady_clock::now();
          Matrix_times_SJLT(A,Temp,Sr_new);
          end = std::chrono::steady_clock::now();
-         std::cout << "A*S append = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+         std::cout << "A*S append = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
          begin = std::chrono::steady_clock::now();
          MatrixT_times_SJLT(A,Temp,Sc_new);
          end = std::chrono::steady_clock::now();
-         std::cout << "AT*S append= " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+         std::cout << "AT*S append= " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
      }
 
       Rc_new.copy(Rr_new);
-      /*
+
       //temp code
+      DenseM_t temp1(Sr_new);
+      DenseM_t temp2(Sc_new);
+
       begin = std::chrono::steady_clock::now();
-      afunc(Rr_new, Rc_new, Sr_new, Sc_new);
+      afunc(Rr_new, Rc_new, temp1, temp2);
       end = std::chrono::steady_clock::now();
-      std::cout << "A*S and AT*S old = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
-*/
+      std::cout << "A*S and AT*S gemm = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+
+
       if (opts.verbose()){
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original)" << std::endl;
