@@ -705,6 +705,11 @@ template<typename scalar_t, typename integer_t> void
 Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
     SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
          {
+             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+             begin = std::chrono::steady_clock::now();
+             //outer products method:
              A.zero();
              const auto rows_A = S.get_A().get_row_ptr();
              const auto col_A = S.get_A().get_col_inds();
@@ -741,6 +746,57 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
                  }
 
              }
+             end = std::chrono::steady_clock::now();
+             std::cout << "A*S outer products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+
+
+             begin = std::chrono::steady_clock::now();
+             // inner products method:
+             const auto col_ptr_A = S.get_Ac().get_col_ptr();
+             const auto row_ind_A = S.get_Ac().get_row_inds();
+             const auto col_ptr_B = S.get_Bc().get_col_ptr();
+             const auto row_ind_B = S.get_Bc().get_row_inds();
+             DenseMatrix<scalar_t> temp(A.rows(),A.cols());
+             temp.zero();
+
+             if(col_ptr_A.size() != col_ptr_B.size()){
+                 std::cout << "Error in SJLT matrix Ac,Bc sizes different\n";
+                 return;
+             }
+
+             //iterate through each column of S
+             for(std::size_t i = 0; i < col_ptr_A.size()-1; i++){
+
+
+                 std::vector<scalar_t> AS_i(M.cols(),scalar_t(0));
+
+                 for(std::size_t j = col_ptr_A[i]; j < col_ptr_A[i+1]; j++){
+                     //each row index corresponds to adding column row_ind to
+                     //solution
+                     for(std::size_t r = 0; r < M.rows(); r++)
+                     AS_i[r] += M(r,row_ind_A[j]);
+
+                 }
+
+                 for(std::size_t j = col_ptr_B[i]; j < col_ptr_B[i+1]; j++){
+                     //each row index corresponds to adding column row_ind to
+                     //solution
+                     for(std::size_t r = 0; r < M.rows(); r++)
+                     AS_i[r] -= M(r,row_ind_B[j]);
+
+                 }
+
+                 //copy AS_i to matrix:
+                 for(std::size_t r = 0; r < M.rows();r++)
+                 temp(r,i) = AS_i[r];
+
+             }
+
+
+             end = std::chrono::steady_clock::now();
+             std::cout << "A*S inner products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+             temp.sub(A);
+             std::cout << "norm difference of both: " <<   temp.normF();
 
         }
 
@@ -900,14 +956,18 @@ end = std::chrono::steady_clock::now();
                        SPARSE_LAYOUT_COLUMN_MAJOR, M.data(), cols, M.ld(),
                        scalar_t(0.), temp.data(), temp.ld());
 
-                       A.copy(temp.transpose());
+
                     if (stat == SPARSE_STATUS_SUCCESS)
                       std::cout << "# MKL sparse matrix mult success!" << std::endl;
                     else
                       std::cout << "# ERROR MKL sparse matrix multiply failed!"
                                 << std::endl;
   end = std::chrono::steady_clock::now();
-  std::cout << "MKL mult+copy time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+  std::cout << "MKL mult= " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+begin = std::chrono::steady_clock::now();
+A.copy(temp.transpose());
+end = std::chrono::steady_clock::now();
+std::cout << "MKL transpose/copy= " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
 //#else
   begin = std::chrono::steady_clock::now();
