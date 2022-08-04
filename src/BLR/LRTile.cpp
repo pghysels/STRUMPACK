@@ -267,17 +267,15 @@ namespace strumpack {
       } else {
         gpu::copy_device_to_host_async(pinned, U().data(), U().rows()*U().cols(), s);
         event.record(s);
-        event.synchronize();
-        #pragma omp parallel for collapse(2)   
-          for (std::size_t i=0; i<U().rows(); i++) {
-            for (std::size_t j=0; j<U().cols(); j++) {             
-              hU(i, j) = pinned[i+U().ld()*j];
-            }
+        event.synchronize(); 
+        for (std::size_t i=0; i<U().rows(); i++) {
+          for (std::size_t j=0; j<U().cols(); j++) {             
+            hU(i, j) = pinned[i+U().ld()*j];
           }
+        }
         gpu::copy_device_to_host_async(pinned, V().data(), V().rows()*V().cols(), s);
         event.record(s);
         event.synchronize();
-        #pragma omp parallel for collapse(2)   
         for (std::size_t i=0; i<V().rows(); i++) {
           for (std::size_t j=0; j<V().cols(); j++) {             
             hV(i, j) = pinned[i+V().ld()*j];

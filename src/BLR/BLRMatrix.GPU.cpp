@@ -30,7 +30,6 @@
 #include <memory>
 #include <functional>
 #include <algorithm>
-#include <cassert>
 
 #include "BLRMatrix.hpp"
 #include "BLRTileBLAS.hpp"
@@ -443,8 +442,8 @@ namespace strumpack {
         gpu::DeviceMemory<scalar_t> dmB11(dsep*dsep + gpu::getrf_buffersize<scalar_t>
                                     (solvehandle, *std::max_element(tiles1.begin(), 
                                      tiles1.end()))), 
-                                     dmB12(dsep*A12.cols()), 
-                                     dmB21(A21.rows()*dsep);
+                                    dmB12(dsep*A12.cols()), 
+                                    dmB21(A21.rows()*dsep);
         gpu::DeviceMemory<int> dpiv(dsep+1);
         std::size_t max_m = 0, max_mn = 0;
         for (std::size_t k1=0; k1<rb; k1++) {
@@ -809,11 +808,13 @@ namespace strumpack {
 #pragma omp single
 {
   #pragma omp task
+  {
             for (std::size_t r=0; r<rb; r++) {
               for (std::size_t c=0; c<rb; c++){
                 B11.tile(r, c).move_gpu_tile_to_cpu(copy_stream, pinned);
               }
             }
+  }
   #pragma omp task
   {
 #if defined(STRUMPACK_USE_MAGMA)

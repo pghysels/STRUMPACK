@@ -181,10 +181,12 @@ namespace strumpack {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
-      factor_phase1(A, opts, workspace, etree_level, task_depth);
-      // do not use tasking for blas/lapack parallelism (use system
-      // blas threading!)
-      factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
+      {
+        factor_phase1(A, opts, workspace, etree_level, task_depth);
+        // do not use tasking for blas/lapack parallelism (use system
+        // blas threading!)
+        factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
+      }
     } else {
       factor_phase1(A, opts, workspace, etree_level, task_depth);
       factor_phase2(A, opts, etree_level, task_depth);
