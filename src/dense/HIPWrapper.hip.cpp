@@ -103,15 +103,18 @@ namespace strumpack {
       ops = std::min(ops, batchCount);
       unsigned int nbx = (max_n + nt - 1) / nt,
         nbf = (batchCount + ops - 1) / ops;
-      dim3 block(nt, ops), grid(nbx, nbf);
-      // assume that nbf < MAX_BLOCKS_Z = 65535, should be ok
-      hipStream_t streamId;
-      hipblasGetStream(handle, &streamId);
-      hipLaunchKernelGGL
-        (HIP_KERNEL_NAME(laswp_vbatch_kernel),
-         grid, block, 0, streamId,
-         dn, dA, lddA, dipiv, npivots, batchCount);
-      // gpu_check(cudaPeekAtLastError());
+      dim3 block(nt, ops);
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+        dim3 grid(nbx, std::min(nbf-f, MAX_BLOCKS_Y));
+        hipStream_t streamId;
+        hipblasGetStream(handle, &streamId);
+        auto f0 = f * ops;
+        hipLaunchKernelGGL
+          (HIP_KERNEL_NAME(laswp_vbatch_kernel),
+           grid, block, 0, streamId,
+           dn+f0, dA+f0, lddA+f0, dipiv+f0, npivots+f0, batchCount-f0);
+        // gpu_check(cudaPeekAtLastError());
+      }
     }
 
     // explicit template instantiations

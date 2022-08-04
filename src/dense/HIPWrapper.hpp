@@ -44,6 +44,9 @@
 namespace strumpack {
   namespace gpu {
 
+    const unsigned int MAX_BLOCKS_Y = 65535;
+    const unsigned int MAX_BLOCKS_Z = 65535;
+
 #define gpu_check(err) {                                              \
       strumpack::gpu::hip_assert((err), __FILE__, __LINE__);          \
     }
