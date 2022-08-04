@@ -17,7 +17,7 @@ option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
-option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
+option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" ON)
 option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
@@ -71,9 +71,9 @@ endif()
 if(TPL_ENABLE_PTSCOTCH)
   set(TPL_ENABLE_SCOTCH ON)
 endif()
-if(NOT STRUMPACK_USE_CUDA)
+if(NOT (STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP))
   if(TPL_ENABLE_MAGMA)
-    message(STATUS "Disabling MAGMA, it requires CUDA to be enabled.")
+    message(STATUS "Disabling MAGMA, it requires CUDA or HIP to be enabled.")
   endif()
 endif()
 
@@ -107,14 +107,6 @@ if(STRUMPACK_USE_CUDA)
     enable_language(CUDA)
     # will be in CMake 3.17? for now we have a copy in cmake/Modules
     find_package(CUDAToolkit REQUIRED)
-    if(TPL_ENABLE_MAGMA)
-      list(APPEND CMAKE_PREFIX_PATH
-        ${TPL_MAGMA_PREFIX} $ENV{MAGMA_DIR} $ENV{MAGMA_ROOT})
-      find_package(MAGMA)
-      if(MAGMA_FOUND)
-        option(STRUMPACK_USE_MAGMA "" ON)
-      endif()
-    endif()
   else()
     message(WARNING "CUDA compiler not found,"
       " proceeding without CUDA support.")
@@ -132,6 +124,7 @@ if(STRUMPACK_USE_HIP)
     if(HIP_FOUND)
       set(STRUMPACK_HIP_PLATFORM_HCC ON)
       find_package(hipblas REQUIRED)
+      find_package(hipsparse REQUIRED)
       find_package(rocsolver REQUIRED)
       find_package(rocblas REQUIRED)
       # find_package(rocthrust REQUIRED)
@@ -174,6 +167,16 @@ if(STRUMPACK_USE_BLAS64)
     ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
     PROPERTIES COMPILE_OPTIONS
     "$<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>> $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>")
+endif()
+
+
+if(TPL_ENABLE_MAGMA)
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_MAGMA_PREFIX} $ENV{MAGMA_DIR} $ENV{MAGMA_ROOT})
+  find_package(MAGMA)
+  if(MAGMA_FOUND)
+    option(STRUMPACK_USE_MAGMA "" ON)
+  endif()
 endif()
 
 
@@ -533,13 +536,18 @@ endif()
 if(STRUMPACK_USE_HIP)
   set_source_files_properties(
     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    src/dense/HIPWrapper.hip.cpp
     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
   if(BUILD_SHARED_LIBS)
     set(STATIC_OR_SHARED SHARED)
   else()
     set(STATIC_OR_SHARED STATIC)
   endif()
-  hip_add_library(strumpack "src/sparse/fronts/FrontalMatrixHIP.hip.cpp" ${STATIC_OR_SHARED})
+  hip_add_library(
+    strumpack
+    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    src/dense/HIPWrapper.hip.cpp
+    ${STATIC_OR_SHARED})
 else()
   add_library(strumpack "")
 endif()
@@ -667,7 +675,7 @@ if(MAGMA_FOUND)
 endif()
 
 if(hipblas_FOUND)
-  target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver)
+  target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver roc::hipsparse)
   # target_link_libraries(strumpack PUBLIC roc::rocprim) # roc::rocprim_hip)
   # target_link_libraries(strumpack PUBLIC roc::rocthrust)
   # if(STRUMPACK_HIP_PLATFORM_HCC)

@@ -63,24 +63,6 @@ namespace strumpack {
   template class GPUFactors<std::complex<float>>;
   template class GPUFactors<std::complex<double>>;
 
-  constexpr int align_max_struct() {
-    auto m = sizeof(std::complex<double>);
-    m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
-    m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
-    m = std::max(m, sizeof(Triplet<std::complex<double>>));
-    int k = 16;
-    while (k < int(m)) k *= 2;
-    return k;
-  }
-
-  std::size_t round_up(std::size_t n) {
-    int k = align_max_struct();
-    return std::size_t((n + k - 1) / k) * k;
-  }
-  template<typename T> T* aligned_ptr(void* p) {
-    return (T*)(round_up(uintptr_t(p)));
-  }
-
   // TODO remove these! use round_up
   uintptr_t round_to_16(uintptr_t p) { return (p + 15) & ~15; }
   uintptr_t round_to_16(void* p) {
@@ -155,21 +137,21 @@ namespace strumpack {
       getrf_work_size = gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
 
       factor_bytes = sizeof(scalar_t) * factor_size;
-      factor_bytes = round_up(factor_bytes);
+      factor_bytes = gpu::round_up(factor_bytes);
 
       work_bytes = sizeof(scalar_t) * (Schur_size + getrf_work_size * max_streams);
-      work_bytes = round_up(work_bytes);
+      work_bytes = gpu::round_up(work_bytes);
       work_bytes += sizeof(int) * (piv_size + f.size());
-      work_bytes = round_up(work_bytes);
+      work_bytes = gpu::round_up(work_bytes);
       work_bytes += sizeof(gpu::FrontData<scalar_t>) * (N8 + N16 + N24 + N32);
-      work_bytes = round_up(work_bytes);
+      work_bytes = gpu::round_up(work_bytes);
 
       ea_bytes = sizeof(gpu::AssembleData<scalar_t>) * f.size();
-      ea_bytes = round_up(ea_bytes);
+      ea_bytes = gpu::round_up(ea_bytes);
       ea_bytes += sizeof(std::size_t) * Isize.back();
-      ea_bytes = round_up(ea_bytes);
+      ea_bytes = gpu::round_up(ea_bytes);
       ea_bytes += sizeof(Triplet<scalar_t>) * (elems11.back() + elems12.back() + elems21.back());
-      ea_bytes = round_up(ea_bytes);
+      ea_bytes = gpu::round_up(ea_bytes);
     }
 
     void print_info(int l, int lvls) {
@@ -221,7 +203,7 @@ namespace strumpack {
     }
 
     void set_work_pointers(void* wmem, int max_streams) {
-      auto schur = aligned_ptr<scalar_t>(wmem);
+      auto schur = gpu::aligned_ptr<scalar_t>(wmem);
       for (auto F : f) {
         const int dupd = F->dim_upd();
         if (dupd) {
@@ -231,13 +213,13 @@ namespace strumpack {
       }
       dev_getrf_work = schur;
       schur += max_streams * getrf_work_size;
-      auto imem = aligned_ptr<int>(schur);
+      auto imem = gpu::aligned_ptr<int>(schur);
       for (auto F : f) {
         F->piv_ = imem;
         imem += F->dim_sep();
       }
       dev_getrf_err = imem;   imem += f.size();
-      auto fdat = aligned_ptr<gpu::FrontData<scalar_t>>(imem);
+      auto fdat = gpu::aligned_ptr<gpu::FrontData<scalar_t>>(imem);
       f8  = fdat;  fdat += N8;
       f16 = fdat;  fdat += N16;
       f24 = fdat;  fdat += N24;
@@ -346,14 +328,14 @@ namespace strumpack {
   (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
-    auto hasmbl = aligned_ptr<gpu::AssembleData<scalar_t>>(hea_mem);
-    auto Iptr   = aligned_ptr<std::size_t>(hasmbl + N);
-    auto e11    = aligned_ptr<Trip_t>(Iptr + L.Isize.back());
+    auto hasmbl = gpu::aligned_ptr<gpu::AssembleData<scalar_t>>(hea_mem);
+    auto Iptr   = gpu::aligned_ptr<std::size_t>(hasmbl + N);
+    auto e11    = gpu::aligned_ptr<Trip_t>(Iptr + L.Isize.back());
     auto e12    = e11 + L.elems11.back();
     auto e21    = e12 + L.elems12.back();
-    auto dasmbl = aligned_ptr<gpu::AssembleData<scalar_t>>(dea_mem);
-    auto dIptr  = aligned_ptr<std::size_t>(dasmbl + N);
-    auto de11   = aligned_ptr<Trip_t>(dIptr + L.Isize.back());
+    auto dasmbl = gpu::aligned_ptr<gpu::AssembleData<scalar_t>>(dea_mem);
+    auto dIptr  = gpu::aligned_ptr<std::size_t>(dasmbl + N);
+    auto de11   = gpu::aligned_ptr<Trip_t>(dIptr + L.Isize.back());
     auto de12   = de11 + L.elems11.back();
     auto de21   = de12 + L.elems12.back();
 
@@ -575,11 +557,11 @@ namespace strumpack {
         if (l % 2) {
           work_mem = all_dmem;
           dea_mem = work_mem + L.work_bytes;
-          dev_factors = aligned_ptr<scalar_t>(dea_mem + L.ea_bytes);
+          dev_factors = gpu::aligned_ptr<scalar_t>(dea_mem + L.ea_bytes);
         } else {
           work_mem = all_dmem + peak_dmem - L.work_bytes;
           dea_mem = work_mem - L.ea_bytes;
-          dev_factors = aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
+          dev_factors = gpu::aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
         }
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
