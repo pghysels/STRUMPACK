@@ -17,7 +17,7 @@ option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
-option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" ON)
+option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" OFF)
 option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
