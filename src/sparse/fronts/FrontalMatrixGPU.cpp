@@ -366,7 +366,7 @@ namespace strumpack {
         c->upd_to_parent(&f, fIptr);
       }
     }
-    gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes);
+    gpu_check(gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes));
     gpu::assemble(N, hasmbl, dasmbl);
   }
 
@@ -387,7 +387,7 @@ namespace strumpack {
       else if (dsep <= 24) fdata[n24++] = t;
       else                 fdata[n32++] = t;
     }
-    gpu::copy_host_to_device(L.f8, fdata, L.small_fronts);
+    gpu_check(gpu::copy_host_to_device(L.f8, fdata, L.small_fronts));
     auto replace = opts.replace_tiny_pivots();
     auto thresh = opts.pivot_threshold();
     gpu::factor_block_batch<scalar_t,8>(L.N8, L.f8, replace, thresh, dinfo);
@@ -449,34 +449,34 @@ namespace strumpack {
         (dsep*dsep + gpu::getrf_buffersize<scalar_t>(sh, dsep));
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
-      gpu::copy_host_to_device(dF11, F11_);
+      gpu_check(gpu::copy_host_to_device(dF11, F11_));
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
       int info;
-      gpu::copy_device_to_host(&info, dpiv+dsep, 1);
+      gpu_check(gpu::copy_device_to_host(&info, dpiv+dsep, 1));
       if (info) err_code = ReturnCode::ZERO_PIVOT;
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
-      gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
-      gpu::copy_device_to_host(F11_, dF11);
+      gpu_check(gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep));
+      gpu_check(gpu::copy_device_to_host(F11_, dF11));
       if (opts.replace_tiny_pivots())
         gpu::replace_pivots
           (F11_.rows(), dF11.data(), opts.pivot_threshold());
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
-        gpu::copy_host_to_device(dF12, F12_);
+        gpu_check(gpu::copy_host_to_device(dF12, F12_));
         gpu::getrs(sh, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
-        gpu::copy_device_to_host(F12_, dF12);
+        gpu_check(gpu::copy_device_to_host(F12_, dF12));
         dm11.release();
         gpu::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd);
         DenseMW_t dF21(dupd, dsep, dm2122, dupd);
         DenseMW_t dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
-        gpu::copy_host_to_device(dF21, F21_);
-        gpu::copy_host_to_device(dF22, host_Schur_.get());
+        gpu_check(gpu::copy_host_to_device(dF21, F21_));
+        gpu_check(gpu::copy_host_to_device(dF22, host_Schur_.get()));
         gpu::BLASHandle bh;
         gpu::gemm(bh, Trans::N, Trans::N, scalar_t(-1.),
                   dF21, dF12, scalar_t(1.), dF22);
-        gpu::copy_device_to_host(host_Schur_.get(), dF22);
+        gpu_check(gpu::copy_device_to_host(host_Schur_.get(), dF22));
       }
     }
     // count flops
@@ -563,8 +563,8 @@ namespace strumpack {
           dea_mem = work_mem - L.ea_bytes;
           dev_factors = gpu::aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
         }
-        gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
-        gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
+        gpu_check(gpu::memset<scalar_t>(work_mem, 0, L.Schur_size));
+        gpu_check(gpu::memset<scalar_t>(dev_factors, 0, L.factor_size));
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem, max_streams);
         old_work = work_mem;
@@ -607,8 +607,8 @@ namespace strumpack {
         }
 
         e_small.wait(copy_stream);
-        gpu::copy_device_to_host_async<scalar_t>
-          (pinned, dev_factors, L.factors_small, copy_stream);
+        gpu_check(gpu::copy_device_to_host_async<scalar_t>
+                  (pinned, dev_factors, L.factors_small, copy_stream));
 
         STRUMPACK_ADD_MEMORY(L.factor_bytes);
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
@@ -664,8 +664,9 @@ namespace strumpack {
                 events[c].record(streams[s]);
                 events[c].wait(copy_stream);
                 auto& f = *(L.f[n0]);
-                gpu::copy_device_to_host_async<scalar_t>
-                  (pin[c % 2], f.F11_.data(), factors_chunk[c], copy_stream);
+                gpu_check(gpu::copy_device_to_host_async<scalar_t>
+                          (pin[c % 2], f.F11_.data(),
+                           factors_chunk[c], copy_stream));
               }
             }
           }
@@ -678,14 +679,14 @@ namespace strumpack {
 
         L.f[0]->pivot_mem_.resize(L.piv_size);
         copy_stream.synchronize();
-        gpu::copy_device_to_host
-          (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
+        gpu_check(gpu::copy_device_to_host
+                  (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size));
         L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
 
         std::vector<int> getrf_infos(L.f.size());
-        gpu::copy_device_to_host
-          (getrf_infos.data(), L.dev_getrf_err, L.f.size());
+        gpu_check(gpu::copy_device_to_host
+                  (getrf_infos.data(), L.dev_getrf_err, L.f.size()));
         for (auto ierr : getrf_infos)
           if (ierr) {
             err_code = ReturnCode::ZERO_PIVOT;
@@ -711,8 +712,9 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
       host_Schur_.reset(new scalar_t[dupd*dupd]);
-      gpu::copy_device_to_host
-        (host_Schur_.get(), reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
+      gpu_check(gpu::copy_device_to_host
+                (host_Schur_.get(),
+                 reinterpret_cast<scalar_t*>(old_work), dupd*dupd));
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
 #if defined(STRUMPACK_USE_MAGMA)
@@ -750,12 +752,12 @@ namespace strumpack {
       df->data_->dL_lvl[l] = Lptr;
       df->data_->dU_lvl[l] = Uptr;
       df->data_->dP_lvl[l] = Pptr;
-      gpu::copy_host_to_device<scalar_t>
-        (df->data_->dL_lvl[l], L.f[0]->host_factors_.get(), L.L_size);
-      gpu::copy_host_to_device<scalar_t>
-        (df->data_->dU_lvl[l], L.f[0]->host_factors_.get()+L.L_size, L.U_size);
-      gpu::copy_host_to_device<int>
-        (df->data_->dP_lvl[l], L.f[0]->piv_, L.piv_size);
+      gpu_check(gpu::copy_host_to_device<scalar_t>
+                (df->data_->dL_lvl[l], L.f[0]->host_factors_.get(), L.L_size));
+      gpu_check(gpu::copy_host_to_device<scalar_t>
+                (df->data_->dU_lvl[l], L.f[0]->host_factors_.get()+L.L_size, L.U_size));
+      gpu_check(gpu::copy_host_to_device<int>
+                (df->data_->dP_lvl[l], L.f[0]->piv_, L.piv_size));
       Lptr += L.L_size;
       Uptr += L.U_size;
       Pptr += L.piv_size;
@@ -840,7 +842,7 @@ namespace strumpack {
       db += dsep*nrhs;
       dbupd += dupd*nrhs;
     }
-    gpu::copy_host_to_device<char>(dea_mem, hea_mem, mem_size);
+    gpu_check(gpu::copy_host_to_device<char>(dea_mem, hea_mem, mem_size));
     gpu::extend_add_rhs(nrhs, N, hasmbl, dasmbl);
     gpu::synchronize();
   }
@@ -869,7 +871,7 @@ namespace strumpack {
         db += dsep*nrhs;
         dbupd += dupd*nrhs;
       }
-      gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N24+L.N32);
+      gpu_check(gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N24+L.N32));
       gpu::fwd_block_batch<scalar_t,8>(nrhs, L.N8, dfdata);
       gpu::fwd_block_batch<scalar_t,16>(nrhs, L.N16, dfdata+L.N8);
       gpu::fwd_block_batch<scalar_t,24>(nrhs, L.N24, dfdata+L.N8+L.N16);
@@ -1020,17 +1022,17 @@ namespace strumpack {
           dL = gpu_factors->data_->dL_lvl[l];
           dpiv = gpu_factors->data_->dP_lvl[l];
         } else {
-          gpu::copy_host_to_device<scalar_t>
-            (dL, L.f[0]->host_factors_.get(), L.L_size);
-          gpu::copy_host_to_device<int>
-            (dpiv, L.f[0]->pivot_mem_.data(), L.piv_size);
+          gpu_check(gpu::copy_host_to_device<scalar_t>
+                    (dL, L.f[0]->host_factors_.get(), L.L_size));
+          gpu_check(gpu::copy_host_to_device<int>
+                    (dpiv, L.f[0]->pivot_mem_.data(), L.piv_size));
           db = dL + L.L_size;
         }
-        gpu::memset<scalar_t>(dbupd, 0, d*L.total_upd_size);
+        gpu_check(gpu::memset<scalar_t>(dbupd, 0, d*L.total_upd_size));
         std::unique_ptr<scalar_t[]> allb(new scalar_t[d * L.piv_size]);
         rhs_to_contig(L, b, allb.get());
-        gpu::copy_host_to_device<scalar_t>
-          (db, allb.get(), d * L.piv_size);
+        gpu_check(gpu::copy_host_to_device<scalar_t>
+                  (db, allb.get(), d * L.piv_size));
         if (l != lvls-1) {
           std::size_t mem_size =
             round_to_16(L.f.size() * sizeof(gpu::AssembleData<scalar_t>)) +
@@ -1042,7 +1044,8 @@ namespace strumpack {
                          blas_handles, solver_handles);
         gpu::synchronize();
         std::swap(dbupd, old_dbupd);
-        gpu::copy_device_to_host<scalar_t>(allb.get(), db, d*L.piv_size);
+        gpu_check(gpu::copy_device_to_host<scalar_t>
+                  (allb.get(), db, d*L.piv_size));
         rhs_from_contig(L, b, allb.get());
         // auto level_time = tl.elapsed();
         // std::cout << "#   GPU Fwd Solve complete, took: "
@@ -1055,7 +1058,7 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     if (dupd) { // get bupd from the device, needed by parent
       DenseMW_t bupd(dupd, d, work[0], 0, 0);
-      gpu::copy_device_to_host(bupd, old_dbupd);
+      gpu_check(gpu::copy_device_to_host(bupd, old_dbupd));
     }
   }
 
@@ -1113,7 +1116,7 @@ namespace strumpack {
       dy += dsep*nrhs;
       dyupd += dupd*nrhs;
     }
-    gpu::copy_host_to_device<char>(dea_mem, hea_mem, mem_size);
+    gpu_check(gpu::copy_host_to_device<char>(dea_mem, hea_mem, mem_size));
     gpu::extract_rhs(nrhs, N, hasmbl, dasmbl);
     gpu::synchronize();
   }
@@ -1141,7 +1144,7 @@ namespace strumpack {
         dy += dsep*nrhs;
         dyupd += dupd*nrhs;
       }
-      gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N24+L.N32);
+      gpu_check(gpu::copy_host_to_device(dfdata, fdata, L.N8+L.N16+L.N24+L.N32));
       gpu::bwd_block_batch<scalar_t,8>(nrhs, L.N8, dfdata);
       gpu::bwd_block_batch<scalar_t,16>(nrhs, L.N16, dfdata+L.N8);
       gpu::bwd_block_batch<scalar_t,24>(nrhs, L.N24, dfdata+L.N8+L.N16);
@@ -1265,13 +1268,13 @@ namespace strumpack {
           dU = gpu_factors->data_->dU_lvl[l];
         else {
           dy = dU + L.U_size;
-          gpu::copy_host_to_device<scalar_t>
-            (dU, L.f[0]->host_factors_.get()+L.L_size, L.U_size);
+          gpu_check(gpu::copy_host_to_device<scalar_t>
+                    (dU, L.f[0]->host_factors_.get()+L.L_size, L.U_size));
         }
         std::unique_ptr<scalar_t[]> ally(new scalar_t[d * L.piv_size]);
         rhs_to_contig(L, y, ally.get());
-        gpu::copy_host_to_device<scalar_t>
-          (dy, ally.get(), d * L.piv_size);
+        gpu_check(gpu::copy_host_to_device<scalar_t>
+                  (dy, ally.get(), d * L.piv_size));
         bwd_small_fronts(d, L, fdata, dfdata, dU, dy, dyupd);
         bwd_large_fronts(d, L, dU, dy, dyupd,
                          blas_handles, solver_handles);
@@ -1283,7 +1286,8 @@ namespace strumpack {
           std::swap(dyupd, new_dyupd);
         }
         gpu::synchronize();
-        gpu::copy_device_to_host<scalar_t>(ally.get(), dy, d*L.piv_size);
+        gpu_check(gpu::copy_device_to_host<scalar_t>
+                  (ally.get(), dy, d*L.piv_size));
         rhs_from_contig(L, y, ally.get());
         // auto level_time = tl.elapsed();
         // std::cout << "#   GPU Bwd Solve complete, took: "

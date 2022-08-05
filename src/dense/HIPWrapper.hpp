@@ -109,68 +109,70 @@ namespace strumpack {
       hipEvent_t e_;
     };
 
-    template<typename T> void memset
-    (void* dptr, int value, std::size_t count) {
-      gpu_check(hipMemset(dptr, value, count*sizeof(T)));
+    template<typename T> hipError_t
+    memset(void* dptr, int value, std::size_t count) {
+      return hipMemset(dptr, value, count*sizeof(T));
     }
 
-    template<typename T> void copy_device_to_host
-    (T* hptr, const T* dptr, std::size_t count) {
-      gpu_check(hipMemcpy(hptr, dptr, count*sizeof(T),
-                           hipMemcpyDeviceToHost));
+    template<typename T> hipError_t
+    copy_device_to_host(T* hptr, const T* dptr, std::size_t count) {
+      return hipMemcpy(hptr, dptr, count*sizeof(T),
+                       hipMemcpyDeviceToHost);
     }
-    template<typename T> void copy_device_to_host_async
-    (T* hptr, const T* dptr, std::size_t count, const Stream& s) {
-      gpu_check(hipMemcpyAsync(hptr, dptr, count*sizeof(T),
-                                hipMemcpyDeviceToHost, s));
+    template<typename T> hipError_t
+    copy_device_to_host_async(T* hptr, const T* dptr,
+                              std::size_t count, const Stream& s) {
+      return hipMemcpyAsync(hptr, dptr, count*sizeof(T),
+                            hipMemcpyDeviceToHost, s);
     }
-    template<typename T> void copy_host_to_device
-    (T* dptr, const T* hptr, std::size_t count) {
-      gpu_check(hipMemcpy(dptr, hptr, count*sizeof(T),
-                           hipMemcpyHostToDevice));
+    template<typename T> hipError_t
+    copy_host_to_device(T* dptr, const T* hptr, std::size_t count) {
+      return hipMemcpy(dptr, hptr, count*sizeof(T),
+                       hipMemcpyHostToDevice);
     }
-    template<typename T> void copy_host_to_device_async
-    (T* dptr, const T* hptr, std::size_t count, const Stream& s) {
-      gpu_check(hipMemcpyAsync(dptr, hptr, count*sizeof(T),
-                                hipMemcpyHostToDevice, s));
+    template<typename T> hipError_t
+    copy_host_to_device_async(T* dptr, const T* hptr,
+                              std::size_t count, const Stream& s) {
+      return hipMemcpyAsync(dptr, hptr, count*sizeof(T),
+                            hipMemcpyHostToDevice, s);
     }
 
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
+    template<typename T> hipError_t
+    copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_device_to_host
+      return copy_device_to_host
         (h.data(), d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const T* d) {
+    template<typename T> hipError_t
+    copy_device_to_host(DenseMatrix<T>& h, const T* d) {
       assert(h.rows() == h.ld());
-      copy_device_to_host
+      return copy_device_to_host
         (h.data(), d, std::size_t(h.rows())*h.cols());
     }
-    template<typename T> void copy_device_to_host
-    (T* h, const DenseMatrix<T>& d) {
+    template<typename T> hipError_t
+    copy_device_to_host(T* h, const DenseMatrix<T>& d) {
       assert(d.rows() == d.ld());
-      copy_device_to_host
+      return copy_device_to_host
         (h, d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
+    template<typename T> hipError_t
+    copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_host_to_device
+      return copy_host_to_device
         (d.data(), h.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const T* h) {
+    template<typename T> hipError_t
+    copy_host_to_device(DenseMatrix<T>& d, const T* h) {
       assert(d.rows() == d.ld());
-      copy_host_to_device
+      return copy_host_to_device
         (d.data(), h, std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (T* d, const DenseMatrix<T>& h) {
+    template<typename T> hipError_t
+    copy_host_to_device(T* d, const DenseMatrix<T>& h) {
       assert(h.rows() == h.ld());
-      copy_host_to_device
+      return copy_host_to_device
         (d, h.data(), std::size_t(h.rows())*h.cols());
     }
 

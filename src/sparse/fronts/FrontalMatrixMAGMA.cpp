@@ -223,7 +223,7 @@ namespace strumpack {
       dev_ipiv_batch = ipmem;  ipmem += Nsmall;
     }
 
-    static const int FRONT_SMALL = 256;
+    static const int FRONT_SMALL = 512;
     std::vector<FM_t*> f;
     std::size_t factor_size = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0, work_bytes = 0, ea_bytes = 0,
@@ -370,7 +370,8 @@ namespace strumpack {
         c->upd_to_parent(&f, fIptr);
       }
     }
-    gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes);
+    gpu_check(gpu::copy_host_to_device<char>
+              (dea_mem, hea_mem, L.ea_bytes));
     gpu::assemble(N, hasmbl, dasmbl);
   }
 
@@ -428,13 +429,13 @@ namespace strumpack {
         (dsep*dsep + gpu::getrf_buffersize<scalar_t>(sh, dsep));
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
-      gpu::copy_host_to_device(dF11, F11_);
+      gpu_check(gpu::copy_host_to_device(dF11, F11_));
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
       // TODO check return code!
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
-      gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
-      gpu::copy_device_to_host(F11_, dF11);
+      gpu_check(gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep));
+      gpu_check(gpu::copy_device_to_host(F11_, dF11));
       if (opts.replace_tiny_pivots()) {
         auto thresh = opts.pivot_threshold();
         for (std::size_t i=0; i<F11_.rows(); i++)
@@ -444,19 +445,19 @@ namespace strumpack {
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
-        gpu::copy_host_to_device(dF12, F12_);
+        gpu_check(gpu::copy_host_to_device(dF12, F12_));
         gpu::getrs(sh, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
-        gpu::copy_device_to_host(F12_, dF12);
+        gpu_check(gpu::copy_device_to_host(F12_, dF12));
         dm11.release();
         gpu::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd);
         DenseMW_t dF21(dupd, dsep, dm2122, dupd);
         DenseMW_t dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
-        gpu::copy_host_to_device(dF21, F21_);
-        gpu::copy_host_to_device(dF22, host_Schur_.get());
+        gpu_check(gpu::copy_host_to_device(dF21, F21_));
+        gpu_check(gpu::copy_host_to_device(dF22, host_Schur_.get()));
         gpu::BLASHandle bh;
         gpu::gemm(bh, Trans::N, Trans::N, scalar_t(-1.),
                   dF21, dF12, scalar_t(1.), dF22);
-        gpu::copy_device_to_host(host_Schur_.get(), dF22);
+        gpu_check(gpu::copy_device_to_host(host_Schur_.get(), dF22));
       }
     }
     // count flops
@@ -539,8 +540,8 @@ namespace strumpack {
           dea_mem = work_mem - L.ea_bytes;
           dev_factors = gpu::aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
         }
-        gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
-        gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
+        gpu_check(gpu::memset<scalar_t>(work_mem, 0, L.Schur_size));
+        gpu_check(gpu::memset<scalar_t>(dev_factors, 0, L.factor_size));
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
         old_work = work_mem;
@@ -562,12 +563,12 @@ namespace strumpack {
         auto ld1 = L.dev_ld1_batch; auto ld2 = L.dev_ld2_batch;
         auto F11 = L.dev_F_batch;   auto F12 = F11 + Nsmall;
         auto F21 = F12 + Nsmall;    auto F22 = F21 + Nsmall;
-        gpu::copy_host_to_device(d1,  L.d1_batch.data(),  Nsmall);
-        gpu::copy_host_to_device(d2,  L.d2_batch.data(),  Nsmall);
-        gpu::copy_host_to_device(ld1, L.ld1_batch.data(), Nsmall);
-        gpu::copy_host_to_device(ld2, L.ld2_batch.data(), Nsmall);
-        gpu::copy_host_to_device(F11, L.F_batch.data(),   4*Nsmall);
-        gpu::copy_host_to_device(L.dev_ipiv_batch, L.ipiv_batch.data(), Nsmall);
+        gpu_check(gpu::copy_host_to_device(d1,  L.d1_batch.data(),  Nsmall));
+        gpu_check(gpu::copy_host_to_device(d2,  L.d2_batch.data(),  Nsmall));
+        gpu_check(gpu::copy_host_to_device(ld1, L.ld1_batch.data(), Nsmall));
+        gpu_check(gpu::copy_host_to_device(ld2, L.ld2_batch.data(), Nsmall));
+        gpu_check(gpu::copy_host_to_device(F11, L.F_batch.data(),   4*Nsmall));
+        gpu_check(gpu::copy_host_to_device(L.dev_ipiv_batch, L.ipiv_batch.data(), Nsmall));
 
         gpu::magma::getrf_vbatched_max_nocheck_work
           (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
@@ -606,8 +607,8 @@ namespace strumpack {
         L.f[0]->pivot_mem_.resize(L.piv_size);
 
         comp_stream.synchronize();
-        gpu::copy_device_to_host_async<scalar_t>
-          (pinned, dev_factors, L.factor_size, copy_stream);
+        gpu_check(gpu::copy_device_to_host_async<scalar_t>
+                  (pinned, dev_factors, L.factor_size, copy_stream));
 
         // use max_nocheck to overlap this with copy above
         gpu::magma::gemm_vbatched_max_nocheck
@@ -624,8 +625,8 @@ namespace strumpack {
         for (std::size_t i=0; i<L.factor_size; i++)
           host_factors[i] = pinned[i];
 
-        gpu::copy_device_to_host
-          (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
+        gpu_check(gpu::copy_device_to_host
+                  (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size));
         L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
         comp_stream.synchronize();
@@ -649,8 +650,8 @@ namespace strumpack {
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
       host_Schur_.reset(new scalar_t[dupd*dupd]);
-      gpu::copy_device_to_host
-        (host_Schur_.get(), (scalar_t*)(old_work), dupd*dupd);
+      gpu_check(gpu::copy_device_to_host
+                (host_Schur_.get(), (scalar_t*)(old_work), dupd*dupd));
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
     magma_queue_destroy(magma_q);
