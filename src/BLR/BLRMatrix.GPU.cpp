@@ -169,7 +169,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
 #if defined(STRUMPACK_USE_KBLAS)
-      int svd_size = 0;
+      int svd_size = round_to_16(sizeof(scalar_t) * (maxmn_all + 3) + sizeof(int) * 3);
 #else
       int svd_size = 0;
 #endif
@@ -199,33 +199,40 @@ namespace strumpack {
         std::size_t minmn = std::min(tilerows(i), tilecols(j));
         DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
         DenseMW_t dV(tilecols(j), minmn, d_V, tilecols(j));
-        gpu::DeviceMemory<scalar_t> dmemA(A.rows()*A.cols());
+        auto dmemA = reinterpret_cast<scalar_t*>(svd_mem);
         DenseMW_t dA(A.rows(), A.cols(), dmemA, A.rows());
         gpu::copy_device_to_device(dA, A);
-        int rank = 0;
-        gpu::DeviceMemory<int> drank(1);
         const double tol = opts.rel_tol();
         int rows = dA.rows(), cols = dA.cols();
-        gpu::DeviceMemory<int> drows(1), dcols(1);
-        gpu::copy_host_to_device(drows.as<int>(), &rows, 1);
-        gpu::copy_host_to_device(dcols.as<int>(), &cols, 1);
+        auto drows = reinterpret_cast<int*>(svd_mem);
+        drows += A.rows()*A.cols();
+        gpu::copy_host_to_device(drows, &rows, 1);
+        auto dcols = reinterpret_cast<int*>(svd_mem);
+        dcols += A.rows()*A.cols() + 1;
+        gpu::copy_host_to_device(dcols, &cols, 1);
         scalar_t* hA_ptr = dA.data();
-        gpu::DeviceMemory<scalar_t*> dApptr(1);
+        auto dApptr = reinterpret_cast<scalar_t**>(svd_mem);
+        dApptr += A.rows()*A.cols() + 2;
         scalar_t** dA_pptr = dApptr;
         gpu::copy_host_to_device(dA_pptr, &hA_ptr, 1);
         scalar_t* hU_ptr = dU.data();
-        gpu::DeviceMemory<scalar_t*> dUpptr(1);
+        auto dUpptr = reinterpret_cast<scalar_t**>(svd_mem);
+        dUpptr += A.rows()*A.cols() + 3;
         scalar_t** dU_pptr = dUpptr;
         gpu::copy_host_to_device(dU_pptr, &hU_ptr, 1);
         scalar_t* hV_ptr = dV.data();
-        gpu::DeviceMemory<scalar_t*> dVpptr(1);
+        auto dVpptr = reinterpret_cast<scalar_t**>(svd_mem);
+        dVpptr += A.rows()*A.cols() + 4;
         scalar_t** dV_pptr = dVpptr;
         gpu::copy_host_to_device(dV_pptr, &hV_ptr, 1);
-        gpu::kblas::ara(blashandle.kblas_handle(), drows.as<int>(), dcols.as<int>(), 
-                        dA_pptr, drows, dU_pptr, drows.as<int>(), dV_pptr, 
-                        dcols.as<int>(), drank.as<int>(), tol, rows, cols, 
+        int rank = 0;
+        auto drank = reinterpret_cast<int*>(svd_mem);
+        drank += A.rows()*A.cols() + 5;
+        gpu::kblas::ara(blashandle.kblas_handle(), drows, dcols, 
+                        dA_pptr, drows, dU_pptr, drows, dV_pptr, 
+                        dcols, drank, tol, rows, cols, 
                         minmn, 32, 10, blashandle.kblas_rand_state(), 1, 1);
-        gpu::copy_device_to_host(&rank, drank.as<int>(), 1);
+        gpu::copy_device_to_host(&rank, drank, 1);
         STRUMPACK_FLOPS(blas::ara_flops(rows, cols, rank, 10));
         if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
