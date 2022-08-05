@@ -94,10 +94,11 @@ namespace strumpack {
           Isize[i+1] += Isize[i];
         }
       }
-      d1_batch.resize(Nsmall);
-      d2_batch.resize(Nsmall);
-      ld1_batch.resize(Nsmall);
-      ld2_batch.resize(Nsmall);
+      batch_sizes.resize(4*(Nsmall+1));
+      d1_batch = batch_sizes.data(); //.resize(Nsmall);
+      d2_batch = d1_batch + Nsmall + 1; //.resize(Nsmall);
+      ld1_batch = d2_batch + Nsmall + 1; //.resize(Nsmall);
+      ld2_batch = ld1_batch + Nsmall + 1; //.resize(Nsmall);
       F_batch.resize(4*Nsmall);
       ipiv_batch.resize(Nsmall);
 #pragma omp parallel for                        \
@@ -132,7 +133,11 @@ namespace strumpack {
       work_bytes = gpu::round_up(work_bytes);
       work_bytes += getrf_work_bytes;
       work_bytes = gpu::round_up(work_bytes);
-      work_bytes += sizeof(int) * (piv_size + N + 4 * (Nsmall+1));
+      work_bytes += sizeof(int) * (piv_size);
+      work_bytes = gpu::round_up(work_bytes);
+      work_bytes += sizeof(int) * N;
+      work_bytes = gpu::round_up(work_bytes);
+      work_bytes += sizeof(int) * 4 * (Nsmall+1);
       work_bytes = gpu::round_up(work_bytes);
       work_bytes += sizeof(scalar_t*) * 4 * Nsmall;
       work_bytes = gpu::round_up(work_bytes);
@@ -212,7 +217,9 @@ namespace strumpack {
         imem += F->dim_sep();
       }
       auto N = f.size();
+      imem = gpu::aligned_ptr<int>(imem);
       dev_getrf_err = imem;    imem += N;
+      imem = gpu::aligned_ptr<int>(imem);
       dev_d1_batch  = imem;    imem += Nsmall+1;
       dev_d2_batch  = imem;    imem += Nsmall+1;
       dev_ld1_batch = imem;    imem += Nsmall+1;
@@ -235,7 +242,9 @@ namespace strumpack {
     int* dev_getrf_err = nullptr;
 
     // meta-data for batched call(s)
-    std::vector<int> d1_batch, d2_batch, ld1_batch, ld2_batch;
+    std::vector<int> batch_sizes;
+    int *d1_batch = nullptr, *d2_batch = nullptr,
+      *ld1_batch = nullptr, *ld2_batch = nullptr;
     int max_d1_small = 0, max_d2_small = 0;
     std::vector<scalar_t*> F_batch;
     std::vector<int*> ipiv_batch;
@@ -563,10 +572,7 @@ namespace strumpack {
         auto ld1 = L.dev_ld1_batch; auto ld2 = L.dev_ld2_batch;
         auto F11 = L.dev_F_batch;   auto F12 = F11 + Nsmall;
         auto F21 = F12 + Nsmall;    auto F22 = F21 + Nsmall;
-        gpu_check(gpu::copy_host_to_device(d1,  L.d1_batch.data(),  Nsmall));
-        gpu_check(gpu::copy_host_to_device(d2,  L.d2_batch.data(),  Nsmall));
-        gpu_check(gpu::copy_host_to_device(ld1, L.ld1_batch.data(), Nsmall));
-        gpu_check(gpu::copy_host_to_device(ld2, L.ld2_batch.data(), Nsmall));
+        gpu_check(gpu::copy_host_to_device(d1, L.d1_batch, 4*(Nsmall+1)));
         gpu_check(gpu::copy_host_to_device(F11, L.F_batch.data(),   4*Nsmall));
         gpu_check(gpu::copy_host_to_device(L.dev_ipiv_batch, L.ipiv_batch.data(), Nsmall));
 
