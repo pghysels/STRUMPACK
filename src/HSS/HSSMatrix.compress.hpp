@@ -41,6 +41,7 @@ namespace strumpack {
     AFunctor<scalar_t> afunc(A);
 
         if(opts.compression_sketch() == CompressionSketch::SJLT){
+
             if (opts.verbose())
                std::cout << "# Multiplying fast with SJLT format"  << std::endl;
               //do a fast SJLT multiply:
@@ -60,33 +61,35 @@ namespace strumpack {
           DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
           DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
           DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
-          // here
-           std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-           std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+          std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
+
      if(d_old == 0){
 
 
-         begin = std::chrono::steady_clock::now();
+
          S.add_columns(d,opts.nnz0());
          end = std::chrono::steady_clock::now();
-         std::cout << "S init creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+         if (opts.verbose())
+         std::cout << "# S init creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+
          Rr_new.copy(S.SJLT_to_dense());
 
          //old
          //g.SJLTDenseSketch(Rr_new, opts.nnz0());
-         if (opts.verbose())
-            std::cout << "# Fast multiplies"  << std::endl;
+
 
         begin = std::chrono::steady_clock::now();
         Matrix_times_SJLT(A,S,Sr_new);
         end = std::chrono::steady_clock::now();
-        std::cout << "A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+        if (opts.verbose())
+        std::cout << "# A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
-        //begin = std::chrono::steady_clock::now();
+        begin = std::chrono::steady_clock::now();
         MatrixT_times_SJLT(A,S,Sc_new);
-        //end = std::chrono::steady_clock::now();
-        //std::cout << "AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
-
+        end = std::chrono::steady_clock::now();
+        if (opts.verbose())
+        std::cout << "# AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
         total_nnz += opts.nnz0();
      } else{
@@ -96,23 +99,24 @@ namespace strumpack {
          opts.nnz(),n,d-d_old);
          S.append_sjlt_matrix(Temp);
          end = std::chrono::steady_clock::now();
-         std::cout << "S append creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+         if (opts.verbose())
+         std::cout << "# S append cols creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
 
          Rr_new.copy(Temp.SJLT_to_dense());
          total_nnz += opts.nnz();
-         if (opts.verbose())
-            std::cout << "# Fast multiplies"  << std::endl;
 
          begin = std::chrono::steady_clock::now();
          Matrix_times_SJLT(A,Temp,Sr_new);
          end = std::chrono::steady_clock::now();
-         std::cout << "A*S append = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+         if (opts.verbose())
+         std::cout << "# A*S appended cols time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
          begin = std::chrono::steady_clock::now();
          MatrixT_times_SJLT(A,Temp,Sc_new);
          end = std::chrono::steady_clock::now();
-         std::cout << "AT*S append= " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+         if (opts.verbose())
+         std::cout << "# AT*S appended cols time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
      }
 
@@ -125,8 +129,12 @@ namespace strumpack {
       begin = std::chrono::steady_clock::now();
       afunc(Rr_new, Rc_new, temp1, temp2);
       end = std::chrono::steady_clock::now();
+      if (opts.verbose()){
       std::cout << "A*S and AT*S gemm = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
-
+      //check compression integrity:
+      std::cout << "# A*S gemm - A*S fast normsq = " << temp1.sub(Sr_new).normF() << "\n";
+      std::cout << "# AT*S gemm - AT*S fast normsq = " << temp2.sub(Sc_new).normF() << "\n";
+      }
 
       if (opts.verbose()){
           std::cout << "# compressing with d = " << d-opts.p()

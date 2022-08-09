@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <random>
 #include <chrono>
-#include <stdexcept>
+//#include <stdexcept>
 
 #if defined(STRUMPACK_USE_MKL)
 #include "mkl_spblas.h"
@@ -681,34 +681,15 @@ private:
 };
 
 
-// helper functions to do an efficient multiplication of M*S
-
-/*
-* add or subtract column based on 'plus' of col_get of M to column col_put of D
-*/
- template<typename scalar_t> void pm_column(const DenseMatrix<scalar_t>& M,
-      std::size_t col_get, DenseMatrix<scalar_t>& D, std::size_t col_put,
-      bool plus){
-
-     if( col_get >= M.cols() || col_put >= D.cols()){
-         std::cout<< "# Error index out of bounds\n";
-     }
-
-     for(std::size_t r = 0; r < M.rows(); r++){
-
-         D(r, col_put) += plus ?  M(r,col_get): - M(r,col_get);
-     }
- }
 
  //multiplication AS
 template<typename scalar_t, typename integer_t> void
 Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
     SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
          {
-             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+             //std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
 
-             begin = std::chrono::steady_clock::now();
+             //begin = std::chrono::steady_clock::now();
              //outer products method:
              A.zero();
              const auto rows_A = S.get_A().get_row_ptr();
@@ -732,7 +713,6 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
                       for(size_t r = 0; r < rows; r++)
                           A(r,col_A[j])  +=   col_i[r];
-                      //pm_column<scalar_t>(M,i, A, col_A[j], true);
                   }
 
                   //subtract cols
@@ -742,62 +722,61 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
                      for(size_t r = 0; r < rows; r++)
                          A(r, col_B[j])  -=   col_i[r];
-                     //pm_column<scalar_t>(M,i, A, col_B[j], false);
                  }
 
              }
-             end = std::chrono::steady_clock::now();
-             std::cout << "A*S outer products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+             //end = std::chrono::steady_clock::now();
+             //std::cout << "A*S outer products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+        }
 
 
-             begin = std::chrono::steady_clock::now();
-             // inner products method:
-             const auto col_ptr_A = S.get_Ac().get_col_ptr();
-             const auto row_ind_A = S.get_Ac().get_row_inds();
-             const auto col_ptr_B = S.get_Bc().get_col_ptr();
-             const auto row_ind_B = S.get_Bc().get_row_inds();
-             DenseMatrix<scalar_t> temp(A.rows(),A.cols());
-             temp.zero();
+        template<typename scalar_t, typename integer_t> void
+        Matrix_times_SJLT_inner(const DenseMatrix<scalar_t>& M ,
+            SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A){
+         //std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
+         //begin = std::chrono::steady_clock::now();
+         // inner products method:
+         const auto col_ptr_A = S.get_Ac().get_col_ptr();
+         const auto row_ind_A = S.get_Ac().get_row_inds();
+         const auto col_ptr_B = S.get_Bc().get_col_ptr();
+         const auto row_ind_B = S.get_Bc().get_row_inds();
+         A.zero();
 
-             if(col_ptr_A.size() != col_ptr_B.size()){
-                 std::cout << "Error in SJLT matrix Ac,Bc sizes different\n";
-                 return;
-             }
+         if(col_ptr_A.size() != col_ptr_B.size()){
+             std::cout << "Error in SJLT matrix Ac,Bc sizes different\n";
+             return;
+         }
 
-             //iterate through each column of S
-             for(std::size_t i = 0; i < col_ptr_A.size()-1; i++){
+         //iterate through each column of S
+         for(std::size_t i = 0; i < col_ptr_A.size()-1; i++){
 
 
-                 std::vector<scalar_t> AS_i(M.cols(),scalar_t(0));
+             std::vector<scalar_t> AS_i(M.cols(),scalar_t(0));
 
-                 for(std::size_t j = col_ptr_A[i]; j < col_ptr_A[i+1]; j++){
-                     //each row index corresponds to adding column row_ind to
-                     //solution
-                     for(std::size_t r = 0; r < M.rows(); r++)
-                     AS_i[r] += M(r,row_ind_A[j]);
-
-                 }
-
-                 for(std::size_t j = col_ptr_B[i]; j < col_ptr_B[i+1]; j++){
-                     //each row index corresponds to adding column row_ind to
-                     //solution
-                     for(std::size_t r = 0; r < M.rows(); r++)
-                     AS_i[r] -= M(r,row_ind_B[j]);
-
-                 }
-
-                 //copy AS_i to matrix:
-                 for(std::size_t r = 0; r < M.rows();r++)
-                 temp(r,i) = AS_i[r];
+             for(std::size_t j = col_ptr_A[i]; j < col_ptr_A[i+1]; j++){
+                 //each row index corresponds to adding column row_ind to
+                 //solution
+                 for(std::size_t r = 0; r < M.rows(); r++)
+                 AS_i[r] += M(r,row_ind_A[j]);
 
              }
 
+             for(std::size_t j = col_ptr_B[i]; j < col_ptr_B[i+1]; j++){
+                 //each row index corresponds to adding column row_ind to
+                 //solution
+                 for(std::size_t r = 0; r < M.rows(); r++)
+                 AS_i[r] -= M(r,row_ind_B[j]);
 
-             end = std::chrono::steady_clock::now();
-             std::cout << "A*S inner products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
-             temp.sub(A);
-             std::cout << "norm difference of both: " <<   temp.normF();
+             }
 
+             //copy AS_i to matrix:
+             for(std::size_t r = 0; r < M.rows();r++)
+             A(r,i) = AS_i[r];
+
+         }
+
+        // end = std::chrono::steady_clock::now();
+        // std::cout << "A*S inner products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
         }
 
 #if defined(STRUMPACK_USE_MKL)
@@ -895,82 +874,86 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
         (operation, alpha_mkl, A, descr, layout, (MKL_Complex16*)B,
          columns, ldb, beta_mkl, (MKL_Complex16*)C, ldc);
     }
+
+
+
+    template<typename scalar_t, typename integer_t> void
+    MatrixT_times_SJLT_MKL(const DenseMatrix<scalar_t>& M ,
+        SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A){
+
+      //  std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
+
+      //  begin = std::chrono::steady_clock::now();
+        std::size_t rows = M.rows(), cols = M.cols(),
+        s_cols = A.cols();
+        DenseMatrix<scalar_t> temp(s_cols,rows);
+     //   begin = std::chrono::steady_clock::now();
+        const auto rows_A = S.get_A().get_row_ptr();
+        const auto col_A = S.get_A().get_col_inds();
+        const auto rows_B = S.get_B().get_row_ptr();
+        const auto col_B = S.get_B().get_col_inds();
+
+        std::vector<MKL_INT> rows_start(rows+1),
+        col_indx(S.get_A().nnz() + S.get_B().nnz());
+        std::vector<scalar_t> values(col_indx.size());
+        for (std::size_t r=0, i=0; r<cols; r++) {
+        for (std::size_t j=rows_A[r]; j<rows_A[r+1]; j++, i++) {
+        col_indx[i] = col_A[j];
+        values[i] = scalar_t(1.);
+        }
+        for (std::size_t j=rows_B[r]; j<rows_B[r+1]; j++, i++) {
+        col_indx[i] = col_B[j];
+        values[i] = scalar_t(-1.);
+        }
+        rows_start[r+1] = i;
+        }
+
+        sparse_matrix_t mkl_S;
+        sparse_status_t stat = wrapper_mkl_sparse_create_csr
+        (&mkl_S, SPARSE_INDEX_BASE_ZERO, rows, s_cols,
+        rows_start.data(), rows_start.data()+1,
+        col_indx.data(), values.data());
+        if (stat == SPARSE_STATUS_SUCCESS)
+        std::cout << "# created MKL sparse matrix" << std::endl;
+        else
+        std::cout << "# ERROR constructing MKL sparse matrix!"
+                << std::endl;
+        matrix_descr mkl_S_descr;
+        mkl_S_descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+
+
+        stat = wrapper_mkl_sparse_mm
+        (SPARSE_OPERATION_CONJUGATE_TRANSPOSE,
+        scalar_t(1.), mkl_S, mkl_S_descr,
+        SPARSE_LAYOUT_COLUMN_MAJOR, M.data(), cols, M.ld(),
+        scalar_t(0.), temp.data(), temp.ld());
+
+
+        if (stat == SPARSE_STATUS_SUCCESS)
+        std::cout << "# MKL sparse matrix mult success!" << std::endl;
+        else
+        std::cout << "# ERROR MKL sparse matrix multiply failed!"
+                << std::endl;
+
+      //  end = std::chrono::steady_clock::now();
+      //  std::cout << "MKL mult= " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+        A.copy(temp.transpose());
+        }
 #endif
 
-
-
-    //multiplication M^TS, A <- answer
+    //given M,S : A <- M^T * S using inner products of columns of M and S
        template<typename scalar_t, typename integer_t> void
        MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
            SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
                 {
 
-                    std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
-
-                    std::size_t rows = M.rows(), cols = M.cols(),
-                    s_cols = A.cols();
-                    DenseMatrix<scalar_t> temp(s_cols,rows);
-
-//#if defined(STRUMPACK_USE_MKL)
-    begin = std::chrono::steady_clock::now();
-                    const auto rows_A = S.get_A().get_row_ptr();
-                    const auto col_A = S.get_A().get_col_inds();
-                    const auto rows_B = S.get_B().get_row_ptr();
-                    const auto col_B = S.get_B().get_col_inds();
-
-                    std::vector<MKL_INT> rows_start(rows+1),
-                      col_indx(S.get_A().nnz() + S.get_B().nnz());
-                    std::vector<scalar_t> values(col_indx.size());
-                    for (std::size_t r=0, i=0; r<cols; r++) {
-                      for (std::size_t j=rows_A[r]; j<rows_A[r+1]; j++, i++) {
-                        col_indx[i] = col_A[j];
-                        values[i] = scalar_t(1.);
-                      }
-                      for (std::size_t j=rows_B[r]; j<rows_B[r+1]; j++, i++) {
-                        col_indx[i] = col_B[j];
-                        values[i] = scalar_t(-1.);
-                      }
-                      rows_start[r+1] = i;
-                    }
-
-                    sparse_matrix_t mkl_S;
-                    sparse_status_t stat = wrapper_mkl_sparse_create_csr
-                      (&mkl_S, SPARSE_INDEX_BASE_ZERO, rows, s_cols,
-                       rows_start.data(), rows_start.data()+1,
-                       col_indx.data(), values.data());
-                    if (stat == SPARSE_STATUS_SUCCESS)
-                      std::cout << "# created MKL sparse matrix" << std::endl;
-                    else
-                      std::cout << "# ERROR constructing MKL sparse matrix!"
-                                << std::endl;
-                    matrix_descr mkl_S_descr;
-                    mkl_S_descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-
-end = std::chrono::steady_clock::now();
-  std::cout << "MKL creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
-  begin = std::chrono::steady_clock::now();
-
-                    stat = wrapper_mkl_sparse_mm
-                      (SPARSE_OPERATION_CONJUGATE_TRANSPOSE,
-                       scalar_t(1.), mkl_S, mkl_S_descr,
-                       SPARSE_LAYOUT_COLUMN_MAJOR, M.data(), cols, M.ld(),
-                       scalar_t(0.), temp.data(), temp.ld());
+                //std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
+                //begin = std::chrono::steady_clock::now();
+                std::size_t rows = M.rows(), cols = M.cols(),
+                s_cols = A.cols();
+                DenseMatrix<scalar_t> temp(s_cols,rows);
 
 
-                    if (stat == SPARSE_STATUS_SUCCESS)
-                      std::cout << "# MKL sparse matrix mult success!" << std::endl;
-                    else
-                      std::cout << "# ERROR MKL sparse matrix multiply failed!"
-                                << std::endl;
-  end = std::chrono::steady_clock::now();
-  std::cout << "MKL mult= " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
-begin = std::chrono::steady_clock::now();
-A.copy(temp.transpose());
-end = std::chrono::steady_clock::now();
-std::cout << "MKL transpose/copy= " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
-
-//#else
-  begin = std::chrono::steady_clock::now();
                     const auto col_ptr_A = S.get_Ac().get_col_ptr();
                     const auto row_ind_A = S.get_Ac().get_row_inds();
 
@@ -978,38 +961,35 @@ std::cout << "MKL transpose/copy= " << std::chrono::duration_cast<std::chrono::m
                     const auto row_ind_B = S.get_Bc().get_row_inds();
 
                     A.zero();
- end = std::chrono::steady_clock::now();
-std::cout << "old setup time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
- begin = std::chrono::steady_clock::now();
-#pragma omp parallel for
+                    #pragma omp parallel for
                     for(std::size_t i = 0; i < cols; i++){
 
 
                             //iterate through the columns of A, B
+                        #pragma omp parallel for
                         for(size_t c = 0; c < s_cols; c++){
                              std::size_t startA = col_ptr_A[c],
                              endA = col_ptr_A[c + 1];
+                             scalar_t Aic = 0;
 
                             for(std::size_t j =startA; j < endA; j++){
-                                A(i,c) += M(row_ind_A[j],i);
+                                Aic += M(row_ind_A[j],i);
                             }
 
                             std::size_t startB = col_ptr_B[c],
                             endB = col_ptr_B[c + 1];
                             for(std::size_t j = startB; j < endB; j++){
-                                 A(i,c) -=  M(row_ind_B[j],i) ;
+                                 Aic -=  M(row_ind_B[j],i) ;
                             }
+
+                            A(i,c) = Aic;
                         }
                     }
-//#endif
-                    end = std::chrono::steady_clock::now();
 
-                    std::cout << "old mult = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+                   // end = std::chrono::steady_clock::now();
+                   // std::cout << "AT*S mult = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
 
-                    A.sub(temp.transpose());
-                    std::cout << "MKL vs. for loop norm: " << A.normF() << std::endl;
-                    A.copy(temp.transpose());
                }
 
 
