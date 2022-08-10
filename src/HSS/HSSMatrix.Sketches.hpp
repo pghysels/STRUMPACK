@@ -552,7 +552,7 @@ public:
         Ac_.append_cols(Ac_temp);
         Bc_.append_cols(Bc_temp);
         n_cols_ += new_cols;
-        nnz_ += nnz * n_rows_;
+        nnz_ += nnz;
     }
 
     void append_sjlt_matrix(SJLT_Matrix<scalar_t, integer_t> temp) {
