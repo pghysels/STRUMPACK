@@ -169,9 +169,9 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA)
 #if defined(STRUMPACK_USE_MAGMA)
 #if defined(STRUMPACK_USE_KBLAS)
-      int svd_size = round_to_16(sizeof(scalar_t) * (maxmn_all + 3) + sizeof(int) * 3);
+      int svd_size = round_to_16(sizeof(scalar_t) * (2*maxmn_all + 3) + sizeof(int) * 3);
 #else
-      int svd_size = 0;
+      int svd_size = round_to_16(sizeof(scalar_t) * 2 * maxm_all);
 #endif
 #else
       gesvdjInfo_t params = nullptr;
@@ -236,7 +236,8 @@ namespace strumpack {
         STRUMPACK_FLOPS(blas::ara_flops(rows, cols, rank, 10));
         if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
-          gpu::DeviceMemory<scalar_t> d_V(rank*dV.rows());
+          auto d_V = reinterpret_cast<scalar_t*>(svd_mem);
+          d_V += A.rows()*A.cols() + 6;
           DenseMW_t dV_tmp(rank, dV.rows(), d_V, rank);
           gpu::geam<scalar_t>(blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, 
                               dV_tmp, dV_tmp);
@@ -257,8 +258,7 @@ namespace strumpack {
         std::size_t minmn = std::min(tilerows(i), tilecols(j));
         DenseMW_t dU(tilerows(i), minmn, d_U, tilerows(i));
         DenseMW_t dV(minmn, tilecols(j), d_V, minmn);
-        gpu::DeviceMemory<real_t> d_S(minmn);
-        real_t* dS = d_S;
+        auto dS = reinterpret_cast<real_t*>(svd_mem);
         std::vector<real_t> S_tmp;
         S_tmp.resize(minmn);
         int rank = 0;
@@ -272,7 +272,8 @@ namespace strumpack {
         if (rank*(dU.rows() + dV.cols()) < dU.rows()*dV.cols()){
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
           DenseMW_t dV_tmp(rank, dV.cols(), dV, 0, 0);
-          gpu::DeviceMemory<scalar_t> d_x(rank);
+          auto d_x = reinterpret_cast<scalar_t*>(svd_mem);
+          d_x += minmn;
           gpu::copy_real_to_scalar<scalar_t>(d_x, dS, rank);
           gpu::dgmm<scalar_t>(blashandle, Side::L, dV_tmp, 
                               d_x, dV_tmp);
