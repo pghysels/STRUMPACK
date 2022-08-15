@@ -1012,13 +1012,13 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
                              scalar_t Aic = 0;
 
                             for(std::size_t j =startA; j < endA; j++){
-                                Aic += M(row_ind_A[j],i);
+                              Aic += blas::my_conj(M(row_ind_A[j],i));
                             }
 
                             std::size_t startB = col_ptr_B[c],
                             endB = col_ptr_B[c + 1];
                             for(std::size_t j = startB; j < endB; j++){
-                                 Aic -=  M(row_ind_B[j],i) ;
+                              Aic -=  blas::my_conj(M(row_ind_B[j],i)) ;
                             }
 
                             A(i,c) = Aic;
