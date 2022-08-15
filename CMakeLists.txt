@@ -19,7 +19,7 @@ option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
 option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
 option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
-option(TPL_ENABLE_MKL        "Build with MKL support" ON)
+option(TPL_ENABLE_MKL        "Build with MKL support" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)

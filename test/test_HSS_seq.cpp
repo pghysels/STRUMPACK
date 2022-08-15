@@ -150,7 +150,8 @@ int run(int argc, char* argv[]) {
     cout << "ERROR: compression error too big!!" << endl;
     return 1;
   }
-
+  return 0;
+  
   if (!H.leaf()) {
     double beta = 0.;
     HSSMatrix<double>* H0 = H.child(0);
@@ -273,8 +274,8 @@ int main(int argc, char* argv[]) {
   cout << endl;
 
   int ierr;
-#pragma omp parallel
-#pragma omp single nowait
+// #pragma omp parallel
+// #pragma omp single nowait
   ierr = run(argc, argv);
   return ierr;
 }

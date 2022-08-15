@@ -177,10 +177,14 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
     export COMBBLASAPP_DIR=/home/pieterg/local/CombBLAS/Applications
 
     # -DBLA_VENDOR=OpenBLAS \
+        #  -DBLA_VENDOR=Intel10_64lp \
+        #  -DBLA_VENDOR=OpenBLAS \
+
+
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Release \
-          -DBLA_VENDOR=Intel10_64lp \
           -DSTRUMPACK_USE_MPI=ON \
+          -DBLA_VENDOR=OpenBLAS \
           -DSTRUMPACK_USE_OPENMP=ON \
           -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \

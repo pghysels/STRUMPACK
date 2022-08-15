@@ -14,6 +14,9 @@
 #if defined(STRUMPACK_USE_MKL)
 #include "mkl_spblas.h"
 #endif
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
 
 namespace strumpack {
   namespace HSS {
@@ -684,7 +687,7 @@ private:
 
  //multiplication AS
 template<typename scalar_t, typename integer_t> void
-Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
+Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
     SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
          {
              //std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
@@ -698,37 +701,68 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
              const auto col_B = S.get_B().get_col_inds();
 
              std::size_t rows = M.rows();
-             std::vector<scalar_t> col_i;
-             col_i.reserve(rows);
 
-
+#if 0
              for(size_t i = 0; i <rows_A.size() - 1 ;i++){
-
-                 for(size_t r = 0; r < rows; r++)
-                     col_i[r] = M(r,i);
-
-
-                  size_t start_A = rows_A[i], end_A = rows_A[i + 1];
+               std::size_t start_A = rows_A[i], end_A = rows_A[i + 1];
+               std::size_t startB = rows_B[i],endB = rows_B[i + 1];
+               for(size_t r = 0; r < rows; r++) {
+                  auto Mri = M(r,i);
                   for(std::size_t j =start_A;j < end_A; j++){
-
-                      for(size_t r = 0; r < rows; r++)
-                          A(r,col_A[j])  +=   col_i[r];
+                    auto cAj = col_A[j];
+                    //for(size_t r = 0; r < rows; r++)
+                    A(r,cAj)  +=   Mri; //Mi[r]; //M(r,i);
                   }
 
                   //subtract cols
-                 std::size_t startB = rows_B[i],endB = rows_B[i + 1];
-
                  for(std::size_t j =startB; j < endB; j++){
-
-                     for(size_t r = 0; r < rows; r++)
-                         A(r, col_B[j])  -=   col_i[r];
+                   auto cBj = col_B[j];
+                   //for(size_t r = 0; r < rows; r++)
+                   A(r, cBj)  -=  Mri; //Mi[r]; //M(r,i);
                  }
-
+               }
              }
+#else
+             for(size_t i = 0; i <rows_A.size() - 1 ;i++){
+               std::size_t start_A = rows_A[i], end_A = rows_A[i + 1];
+               std::size_t startB = rows_B[i],endB = rows_B[i + 1];
+               auto Mi = M.ptr(0,i);
+               for(std::size_t j =start_A;j < end_A; j++){
+                 auto cAj = col_A[j];
+                 for(size_t r = 0; r < rows; r++)
+                   A(r,cAj)  +=   Mi[r]; //M(r,i);
+               }
+               //subtract cols
+               for(std::size_t j =startB; j < endB; j++){
+                 auto cBj = col_B[j];
+                 for(size_t r = 0; r < rows; r++)
+                   A(r, cBj)  -=  Mi[r]; //M(r,i);
+               }
+             }
+#endif
              //end = std::chrono::steady_clock::now();
              //std::cout << "A*S outer products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
         }
 
+    template<typename scalar_t, typename integer_t> void
+    Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
+    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
+         {
+#if defined(_OPENMP)
+           int rows = M.rows();
+           int T = omp_get_max_threads();
+           int B = rows / T;
+#pragma omp parallel for schedule(static,1)
+           for (int r=0; r<rows; r+=B) {
+             DenseMatrixWrapper<scalar_t> Asub(std::min(rows-r, B), A.cols(), A, r, 0);
+             auto Msub = ConstDenseMatrixWrapperPtr<scalar_t>
+               (std::min(rows-r, B), M.cols(), M, r, 0);
+             Matrix_times_SJLT_seq(*Msub, S, Asub);
+           }
+#else
+           Matrix_times_SJLT_seq(M, S, A);
+#endif
+         }
 
         template<typename scalar_t, typename integer_t> void
         Matrix_times_SJLT_inner(const DenseMatrix<scalar_t>& M ,
@@ -747,7 +781,10 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
              return;
          }
 
+         std::cout << "inner" << std::endl;
+
          //iterate through each column of S
+         #pragma omp parallel for
          for(std::size_t i = 0; i < col_ptr_A.size()-1; i++){
 
 
@@ -962,12 +999,13 @@ Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
 
                     A.zero();
 
-                    #pragma omp parallel for
+
+#pragma omp parallel for
                     for(std::size_t i = 0; i < cols; i++){
 
 
-                            //iterate through the columns of A, B
-                        #pragma omp parallel for
+                      //iterate through the columns of A, B
+                      //#pragma omp parallel for
                         for(size_t c = 0; c < s_cols; c++){
                              std::size_t startA = col_ptr_A[c],
                              endA = col_ptr_A[c + 1];
