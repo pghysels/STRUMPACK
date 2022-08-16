@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
   double pos_src[] = {1.8, 1.8};
   int order = 2;
   double w = M_PI * 8;
-  int N = 10000;
+  int N = 500;
   int center[] = {1, 1};
   int nquad = 4;
   double gamma = 1.781072418;
@@ -76,8 +76,15 @@ int main(int argc, char* argv[]) {
     dl[i] = norm(tmp, 2);
   }
 
+  {
+    int nmax = 2;
+    auto lambda = 2. * M_PI / w / nmax;
+    auto ppw = lambda / *std::max_element(dl.begin(), dl.end());
+    std::cout << "ppw: " << ppw << std::endl;
+  }
+
   DenseMatrix<std::complex<double>> B(N, 1);
-#pragma omp parallel for
+  // #pragma omp parallel for
   for (int i=0; i<N; i++) {
     double p[] = {xyz(0,i), xyz(1,i)};
     double rvec[] = {p[0] - pos_src[0], p[1] - pos_src[1]};
