@@ -1,6 +1,11 @@
 target_sources(strumpack
   PRIVATE ${CMAKE_CURRENT_LIST_DIR}/strumpack_dense.f90)
 
+if(STRUMPACK_USE_MPI)
+  target_sources(strumpack
+    PRIVATE ${CMAKE_CURRENT_LIST_DIR}/strumpack_dense_mpi.c)
+endif()
+
 # This is really a problem. Using a wildcard to install the mod makes
 # CMake install a bunch of empty directories, which leads to an
 # infinite recursion when building in the src tree, which we do for

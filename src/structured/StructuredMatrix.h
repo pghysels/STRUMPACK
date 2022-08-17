@@ -39,24 +39,19 @@
 
 #include "StrumpackConfig.hpp"
 
-#if defined(STRUMPACK_USE_MPI)
-#define OMPI_SKIP_MPICXX 1
-#include "mpi.h"
-#endif
-
 /**
  * Enumeration of possible structured matrix types.
  * See structured::Type
  */
 typedef enum {
-              SP_TYPE_HSS = 0,
-              SP_TYPE_BLR,
-              SP_TYPE_HODLR,
-              SP_TYPE_HODBF,
-              SP_TYPE_BUTTERFLY,
-              SP_TYPE_LR,
-              SP_TYPE_LOSSY,
-              SP_TYPE_LOSSLESS
+  SP_TYPE_HSS = 0,
+  SP_TYPE_BLR,
+  SP_TYPE_HODLR,
+  SP_TYPE_HODBF,
+  SP_TYPE_BUTTERFLY,
+  SP_TYPE_LR,
+  SP_TYPE_LOSSY,
+  SP_TYPE_LOSSLESS
 } SP_STRUCTURED_TYPE;
 
 
@@ -369,160 +364,6 @@ extern "C" {
                                 double _Complex(int i, int j),
                                 const CSPOptions* opts);
 
-
-#if defined(STRUMPACK_USE_MPI)
-  int SP_s_struct_from_dense2d(CSPStructMat* S, const MPI_Comm comm,
-                               int rows, int cols, const float* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts);
-  int SP_d_struct_from_dense2d(CSPStructMat* S, const MPI_Comm comm,
-                               int rows, int cols, const double* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts);
-  int SP_c_struct_from_dense2d(CSPStructMat* S, const MPI_Comm comm,
-                               int rows, int cols, const float _Complex* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts);
-  int SP_z_struct_from_dense2d(CSPStructMat* S, const MPI_Comm comm,
-                               int rows, int cols, const double _Complex* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts);
-
-
-  /**
-   * Construct a structured matrix using a routine to compute
-   * individual elements, using MPI. Should be called by all ranks in
-   * the communicator.
-   *
-   * \param S Pointer to CSPStructMat object, which will be constructed.
-   * \param comm communicator
-   * \param rows Number of rows in A
-   * \param cols Number of columns in A
-   * \param A Matrix element routine, returning A(i,j)
-   * \param opts Options structure, needs to be initialized by the
-   * user.
-   * \return 0 if successful
-   *
-   * \see SP_s_struct_destroy, SP_s_struct_default_options
-   */
-  int SP_s_struct_from_elements_mpi(CSPStructMat* S, const MPI_Comm comm,
-                                    int rows, int cols,
-                                    float A(int i, int j),
-                                    const CSPOptions* opts);
-  /**
-   * Construct a structured matrix using a routine to compute
-   * individual elements, using MPI. Should be called by all ranks in
-   * the communicator.
-   *
-   * \param S Pointer to CSPStructMat object, which will be constructed.
-   * \param comm communicator
-   * \param rows Number of rows in A
-   * \param cols Number of columns in A
-   * \param A Matrix element routine, returning A(i,j)
-   * \param opts Options structure, needs to be initialized by the
-   * user.
-   * \return 0 if successful
-   *
-   * \see SP_d_struct_destroy, SP_d_struct_default_options
-   */
-  int SP_d_struct_from_elements_mpi(CSPStructMat* S, const MPI_Comm comm,
-                                    int rows, int cols,
-                                    double A(int i, int j),
-                                    const CSPOptions* opts);
-  /**
-   * Construct a structured matrix using a routine to compute
-   * individual elements, using MPI. Should be called by all ranks in
-   * the communicator.
-   *
-   * \param S Pointer to CSPStructMat object, which will be constructed.
-   * \param comm communicator
-   * \param rows Number of rows in A
-   * \param cols Number of columns in A
-   * \param A Matrix element routine, returning A(i,j)
-   * \param opts Options structure, needs to be initialized by the
-   * user.
-   * \return 0 if successful
-   *
-   * \see SP_c_struct_destroy, SP_c_struct_default_options
-   */
-  int SP_c_struct_from_elements_mpi(CSPStructMat* S, const MPI_Comm comm,
-                                    int rows, int cols,
-                                    float _Complex A(int i, int j),
-                                    const CSPOptions* opts);
-  /**
-   * Construct a structured matrix using a routine to compute
-   * individual elements, using MPI. Should be called by all ranks in
-   * the communicator.
-   *
-   * \param S Pointer to CSPStructMat object, which will be constructed.
-   * \param comm communicator
-   * \param rows Number of rows in A
-   * \param cols Number of columns in A
-   * \param A Matrix element routine, returning A(i,j)
-   * \param opts Options structure, needs to be initialized by the
-   * user.
-   * \return 0 if successful
-   *
-   * \see SP_z_struct_destroy, SP_z_struct_default_options
-   */
-  int SP_z_struct_from_elements_mpi(CSPStructMat* S, const MPI_Comm comm,
-                                    int rows, int cols,
-                                    double _Complex A(int i, int j),
-                                    const CSPOptions* opts);
-
-
-  /**
-   * For a 1d distributed structured matrix, return the local number
-   * of rows assigned to this process.
-   * \return number of local rows
-   */
-  int SP_s_struct_local_rows(const CSPStructMat S);
-  /**
-   * For a 1d distributed structured matrix, return the local number
-   * of rows assigned to this process.
-   * \return number of local rows
-   */
-  int SP_d_struct_local_rows(const CSPStructMat S);
-  /**
-   * For a 1d distributed structured matrix, return the local number
-   * of rows assigned to this process.
-   * \return number of local rows
-   */
-  int SP_c_struct_local_rows(const CSPStructMat S);
-  /**
-   * For a 1d distributed structured matrix, return the local number
-   * of rows assigned to this process.
-   * \return number of local rows
-   */
-  int SP_z_struct_local_rows(const CSPStructMat S);
-
-
-  /**
-   * For a 1d distributed structured matrix, return the first row
-   * assigned to this process.
-   * \return first row in 1d block row distribution
-   */
-  int SP_s_struct_begin_row(const CSPStructMat S);
-  /**
-   * For a 1d distributed structured matrix, return the first row
-   * assigned to this process.
-   * \return first row in 1d block row distribution
-   */
-  int SP_d_struct_begin_row(const CSPStructMat S);
-  /**
-   * For a 1d distributed structured matrix, return the first row
-   * assigned to this process.
-   * \return first row in 1d block row distribution
-   */
-  int SP_c_struct_begin_row(const CSPStructMat S);
-  /**
-   * For a 1d distributed structured matrix, return the first row
-   * assigned to this process.
-   * \return first row in 1d block row distribution
-   */
-  int SP_z_struct_begin_row(const CSPStructMat S);
-
-#endif
 
 
   /**
