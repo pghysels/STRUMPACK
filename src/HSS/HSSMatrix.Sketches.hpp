@@ -350,6 +350,8 @@ namespace strumpack {
               BinaryCCSMarix<scalar_t>& Bc, std::size_t nnz,
               std::size_t n_rows, std::size_t n_cols) {
 
+
+
               if (nnz > n_cols) {
                   std::cout << "# POSSIBLE ERROR: nnz bigger than n_cols"
                             << std::endl;
@@ -478,6 +480,132 @@ namespace strumpack {
 
 
 
+          void createSJLTCRS_Chunks(BinaryCRSMarix<scalar_t>& A,
+              BinaryCRSMarix<scalar_t>& B, BinaryCCSMarix<scalar_t>& Ac,
+              BinaryCCSMarix<scalar_t>& Bc, std::size_t nnz,
+              std::size_t n_rows, std::size_t n_cols) {
+
+              if (nnz > n_cols) {
+                  std::cout << "# POSSIBLE ERROR: nnz bigger than n_cols"
+                            << std::endl;
+                  std::cout << "# setting nnz to n_cols" << std::endl;
+                  nnz = n_cols;
+              }
+
+
+              //set the nnz value for each of the matrices:
+              A.set_nnz_value(scalar_t(1));
+              Ac.set_nnz_value(scalar_t(1));
+              B.set_nnz_value(scalar_t(-1));
+              Bc.set_nnz_value(scalar_t(-1));
+
+              //We'll be generating 8 pointers for the 4 matrices:
+
+              //rowise:
+
+              std::vector<std::size_t> A_row_ptr(1 + n_rows,0);
+              std::vector<std::size_t> A_col_inds;
+
+
+              A_col_inds.reserve(n_rows * nnz);
+
+              std::vector<std::size_t> B_row_ptr(1 + n_rows, 0);
+              std::vector<std::size_t> B_col_inds;
+
+              B_col_inds.reserve(n_rows * nnz);
+
+              //columnwise:
+
+              std::vector<std::size_t> Ac_col_ptr(1 + n_cols, 0);
+              std::vector<std::vector<std::size_t>>
+              Ac_row_inds(n_cols, std::vector<std::size_t>());
+
+              for (auto v : Ac_row_inds)
+                  v.reserve(std::size_t(nnz*n_rows/n_cols + 1));
+
+              std::vector<std::size_t> Bc_col_ptr(1 + n_cols, 0);
+              std::vector<std::vector<std::size_t>>
+              Bc_row_inds(n_cols, std::vector<std::size_t>());
+
+              for (auto v : Bc_row_inds)
+                  v.reserve(std::size_t(nnz * n_rows / n_cols + 1));
+
+
+              //SJLT generation algorithm:
+
+              if(nnz != 0){
+
+              std::size_t chunk_size = n_cols/nnz;
+              std::uniform_int_distribution<> shift(0, int(chunk_size) - 1);
+              std::uniform_int_distribution<> sign(0, 1);
+              std::size_t a_nnz = 0, b_nnz = 0;
+
+              for (std::size_t i = 0; i < n_rows; i++) {
+
+
+                  a_nnz = 0, b_nnz = 0;
+
+                  for (std::size_t j = 0; j < nnz; j++) {
+                  std::size_t index = shift(e_) + chunk_size*j;
+                      //decide whether each is +- 1
+                      if (sign(e_) == 0)  {
+                          //belongs to A
+                          A_col_inds.push_back(index);
+                          a_nnz++;
+
+                          //CCS processing:
+                          Ac_col_ptr[index+1]++;
+                          Ac_row_inds[index].push_back(i);
+                      }
+                      else {
+                          //belongs to B
+                          B_col_inds.push_back(index);
+                          b_nnz++;
+
+                          //CCS processing:
+                          Bc_col_ptr[index+1]++;
+                          Bc_row_inds[index].push_back(i);
+                      }
+
+                  }
+                  //put in A and B row into A and B
+                  A_row_ptr[i + 1] = A_row_ptr[i] + a_nnz;
+                  B_row_ptr[i + 1] = B_row_ptr[i] + b_nnz;
+              }
+            }
+              A.set_ptrs(A_col_inds,A_row_ptr);
+              B.set_ptrs(B_col_inds, B_row_ptr);
+
+              //Columnwise processing:
+
+              //update col_ptr by summing previous indices:
+              for (std::size_t i = 1; i < Ac_col_ptr.size(); i++)
+                  Ac_col_ptr[i] += Ac_col_ptr[i-1];
+
+              for (std::size_t i = 1; i < Bc_col_ptr.size(); i++)
+                  Bc_col_ptr[i] += Bc_col_ptr[i - 1];
+
+
+
+              //update row_inds by unravelling vectors:
+              std::vector<std::size_t> Ac_final_inds;
+              Ac_final_inds.reserve(Ac_col_ptr[Ac_col_ptr.size() - 1]);
+
+              for (auto&& v : Ac_row_inds)
+                  Ac_final_inds.insert(Ac_final_inds.end(), v.begin(), v.end());
+
+
+              std::vector<std::size_t> Bc_final_inds;
+              Bc_final_inds.reserve(Bc_col_ptr[Ac_col_ptr.size() - 1]);
+
+              for (auto&& v : Bc_row_inds)
+                  Bc_final_inds.insert(Bc_final_inds.end(), v.begin(), v.end());
+
+              Ac.set_ptrs(Ac_final_inds,Ac_col_ptr);
+              Bc.set_ptrs(Bc_final_inds, Bc_col_ptr);
+          }
+
+
           void SJLTDenseSketch
           (DenseMatrix<scalar_t>& B, std::size_t nnz) {
 
@@ -526,13 +654,16 @@ namespace strumpack {
 template<typename scalar_t, typename integer_t> class SJLT_Matrix {
 public:
     SJLT_Matrix(SJLTGenerator<scalar_t, integer_t> g, std::size_t nnz,
-        std::size_t n_rows, std::size_t n_cols) :
+        std::size_t n_rows, std::size_t n_cols, bool chunk) :
         g_(g), nnz_(nnz), n_rows_(n_rows), n_cols_(n_cols),
         A_(BinaryCRSMarix<scalar_t>(0, n_cols)),
         B_(BinaryCRSMarix<scalar_t>(0, n_cols)),
         Ac_(BinaryCCSMarix<scalar_t>(n_rows, 0)),
-        Bc_(BinaryCCSMarix<scalar_t>(n_rows, 0))
+        Bc_(BinaryCCSMarix<scalar_t>(n_rows, 0)),chunk_(chunk)
     {
+        if(chunk_)
+        g_.createSJLTCRS_Chunks(A_, B_, Ac_, Bc_, nnz_, n_rows_, n_cols_);
+        else
         g_.createSJLTCRS(A_, B_, Ac_, Bc_, nnz_, n_rows_, n_cols_);
 
     }
@@ -547,9 +678,13 @@ public:
         /*Fix this*/
         BinaryCCSMarix<scalar_t> Ac_temp(n_rows_, 0);
         BinaryCCSMarix<scalar_t> Bc_temp(n_rows_, 0);
-
+        if(chunk_)
+        g_.createSJLTCRS_Chunks(A_temp, B_temp, Ac_temp, Bc_temp,
+                         nnz, n_rows_, new_cols);
+        else
         g_.createSJLTCRS(A_temp, B_temp, Ac_temp, Bc_temp,
                          nnz, n_rows_, new_cols);
+
         A_.append_cols(A_temp);
         B_.append_cols(B_temp);
         Ac_.append_cols(Ac_temp);
@@ -634,7 +769,9 @@ public:
         return g_;
     }
 
-
+    bool get_chunk(){
+        return chunk_;
+    }
     //convert SJLT class to densematrix
     DenseMatrix<scalar_t> SJLT_to_dense() {
         DenseMatrix<scalar_t> S(n_rows_, n_cols_);
@@ -681,6 +818,7 @@ private:
     BinaryCRSMarix<scalar_t> B_;
     BinaryCCSMarix<scalar_t> Ac_;
     BinaryCCSMarix<scalar_t> Bc_;
+    bool chunk_ = true;
 };
 
 

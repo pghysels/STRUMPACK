@@ -125,6 +125,20 @@ namespace strumpack {
      */
     std::string get_name(CompressionSketch a);
 
+    enum class SJLTAlgo {
+      CHUNK,    /*!< puts nnz nonzeros in each row by spliting the row into
+                     col/nnz chunks and putting one nonzero in each */
+
+      PERM      /*!< puts nnz nonzeros on each row by permuting all
+                     col indices and taking the first nnz*/
+    };
+
+    /**
+     * Return a string with the name of the sjlt algorithm.
+     * \param a type of SJLT sampling algorithm
+     * \return name, string with a short description
+     */
+    std::string get_name(SJLTAlgo a);
 
     /**
      * \class HSSOptions
@@ -224,6 +238,16 @@ namespace strumpack {
       void set_compression_sketch(CompressionSketch a) {
         compress_sketch_ = a;
       }
+
+      /**
+       * Specify the variant of the sketching matrix.
+       *
+       * \param a Type of sketching matrix
+       */
+      void set_sjlt_algo(SJLTAlgo a) {
+        sjlt_algo_ = a;
+      }
+
 
       /**
        * Specify the clustering algorithm. This is used when
@@ -358,6 +382,10 @@ namespace strumpack {
       CompressionSketch compression_sketch() const {
           return compress_sketch_;
       }
+
+      SJLTAlgo sjlt_algo()const{
+          return sjlt_algo_;
+      }
       /**
        * Get the clustering algorithm to be used. This is used when
        * constructing an HSS approximation of a kernel matrix.
@@ -447,6 +475,7 @@ namespace strumpack {
       bool log_ranks_ = false;
       CompressionAlgorithm compress_algo_ = CompressionAlgorithm::STABLE;
       CompressionSketch compress_sketch_ = CompressionSketch::GAUSSIAN;
+      SJLTAlgo sjlt_algo_ = SJLTAlgo::CHUNK;
       bool sync_ = false;
       ClusteringAlgorithm clustering_algo_ = ClusteringAlgorithm::TWO_MEANS;
       int approximate_neighbors_ = 64;

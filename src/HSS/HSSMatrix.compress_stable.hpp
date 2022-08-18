@@ -45,7 +45,8 @@ namespace strumpack {
           auto n = this->cols();
           DenseM_t Rr, Rc, Sr, Sc;
           SJLTGenerator<scalar_t, int> g;
-          SJLT_Matrix<scalar_t, int> S(g,0,n,0);
+          bool chunk = opts.sjlt_algo() == SJLTAlgo::CHUNK;
+          SJLT_Matrix<scalar_t, int> S(g,0,n,0,chunk);
 
           if(opts.verbose()){
                std::cout<< "# compressing with sjlt \n";
@@ -91,7 +92,7 @@ namespace strumpack {
 
                     begin = std::chrono::steady_clock::now();
                     SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
-                    opts.nnz(),n,dnew);
+                    opts.nnz(),n,dnew,chunk);
 
                     S.append_sjlt_matrix(Temp);
                     end = std::chrono::steady_clock::now();

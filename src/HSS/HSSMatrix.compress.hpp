@@ -41,6 +41,7 @@ namespace strumpack {
     AFunctor<scalar_t> afunc(A);
 
         if(opts.compression_sketch() == CompressionSketch::SJLT){
+            bool chunk = opts.sjlt_algo() == SJLTAlgo::CHUNK;
 
             if (opts.verbose())
                std::cout << "# Multiplying fast with SJLT format"  << std::endl;
@@ -49,7 +50,7 @@ namespace strumpack {
         auto n = this->cols();
         DenseM_t Rr, Rc, Sr, Sc;
         SJLTGenerator<scalar_t, int> g;
-        SJLT_Matrix<scalar_t, int> S(g,0,n,0);
+        SJLT_Matrix<scalar_t, int> S(g,0,n,0,chunk);
 
         WorkCompress<scalar_t> w;
         while (!this->is_compressed()) {
@@ -96,7 +97,7 @@ namespace strumpack {
 
          begin = std::chrono::steady_clock::now();
          SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
-         nnz_cur,n,d-d_old);
+         nnz_cur,n,d-d_old,chunk);
          total_nnz += nnz_cur;
          nnz_cur *=2;
          S.append_sjlt_matrix(Temp);
@@ -172,7 +173,8 @@ namespace strumpack {
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       SJLTGenerator<scalar_t, int> g;
-      SJLT_Matrix<scalar_t, int> S(g,0,n,0);
+      bool chunk = opts.sjlt_algo() == SJLTAlgo::CHUNK;
+      SJLT_Matrix<scalar_t, int> S(g,0,n,0,chunk);
       // here
       if (!opts.user_defined_random()){
           if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
@@ -215,7 +217,7 @@ namespace strumpack {
                } else{
                    //new, verify that g is new random not the same as old
                    SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
-                   opts.nnz(),n,d-d_old);
+                   opts.nnz(),n,d-d_old,chunk);
                    S.append_sjlt_matrix(Temp);
                    Rr_new.copy(Temp.SJLT_to_dense());
                   //old
@@ -257,6 +259,7 @@ namespace strumpack {
     (const DenseM_t& A, const opts_t& opts) {
       AFunctor<scalar_t> afunc(A);
      if(opts.compression_sketch() == CompressionSketch::SJLT){
+         bool chunk = opts.sjlt_algo() == SJLTAlgo::CHUNK;
 
          //start:
 
@@ -264,7 +267,7 @@ namespace strumpack {
          auto n = this->cols();
          DenseM_t Rr, Rc, Sr, Sc, R2, Sr2, Sc2;
          SJLTGenerator<scalar_t, int> g;
-         SJLT_Matrix<scalar_t, int> S(g,0,n,0);
+         SJLT_Matrix<scalar_t, int> S(g,0,n,0,chunk);
          std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
          if(opts.verbose())
              std::cout<< "# compressing with sjlt \n";
@@ -318,7 +321,7 @@ namespace strumpack {
 
                begin = std::chrono::steady_clock::now();
                SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
-               opts.nnz(),n,d-d_old);
+               opts.nnz(),n,d-d_old,chunk);
                S.append_sjlt_matrix(Temp);
                end = std::chrono::steady_clock::now();
                if (opts.verbose())
