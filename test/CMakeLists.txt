@@ -602,40 +602,87 @@ endif()
 
 
 if(STRUMPACK_USE_MPI)
-  set(test_name "SPARSE_mpi_1")
+  set(test_name "SPARSE_HSS_mpi_1")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
     ${MPIEXEC_POSTFLAGS} cavity16/cavity16.mtx --sp_compression HSS --sp_enable_replace_tiny_pivots --hss_leaf_size 4 --hss_rel_tol 1e-2 --hss_abs_tol 1e-2 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "SPARSE_mpi_5")
+  set(test_name "SPARSE_HSS_mpi_5")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
     ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "SPARSE_mpi_7")
+  set(test_name "SPARSE_HSS_mpi_7")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
     ${MPIEXEC_POSTFLAGS} sherman4/sherman4.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "SPARSE_mpi_8")
+  set(test_name "SPARSE_HSS_mpi_8")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
     ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "SPARSE_mpi_10")
+  set(test_name "SPARSE_HSS_mpi_10")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
     ${MPIEXEC_POSTFLAGS} mesh3e1/mesh3e1.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-10 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "SPARSE_mpi_14")
+  set(test_name "SPARSE_HSS_mpi_14")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
     ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-  set(test_name "SPARSE_mpi_19")
+  set(test_name "SPARSE_HSS_mpi_19")
   add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
     ${MPIEXEC_POSTFLAGS} mesh3e1/mesh3e1.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+  set(test_name "SPARSE_HSS_mpi_21")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+    ${MPIEXEC_POSTFLAGS} utm300/utm300.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+  if(STRUMPACK_USE_BPACK)
+    set(test_name "SPARSE_HODLR_mpi_1")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} cavity16/cavity16.mtx --sp_compression HODLR --sp_enable_replace_tiny_pivots --hodlr_leaf_size 4 --hodlr_rel_tol 1e-2 --hodlr_abs_tol 1e-2 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set(test_name "SPARSE_HODLR_mpi_5")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1e-10 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set(test_name "SPARSE_HODLR_mpi_7")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} sherman4/sherman4.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1e-10 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set(test_name "SPARSE_HODLR_mpi_8")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set(test_name "SPARSE_HODBF_mpi_10")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} mesh3e1/mesh3e1.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1e-10 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --hodlr_butterfly_levels 1 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    # set(test_name "SPARSE_HODBF_mpi_14")
+    # add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+    #   ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1e-1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --hodlr_butterfly_levels 2 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    # set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set(test_name "SPARSE_HODBF_mpi_19")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} mesh3e1/mesh3e1.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1e-1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --hodlr_butterfly_levels 100 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set(test_name "SPARSE_HODBF_mpi_21")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} utm300/utm300.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1e-1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --hodlr_butterfly_levels 100 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  endif()
 
   if(STRUMPACK_USE_SCOTCH)
     set(test_name "SPARSE_mpi_13")
@@ -653,11 +700,6 @@ if(STRUMPACK_USE_MPI)
       ${MPIEXEC_POSTFLAGS} sherman4/sherman4.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
     set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-    set(test_name "SPARSE_mpi_21")
-    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
-      ${MPIEXEC_POSTFLAGS} utm300/utm300.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
-    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
-
     set(test_name "SPARSE_mpi_22")
     add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 16 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
       ${MPIEXEC_POSTFLAGS} utm300/utm300.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method scotch --sp_compression_min_sep_size 25)
@@ -670,11 +712,6 @@ if(STRUMPACK_USE_MPI)
   endif()
 
   if(STRUMPACK_USE_PTSCOTCH)
-    set(test_name "SPARSE_mpi_12")
-    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
-      ${MPIEXEC_POSTFLAGS} utm300/utm300.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_compression_min_sep_size 25)
-    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
-
     set(test_name "SPARSE_mpi_26")
     add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
       ${MPIEXEC_POSTFLAGS} utm300/utm300.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method ptscotch --sp_compression_min_sep_size 25)
@@ -720,6 +757,11 @@ if(STRUMPACK_USE_MPI)
     set(test_name "SPARSE_mpi_11")
     add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 19 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
       ${MPIEXEC_POSTFLAGS} mesh3e1/mesh3e1.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_compression_min_sep_size 25)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set(test_name "SPARSE_mpi_12")
+    add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} utm300/utm300.mtx --sp_compression HSS --hss_leaf_size 4 --hss_rel_tol 1e-1 --hss_abs_tol 1e-10 --hss_d0 16 --hss_dd 8 --sp_reordering_method parmetis --sp_compression_min_sep_size 25)
     set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
     set(test_name "SPARSE_mpi_15")

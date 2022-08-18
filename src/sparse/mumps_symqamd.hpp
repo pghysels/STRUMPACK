@@ -32,10 +32,9 @@
 #include "StrumpackFortranCInterface.h"
 #include "CompressedSparseMatrix.hpp"
 #include "StrumpackOptions.hpp"
-#include "ETree.hpp"
 #include "SeparatorTree.hpp"
 
-#define MUMPS_SYMQAMD_FC STRUMPACK_FC_GLOBAL_(mumps_symqamd, MUMPS_SYMQAMD)
+#define MUMPS_SYMQAMD_FC STRUMPACK_FC_GLOBAL_(strumpack_symqamd, STRUMPACK_SYMQAMD)
 
 extern "C" void MUMPS_SYMQAMD_FC
 (int* TRESH, int* NDENSE, int* N, int* IWLEN, int* PE, int* PFREE,
@@ -46,16 +45,17 @@ extern "C" void MUMPS_SYMQAMD_FC
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> aggressive_amalgamation
-  (int N, const integer_t* ptr, const integer_t* ind,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   const SPOptions<scalar_t>& opts) {
+  SeparatorTree<integer_t>
+  aggressive_amalgamation(int N, const integer_t* ptr, const integer_t* ind,
+                          std::vector<integer_t>& perm,
+                          std::vector<integer_t>& iperm,
+                          const SPOptions<scalar_t>& opts) {
     int NNZ = ptr[N];
 
     int TRESH = 0;              /* <= 0 Recommended value. Automatic setting will be done. */
     int* NDENSE = new int[N];   /* [N] used internally */
     int IWLEN = NNZ;            /* length of workspace IW */
-    int* PE = new int[N];       /* [N] On input PE(i) contains the pointers in IW to
+    std::vector<int> PE(N);     /* [N] On input PE(i) contains the pointers in IW to
                                  * (the column indices of) row i of the matrix.  On
                                  * output it contains the tree:
                                  * - if I is a principal variable (NV(I) >0) then -pe(I) is the
@@ -95,7 +95,7 @@ namespace strumpack {
     }
     PFREE++;
     MUMPS_SYMQAMD_FC
-      (&TRESH, NDENSE, &N, &IWLEN, PE, &PFREE, LEN, IW, NV, ELEN,
+      (&TRESH, NDENSE, &N, &IWLEN, PE.data(), &PFREE, LEN, IW, NV, ELEN,
        LAST, &NCMPA, DEGREE, HEAD, NEXT, W, PERM,
        LISTVAR_SCHUR, &SIZE_SCHUR, &AGG6);
     for (int i=0; i<N; i++) {
@@ -113,12 +113,12 @@ namespace strumpack {
     for (int i=0; i<N; i++) NV[i] = tmp[i];
 
     // post-order the assembly tree
-    auto po = etree_postorder(N, PE);
+    auto po = etree_postorder(PE);
     for (int i=0; i<N; i++) tmp[po[i]] = po[PE[i]];
     for (int i=0; i<N; i++) PE[i] = tmp[i];
     for (int i=0; i<N; i++) tmp[po[i]] = NV[i];
     for (int i=0; i<N; i++) NV[i] = tmp[i];
-    std::replace(PE, PE+N, N, -1);
+    std::replace(PE.begin(), PE.end(), N, -1);
 
     // combine perm with postordering of the tree
     for (int i=0; i<N; i++) tmp[i] = po[perm[i]];
@@ -158,61 +158,60 @@ namespace strumpack {
     fronts -= merges;
     for (int i=0, f=0; i<N; i++) if (NV[i]) fid[i] = f++;
 
-    auto sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(fronts + dummies + roots-1));
-    for (int f=0; f<sep_tree->separators(); f++)
-      sep_tree->lch(f) = sep_tree->rch(f) = -1;
-    for (int f=0; f<=sep_tree->separators(); f++)
-      sep_tree->sizes(f) = 0;
+    SeparatorTree<integer_t> sep_tree(fronts + dummies + roots-1);
+    for (int f=0; f<sep_tree.separators(); f++)
+      sep_tree.lch[f] = sep_tree.rch[f] = -1;
+    for (int f=0; f<=sep_tree.separators(); f++)
+      sep_tree.sizes[f] = 0;
 
     for (int i=0; i<N; i++) {
       if (NV[i]) {
-        sep_tree->pa(fid[i]) = (PE[i] == -1) ? -1 : fid[PE[i]];
-        sep_tree->sizes(fid[i]+1)++;
+        sep_tree.parent[fid[i]] = (PE[i] == -1) ? -1 : fid[PE[i]];
+        sep_tree.sizes[fid[i]+1]++;
       } else { // secondary
         int p = PE[i];
         while (NV[p] == 0) p = PE[p]; // find the principal node
-        sep_tree->sizes(fid[p]+1)++;
+        sep_tree.sizes[fid[p]+1]++;
       }
     }
     if (roots > 1) {
       // add a single empty root, with the other roots as children
-      std::replace(sep_tree->pa(), sep_tree->pa()+fronts,
+      std::replace(sep_tree.parent, sep_tree.parent+fronts,
                    integer_t(-1), integer_t(fronts));
-      sep_tree->pa(fronts) = -1;
+      sep_tree.parent[fronts] = -1;
       fronts++;
     }
     std::fill(count.begin(), count.end(), 0);
     for (int f=0, ft=fronts; f<fronts; f++) {
-      auto p = sep_tree->pa(f);
+      auto p = sep_tree.parent[f];
       if (p != -1) {
         count[p]++;
         switch (count[p]) {
-        case 1: sep_tree->lch(p) = f; break;
-        case 2: sep_tree->rch(p) = f; break;
+        case 1: sep_tree.lch[p] = f; break;
+        case 2: sep_tree.rch[p] = f; break;
         default:
           // create a dummy holding the 2 existing children of p, with
           // parent p
-          sep_tree->pa(ft) = p;
-          sep_tree->lch(ft) = sep_tree->lch(p);
-          sep_tree->rch(ft) = sep_tree->rch(p);
-          sep_tree->sizes(ft+1) = 0;
-          sep_tree->pa(sep_tree->lch(p)) = ft;
-          sep_tree->pa(sep_tree->rch(p)) = ft;
+          sep_tree.parent[ft] = p;
+          sep_tree.lch[ft] = sep_tree.lch[p];
+          sep_tree.rch[ft] = sep_tree.rch[p];
+          sep_tree.sizes[ft+1] = 0;
+          sep_tree.parent[sep_tree.lch[p]] = ft;
+          sep_tree.parent[sep_tree.rch[p]] = ft;
           // make the dummy the left child of p, make the current node
           // the right child of p
-          sep_tree->lch(p) = ft;
-          sep_tree->rch(p) = f;
+          sep_tree.lch[p] = ft;
+          sep_tree.rch[p] = f;
           ft++;
           break;
         }
       }
     }
-    for (integer_t f=0; f<sep_tree->separators(); f++)
-      sep_tree->sizes(f+1) = sep_tree->sizes(f) + sep_tree->sizes(f+1);
-    assert(sep_tree->sizes(sep_tree->separators()) == N);
+    for (integer_t f=0; f<sep_tree.separators(); f++)
+      sep_tree.sizes[f+1] = sep_tree.sizes[f] + sep_tree.sizes[f+1];
+    assert(sep_tree.sizes[sep_tree.separators()] == N);
     delete[] NDENSE;
-    delete[] PE;
+    // delete[] PE;
     delete[] LEN;
     delete[] IW;
     delete[] NV;

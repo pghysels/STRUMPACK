@@ -56,21 +56,9 @@ namespace strumpack {
    */
   template<typename integer_t> class SeparatorTree {
   public:
-
-    /**
-     * Construct based on number of separators.
-     */
+    SeparatorTree() = default;
     SeparatorTree(integer_t nr_nodes);
-
-    /**
-     * Construct from on a vector of Separators.
-     */
-    SeparatorTree(std::vector<Separator<integer_t>>& seps);
-
-    /**
-     * Construct from an elimination tree.
-     */
-    SeparatorTree(std::vector<integer_t>& etree);
+    SeparatorTree(const std::vector<Separator<integer_t>>& seps);
 
     integer_t levels() const;
     integer_t level(integer_t i) const;
@@ -79,58 +67,36 @@ namespace strumpack {
     void printm(const std::string& name) const;
     void check() const;
 
-    std::unique_ptr<SeparatorTree<integer_t>> subtree(integer_t p, integer_t P) const;
-    std::unique_ptr<SeparatorTree<integer_t>> toptree(integer_t P) const;
+    SeparatorTree<integer_t> subtree(integer_t p, integer_t P) const;
+    SeparatorTree<integer_t> toptree(integer_t P) const;
 
     integer_t separators() const { return nr_seps_; }
 
-    const integer_t* pa() const { return parent_; }
-    const integer_t* lch() const { return lchild_; }
-    const integer_t* rch() const { return rchild_; }
-
-    integer_t* pa() { return parent_; }
-    integer_t* lch() { return lchild_; }
-    integer_t* rch() { return rchild_; }
-
-    integer_t sizes(integer_t sep) const { return sep_sizes_[sep]; }
-    integer_t pa(integer_t sep) const { return parent_[sep]; }
-    integer_t lch(integer_t sep) const { return lchild_[sep]; }
-    integer_t rch(integer_t sep) const { return rchild_[sep]; }
-
-    integer_t& sizes(integer_t sep) { return sep_sizes_[sep]; }
-    integer_t& pa(integer_t sep) { return parent_[sep]; }
-    integer_t& lch(integer_t sep) { return lchild_[sep]; }
-    integer_t& rch(integer_t sep) { return rchild_[sep]; }
-
-    bool is_leaf(integer_t sep) const {
-      return lchild_[sep] == -1;
-    }
-    bool is_root(integer_t sep) const {
-      return parent_[sep] == -1;
-    }
-    bool is_empty() const {
-      return nr_seps_ == 0;
-    }
+    bool is_leaf(integer_t sep) const { return lch[sep] == -1; }
+    bool is_root(integer_t sep) const { return parent[sep] == -1; }
+    bool is_empty() const { return nr_seps_ == 0; }
 
 #if defined(STRUMPACK_USE_MPI)
     void broadcast(const MPIComm& c);
 #endif
 
+    integer_t *sizes = nullptr,
+      *parent = nullptr,
+      *lch = nullptr,
+      *rch = nullptr;
+
   protected:
     integer_t nr_seps_ = 0;
-    std::unique_ptr<integer_t[]> iwork_ = nullptr;
-    integer_t *sep_sizes_ = nullptr, *parent_ = nullptr,
-      *lchild_ = nullptr, *rchild_ = nullptr;
-
+    std::vector<integer_t> iwork_;
     integer_t size() const { return 4*nr_seps_+1; }
 
-    void allocate_nr_seps(integer_t nseps) {
+    void allocate(integer_t nseps) {
       nr_seps_ = nseps;
-      iwork_.reset(new integer_t[4*nseps+1]);
-      sep_sizes_ = iwork_.get();
-      parent_ = sep_sizes_ + nr_seps_ + 1;
-      lchild_ = parent_ + nr_seps_;
-      rchild_ = lchild_ + nr_seps_;
+      iwork_.resize(4 * nseps + 1);
+      sizes = iwork_.data();
+      parent = sizes + nr_seps_ + 1;
+      lch = parent + nr_seps_;
+      rch = lch + nr_seps_;
     }
 
   private:
@@ -145,10 +111,56 @@ namespace strumpack {
    * elimination tree with the permutation. Build a separator tree
    * from the elimination tree. Set the inverse permutation.
    */
+  template<typename integer_t> SeparatorTree<integer_t>
+  build_sep_tree_from_perm(const integer_t* ptr, const integer_t* ind,
+                           std::vector<integer_t>& perm,
+                           std::vector<integer_t>& iperm);
+
+  /*! \brief Symmetric elimination tree
+   *
+   * <pre>
+   *      p = spsymetree (A);
+   *
+   *      Find the elimination tree for symmetric matrix A.
+   *      This uses Liu's algorithm, and runs in time O(nz*log n).
+   *
+   *      Input:
+   *        Square sparse matrix A.  No check is made for symmetry;
+   *        elements below and on the diagonal are ignored.
+   *        Numeric values are ignored, so any explicit zeros are
+   *        treated as nonzero.
+   *      Output:
+   *        Integer array of parents representing the etree, with n
+   *        meaning a root of the elimination forest.
+   *      Note:
+   *        This routine uses only the upper triangle, while sparse
+   *        Cholesky (as in spchol.c) uses only the lower.  Matlab's
+   *        dense Cholesky uses only the upper.  This routine could
+   *        be modified to use the lower triangle either by transposing
+   *        the matrix or by traversing it by rows with auxiliary
+   *        pointer and link arrays.
+   *
+   *      John R. Gilbert, Xerox, 10 Dec 1990
+   *      Based on code by JRG dated 1987, 1988, and 1990.
+   *      Modified by X.S. Li, November 1999.
+   * </pre>
+   */
   template<typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> build_sep_tree_from_perm
-  (const integer_t* ptr, const integer_t* ind,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm);
+  std::vector<integer_t>
+  spsymetree(const integer_t* acolst,      // column starts
+             const integer_t* acolend,     //   and ends past 1
+             const integer_t* arow,        // row indices of A
+             integer_t n,                  // dimension of A
+             integer_t subgraph_begin=0);  // first row/column of subgraph
+
+  template<typename integer_t>
+  std::vector<integer_t>
+  etree_postorder(const std::vector<integer_t>& etree);
+
+  template<typename integer_t>
+  std::vector<Separator<integer_t>>
+  separators_from_etree(std::vector<integer_t>& etree,
+                        std::vector<integer_t>& post);
 
 } // end namespace strumpack
 

@@ -44,6 +44,9 @@
 namespace strumpack {
   namespace gpu {
 
+    const unsigned int MAX_BLOCKS_Y = 65535;
+    const unsigned int MAX_BLOCKS_Z = 65535;
+
 #define gpu_check(err) {                                              \
       strumpack::gpu::hip_assert((err), __FILE__, __LINE__);          \
     }
@@ -62,10 +65,7 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() {
-        gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
-        //gpu_check(hipStreamCreate(&s_));
-      }
+      Stream() { gpu_check(hipStreamCreate(&s_)); }
       ~Stream() { gpu_check(hipStreamDestroy(s_)); }
       operator hipStream_t&() { return s_; }
       operator const hipStream_t&() const { return s_; }
@@ -109,63 +109,71 @@ namespace strumpack {
       hipEvent_t e_;
     };
 
-    template<typename T> void memset
-    (void* dptr, int value, std::size_t count) {
-      gpu_check(hipMemset(dptr, value, count*sizeof(T)));
+    template<typename T> hipError_t
+    memset(void* dptr, int value, std::size_t count) {
+      return hipMemset(dptr, value, count*sizeof(T));
     }
 
-    template<typename T> void copy_device_to_host
-    (T* hptr, const T* dptr, std::size_t count) {
-      gpu_check(hipMemcpy(hptr, dptr, count*sizeof(T),
-                           hipMemcpyDeviceToHost));
+    template<typename T> hipError_t
+    copy_device_to_host(T* hptr, const T* dptr, std::size_t count) {
+      return hipMemcpy(hptr, dptr, count*sizeof(T),
+                       hipMemcpyDeviceToHost);
     }
-    template<typename T> void copy_device_to_host_async
-    (T* hptr, const T* dptr, std::size_t count, const Stream& s) {
-      gpu_check(hipMemcpyAsync(hptr, dptr, count*sizeof(T),
-                                hipMemcpyDeviceToHost, s));
+    template<typename T> hipError_t
+    copy_device_to_host_async(T* hptr, const T* dptr,
+                              std::size_t count, const Stream& s) {
+      return hipMemcpyAsync(hptr, dptr, count*sizeof(T),
+                            hipMemcpyDeviceToHost, s);
     }
-    template<typename T> void copy_host_to_device
-    (T* dptr, const T* hptr, std::size_t count) {
-      gpu_check(hipMemcpy(dptr, hptr, count*sizeof(T),
-                           hipMemcpyHostToDevice));
+    template<typename T> hipError_t
+    copy_host_to_device(T* dptr, const T* hptr, std::size_t count) {
+      return hipMemcpy(dptr, hptr, count*sizeof(T),
+                       hipMemcpyHostToDevice);
     }
-    template<typename T> void copy_host_to_device_async
-    (T* dptr, const T* hptr, std::size_t count, const Stream& s) {
-      gpu_check(hipMemcpyAsync(dptr, hptr, count*sizeof(T),
-                                hipMemcpyHostToDevice, s));
+    template<typename T> hipError_t
+    copy_host_to_device_async(T* dptr, const T* hptr,
+                              std::size_t count, const Stream& s) {
+      return hipMemcpyAsync(dptr, hptr, count*sizeof(T),
+                            hipMemcpyHostToDevice, s);
     }
 
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
+    template<typename T> hipError_t
+    copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
+      return copy_device_to_host
+        (h.data(), d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const T* d) {
+    template<typename T> hipError_t
+    copy_device_to_host(DenseMatrix<T>& h, const T* d) {
       assert(h.rows() == h.ld());
-      copy_device_to_host(h.data(), d, h.rows()*h.cols());
+      return copy_device_to_host
+        (h.data(), d, std::size_t(h.rows())*h.cols());
     }
-    template<typename T> void copy_device_to_host
-    (T* h, const DenseMatrix<T>& d) {
+    template<typename T> hipError_t
+    copy_device_to_host(T* h, const DenseMatrix<T>& d) {
       assert(d.rows() == d.ld());
-      copy_device_to_host(h, d.data(), d.rows()*d.cols());
+      return copy_device_to_host
+        (h, d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
+    template<typename T> hipError_t
+    copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
+      return copy_host_to_device
+        (d.data(), h.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const T* h) {
+    template<typename T> hipError_t
+    copy_host_to_device(DenseMatrix<T>& d, const T* h) {
       assert(d.rows() == d.ld());
-      copy_host_to_device(d.data(), h, d.rows()*d.cols());
+      return copy_host_to_device
+        (d.data(), h, std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (T* d, const DenseMatrix<T>& h) {
+    template<typename T> hipError_t
+    copy_host_to_device(T* d, const DenseMatrix<T>& h) {
       assert(h.rows() == h.ld());
-      copy_host_to_device(d, h.data(), h.rows()*h.cols());
+      return copy_host_to_device
+        (d, h.data(), std::size_t(h.rows())*h.cols());
     }
 
 
@@ -328,6 +336,16 @@ namespace strumpack {
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
          const DenseMatrix<scalar_t>& x, scalar_t beta,
          DenseMatrix<scalar_t>& y);
+
+    template<typename scalar_t> void
+    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
+          int k1, int k2, int* ipiv, int inc);
+
+    // assume inc = 1
+    template<typename scalar_t> void
+    laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
+                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
+                       unsigned int batchCount);
 
   } // end namespace gpu
 } // end namespace strumpack

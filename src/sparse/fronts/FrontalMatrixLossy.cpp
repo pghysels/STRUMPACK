@@ -142,12 +142,13 @@ namespace strumpack {
     F21 = F21c_.decompress();
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixLossy<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
-    FD_t::factor(A, opts, workspace, etree_level, task_depth);
+    auto e = FD_t::factor(A, opts, workspace, etree_level, task_depth);
     compress(opts);
+    return e;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -157,7 +158,7 @@ namespace strumpack {
     decompress(F11, F12, F21);
     if (this->dim_sep()) {
       DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      bloc.laswp(this->piv, true);
+      bloc.laswp(this->piv_, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11, bloc, task_depth);
         if (this->dim_upd())
@@ -193,6 +194,12 @@ namespace strumpack {
              F11, yloc, task_depth);
       }
     }
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixLossy<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    return this->matrix_inertia(F11c_.decompress(), neg, zero, pos);
   }
 
   // explicit template instantiations

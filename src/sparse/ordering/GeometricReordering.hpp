@@ -39,11 +39,11 @@
 namespace strumpack {
 
   template<typename integer_t,typename scalar_t>
-  std::unique_ptr<SeparatorTree<integer_t>> geometric_nested_dissection
-  (const CompressedSparseMatrix<scalar_t,integer_t>& A,
-   int nx, int ny, int nz, int components, int width,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   const SPOptions<scalar_t>& opts);
+  SeparatorTree<integer_t>
+  geometric_ND(const CompressedSparseMatrix<scalar_t,integer_t>& A,
+               int nx, int ny, int nz, int components, int width,
+               std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
+               const SPOptions<scalar_t>& opts);
 
 } // end namespace strumpack
 

@@ -323,6 +323,24 @@ namespace strumpack {
     return g;
   }
 
+#if defined(STRUMPACK_USE_MPI)
+  template<typename integer_t> void
+  CSRGraph<integer_t>::broadcast(const MPIComm& comm) {
+    std::size_t gsize = 0;
+    std::vector<integer_t> gv;
+    if (comm.is_root()) {
+      gv = serialize();
+      gsize = gv.size();
+    }
+    comm.broadcast(gsize);
+    if (!comm.is_root())
+      gv.resize(gsize);
+    comm.broadcast(gv);
+    if (!comm.is_root())
+      *this = deserialize(gv);
+  }
+#endif
+
   template<typename integer_t> template<typename int_t> DenseMatrix<bool>
   CSRGraph<integer_t>::admissibility(const std::vector<int_t>& tiles) const {
     std::size_t nt = tiles.size(), n = size();

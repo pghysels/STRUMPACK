@@ -37,6 +37,7 @@
 
 #include "CompressedSparseMatrix.hpp"
 #include "CSRGraph.hpp"
+// #include "ordering/Graph.hpp"
 
 namespace strumpack {
 
@@ -104,6 +105,8 @@ namespace strumpack {
     CSRGraph<integer_t>
     extract_graph_CB(int ordering_level,
                      const std::vector<integer_t>& upd) const override;
+
+    // ordering::Graph<integer_t> graph() const;
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     // TODO implement these outside of this class

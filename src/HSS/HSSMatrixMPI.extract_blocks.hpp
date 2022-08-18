@@ -125,6 +125,7 @@ namespace strumpack {
           sbuf[destr[t.r]+destc[t.c]].emplace_back(t, k);
       }
       auto rbuf = Comm().all_to_all_v(sbuf);
+      Quadlet::free_mpi_type();
       std::fill(nb_destr.begin(), nb_destr.end(), -1);
       for (auto& q : rbuf) {
         auto k = q.k;

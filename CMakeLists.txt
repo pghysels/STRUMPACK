@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.17)
-project(STRUMPACK VERSION 6.3.0 LANGUAGES CXX C Fortran)
-
+project(STRUMPACK VERSION 6.3.1 LANGUAGES CXX C Fortran)
+cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
 option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
 option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" ON)
+option(STRUMPACK_USE_SYCL    "Use SYCL/DPC++ for Intel GPU acceleration" OFF)
+option(STRUMPACK_USE_BLAS64  "Use 64 bit interfaces to BLAS and LAPACK, e.g., MKL ILP64 or openblas64" OFF)
 
 option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" ON)
 option(TPL_ENABLE_PARMETIS   "Build with support for ParMetis" ON)
@@ -15,7 +17,8 @@ option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
-option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
+option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" OFF)
+option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
@@ -24,6 +27,8 @@ option(STRUMPACK_MESSAGE_COUNTER "Build with counter for MPI messages" OFF)
 include(CheckLibraryExists)
 # include(CMakePushCheckState)
 include(CheckCXXSourceCompiles)
+
+include(GNUInstallDirs)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
@@ -66,9 +71,9 @@ endif()
 if(TPL_ENABLE_PTSCOTCH)
   set(TPL_ENABLE_SCOTCH ON)
 endif()
-if(NOT STRUMPACK_USE_CUDA)
+if(NOT (STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP))
   if(TPL_ENABLE_MAGMA)
-    message(STATUS "Disabling MAGMA, it requires CUDA to be enabled.")
+    message(STATUS "Disabling MAGMA, it requires CUDA or HIP to be enabled.")
   endif()
 endif()
 
@@ -102,14 +107,6 @@ if(STRUMPACK_USE_CUDA)
     enable_language(CUDA)
     # will be in CMake 3.17? for now we have a copy in cmake/Modules
     find_package(CUDAToolkit REQUIRED)
-    if(TPL_ENABLE_MAGMA)
-      list(APPEND CMAKE_PREFIX_PATH
-        ${TPL_MAGMA_PREFIX} $ENV{MAGMA_DIR} $ENV{MAGMA_ROOT})
-      find_package(MAGMA)
-      if(MAGMA_FOUND)
-        option(STRUMPACK_USE_MAGMA "" ON)
-      endif()
-    endif()
   else()
     message(WARNING "CUDA compiler not found,"
       " proceeding without CUDA support.")
@@ -127,6 +124,7 @@ if(STRUMPACK_USE_HIP)
     if(HIP_FOUND)
       set(STRUMPACK_HIP_PLATFORM_HCC ON)
       find_package(hipblas REQUIRED)
+      find_package(hipsparse REQUIRED)
       find_package(rocsolver REQUIRED)
       find_package(rocblas REQUIRED)
       # find_package(rocthrust REQUIRED)
@@ -136,6 +134,48 @@ if(STRUMPACK_USE_HIP)
         " proceeding without HIP support.")
       set(STRUMPACK_USE_HIP OFF)
     endif()
+  endif()
+endif()
+
+if(STRUMPACK_USE_SYCL)
+  message(STATUS "SYCL/DPC++ enabled, looking for MKL")
+  list(APPEND CMAKE_PREFIX_PATH $ENV{MKLROOT} $ENV{TBBROOT})
+  # set(MKL_LINK dynamic)
+  # set(MKL_LINK static)
+  # set(MKL_ARCH intel64)
+  # set(MKL_INTERFACE lp64)   ## this doesn't work, only ilp64 works
+  set(STRUMPACK_USE_BLAS64 ON)
+  find_package(MKL REQUIRED)
+endif()
+
+
+if(TPL_ENABLE_MATLAB)
+  find_package(Matlab REQUIRED COMPONENTS MEX_COMPILER)
+  if(Matlab_FOUND)
+    message("Found MATLAB, make sure to use BLAS/LAPACK with 64bit interface, such as Intel MKL ILP64")
+    set(STRUMPACK_USE_BLAS64 ON)
+    option(STRUMPACK_USE_MATLAB "" ON)
+  endif()
+endif()
+
+
+if(STRUMPACK_USE_BLAS64)
+  # BLA_SIZEOF_INTEGER is new in CMake 3.22
+  set(BLA_SIZEOF_INTEGER 8)
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+    ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+    PROPERTIES COMPILE_OPTIONS
+    "$<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>> $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>")
+endif()
+
+
+if(TPL_ENABLE_MAGMA)
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_MAGMA_PREFIX} $ENV{MAGMA_DIR} $ENV{MAGMA_ROOT})
+  find_package(MAGMA)
+  if(MAGMA_FOUND)
+    option(STRUMPACK_USE_MAGMA "" ON)
   endif()
 endif()
 
@@ -228,11 +268,11 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
   if(TARGET OpenMP::OpenMP_Fortran)
     try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
       SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} OpenMP::OpenMP_Fortran)
+      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES} OpenMP::OpenMP_Fortran)
   else()
     try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
       SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
+      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
   endif()
   if(STRUMPACK_TPL_LAPACK_WORKS)
     message(STATUS
@@ -248,12 +288,12 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
     if(TARGET OpenMP::OpenMP_Fortran)
       try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
         SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES}
+        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES}
         Threads::Threads OpenMP::OpenMP_Fortran)
     else()
       try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
         SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} Threads::Threads)
+        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES} Threads::Threads)
     endif()
     if(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS)
       message(STATUS
@@ -457,6 +497,9 @@ if(TPL_ENABLE_BPACK)
 endif()
 
 if(TPL_ENABLE_SLATE)
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_SLATE_PREFIX}
+    $ENV{slate_DIR} $ENV{slate_ROOT}
+    $ENV{SLATE_DIR} $ENV{SLATE_ROOT})
   find_package(blaspp)
   find_package(lapackpp)
   find_package(slate)
@@ -465,7 +508,7 @@ if(TPL_ENABLE_SLATE)
     # option(STRUMPACK_USE_SLATE_LAPACK "" ON)
     option(STRUMPACK_USE_SLATE "" ON)
     option(STRUMPACK_USE_SLATE_SCALAPACK "" ON)
-    set(STRUMPACK_PBLAS_BLOCKSIZE "256")
+    set(STRUMPACK_PBLAS_BLOCKSIZE "512")
   else()
     message(WARNING "SLATE was not found."
       " SLATE is required for GPU support in the distributed memory code.")
@@ -485,6 +528,7 @@ if(TPL_ENABLE_COMBBLAS)
   endif()
 endif()
 
+
 # TODO PIC
 # TODO libatomic?
 
@@ -492,13 +536,18 @@ endif()
 if(STRUMPACK_USE_HIP)
   set_source_files_properties(
     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    src/dense/HIPWrapper.hip.cpp
     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
   if(BUILD_SHARED_LIBS)
     set(STATIC_OR_SHARED SHARED)
   else()
     set(STATIC_OR_SHARED STATIC)
   endif()
-  hip_add_library(strumpack "src/sparse/fronts/FrontalMatrixHIP.hip.cpp" ${STATIC_OR_SHARED})
+  hip_add_library(
+    strumpack
+    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    src/dense/HIPWrapper.hip.cpp
+    ${STATIC_OR_SHARED})
 else()
   add_library(strumpack "")
 endif()
@@ -513,7 +562,7 @@ add_subdirectory(src)
 target_sources(strumpack
   PRIVATE ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h)
 
-target_compile_features(strumpack PUBLIC cxx_std_11)
+target_compile_features(strumpack PUBLIC cxx_std_17)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 target_compile_options(strumpack PRIVATE
@@ -526,6 +575,12 @@ check_cxx_compiler_flag(-Wno-overloaded-virtual
 if(COMPILER_SUPPORTS_NOOVERLOAD_WARNING)
   target_compile_options(strumpack PUBLIC
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-overloaded-virtual>)
+endif()
+
+if(STRUMPACK_USE_BLAS64)
+  target_compile_options(strumpack PRIVATE
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>>
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>)
 endif()
 
 
@@ -565,6 +620,11 @@ if(LAPACK_FOUND)
 endif()
 if(BLAS_FOUND)
   target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
+endif()
+
+if(MKL_FOUND)
+  target_link_libraries(strumpack PUBLIC MKL::MKL)
+  # target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
 endif()
 
 # the order is important
@@ -615,7 +675,7 @@ if(MAGMA_FOUND)
 endif()
 
 if(hipblas_FOUND)
-  target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver)
+  target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver roc::hipsparse)
   # target_link_libraries(strumpack PUBLIC roc::rocprim) # roc::rocprim_hip)
   # target_link_libraries(strumpack PUBLIC roc::rocthrust)
   # if(STRUMPACK_HIP_PLATFORM_HCC)
@@ -631,7 +691,7 @@ if(hipblas_FOUND)
   #   #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
   #   else()
   #     target_compile_options(strumpack PRIVATE
-  # 	$<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
+  #     $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
   #     message(WARNING "No AMD GPU architecture was specified,"
   #       " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
   #       " where xxx can be for instance gfx906 (or a comma separated list)")
@@ -654,6 +714,7 @@ add_subdirectory(examples)
 include(CTest)
 add_subdirectory(test)
 
+
 # documentation
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
@@ -672,7 +733,8 @@ install(FILES
   DESTINATION include)
 
 install(TARGETS strumpack EXPORT STRUMPACKTargets
-  LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 
 # export targets and all

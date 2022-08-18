@@ -46,6 +46,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
+    using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
     using Opts_t = SPOptions<scalar_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
@@ -70,6 +71,7 @@ namespace strumpack {
 
     void extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                     const FMPI_t* pa) const override;
+
     void
     extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FBLRMPI_t* pa) const override;
@@ -79,8 +81,21 @@ namespace strumpack {
                                    integer_t end_col,
                                    const SPOptions<scalar_t>& opts)
       const override;
-    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                    int etree_level=0, int task_depth=0)
+
+    void
+    extadd_blr_copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
+                                 BLRMPI_t& F21, BLRMPI_t& F22,
+                                 scalar_t** pbuf, const FBLRMPI_t* pa)
+      const override;
+    void
+    extadd_blr_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                                     BLRMPI_t& F21, BLRMPI_t& F22,
+                                     scalar_t** pbuf, const FBLRMPI_t* pa,
+                                     integer_t begin_col, integer_t end_col)
+      const override;
+
+    ReturnCode multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                                          int etree_level=0, int task_depth=0)
       override;
 
     void forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,

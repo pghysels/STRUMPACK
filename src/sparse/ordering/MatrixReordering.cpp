@@ -53,7 +53,11 @@
 #include "ParMetisReordering.hpp"
 #endif
 #include "RCMReordering.hpp"
+#include "ANDSparspak.hpp"
 #include "GeometricReordering.hpp"
+#include "minimum_degree/AMDReordering.hpp"
+#include "minimum_degree/MMDReordering.hpp"
+// #include "spectral/SpectralReordering.hpp"
 
 namespace strumpack {
 
@@ -72,16 +76,16 @@ namespace strumpack {
     switch (opts.reordering_method()) {
     case ReorderingStrategy::NATURAL: {
       std::iota(perm_.begin(), perm_.end(), 0);
-      sep_tree_ = build_sep_tree_from_perm(A.ptr(), A.ind(), perm_, iperm_);
+      tree_ = build_sep_tree_from_perm(A.ptr(), A.ind(), perm_, iperm_);
       break;
     }
     case ReorderingStrategy::METIS: {
-      sep_tree_ = metis_nested_dissection(A, perm_, iperm_, opts);
+      tree_ = metis_nested_dissection(A, perm_, iperm_, opts);
       break;
     }
     case ReorderingStrategy::SCOTCH: {
 #if defined(STRUMPACK_USE_SCOTCH)
-      sep_tree_ = scotch_nested_dissection(A, perm_, iperm_, opts);
+      tree_ = scotch_nested_dissection(A, perm_, iperm_, opts);
 #else
       std::cerr << "ERROR: STRUMPACK was not configured with Scotch support"
                 << std::endl;
@@ -90,14 +94,36 @@ namespace strumpack {
       break;
     }
     case ReorderingStrategy::GEOMETRIC: {
-      sep_tree_ = geometric_nested_dissection
-        (A, nx, ny, nz, components, width, perm_, iperm_, opts);
-      if (!sep_tree_) return 1;
+      tree_ = geometric_ND(A, nx, ny, nz, components, width,
+                           perm_, iperm_, opts);
       break;
     }
     case ReorderingStrategy::RCM: {
-      sep_tree_ = rcm_reordering(A, perm_, iperm_);
+      tree_ = rcm_reordering(A, perm_, iperm_);
       break;
+    }
+    case ReorderingStrategy::AMD: {
+      tree_ = ordering::amd_reordering(A, perm_, iperm_);
+      break;
+    }
+    case ReorderingStrategy::MMD: {
+      tree_ = ordering::mmd_reordering(A, perm_, iperm_);
+      break;
+    }
+    case ReorderingStrategy::AND: {
+      tree_ = ordering::and_reordering(A, perm_, iperm_);
+      break;
+    }
+    case ReorderingStrategy::MLF: {
+      std::cerr << "# ERROR: MLF ordering not supported." << std::endl;
+      return 1;
+    }
+    case ReorderingStrategy::SPECTRAL: {
+      std::cerr << "# ERROR: spectral ordering not supported." << std::endl;
+      return 1;
+      // tree_ = ordering::spectral_nd
+      //   (A, perm_, iperm_, opts.ND_options());
+      // break;
     }
     default:
       std::cerr << "# ERROR: parallel matrix reorderings are"
@@ -106,7 +132,7 @@ namespace strumpack {
         " StrumpackSparseSolverMPIDist instead." << std::endl;
       return 1;
     }
-    sep_tree_->check();
+    tree_.check();
     nested_dissection_print(opts, A.nnz(), opts.verbose());
     return 0;
   }
@@ -118,15 +144,15 @@ namespace strumpack {
     assert(A.size() == integer_t(n));
     if (base == 0) std::copy(p, p+n, perm_.data());
     else for (std::size_t i=0; i<n; i++) perm_[i] = p[i] - base;
-    sep_tree_ = build_sep_tree_from_perm(A.ptr(), A.ind(), perm_, iperm_);
-    sep_tree_->check();
+    tree_ = build_sep_tree_from_perm(A.ptr(), A.ind(), perm_, iperm_);
+    tree_.check();
     nested_dissection_print(opts, A.nnz(), opts.verbose());
     return 0;
   }
 
   template<typename scalar_t,typename integer_t> void
   MatrixReordering<scalar_t,integer_t>::clear_tree_data() {
-    sep_tree_ = nullptr;
+    tree_ = SeparatorTree<integer_t>();
   }
 
   // reorder the vertices in the separator to get a better rank structure
@@ -153,7 +179,7 @@ namespace strumpack {
   MatrixReordering<scalar_t,integer_t>::nested_dissection_print
   (const Opts_t& opts, integer_t nnz, bool verbose) const {
     nested_dissection_print
-      (opts, nnz, sep_tree_->levels(), sep_tree_->separators(), verbose);
+      (opts, nnz, tree_.levels(), tree_.separators(), verbose);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -230,7 +256,7 @@ namespace strumpack {
           else filename += "_ETREE";
         }
       }
-      sep_tree_->printm(filename);
+      tree_.printm(filename);
     }
   }
 

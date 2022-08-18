@@ -518,11 +518,12 @@ namespace strumpack {
         if (A.rows() != A.cols())
           throw std::invalid_argument
             ("HODLR compression only supported for square matrices.");
-        structured::ClusterTree t(A.rows());
-        t.refine(opts.leaf_size());
         HODLR::HODLROptions<scalar_t> hodlr_opts(opts);
         auto H = new HODLR::HODLRMatrix<scalar_t>
-          (A.Comm(), t, hodlr_opts);
+          (A.Comm(),
+           row_tree ? *row_tree :
+           structured::ClusterTree(A.rows()).refine(opts.leaf_size()),
+           hodlr_opts);
         H->compress(Ablocks);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
 #else
@@ -620,14 +621,48 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
-    construct_from_elements(const MPIComm& comm, int rows, int cols,
+    construct_from_elements(const MPIComm& comm, const BLACSGrid* grid,
+                            int rows, int cols,
                             const extract_dist_block_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree,
                             const structured::ClusterTree* col_tree) {
       switch (opts.type()) {
-      case Type::HSS:
-        throw std::logic_error("Not implemented yet.");
+      case Type::HSS: {
+        auto Amult = [&A,&rows,&cols,&grid]
+          (Trans op, const DistributedMatrix<scalar_t>& R,
+           DistributedMatrix<scalar_t>& S) {
+          if (op == Trans::N) {
+            std::vector<std::size_t> J(cols);
+            std::iota(J.begin(), J.end(), 0);
+            int rsub = grid->nprows()*R.MB();
+            for (int r=0; r<S.rows(); r+=rsub) {
+              rsub = std::min(rsub, S.rows()-r);
+              DistributedMatrix<scalar_t> Asub(grid, rsub, cols);
+              std::vector<std::size_t> I(rsub);
+              std::iota(I.begin(), I.end(), r);
+              A(I, J, Asub);
+              DistributedMatrixWrapper<scalar_t> Ssub(rsub, S.cols(), S, r, 0);
+              gemm(op, Trans::N, scalar_t(1.), Asub, R, scalar_t(0.), Ssub);
+            }
+          } else {
+            std::vector<std::size_t> I(rows);
+            std::iota(I.begin(), I.end(), 0);
+            int csub = grid->npcols()*R.NB();
+            for (int c=0; c<S.rows(); c+=csub) {
+              csub = std::min(csub, S.rows()-c);
+              DistributedMatrix<scalar_t> Asub(grid, rows, csub);
+              std::vector<std::size_t> J(csub);
+              std::iota(J.begin(), J.end(), c);
+              A(I, J, Asub);
+              DistributedMatrixWrapper<scalar_t> Ssub(csub, S.cols(), S, c, 0);
+              gemm(op, Trans::N, scalar_t(1.), Asub, R, scalar_t(0.), Ssub);
+            }
+          }
+        };
+        return construct_partially_matrix_free<scalar_t>
+          (grid, rows, cols, Amult, A, opts, row_tree, col_tree);
+      } break;
       case Type::BLR:
         throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
@@ -674,25 +709,25 @@ namespace strumpack {
 
     // explicit template instantiations
     template std::unique_ptr<StructuredMatrix<float>>
-    construct_from_elements(const MPIComm&, int, int,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
                             const extract_dist_block_t<float>&,
                             const StructuredOptions<float>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*);
     template std::unique_ptr<StructuredMatrix<double>>
-    construct_from_elements(const MPIComm&, int, int,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
                             const extract_dist_block_t<double>&,
                             const StructuredOptions<double>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*);
     template std::unique_ptr<StructuredMatrix<std::complex<float>>>
-    construct_from_elements(const MPIComm&, int, int,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
                             const extract_dist_block_t<std::complex<float>>&,
                             const StructuredOptions<std::complex<float>>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*);
     template std::unique_ptr<StructuredMatrix<std::complex<double>>>
-    construct_from_elements(const MPIComm&, int, int,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
                             const extract_dist_block_t<std::complex<double>>&,
                             const StructuredOptions<std::complex<double>>&,
                             const structured::ClusterTree*,
@@ -700,7 +735,8 @@ namespace strumpack {
 
 
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
-    construct_from_elements(const MPIComm& comm, int rows, int cols,
+    construct_from_elements(const MPIComm& comm, const BLACSGrid* grid,
+                            int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree,
@@ -720,8 +756,21 @@ namespace strumpack {
         };
 #endif
       switch (opts.type()) {
-      case Type::HSS:
-        throw std::logic_error("Not implemented yet.");
+      case Type::HSS: {
+        auto Ablock = [&A]
+          (const std::vector<std::size_t>& I,
+           const std::vector<std::size_t>& J,
+           DistributedMatrix<scalar_t>& B) {
+          for (std::size_t j=0; j<J.size(); j++) {
+            if (B.colg2p(j) != B.pcol()) continue;
+            for (std::size_t i=0; i<I.size(); i++)
+              if (B.rowg2p(i) == B.prow())
+                B.global(i, j) = A(I[i], J[j]);
+          }
+        };
+        return construct_from_elements<scalar_t>
+          (comm, grid, rows, cols, Ablock, opts, row_tree, col_tree);
+      } break;
       case Type::BLR:
         throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
@@ -805,23 +854,25 @@ namespace strumpack {
 
     // explicit template instantiations
     template std::unique_ptr<StructuredMatrix<float>>
-    construct_from_elements(const MPIComm&, int, int, const extract_t<float>&,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
+                            const extract_t<float>&,
                             const StructuredOptions<float>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*);
     template std::unique_ptr<StructuredMatrix<double>>
-    construct_from_elements(const MPIComm&, int, int, const extract_t<double>&,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
+                            const extract_t<double>&,
                             const StructuredOptions<double>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*);
     template std::unique_ptr<StructuredMatrix<std::complex<float>>>
-    construct_from_elements(const MPIComm&, int, int,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
                             const extract_t<std::complex<float>>&,
                             const StructuredOptions<std::complex<float>>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*);
     template std::unique_ptr<StructuredMatrix<std::complex<double>>>
-    construct_from_elements(const MPIComm&, int, int,
+    construct_from_elements(const MPIComm&, const BLACSGrid*, int, int,
                             const extract_t<std::complex<double>>&,
                             const StructuredOptions<std::complex<double>>&,
                             const structured::ClusterTree*,
@@ -1141,6 +1192,84 @@ namespace strumpack {
                           const StructuredOptions<std::complex<double>>&,
                           const structured::ClusterTree*,
                           const structured::ClusterTree*);
+
+
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_partially_matrix_free(const BLACSGrid* grid,
+                                    int rows, int cols,
+                                    const mult_2d_t<scalar_t>& Amult,
+                                    const extract_dist_block_t<scalar_t>& Aelem,
+                                    const StructuredOptions<scalar_t>& opts,
+                                    const structured::ClusterTree* row_tree,
+                                    const structured::ClusterTree* col_tree) {
+      switch (opts.type()) {
+      case Type::HSS: {
+        HSS::HSSOptions<scalar_t> hss_opts(opts);
+        auto H = row_tree ?
+          new HSS::HSSMatrixMPI<scalar_t>(*row_tree, grid, hss_opts) :
+          new HSS::HSSMatrixMPI<scalar_t>
+          (structured::ClusterTree(rows).refine(opts.leaf_size()),
+           grid, hss_opts);
+        using DistM_t = DistributedMatrix<scalar_t>;
+        auto sample =
+          [&Amult](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
+            Amult(Trans::N, R, Sr);
+            Amult(Trans::C, R, Sc);
+          };
+        H->compress(sample, Aelem, hss_opts);
+        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+      } break;
+      case Type::BLR: {
+        return construct_from_elements<scalar_t>
+          (grid->Comm(), grid, rows, cols, Aelem, opts);
+      } break;
+      case Type::HODLR:
+        throw std::logic_error("Use construct_from_elements or construct_matrix_free instead.");
+      case Type::HODBF:
+        throw std::logic_error("Use construct_from_elements or construct_matrix_free instead.");
+      case Type::BUTTERFLY:
+        throw std::logic_error("Use construct_from_elements or construct_matrix_free instead.");
+      case Type::LR:
+        throw std::logic_error("Use construct_from_elements or construct_matrix_free instead.");
+      case Type::LOSSY:
+        throw std::invalid_argument
+          ("Type LOSSY does not support partially matrix-free compression.");
+      case Type::LOSSLESS:
+        throw std::invalid_argument
+          ("Type LOSSLESS does not support partially matrix-free compression.");
+      }
+      return std::unique_ptr<StructuredMatrix<scalar_t>>(nullptr);
+    }
+
+    // explicit template instantiations
+    template std::unique_ptr<StructuredMatrix<float>>
+    construct_partially_matrix_free(const BLACSGrid*, int, int,
+                                    const mult_2d_t<float>&,
+                                    const extract_dist_block_t<float>&,
+                                    const StructuredOptions<float>&,
+                                    const structured::ClusterTree*,
+                                    const structured::ClusterTree*);
+    template std::unique_ptr<StructuredMatrix<double>>
+    construct_partially_matrix_free(const BLACSGrid*, int, int,
+                                    const mult_2d_t<double>&,
+                                    const extract_dist_block_t<double>&,
+                                    const StructuredOptions<double>&,
+                                    const structured::ClusterTree*,
+                                    const structured::ClusterTree*);
+    template std::unique_ptr<StructuredMatrix<std::complex<float>>>
+    construct_partially_matrix_free(const BLACSGrid*, int, int,
+                                    const mult_2d_t<std::complex<float>>&,
+                                    const extract_dist_block_t<std::complex<float>>&,
+                                    const StructuredOptions<std::complex<float>>&,
+                                    const structured::ClusterTree*,
+                                    const structured::ClusterTree*);
+    template std::unique_ptr<StructuredMatrix<std::complex<double>>>
+    construct_partially_matrix_free(const BLACSGrid*, int, int,
+                                    const mult_2d_t<std::complex<double>>&,
+                                    const extract_dist_block_t<std::complex<double>>&,
+                                    const StructuredOptions<std::complex<double>>&,
+                                    const structured::ClusterTree*,
+                                    const structured::ClusterTree*);
 #endif
 
 

@@ -58,10 +58,25 @@ namespace strumpack { // these are all global variables
    * \ingroup Enumerations
    */
   enum class ReturnCode {
-    SUCCESS,          /*!< Operation completed successfully. */
-    MATRIX_NOT_SET,   /*!< The input matrix was not set.     */
-    REORDERING_ERROR  /*!< The matrix reordering failed.     */
+    SUCCESS,            /*!< Operation completed successfully.      */
+    MATRIX_NOT_SET,     /*!< The input matrix was not set.          */
+    REORDERING_ERROR,   /*!< The matrix reordering failed.          */
+    ZERO_PIVOT,         /*!< A zero pivot was encountered.          */
+    NO_CONVERGENCE,     /*!< The iterative solver did not converge. */
+    INACCURATE_INERTIA  /*!< Inertia could not be computed.         */
   };
+
+  inline std::ostream& operator<<(std::ostream& os, ReturnCode& e) {
+    switch (e) {
+    case ReturnCode::SUCCESS:            os << "SUCCESS"; break;
+    case ReturnCode::MATRIX_NOT_SET:     os << "MATRIX_NOT_SET"; break;
+    case ReturnCode::REORDERING_ERROR:   os << "REORDERING_ERROR"; break;
+    case ReturnCode::ZERO_PIVOT:         os << "ZERO_PIVOT"; break;
+    case ReturnCode::NO_CONVERGENCE:     os << "NO_CONVERGENCE"; break;
+    case ReturnCode::INACCURATE_INERTIA: os << "INACCURATE_INERTIA"; break;
+    }
+    return os;
+  }
 
   namespace params {
 

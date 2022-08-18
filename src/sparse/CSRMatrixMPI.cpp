@@ -866,6 +866,7 @@ namespace strumpack {
         sbuf[dest].emplace_back(col, row);
       }
     auto edges = comm_.all_to_all_v(sbuf);
+    IdxIJ::free_mpi_type();
     std::sort(edges.begin(), edges.end(),
               [](const IdxIJ& a, const IdxIJ& b) {
                 // sort according to rows, then columns
@@ -1030,6 +1031,14 @@ namespace strumpack {
     return comm_.all_reduce(m, MPI_MAX);
   }
 
+  template<typename scalar_t, typename integer_t, typename cast_t>
+  CSRMatrixMPI<cast_t,integer_t>
+  cast_matrix(const CSRMatrixMPI<scalar_t,integer_t>& mat) {
+    std::vector<cast_t> new_val(mat.val(), mat.val()+mat.local_nnz());
+    return CSRMatrixMPI<cast_t,integer_t>
+      (mat.local_rows(), mat.ptr(), mat.ind(), new_val.data(),
+       mat.dist().data(), mat.Comm(), mat.symm_sparse());
+  }
 
   // explicit template instantiations
   template class CSRMatrixMPI<float,int>;
@@ -1047,20 +1056,31 @@ namespace strumpack {
   template class CSRMatrixMPI<std::complex<float>,long long int>;
   template class CSRMatrixMPI<std::complex<double>,long long int>;
 
-
-  template<typename scalar_t, typename integer_t, typename cast_t>
-  CSRMatrixMPI<cast_t,integer_t>
-  cast_matrix(const CSRMatrixMPI<scalar_t,integer_t>& mat) {
-    std::vector<cast_t> new_val(mat.val(), mat.val()+mat.local_nnz());
-    return CSRMatrixMPI<cast_t,integer_t>
-      (mat.local_rows(), mat.ptr(), mat.ind(), new_val.data(),
-       mat.dist().data(), mat.Comm(), mat.symm_sparse());
-  }
-
   template CSRMatrixMPI<float,int>
   cast_matrix<double,int,float>(const CSRMatrixMPI<double,int>& mat);
+  template CSRMatrixMPI<double,int>
+  cast_matrix<float,int,double>(const CSRMatrixMPI<float,int>& mat);
   template CSRMatrixMPI<std::complex<float>,int>
-  cast_matrix<std::complex<double>,int,std::complex<float>>
-  (const CSRMatrixMPI<std::complex<double>,int>& mat);
+  cast_matrix<std::complex<double>,int,std::complex<float>>(const CSRMatrixMPI<std::complex<double>,int>& mat);
+  template CSRMatrixMPI<std::complex<double>,int>
+  cast_matrix<std::complex<float>,int,std::complex<double>>(const CSRMatrixMPI<std::complex<float>,int>& mat);
+
+  template CSRMatrixMPI<float,long int>
+  cast_matrix<double,long int,float>(const CSRMatrixMPI<double,long int>& mat);
+  template CSRMatrixMPI<double,long int>
+  cast_matrix<float,long int,double>(const CSRMatrixMPI<float,long int>& mat);
+  template CSRMatrixMPI<std::complex<float>,long int>
+  cast_matrix<std::complex<double>,long int,std::complex<float>>(const CSRMatrixMPI<std::complex<double>,long int>& mat);
+  template CSRMatrixMPI<std::complex<double>,long int>
+  cast_matrix<std::complex<float>,long int,std::complex<double>>(const CSRMatrixMPI<std::complex<float>,long int>& mat);
+
+  template CSRMatrixMPI<float,long long int>
+  cast_matrix<double,long long int,float>(const CSRMatrixMPI<double,long long int>& mat);
+  template CSRMatrixMPI<double,long long int>
+  cast_matrix<float,long long int,double>(const CSRMatrixMPI<float,long long int>& mat);
+  template CSRMatrixMPI<std::complex<float>,long long int>
+  cast_matrix<std::complex<double>,long long int,std::complex<float>>(const CSRMatrixMPI<std::complex<double>,long long int>& mat);
+  template CSRMatrixMPI<std::complex<double>,long long int>
+  cast_matrix<std::complex<float>,long long int,std::complex<double>>(const CSRMatrixMPI<std::complex<float>,long long int>& mat);
 
 } // end namespace strumpack

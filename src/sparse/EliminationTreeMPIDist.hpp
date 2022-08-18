@@ -63,9 +63,9 @@ namespace strumpack {
     void update_values(const Opts_t& opts, const CSRMPI_t& A,
                        Reord_t& nd);
 
-    void multifrontal_factorization
-    (const CompressedSparseMatrix<scalar_t,integer_t>& A,
-     const Opts_t& opts) override;
+    ReturnCode
+    multifrontal_factorization(const CompressedSparseMatrix<scalar_t,integer_t>& A,
+                               const Opts_t& opts) override;
 
     void multifrontal_solve_dist(DenseM_t& x,
                                  const std::vector<integer_t>& dist) override;
@@ -112,8 +112,8 @@ namespace strumpack {
           prows(g->nprows()), pcols(g->npcols()), grid(g) {}
       integer_t dim_sep() const { return sep_end - sep_begin; }
 
+      static MPI_Datatype pf_mpi_type;
       static MPI_Datatype mpi_type() {
-        static MPI_Datatype pf_mpi_type = MPI_DATATYPE_NULL;
         if (pf_mpi_type == MPI_DATATYPE_NULL) {
           int b[6] = {1, 1, 1, 1, 1, 1};
           MPI_Datatype t[6] =
@@ -127,9 +127,16 @@ namespace strumpack {
           MPI_Datatype tmp_mpi_type;
           MPI_Type_create_struct(6, b, o, t, &tmp_mpi_type);
           MPI_Type_create_resized(tmp_mpi_type, 0, sizeof(PF), &pf_mpi_type);
+          MPI_Type_free(&tmp_mpi_type);
           MPI_Type_commit(&pf_mpi_type);
         }
         return pf_mpi_type;
+      }
+      static void free_mpi_type() {
+        if (pf_mpi_type != MPI_DATATYPE_NULL) {
+          MPI_Type_free(&pf_mpi_type);
+          pf_mpi_type = MPI_DATATYPE_NULL;
+        }
       }
 
       integer_t sep_begin, sep_end;
@@ -141,34 +148,36 @@ namespace strumpack {
         is active. */
     std::vector<ParallelFront> all_pfronts_, local_pfronts_;
 
-    void symbolic_factorization
-    (std::vector<std::vector<integer_t>>& local_upd,
-     std::vector<float>& local_subtree_work,
-     std::vector<integer_t>& dsep_upd, float& dsep_work,
-     std::vector<integer_t>& dleaf_upd, float& dleaf_work);
+    void symb_fact(std::vector<std::vector<integer_t>>& local_upd,
+                   std::vector<float>& local_subtree_work,
+                   std::vector<integer_t>& dsep_upd, float& dsep_work,
+                   std::vector<integer_t>& dleaf_upd, float& dleaf_work);
 
-    float symbolic_factorization_local
-    (integer_t sep, std::vector<std::vector<integer_t>>& upd,
-     std::vector<float>& subtree_work, int depth);
+    float symb_fact_loc(integer_t sep,
+                        std::vector<std::vector<integer_t>>& upd,
+                        std::vector<float>& subtree_work, int depth);
 
-    std::unique_ptr<F_t> proportional_mapping
-    (const Opts_t& opts,
-     std::vector<std::vector<integer_t>>& upd, std::vector<float>& subtree_work,
-     std::vector<integer_t>& dist_upd, std::vector<integer_t>& dleaf_upd,
-     std::vector<float>& dist_subtree_work,
-     integer_t dsep, int P0, int P, int P0_sibling, int P_sibling,
-     const MPIComm& fcomm, bool parent_compression, int level);
+    std::unique_ptr<F_t>
+    prop_map(const Opts_t& opts,
+             std::vector<std::vector<integer_t>>& upd,
+             std::vector<float>& subtree_work,
+             std::vector<integer_t>& dist_upd,
+             std::vector<integer_t>& dleaf_upd,
+             std::vector<float>& dist_subtree_work,
+             integer_t dsep, int P0, int P, int P0_sib, int P_sib,
+             const MPIComm& fcomm, bool pa_comp, int level);
 
-    std::unique_ptr<F_t> proportional_mapping_sub_graphs
-    (const Opts_t& opts, RedistSubTree<integer_t>& tree,
-     integer_t dsep, integer_t sep, int P0, int P, int P0_sibling,
-     int P_sibling, const MPIComm& fcomm, bool parent_compression, int level);
+    std::unique_ptr<F_t>
+    prop_map_sub_graphs(const Opts_t& opts,
+                        const RedistSubTree<integer_t>& tree,
+                        int P0, int P, int P0_sib, int P_sib,
+                        const MPIComm& fcomm, bool pa_comp, int level);
 
-    void communicate_distributed_separator
-    (integer_t dsep, const std::vector<integer_t>& dupd_send,
-     integer_t& dsep_begin, integer_t& dsep_end,
-     std::vector<integer_t>& dupd_recv, int P0, int P,
-     int P0_sibling, int P_sibling, int owner);
+    void comm_dist_sep(integer_t dsep,
+                       const std::vector<integer_t>& dupd_send,
+                       integer_t& dsep_begin, integer_t& dsep_end,
+                       std::vector<integer_t>& dupd_recv,
+                       int P0, int P, int P0_sib, int P_sib, int owner);
   };
 
 } // end namespace strumpack

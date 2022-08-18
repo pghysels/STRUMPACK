@@ -57,17 +57,17 @@ namespace strumpack {
       return std::conj(a);
     }
 
-    template<typename scalar_t> inline long long axpby_flops
-    (long long n, scalar_t alpha, scalar_t beta) {
+    template<typename scalar_t> inline
+    long long axpby_flops(long long n, scalar_t alpha, scalar_t beta) {
       return (alpha != scalar_t(0)) * n * (is_complex<scalar_t>() ? 2 : 1)
         + (alpha != scalar_t(0) && alpha != scalar_t(1) &&
            alpha != scalar_t(-1)) * n * (is_complex<scalar_t>() ? 6 : 1)
         + (beta != scalar_t(0) && beta != scalar_t(1) &&
            beta != scalar_t(-1)) * n * (is_complex<scalar_t>() ? 6 : 1);
     }
-    template<typename scalar> inline void axpby
-    (int n, scalar alpha, const scalar* x, int incx,
-     scalar beta, scalar* y, int incy) {
+    template<typename scalar> inline
+    void axpby(int n, scalar alpha, const scalar* x, int incx,
+               scalar beta, scalar* y, int incy) {
       if (incx==1 && incy==1) {
 #pragma omp parallel for
         for (int i=0; i<n; i++)
@@ -81,8 +81,8 @@ namespace strumpack {
       STRUMPACK_BYTES(sizeof(scalar) * static_cast<long long>(n)*3);
     }
 
-    template<typename scalar> inline void omatcopy
-    (char opA, int m, int n, const scalar* a, int lda, scalar* b, int ldb) {
+    template<typename scalar> inline
+    void omatcopy(char opA, int m, int n, const scalar* a, int lda, scalar* b, int ldb) {
       // TODO do this in blocks??
       if (opA=='T' || opA=='t')
         for (int c=0; c<n; c++)
@@ -106,26 +106,26 @@ namespace strumpack {
 #define MKL_Complex8 std::complex<float>
 #define MKL_Complex16 std::complex<double>
 #include "mkl_trans.h"
-    template<> inline void omatcopy<float>
-    (char opa, int m, int n, const float* a, int lda, float* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const float* a, int lda, float* b, int ldb) {
       if (m && n)
         mkl_somatcopy('C', opa, m, n, 1., a, lda, b, ldb);
     }
-    template<> inline void omatcopy<double>
-    (char opa, int m, int n, const double* a, int lda, double* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const double* a, int lda, double* b, int ldb) {
       if (m && n)
         mkl_domatcopy('C', opa, m, n, 1., a, lda, b, ldb);
     }
-    template<> inline void omatcopy<std::complex<float>>
-    (char opa, int m, int n, const std::complex<float>* a, int lda,
-     std::complex<float>* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const std::complex<float>* a, int lda,
+                  std::complex<float>* b, int ldb) {
       MKL_Complex8 cone = {1.,0.};
       if (m && n)
         mkl_comatcopy('C', opa, m, n, cone, a, lda, b, ldb);
     }
-    template<> inline void omatcopy<std::complex<double>>
-    (char opa, int m, int n, const std::complex<double>* a, int lda,
-     std::complex<double>* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const std::complex<double>* a, int lda,
+                  std::complex<double>* b, int ldb) {
       MKL_Complex16 zone = {1.,0.};
       if (m && n)
         mkl_zomatcopy('C', opa, m, n, zone, a, lda, b, ldb);
@@ -133,46 +133,42 @@ namespace strumpack {
 #elif defined(__HAVE_OPENBLAS)
     extern "C" {
       // TODO this does not work on FH's laptop with openblas
-      void somatcopy_
-      (char* order, char* opa, int* m, int* n, float* alpha,
-       const float* a, int* lda, float* b, int* ldb);
-      void domatcopy_
-      (char* order, char* opa, int* m, int* n, double* alpha,
-       const double* a, int* lda, double* b, int* ldb);
-      void comatcopy_
-      (char* order, char* opa, int* m, int* n,
-       std::complex<float>* alpha, const std::complex<float>* a, int* lda,
-       std::complex<float>* b, int* ldb);
-      void zomatcopy_
-      (char* order, char* opa, int* m, int* n,
-       std::complex<double>* alpha, const std::complex<double>* a, int* lda,
-       std::complex<double>* b, int* ldb);
+      void somatcopy_(char* order, char* opa, int* m, int* n, float* alpha,
+                      const float* a, int* lda, float* b, int* ldb);
+      void domatcopy_(char* order, char* opa, int* m, int* n, double* alpha,
+                      const double* a, int* lda, double* b, int* ldb);
+      void comatcopy_(char* order, char* opa, int* m, int* n,
+                      std::complex<float>* alpha, const std::complex<float>* a, int* lda,
+                      std::complex<float>* b, int* ldb);
+      void zomatcopy_(char* order, char* opa, int* m, int* n,
+                      std::complex<double>* alpha, const std::complex<double>* a, int* lda,
+                      std::complex<double>* b, int* ldb);
     }
-    template<> inline void omatcopy<float>
-    (char opa, int m, int n, const float* a, int lda, float* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const float* a, int lda, float* b, int ldb) {
       char c = 'C';
       float o = 1.;
       if (m && n)
         somatcopy_(&c, &opa, &m, &n, &o, a, &lda, b, &ldb);
     }
-    template<> inline void omatcopy<double>
-    (char opa, int m, int n, const double* a, int lda, double* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const double* a, int lda, double* b, int ldb) {
       char c = 'C';
       double o = 1.;
       if (m && n)
         domatcopy_(&c, &opa, &m, &n, &o, a, &lda, b, &ldb);
     }
-    template<> inline void omatcopy<std::complex<float>>
-    (char opa, int m, int n, const std::complex<float>* a, int lda,
-     std::complex<float>* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const std::complex<float>* a, int lda,
+                  std::complex<float>* b, int ldb) {
       char c = 'C';
       std::complex<float> o(1.);
       if (m && n)
         comatcopy_(&c, &opa, &m, &n, &o, a, &lda, b, &ldb);
     }
-    template<> inline void omatcopy<std::complex<double>>
-    (char opa, int m, int n, const std::complex<double>* a, int lda,
-     std::complex<double>* b, int ldb) {
+    template<> inline
+    void omatcopy(char opa, int m, int n, const std::complex<double>* a, int lda,
+                  std::complex<double>* b, int ldb) {
       char c = 'C';
       std::complex<double> o(1.);
       if (m && n)
@@ -181,8 +177,8 @@ namespace strumpack {
 #endif
 
     // sparse blas 1 routines
-    template<typename scalar> inline void axpyi
-    (std::size_t nz, scalar a, const scalar* x, const int* indx, scalar* y) {
+    template<typename scalar> inline
+    void axpyi(std::size_t nz, scalar a, const scalar* x, const int* indx, scalar* y) {
       if (a == scalar(-1)) {
         for (int i=0; i<nz; i++) y[indx[i]] -= x[i];
         STRUMPACK_FLOPS((is_complex<scalar>() ? 2 : 1) * nz);
@@ -198,8 +194,8 @@ namespace strumpack {
       STRUMPACK_BYTES(sizeof(scalar) * nz * 3 + sizeof(int) * nz);
     }
 
-    template<typename scalar_t,typename integer_t> inline void gthr
-    (std::size_t nz, const scalar_t* y, scalar_t* x, const integer_t* indx) {
+    template<typename scalar_t,typename integer_t> inline
+    void gthr(std::size_t nz, const scalar_t* y, scalar_t* x, const integer_t* indx) {
       for (integer_t i=0; i<nz; i++)
         x[i] = y[indx[i]];
       STRUMPACK_BYTES(sizeof(scalar_t) * nz * 3 + sizeof(integer_t) * nz);
@@ -208,13 +204,16 @@ namespace strumpack {
     int ilaenv(int ispec, char name[], char opts[],
                int n1, int n2, int n3, int n4);
 
-    template<typename real> inline real lamch(char cmach);
+    template<typename scalar> inline
+    typename RealType<scalar>::value_type lamch(char cmach) {
+      return lamch<typename RealType<scalar>::value_type>(cmach);
+    }
     template<> float lamch<float>(char cmach);
     template<> double lamch<double>(char cmach);
 
 
-    template<typename scalar> inline long long gemm_flops
-    (long long m, long long n, long long k, scalar alpha, scalar beta) {
+    template<typename scalar> inline
+    long long gemm_flops(long long m, long long n, long long k, scalar alpha, scalar beta) {
       return (alpha != scalar(0.)) * m * n * (k * 2 - 1) +
         (alpha != scalar(0.) && beta != scalar(0.)) * m * n +
         (alpha != scalar(0.) && alpha != scalar(1.)) * m* n +
@@ -242,8 +241,8 @@ namespace strumpack {
               std::complex<double> beta,
               std::complex<double>* c, int ldc);
 
-    template<typename scalar> inline long long gemv_flops
-    (long long m, long long n, scalar alpha, scalar beta) {
+    template<typename scalar> inline
+    long long gemv_flops(long long m, long long n, scalar alpha, scalar beta) {
       return (alpha != scalar(0.)) * m * (n * 2 - 1) +
         (alpha != scalar(1.) && alpha != scalar(0.)) * m +
         (beta != scalar(0.) && beta != scalar(1.)) * m +
@@ -267,8 +266,8 @@ namespace strumpack {
               std::complex<double> beta,
               std::complex<double> *y, int incy);
 
-    template<typename scalar_t> inline long long ger_flops
-    (long long m, long long n, scalar_t alpha) {
+    template<typename scalar_t> inline
+    long long ger_flops(long long m, long long n, scalar_t alpha) {
       // TODO check this?
       return (alpha != scalar_t(0)) * m * n +
         (alpha != scalar_t(0) && alpha != scalar_t(1)) * m * n +
@@ -334,13 +333,13 @@ namespace strumpack {
     void copy(int n, const std::complex<double>* x, int incx,
               std::complex<double>* y, int incy);
 
-    template<typename scalar_t> inline long long scal_flops
-    (long long n, scalar_t alpha) {
+    template<typename scalar_t> inline
+    long long scal_flops(long long n, scalar_t alpha) {
       if (alpha == scalar_t(1)) return 0;
       else return n;
     }
-    template<typename scalar_t> inline long long scal_moves
-    (long long n, scalar_t alpha) {
+    template<typename scalar_t> inline
+    long long scal_moves(long long n, scalar_t alpha) {
       if (alpha == scalar_t(1)) return 0;
       else return 2 * n;
     }
@@ -436,8 +435,8 @@ namespace strumpack {
     void lapmt(bool fwd, int m, int n, std::complex<double>* a, int lda,
                const int* ipiv);
 
-    template<typename scalar_t> inline long long trsm_flops
-    (long long m, long long n, scalar_t alpha, char s) {
+    template<typename scalar_t> inline
+    long long trsm_flops(long long m, long long n, scalar_t alpha, char s) {
       if (s=='L' || s=='l')
         return (alpha != scalar_t(0)) * n * m *(m + 1) +
           (alpha != scalar_t(1) && alpha != scalar_t(0)) * n * m;
@@ -460,8 +459,8 @@ namespace strumpack {
               const std::complex<double>* a, int lda,
               std::complex<double>* b, int ldb);
 
-    template<typename scalar_t> inline long long trmm_flops
-    (long long m, long long n, scalar_t alpha, char s) {
+    template<typename scalar_t> inline
+    long long trmm_flops(long long m, long long n, scalar_t alpha, char s) {
       if (s=='L' || s=='l')
         return (alpha != scalar_t(0)) * n * m * (m + 1) +
           (alpha != scalar_t(1) && alpha != scalar_t(0)) * n * m;
@@ -543,8 +542,8 @@ namespace strumpack {
     int geqp3(int m, int n, std::complex<double>* a, int lda, int* jpvt,
               std::complex<double>* tau, std::complex<double>* work,
               int lwork);
-    template<typename scalar> inline int geqp3
-    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau) {
+    template<typename scalar> inline
+    int geqp3(int m, int n, scalar* a, int lda, int* jpvt, scalar* tau) {
       scalar lwork;
       geqp3(m, n, a, lda, jpvt, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
@@ -555,43 +554,29 @@ namespace strumpack {
 
     int geqp3tol(int m, int n, float* a, int lda, int* jpvt,
                  float* tau, float* work, int lwork, int& rank,
-                 float rtol, float atol, int depth);
+                 float rtol, float atol);
     int geqp3tol(int m, int n, double* a, int lda, int* jpvt,
                  double* tau, double* work, int lwork, int& rank,
-                 double rtol, double atol, int depth);
+                 double rtol, double atol);
     int geqp3tol(int m, int n, std::complex<float>* a, int lda, int* jpvt,
                  std::complex<float>* tau, std::complex<float>* work,
-                 int lwork, int& rank, float rtol, float atol, int depth);
+                 int lwork, int& rank, float rtol, float atol);
     int geqp3tol(int m, int n, std::complex<double>* a, int lda, int* jpvt,
                  std::complex<double>* tau, std::complex<double>* work,
-                 int lwork, int& rank, double rtol, double atol, int depth);
+                 int lwork, int& rank, double rtol, double atol);
 
-    template<typename scalar, typename real> inline int geqp3tol
-    (int m, int n, scalar* a, int lda, int* jpvt, scalar* tau,
-     int& rank, real rtol, real atol, int depth) {
+    template<typename scalar, typename real> inline
+    int geqp3tol(int m, int n, scalar* a, int lda, int* jpvt, scalar* tau,
+                 int& rank, real rtol, real atol) {
       scalar lwork;
-      geqp3tol
-        (m, n, a, lda, jpvt, tau, &lwork, -1, rank, rtol, atol, depth);
+      geqp3tol(m, n, a, lda, jpvt, tau, &lwork, -1, rank, rtol, atol);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      if (! is_complex<scalar>()) {
-        bool tasked = depth < params::task_recursion_cutoff_level;
-        if (tasked) {
-          int loop_tasks = std::max(params::num_threads / (depth+1), 1);
-          int B = std::max(n / loop_tasks, 1);
-          for (int task=0; task<std::ceil(n/float(B)); task++) {
-#pragma omp task default(shared) firstprivate(task)
-            for (int i=task*B; i<std::min((task+1)*B,n); i++)
-              work[i] = nrm2(m, &a[i*lda], 1);
-          }
-#pragma omp taskwait
-        } else
-          for (int i=0; i<n; i++)
-            work[i] = nrm2(m, &a[i*lda], 1);
+      if (!is_complex<scalar>()) {
+        for (int i=0; i<n; i++)
+          work[i] = nrm2(m, &a[i*lda], 1);
       }
-      return geqp3tol
-        (m, n, a, lda, jpvt, tau, work.get(), ilwork,
-         rank, rtol, atol, depth);
+      return geqp3tol(m, n, a, lda, jpvt, tau, work.get(), ilwork, rank, rtol, atol);
     }
 
 
@@ -613,8 +598,8 @@ namespace strumpack {
     int geqrf(int m, int n, std::complex<double>* a, int lda,
               std::complex<double>* tau, std::complex<double>* work,
               int lwork);
-    template<typename scalar> inline int geqrf
-    (int m, int n, scalar* a, int lda, scalar* tau) {
+    template<typename scalar> inline
+    int geqrf(int m, int n, scalar* a, int lda, scalar* tau) {
       scalar lwork;
       geqrf(m, n, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
@@ -622,33 +607,13 @@ namespace strumpack {
       return geqrf(m, n, a, lda, tau, work.get(), ilwork);
     }
 
-    int geqrfmod(int m, int n, float* a, int lda,
-                 float* tau, float* work, int lwork, int depth);
-    int geqrfmod(int m, int n, double* a, int lda, double* tau,
-                 double* work, int lwork, int depth);
-    int geqrfmod(int m, int n, std::complex<float>* a, int lda,
-                 std::complex<float>* tau, std::complex<float>* work,
-                 int lwork, int depth);
-    int geqrfmod(int m, int n, std::complex<double>* a, int lda,
-                 std::complex<double>* tau, std::complex<double>* work,
-                 int lwork, int depth);
-    template<typename scalar> inline int geqrfmod
-    (int m, int n, scalar* a, int lda, scalar* tau, int depth) {
-      scalar lwork;
-      geqrfmod(m, n, a, lda, tau, &lwork, -1, depth);
-      int ilwork = int(std::real(lwork));
-      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      return geqrfmod(m, n, a, lda, tau, work.get(), ilwork, depth);
-    }
-
-
     inline long long gelqf_flops(long long m, long long n) {
       if (m > n)
         return n * (n * (.5 - (1./3.) * n + m) + m + 29./6.) +
-                              n * (n * (-.5 - (1./3.) * n + m) + m + 5./6.);
+          n * (n * (-.5 - (1./3.) * n + m) + m + 5./6.);
       else
         return m * (m * (-.5 - (1./3.) * m + n) + 2 * n + 29./6.) +
-                              m * (m * (.5 - (1./3.) * m + n) + 5./6.);
+          m * (m * (.5 - (1./3.) * m + n) + 5./6.);
     }
     int gelqf(int m, int n, float* a, int lda, float* tau,
               float* work, int lwork);
@@ -660,33 +625,13 @@ namespace strumpack {
     int gelqf(int m, int n, std::complex<double>* a, int lda,
               std::complex<double>* tau, std::complex<double>* work,
               int lwork);
-    template<typename scalar> inline int gelqf
-    (int m, int n, scalar* a, int lda, scalar* tau) {
+    template<typename scalar> inline
+    int gelqf(int m, int n, scalar* a, int lda, scalar* tau) {
       scalar lwork;
       gelqf(m, n, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return gelqf(m, n, a, lda, tau, work.get(), ilwork);
-    }
-
-
-    void gelqfmod(int m, int n, float* a, int lda, float* tau,
-                  float* work, int lwork, int* info, int depth);
-    void gelqfmod(int m, int n, double* a, int lda, double* tau,
-                  double* work, int lwork, int* info, int depth);
-    void gelqfmod(int m, int n, std::complex<float>* a, int lda,
-                  std::complex<float>* tau, std::complex<float>* work,
-                  int lwork, int* info, int depth);
-    void gelqfmod(int m, int n, std::complex<double>* a, int lda,
-                  std::complex<double>* tau, std::complex<double>* work,
-                  int lwork, int* info, int depth);
-    template<typename scalar> inline void gelqfmod
-    (int m, int n, scalar* a, int lda, scalar* tau, int* info, int depth) {
-      scalar lwork;
-      gelqfmod(m, n, a, lda, tau, &lwork, -1, info, depth);
-      int ilwork = int(std::real(lwork));
-      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      gelqfmod(m, n, a, lda, tau, work.get(), ilwork, info, depth);
     }
 
 
@@ -697,37 +642,25 @@ namespace strumpack {
       else return n * n * (m - n/3 - 1) / 2 + m + 2 * n / 3 +
              n * (n * (m - (1./3.) * n - 1) / 2 - m) + n / 6;
     }
-    void getrf(int m, int n, float* a, int lda, int* ipiv, int* info);
-    void getrf(int m, int n, double* a, int lda, int* ipiv, int* info);
-    void getrf(int m, int n, std::complex<float>* a, int lda,
-               int* ipiv, int* info);
-    void getrf(int m, int n, std::complex<double>* a, int lda,
-               int* ipiv, int* info);
+    int getrf(int m, int n, float* a, int lda, int* ipiv);
+    int getrf(int m, int n, double* a, int lda, int* ipiv);
+    int getrf(int m, int n, std::complex<float>* a, int lda, int* ipiv);
+    int getrf(int m, int n, std::complex<double>* a, int lda, int* ipiv);
 
-    void getrfmod(int m, int n, float* a, int lda, int* ipiv,
-                  int* info, int depth);
-    void getrfmod(int m, int n, double* a, int lda, int* ipiv,
-                  int* info, int depth);
-    void getrfmod(int m, int n, std::complex<float>* a, int lda,
-                  int* ipiv, int* info, int depth);
-    void getrfmod(int m, int n, std::complex<double>* a, int lda,
-                  int* ipiv, int* info, int depth);
 
     inline long long getrs_flops(long long n, long long nrhs) {
       return 2 * n * n * nrhs;
     }
-    void getrs(char t, int n, int nrhs, const float* a, int lda,
-               const int* ipiv, float* b, int ldb, int* info);
-    void getrs(char t, int n, int nrhs, const double* a, int lda,
-               const int* ipiv, double* b, int ldb, int* info);
-    void getrs(char t, int n, int nrhs,
-               const std::complex<float>* a, int lda,
-               const int* ipiv, std::complex<float>* b, int ldb,
-               int* info);
-    void getrs(char t, int n, int nrhs,
-               const std::complex<double>* a, int lda,
-               const int* ipiv, std::complex<double>* b, int ldb,
-               int* info);
+    int getrs(char t, int n, int nrhs, const float* a, int lda,
+              const int* ipiv, float* b, int ldb);
+    int getrs(char t, int n, int nrhs, const double* a, int lda,
+              const int* ipiv, double* b, int ldb);
+    int getrs(char t, int n, int nrhs,
+              const std::complex<float>* a, int lda,
+              const int* ipiv, std::complex<float>* b, int ldb);
+    int getrs(char t, int n, int nrhs,
+              const std::complex<double>* a, int lda,
+              const int* ipiv, std::complex<double>* b, int ldb);
 
     inline long long potrf_flops(long long n) {
       return n*n*n/6 + n*n/2 + n/3 + n*n*n/6 - n/6;
@@ -741,44 +674,21 @@ namespace strumpack {
       if (m == k) return 2 * m * m *(3 * n - m) / 3;
       else return 4 * m * n * k - 2 * (m + n) * k * k + 4 * k * k * k / 3;
     }
-    void xxglq(int m, int n, int k, float* a, int lda, const float* tau,
-               float* work, int lwork, int* info);
-    void xxglq(int m, int n, int k, double* a, int lda, const double* tau,
-               double* work, int lwork, int* info);
-    void xxglq(int m, int n, int k, std::complex<float>* a, int lda,
-               const std::complex<float>* tau, std::complex<float>* work,
-               int lwork, int* info);
-    void xxglq(int m, int n, int k, std::complex<double>* a, int lda,
-               const std::complex<double>* tau, std::complex<double>* work,
-               int lwork, int* info);
-    template<typename scalar> inline void xxglq
-    (int m, int n, int k, scalar* a, int lda, const scalar* tau, int* info) {
+    int xxglq(int m, int n, int k, float* a, int lda, const float* tau,
+              float* work, int lwork);
+    int xxglq(int m, int n, int k, double* a, int lda, const double* tau,
+              double* work, int lwork);
+    int xxglq(int m, int n, int k, std::complex<float>* a, int lda,
+              const std::complex<float>* tau, std::complex<float>* work, int lwork);
+    int xxglq(int m, int n, int k, std::complex<double>* a, int lda,
+              const std::complex<double>* tau, std::complex<double>* work, int lwork);
+    template<typename scalar> inline
+    int xxglq(int m, int n, int k, scalar* a, int lda, const scalar* tau) {
       scalar lwork;
-      xxglq(m, n, k, a, lda, tau, &lwork, -1, info);
+      xxglq(m, n, k, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      xxglq(m, n, k, a, lda, tau, work.get(), ilwork, info);
-    }
-
-    // do not count flops here, they are counted in the blas routines
-    void xxglqmod(int m, int n, int k, float* a, int lda, const float* tau,
-                  float* work, int lwork, int* info, int depth);
-    void xxglqmod(int m, int n, int k, double* a, int lda, const double* tau,
-                  double* work, int lwork, int* info, int depth);
-    void xxglqmod(int m, int n, int k, std::complex<float>* a, int lda,
-                  const std::complex<float>* tau, std::complex<float>* work,
-                  int lwork, int* info, int depth);
-    void xxglqmod(int m, int n, int k, std::complex<double>* a, int lda,
-                  const std::complex<double>* tau, std::complex<double>* work,
-                  int lwork, int* info, int depth);
-    template<typename scalar> inline void xxglqmod
-    (int m, int n, int k, scalar* a, int lda,
-     const scalar* tau, int* info, int depth) {
-      scalar lwork;
-      xxglqmod(m, n, k, a, lda, tau, &lwork, -1, info, depth);
-      int ilwork = int(std::real(lwork));
-      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-      xxglqmod(m, n, k, a, lda, tau, work.get(), ilwork, info, depth);
+      return xxglq(m, n, k, a, lda, tau, work.get(), ilwork);
     }
 
 
@@ -796,8 +706,8 @@ namespace strumpack {
     int xxgqr(int m, int n, int k, std::complex<double>* a, int lda,
               const std::complex<double>* tau, std::complex<double>* work,
               int lwork);
-    template<typename scalar> inline int xxgqr
-    (int m, int n, int k, scalar* a, int lda, const scalar* tau) {
+    template<typename scalar> inline
+    int xxgqr(int m, int n, int k, scalar* a, int lda, const scalar* tau) {
       scalar lwork;
       xxgqr(m, n, k, a, lda, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));
@@ -825,9 +735,9 @@ namespace strumpack {
               const std::complex<double>* tau,
               std::complex<double>* c, int ldc,
               std::complex<double>* work, int lwork);
-    template<typename scalar> inline int xxmqr
-    (char side, char trans, int m, int n, int k, scalar* a, int lda,
-     const scalar* tau, scalar* c, int ldc) {
+    template<typename scalar> inline
+    int xxmqr(char side, char trans, int m, int n, int k, scalar* a, int lda,
+              const scalar* tau, scalar* c, int ldc) {
       scalar lwork;
       xxmqr(side, trans, m, n, k, a, lda, tau, c, ldc, &lwork, -1);
       int ilwork = int(std::real(lwork));
@@ -886,35 +796,14 @@ namespace strumpack {
               std::complex<float>* work, int lwork);
     int sytrf(char s, int n, std::complex<double>* a, int lda, int* ipiv,
               std::complex<double>* work, int lwork);
-    template<typename scalar> inline int sytrf
-    (char s, int n, scalar* a, int lda, int* ipiv) {
+    template<typename scalar> inline
+    int sytrf(char s, int n, scalar* a, int lda, int* ipiv) {
       scalar lwork;
       sytrf(s, n, a, lda, ipiv, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return sytrf(s, n, a, lda, ipiv, work.get(), ilwork);
     }
-
-    // inline long long sytrf_rook_flops(long long n) {
-    //   return n * n * n / 3;
-    // }
-    // int sytrf_rook(char s, int n, float* a, int lda, int* ipiv,
-    //                float* work, int lwork);
-    // int sytrf_rook(char s, int n, double* a, int lda, int* ipiv,
-    //                double* work, int lwork);
-    // int sytrf_rook(char s, int n, std::complex<float>* a, int lda,
-    //                int* ipiv, std::complex<float>* work, int lwork);
-    // int sytrf_rook(char s, int n, std::complex<double>* a, int lda,
-    //                int* ipiv, std::complex<double>* work, int lwork);
-    // template<typename scalar> inline int sytrf_rook
-    // (char s, int n, scalar* a, int lda, int* ipiv) {
-    //   scalar lwork;
-    //   sytrf_rook(s, n, a, lda, ipiv, &lwork, -1);
-    //   int ilwork = int(std::real(lwork));
-    //   std::unique_ptr<scalar[]> work(new scalar[ilwork]);
-    //   return sytrf_rook(s, n, a, lda, ipiv, work.get(), ilwork);
-    // }
-
 
     inline long long sytrs_flops(long long m, long long n, long long k) {
       return 2*m*n*k;
@@ -927,20 +816,6 @@ namespace strumpack {
               const int* ipiv, std::complex<float>* b, int ldb);
     int sytrs(char s, int n, int nrhs, const std::complex<double>* a, int lda,
               const int* ipiv, std::complex<double>* b, int ldb);
-
-    inline long long sytrs_rook_flops(long long m, long long n, long long k) {
-      return 2*m*n*k;
-    }
-    int sytrs_rook(char s, int n, int nrhs, const float* a, int lda,
-                   const int* ipiv, float* b, int ldb);
-    int sytrs_rook(char s, int n, int nrhs, const double* a, int lda,
-                   const int* ipiv, double* b, int ldb);
-    int sytrs_rook(char s, int n, int nrhs,
-                   const std::complex<float>* a, int lda,
-                   const int* ipiv, std::complex<float>* b, int ldb);
-    int sytrs_rook(char s, int n, int nrhs,
-                   const std::complex<double>* a, int lda,
-                   const int* ipiv, std::complex<double>* b, int ldb);
 
   } //end namespace blas
 } // end namespace strumpack

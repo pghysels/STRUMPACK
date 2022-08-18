@@ -26,6 +26,8 @@
  *             Division).
  *
  */
+#include <stack>
+
 #include "EliminationTreeMPIDist.hpp"
 #include "Redistribute.hpp"
 #include "CSRMatrixMPI.hpp"
@@ -36,23 +38,25 @@
 
 namespace strumpack {
 
+  template<typename scalar_t,typename integer_t> MPI_Datatype
+  EliminationTreeMPIDist<scalar_t,integer_t>::ParallelFront::pf_mpi_type = MPI_DATATYPE_NULL;
+
   template<typename scalar_t,typename integer_t>
   EliminationTreeMPIDist<scalar_t,integer_t>::EliminationTreeMPIDist
   (const Opts_t& opts, const CSRMPI_t& A, Reord_t& nd, const MPIComm& comm)
     : EliminationTreeMPI<scalar_t,integer_t>(comm), nd_(nd) {
 
-    std::vector<std::vector<integer_t>> lupd(nd_.local_tree().separators());
+    std::vector<std::vector<integer_t>> lupd(nd_.ltree().separators());
     // every process is responsible for 1 distributed separator, so
     // store only 1 dist_upd
     std::vector<integer_t> dist_upd, dleaf_upd;
-    std::vector<float> ltree_work(nd_.local_tree().separators()),
+    std::vector<float> ltree_work(nd_.ltree().separators()),
       dtree_work(nd_.tree().separators());
 
     float dsep_work, dleaf_work;
     MPIComm::control_start("symbolic_factorization");
     prop_map_ = opts.proportional_mapping();
-    symbolic_factorization
-      (lupd, ltree_work, dist_upd, dsep_work, dleaf_upd, dleaf_work);
+    symb_fact(lupd, ltree_work, dist_upd, dsep_work, dleaf_upd, dleaf_work);
     MPIComm::control_stop("symbolic_factorization");
 
     {
@@ -73,7 +77,7 @@ namespace strumpack {
 
     local_range_ = {A.size(), 0};
     MPIComm::control_start("proportional_mapping");
-    this->root_ = proportional_mapping
+    this->root_ = prop_map
       (opts, lupd, ltree_work, dist_upd, dleaf_upd, dtree_work,
        nd_.tree().root(), 0, P_, 0, 0, comm_, true, 0);
     MPIComm::control_stop("proportional_mapping");
@@ -176,6 +180,7 @@ namespace strumpack {
           all_pfronts_[i++] = f;
     }
     comm_.all_gather_v(all_pfronts_.data(), rcnts, rdispls);
+    ParallelFront::free_mpi_type();
   }
 
   /**
@@ -227,11 +232,11 @@ namespace strumpack {
     }
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_factorization
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
    const Opts_t& opts) {
-    this->root_->multifrontal_factorization(Aprop_, opts);
+    return this->root_->multifrontal_factorization(Aprop_, opts);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -354,6 +359,8 @@ namespace strumpack {
 #pragma omp parallel for
     for (std::size_t i=0; i<std::size_t(m)*n; i++)
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
+
+    Triplet::free_mpi_type();
   }
 
   template<typename integer_t, typename It>
@@ -368,37 +375,37 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> float
-  EliminationTreeMPIDist<scalar_t,integer_t>::symbolic_factorization_local
+  EliminationTreeMPIDist<scalar_t,integer_t>::symb_fact_loc
   (integer_t sep, std::vector<std::vector<integer_t>>& upd,
    std::vector<float>& work, int depth) {
-    auto chl = nd_.local_tree().lch(sep);
-    auto chr = nd_.local_tree().rch(sep);
+    auto chl = nd_.ltree().lch[sep];
+    auto chr = nd_.ltree().rch[sep];
     float fs = 0.;
     if (depth < params::task_recursion_cutoff_level) {
       float fl = 0., fr = 0.;
       if (chl != -1)
 #pragma omp task untied default(shared)                                 \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        fl = symbolic_factorization_local(chl, upd, work, depth+1);
+        fl = symb_fact_loc(chl, upd, work, depth+1);
       if (chr != -1)
 #pragma omp task untied default(shared)                                 \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        fr = symbolic_factorization_local(chr, upd, work, depth+1);
+        fr = symb_fact_loc(chr, upd, work, depth+1);
 #pragma omp taskwait
       fs += fl + fr;
     } else {
       if (chl != -1)
-        fs += symbolic_factorization_local(chl, upd, work, depth);
+        fs += symb_fact_loc(chl, upd, work, depth);
       if (chr != -1)
-        fs += symbolic_factorization_local(chr, upd, work, depth);
+        fs += symb_fact_loc(chr, upd, work, depth);
     }
-    auto sep_begin = nd_.local_tree().sizes(sep) +
+    auto sep_begin = nd_.ltree().sizes[sep] +
       nd_.sub_graph_range.first;
-    auto sep_end = nd_.local_tree().sizes(sep+1) +
+    auto sep_end = nd_.ltree().sizes[sep+1] +
       nd_.sub_graph_range.first;
     {
-      auto lor = nd_.local_tree().sizes(sep);
-      auto hir = nd_.local_tree().sizes(sep+1);
+      auto lor = nd_.ltree().sizes[sep];
+      auto hir = nd_.ltree().sizes[sep+1];
       std::size_t maxest = nd_.my_sub_graph.ptr(hir) -
         nd_.my_sub_graph.ptr(lor);
       if (chl != -1) maxest += upd[chl].size();
@@ -460,7 +467,7 @@ namespace strumpack {
    *        parent
    */
   template<typename scalar_t,typename integer_t> void
-  EliminationTreeMPIDist<scalar_t,integer_t>::symbolic_factorization
+  EliminationTreeMPIDist<scalar_t,integer_t>::symb_fact
   (std::vector<std::vector<integer_t>>& local_upd,
    std::vector<float>& local_subtree_work,
    std::vector<integer_t>& dist_upd, float& dsep_work,
@@ -468,11 +475,11 @@ namespace strumpack {
     nd_.my_sub_graph.sort_rows();
 
     float fs = 0.;
-    if (!nd_.local_tree().is_empty()) {
+    if (!nd_.ltree().is_empty()) {
 #pragma omp parallel
 #pragma omp single
-      fs = symbolic_factorization_local
-        (nd_.local_tree().root(), local_upd, local_subtree_work, 0);
+      fs = symb_fact_loc
+        (nd_.ltree().root(), local_upd, local_subtree_work, 0);
     }
 
     dsep_work = dleaf_work = 0.;
@@ -483,14 +490,14 @@ namespace strumpack {
       // process: 1 leaf and 1 non-leaf
       if (nd_.proc_dist_sep[dsep] != rank_) continue;
       if (nd_.tree().is_root(dsep)) continue; // skip the root separator
-      auto pa = nd_.tree().pa(dsep);
+      auto pa = nd_.tree().parent[dsep];
       auto pa_rank = nd_.proc_dist_sep[pa];
       if (nd_.tree().is_leaf(dsep)) {
         // Leaf of distributed tree is local subgraph for process
-        // proc_dist_sep[dsep], unless the local_tree is empty.
-        if (!nd_.local_tree().is_empty()) {
-          dleaf_work = local_subtree_work[nd_.local_tree().root()];
-          dleaf_upd = local_upd[nd_.local_tree().root()];
+        // proc_dist_sep[dsep], unless the ltree is empty.
+        if (!nd_.ltree().is_empty()) {
+          dleaf_work = local_subtree_work[nd_.ltree().root()];
+          dleaf_upd = local_upd[nd_.ltree().root()];
         } else {
           auto sep_begin = nd_.sub_graph_range.first;
           auto sep_end = nd_.sub_graph_range.second;
@@ -530,7 +537,7 @@ namespace strumpack {
              nd_.my_dist_sep.ind() + nd_.my_dist_sep.ptr(r+1),
              dist_upd, sep_end);
         int nr_children = (nd_.tree().is_leaf(dsep) &&
-                           nd_.local_tree().is_empty()) ? 0 : 2;
+                           nd_.ltree().is_empty()) ? 0 : 2;
         std::vector<integer_t> d2ch(nr_children);
         std::vector<float> wch(nr_children);
         float fs = 0.;
@@ -587,30 +594,33 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::
-  communicate_distributed_separator
-  (integer_t dsep, const std::vector<integer_t>& dupd_send,
-   integer_t& dsep_begin, integer_t& dsep_end,
-   std::vector<integer_t>& dupd_recv, int P0, int P,
-   int P0_sibling, int P_sibling, int owner) {
+  comm_dist_sep(integer_t dsep, const std::vector<integer_t>& dupd_send,
+                integer_t& dsep_begin, integer_t& dsep_end,
+                std::vector<integer_t>& dupd_recv,
+                int P0, int P, int P0_sib, int P_sib, int owner) {
     std::vector<integer_t> sbuf;
-    std::vector<MPI_Request> sreq;
-    int dest0 = std::min(P0, P0_sibling),
-      dest1 = std::max(P0+P, P0_sibling+P_sibling);
+    std::vector<MPIRequest> sreq;
+    int dest0 = std::min(P0, P0_sib),
+      dest1 = std::max(P0+P, P0_sib+P_sib);
     if (rank_ == owner) {
-      sreq.resize(dest1-dest0);
-      int msg = 0;
       sbuf.reserve(2+dupd_send.size());
       sbuf.push_back(dsep_begin);
       sbuf.push_back(dsep_end);
       sbuf.insert(sbuf.end(), dupd_send.begin(), dupd_send.end());
+      sreq.reserve(dest1-dest0);
       for (int dest=dest0; dest<dest1; dest++)
-        comm_.isend(sbuf, dest, 0, &sreq[msg++]);
+        if (dest != rank_)
+          sreq.emplace_back(comm_.isend(sbuf, dest, dsep));
     }
     if (rank_ >= dest0 && rank_ < dest1) {
-      auto rbuf = comm_.template recv<integer_t>(owner, 0);
-      dsep_begin = rbuf[0];
-      dsep_end = rbuf[1];
-      dupd_recv.assign(rbuf.begin()+2, rbuf.end());
+      if (rank_ == owner)
+        dupd_recv = dupd_send;
+      else {
+        auto rbuf = comm_.template recv<integer_t>(owner, dsep);
+        dsep_begin = rbuf[0];
+        dsep_end = rbuf[1];
+        dupd_recv.assign(rbuf.begin()+2, rbuf.end());
+      }
     }
     if (rank_ == owner) wait_all(sreq);
   }
@@ -618,63 +628,46 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
-  EliminationTreeMPIDist<scalar_t,integer_t>::proportional_mapping
+  EliminationTreeMPIDist<scalar_t,integer_t>::prop_map
   (const Opts_t& opts, std::vector<std::vector<integer_t>>& local_upd,
    std::vector<float>& local_subtree_work,
    std::vector<integer_t>& dist_upd, std::vector<integer_t>& dleaf_upd,
    std::vector<float>& dist_subtree_work, integer_t dsep,
-   int P0, int P, int P0_sibling, int P_sibling,
-   const MPIComm& fcomm, bool parent_compression, int level) {
-    auto chl = nd_.tree().lch(dsep);
-    auto chr = nd_.tree().rch(dsep);
+   int P0, int P, int P0_sib, int P_sib,
+   const MPIComm& fcomm, bool pa_comp, int level) {
     auto owner = nd_.proc_dist_sep[dsep];
-
     if (nd_.tree().is_leaf(dsep)) {
       RedistSubTree<integer_t> sub_tree
-        (nd_.local_tree(), nd_.sub_graph_range.first,
-         local_upd, local_subtree_work, P0, P,
-         P0_sibling, P_sibling, owner, comm_);
-      //if (sub_tree.nr_sep)
-      return proportional_mapping_sub_graphs
-        (opts, sub_tree, dsep, sub_tree.root,
-         P0, P, P0_sibling, P_sibling,
-         fcomm, parent_compression, level);
+        (nd_.ltree(), dsep, nd_.sub_graph_range.first,
+         local_upd, local_subtree_work,
+         P0, P, P0_sib, P_sib, owner, comm_);
+      if (!sub_tree.nr_sep) return nullptr;
+      return prop_map_sub_graphs
+        (opts, sub_tree, P0, P, P0_sib, P_sib,
+         fcomm, pa_comp, level);
     }
-
-    integer_t dsep_begin, dsep_end;
     std::vector<integer_t> dsep_upd;
-    if (nd_.tree().is_leaf(dsep)) {
-      dsep_begin = nd_.sub_graph_range.first;
-      dsep_end = nd_.sub_graph_range.second;
-      communicate_distributed_separator
-        (dsep, dleaf_upd, dsep_begin, dsep_end, dsep_upd,
-         P0, P, P0_sibling, P_sibling, owner);
-    } else {
-      dsep_begin = nd_.dist_sep_range.first;
+    integer_t dsep_begin = nd_.dist_sep_range.first,
       dsep_end = nd_.dist_sep_range.second;
-      communicate_distributed_separator
-        (dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
-         P0, P, P0_sibling, P_sibling, owner);
-    }
+    comm_dist_sep(dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
+                  P0, P, P0_sib, P_sib, owner);
     auto dim_dsep = dsep_end - dsep_begin;
-
     bool use_compression = is_compressed
-      (dim_dsep, dsep_upd.size(), parent_compression, opts);
-
+      (dim_dsep, dsep_upd.size(), pa_comp, opts);
     std::unique_ptr<F_t> front;
     // only store fronts you work on and their siblings (needed for
     // extend-add operation)
     if ((rank_ >= P0 && rank_ < P0+P) ||
-        (rank_ >= P0_sibling && rank_ < P0_sibling+P_sibling)) {
+        (rank_ >= P0_sib && rank_ < P0_sib+P_sib)) {
       if (P == 1) {
         front = create_frontal_matrix<scalar_t,integer_t>
-          (opts, dsep, dsep_begin, dsep_end, dsep_upd, parent_compression,
+          (opts, dsep, dsep_begin, dsep_end, dsep_upd, pa_comp,
            level, this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) this->update_local_ranges(dsep_begin, dsep_end);
       } else {
         auto fmpi = create_frontal_matrix<scalar_t,integer_t>
           (opts, local_pfronts_.size(), dsep_begin, dsep_end, dsep_upd,
-           parent_compression, level, this->nr_fronts_, fcomm, P, rank_ == P0);
+           pa_comp, level, this->nr_fronts_, fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P)
           local_pfronts_.emplace_back
             (dsep_begin, dsep_end, P0, P, fmpi->grid());
@@ -682,20 +675,22 @@ namespace strumpack {
       }
     }
 
-    //if (nd_.tree().is_leaf(dsep)) return front;
-
     // here we should still continue, to send the local subgraph
+    auto chl = nd_.tree().lch[dsep];
+    auto chr = nd_.tree().rch[dsep];
     auto wl = dist_subtree_work[chl];
     auto wr = dist_subtree_work[chr];
     int Pl = std::max(1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
     int Pr = std::max(1, P - Pl);
-    auto lch = proportional_mapping
+    auto cl = fcomm.sub(0, Pl);
+    auto cr = fcomm.sub(P-Pr, Pr);
+    auto lch = prop_map
       (opts, local_upd, local_subtree_work, dist_upd, dleaf_upd,
-       dist_subtree_work, chl, P0, Pl, P0+P-Pr, Pr, fcomm.sub(0, Pl),
+       dist_subtree_work, chl, P0, Pl, P0+P-Pr, Pr, cl,
        use_compression, level+1);
-    auto rch = proportional_mapping
+    auto rch = prop_map
       (opts, local_upd, local_subtree_work, dist_upd, dleaf_upd,
-       dist_subtree_work, chr, P0+P-Pr, Pr, P0, Pl, fcomm.sub(P-Pr, Pr),
+       dist_subtree_work, chr, P0+P-Pr, Pr, P0, Pl, cr,
        use_compression, level+1);
     if (front) {
       front->set_lchild(std::move(lch));
@@ -704,73 +699,97 @@ namespace strumpack {
     return front;
   }
 
+
   /**
    * This should only be called by [P0,P0+P) and
-   * [P0_sibling,P0_sibling+P_sibling)
+   * [P0_sib,P0_sib+P_sib)
    */
   template<typename scalar_t,typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
-  EliminationTreeMPIDist<scalar_t,integer_t>::proportional_mapping_sub_graphs
-  (const Opts_t& opts, RedistSubTree<integer_t>& tree,
-   integer_t dsep, integer_t sep, int P0, int P,
-   int P0_sibling, int P_sibling, const MPIComm& fcomm,
-   bool parent_compression, int level) {
-    if (!tree.nr_sep) return nullptr;
-    auto sep_begin = tree.sep_ptr[sep];
-    auto sep_end = tree.sep_ptr[sep+1];
-    auto dim_sep = sep_end - sep_begin;
-    auto dim_upd = tree.dim_upd[sep];
-    std::unique_ptr<F_t> front;
-    if ((rank_ >= P0 && rank_ < P0+P) ||
-        (rank_ >= P0_sibling && rank_ < P0_sibling+P_sibling)) {
-      std::vector<integer_t> upd(tree.upd[sep], tree.upd[sep]+dim_upd);
-      if (P == 1) {
-        front = create_frontal_matrix<scalar_t,integer_t>
-          (opts, sep, sep_begin, sep_end, upd, parent_compression,
-           level, this->nr_fronts_, rank_ == P0);
-        if (P0 == rank_) this->update_local_ranges(sep_begin, sep_end);
-      } else {
-        auto fmpi = create_frontal_matrix<scalar_t,integer_t>
-          (opts, local_pfronts_.size(), sep_begin, sep_end, upd,
-           parent_compression, level, this->nr_fronts_, fcomm, P, rank_ == P0);
-        if (rank_ >= P0 && rank_ < P0+P)
-          local_pfronts_.emplace_back
-            (fmpi->sep_begin(), fmpi->sep_end(), P0, P, fmpi->grid());
-        front = std::move(fmpi);
+  EliminationTreeMPIDist<scalar_t,integer_t>::prop_map_sub_graphs
+  (const Opts_t& opts, const RedistSubTree<integer_t>& tree,
+   int P0, int P, int P0_sib, int P_sib,
+   const MPIComm& fcomm, bool pa_comp, int level) {
+    struct MapData {
+      integer_t sep;
+      int P0, P, P0_sib, P_sib;
+      const MPIComm *pfcomm;
+      MPIComm fcomm;
+      bool pa_comp;
+      int level;
+      F_t* parent;
+      bool left;
+    };
+    std::stack<MapData> fstack;
+    fstack.emplace
+      (MapData{tree.root, P0, P, P0_sib, P_sib,
+         &fcomm, MPI_COMM_NULL, pa_comp, level, nullptr, true});
+    std::unique_ptr<F_t> froot;
+    while (!fstack.empty()) {
+      auto m = fstack.top();
+      fstack.pop();
+      auto sep_beg = tree.sep_ptr[m.sep];
+      auto sep_end = tree.sep_ptr[m.sep+1];
+      auto dim_sep = sep_end - sep_beg;
+      auto dim_upd = tree.dim_upd[m.sep];
+      std::unique_ptr<F_t> front;
+      const MPIComm* pcomm = m.pfcomm ? m.pfcomm : &m.fcomm;
+      if ((rank_ >= m.P0 && rank_ < m.P0+m.P) ||
+          (rank_ >= m.P0_sib && rank_ < m.P0_sib+m.P_sib)) {
+        std::vector<integer_t> upd(tree.upd[m.sep], tree.upd[m.sep]+dim_upd);
+        if (m.P == 1) {
+          front = create_frontal_matrix<scalar_t,integer_t>
+            (opts, m.sep, sep_beg, sep_end, upd, m.pa_comp,
+             m.level, this->nr_fronts_, rank_ == m.P0);
+          if (m.P0 == rank_) this->update_local_ranges(sep_beg, sep_end);
+        } else {
+          auto fmpi = create_frontal_matrix<scalar_t,integer_t>
+            (opts, local_pfronts_.size(), sep_beg, sep_end, upd,
+             m.pa_comp, m.level, this->nr_fronts_,
+             *pcomm, m.P, rank_ == m.P0);
+          if (rank_ >= m.P0 && rank_ < m.P0+m.P)
+            local_pfronts_.emplace_back
+              (sep_beg, sep_end, m.P0, m.P, fmpi->grid());
+          front = std::move(fmpi);
+        }
+      }
+      if (m.P0 <= rank_ && rank_ < m.P0+m.P) {
+        auto chl = tree.lchild[m.sep];
+        auto chr = tree.rchild[m.sep];
+        if (chl != -1 && chr != -1) {
+          bool comp = is_compressed
+            (dim_sep, dim_upd, m.pa_comp, opts);
+          if (m.P == 1) {
+            fstack.emplace
+              (MapData{chl, m.P0, 1, m.P0, 1, pcomm, MPI_COMM_NULL,
+                 comp, m.level+1, front.get(), true});
+            fstack.emplace
+              (MapData{chr, m.P0, 1, m.P0, 1, pcomm, MPI_COMM_NULL,
+                 comp, m.level+1, front.get(), false});
+          } else {
+            auto wl = tree.work[chl];
+            auto wr = tree.work[chr];
+            int Pl = std::max
+              (1, std::min(int(std::round(m.P * wl / (wl + wr))), m.P-1));
+            int Pr = std::max(1, m.P - Pl);
+            fstack.emplace
+              (MapData{chl, m.P0, Pl, m.P0+m.P-Pr, Pr,
+                 nullptr, pcomm->sub(0, Pl),
+                 comp, m.level+1, front.get(), true});
+            fstack.emplace
+              (MapData{chr, m.P0+m.P-Pr, Pr, m.P0, Pl,
+                 nullptr, pcomm->sub(m.P-Pr, Pr),
+                 comp, m.level+1, front.get(), false});
+          }
+        }
+      }
+      if (!m.parent) froot = std::move(front);
+      else {
+        if (m.left) m.parent->set_lchild(std::move(front));
+        else m.parent->set_rchild(std::move(front));
       }
     }
-    if (rank_ < P0 || rank_ >= P0+P) return front;
-    auto chl = tree.lchild[sep];
-    auto chr = tree.rchild[sep];
-    if (chl != -1 && chr != -1) {
-      bool use_compression = is_compressed
-        (dim_sep, dim_upd, parent_compression, opts);
-      if (P == 1) {
-        front->set_lchild
-          (proportional_mapping_sub_graphs
-           (opts, tree, dsep, chl, P0, 1, P0, 1,
-            fcomm, use_compression, level+1));
-        front->set_rchild
-          (proportional_mapping_sub_graphs
-           (opts, tree, dsep, chr, P0, 1, P0, 1,
-            fcomm, use_compression, level+1));
-      } else {
-        auto wl = tree.work[chl];
-        auto wr = tree.work[chr];
-        int Pl = std::max
-          (1, std::min(int(std::round(P * wl / (wl + wr))), P-1));
-        int Pr = std::max(1, P - Pl);
-        front->set_lchild
-          (proportional_mapping_sub_graphs
-           (opts, tree, dsep, chl, P0, Pl, P0+P-Pr, Pr,
-            fcomm.sub(0, Pl), use_compression, level+1));
-        front->set_rchild
-          (proportional_mapping_sub_graphs
-           (opts, tree, dsep, chr, P0+P-Pr, Pr, P0, Pl,
-            fcomm.sub(P-Pr, Pr), use_compression, level+1));
-      }
-    }// else this->update_local_ranges(sep_begin, sep_end);
-    return front;
+    return froot;
   }
 
   // explicit template specializations

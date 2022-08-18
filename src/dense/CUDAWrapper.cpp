@@ -29,6 +29,9 @@
 #include <stdlib.h>
 
 #include "CUDAWrapper.hpp"
+#if defined(STRUMPACK_USE_MAGMA)
+#include "MAGMAWrapper.hpp"
+#endif
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
 #endif
@@ -98,6 +101,19 @@ namespace strumpack {
       if (code != CUBLAS_STATUS_SUCCESS) {
         std::cerr << "cuBLAS assertion failed: " << code << " "
                   <<  file << " " << line << std::endl;
+        switch (code) {
+        case CUBLAS_STATUS_SUCCESS:          std::cerr << "CUBLAS_STATUS_SUCCESS" << std::endl; break;
+        case CUBLAS_STATUS_NOT_INITIALIZED:  std::cerr << "CUBLAS_STATUS_NOT_INITIALIZED" << std::endl; break;
+        case CUBLAS_STATUS_ALLOC_FAILED:     std::cerr << "CUBLAS_STATUS_ALLOC_FAILED" << std::endl; break;
+        case CUBLAS_STATUS_INVALID_VALUE:    std::cerr << "CUBLAS_STATUS_INVALID_VALUE" << std::endl; break;
+        case CUBLAS_STATUS_ARCH_MISMATCH:    std::cerr << "CUBLAS_STATUS_ARCH_MISMATCH" << std::endl; break;
+        case CUBLAS_STATUS_MAPPING_ERROR:    std::cerr << "CUBLAS_STATUS_MAPPING_ERROR" << std::endl; break;
+        case CUBLAS_STATUS_EXECUTION_FAILED: std::cerr << "CUBLAS_STATUS_EXECUTION_FAILED" << std::endl; break;
+        case CUBLAS_STATUS_INTERNAL_ERROR:   std::cerr << "CUBLAS_STATUS_INTERNAL_ERROR" << std::endl; break;
+        case CUBLAS_STATUS_NOT_SUPPORTED:    std::cerr << "CUBLAS_STATUS_NOT_SUPPORTED" << std::endl; break;
+        case CUBLAS_STATUS_LICENSE_ERROR:    std::cerr << "CUBLAS_STATUS_LICENSE_ERROR" << std::endl; break;
+        default: std::cerr << "unknown cublas error" << std::endl;
+        }
         if (abrt) exit(code);
       }
     }
@@ -119,6 +135,14 @@ namespace strumpack {
       gpu_check(cudaFree(0));
       gpu::BLASHandle hb;
       gpu::SOLVERHandle hs;
+#if defined(STRUMPACK_USE_MAGMA)
+      magma_init();
+      magma_queue_t magma_q;
+      magma_queue_create(0, &magma_q);
+      magma_iset_pointer(nullptr, nullptr, 1, 0, 0, 0, 0, magma_q);
+      magma_queue_destroy(magma_q);
+      magma_finalize();
+#endif
     }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,

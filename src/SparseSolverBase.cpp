@@ -39,10 +39,12 @@
 #include "iterative/IterativeSolvers.hpp"
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
-#else
+#endif
 #if defined(STRUMPACK_USE_HIP)
 #include "dense/HIPWrapper.hpp"
 #endif
+#if defined(STRUMPACK_USE_SYCL)
+#include "dense/DPCPPWrapper.hpp"
 #endif
 
 
@@ -150,6 +152,19 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   SparseSolverBase<scalar_t,integer_t>::Krylov_iterations() const {
     return Krylov_its_;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) {
+    neg = zero = pos = 0;
+    if (opts_.matching() != MatchingJob::NONE)
+      return ReturnCode::INACCURATE_INERTIA;
+    if (!this->factored_) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    return tree()->inertia(neg, zero, pos);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -542,8 +557,10 @@ namespace strumpack {
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    if (opts_.use_gpu())
-      gpu::init();
+    if (opts_.use_gpu()) gpu::init();
+#endif
+#if defined(STRUMPACK_USE_SYCL)
+    if (opts_.use_gpu()) dpcpp::init();
 #endif
     using real_t = typename RealType<scalar_t>::value_type;
     opts_.set_pivot_threshold
@@ -564,8 +581,9 @@ namespace strumpack {
     }
     perf_counters_start();
     flop_breakdown_reset();
+    ReturnCode err_code;
     TaskTimer t1("Sparse-factorization", [&]() {
-        tree()->multifrontal_factorization(*matrix(), opts_);
+      err_code = tree()->multifrontal_factorization(*matrix(), opts_);
       });
     perf_counters_stop("numerical factorization");
     if (opts_.verbose()) {
@@ -661,16 +679,11 @@ namespace strumpack {
 #endif
         }
       }
-      // #if defined(STRUMPACK_COUNT_FLOPS)
-      //       if (opts_.compression() == CompressionType::HSS)
-      //         print_flop_breakdown_HSS();
-      //       if (opts_.compression() == CompressionType::HODLR)
-      //         print_flop_breakdown_HODLR();
-      // #endif
     }
     if (rank_out_) tree()->print_rank_statistics(*rank_out_);
-    factored_ = true;
-    return ReturnCode::SUCCESS;
+    if (err_code == ReturnCode::SUCCESS)
+      factored_ = true;
+    return err_code;
   }
 
 

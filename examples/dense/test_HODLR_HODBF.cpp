@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
     // elements. A ClusterTree for the rows (and columns) can
     // also be provided.
     auto H = structured::construct_from_elements<double>
-      (world, n, n, Toeplitz, options);
+      (world, &grid, n, n, Toeplitz, options);
 
     if (world.is_root())
       cout << get_name(options.type()) << endl

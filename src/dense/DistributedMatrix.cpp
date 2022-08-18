@@ -334,25 +334,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t>
-  DistributedMatrix<scalar_t>::DistributedMatrix
-  (const BLACSGrid* g, int desc[9]) : grid_(g) {
-    std::copy(desc, desc+9, desc_);
-    if (active()) {
-      lrows_ = lcols_ = 0;
-      data_ = nullptr;
-    } else {
-      lrows_ = scalapack::numroc(desc_[2], desc_[4], prow(), desc_[6], nprows());
-      lcols_ = scalapack::numroc(desc_[3], desc_[5], pcol(), desc_[7], npcols());
-      assert(lrows_==desc_[8]);
-      if (lrows_ && lcols_) {
-        STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
-        data_ = new scalar_t[lrows_*lcols_];
-      }
-      else data_ = nullptr;
-    }
-  }
-
-  template<typename scalar_t>
   DistributedMatrix<scalar_t>::~DistributedMatrix() {
     if (data_) {
       STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
@@ -564,8 +545,8 @@ namespace strumpack {
     if (!active()) return tmp;
     scalapack::ptranc
       (cols(), rows(), scalar_t(1.), data(), I(), J(),
-      desc(), scalar_t(0.), tmp.data(),
-      tmp.I(), tmp.J(), tmp.desc());
+       desc(), scalar_t(0.), tmp.data(),
+       tmp.I(), tmp.J(), tmp.desc());
     return tmp;
   }
 

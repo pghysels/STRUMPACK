@@ -146,98 +146,105 @@ namespace strumpack {
     extend_add();
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
-    if (this->dim_sep() && grid()->active()) {
-      TaskTimer pf("FrontalMatrixDenseMPI_factor");
-      pf.start();
-      int info = 0;
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (!this->dim_sep() || !grid()->active())
+      return err_code;
+    TaskTimer pf("FrontalMatrixDenseMPI_factor");
+    pf.start();
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-      if (opts.use_gpu())
-        slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
-      auto slateF11 = slate_matrix(F11_);
-      // TODO get return value
-      slate::getrf(slateF11, slate_piv_, slate_opts_);
+    if (opts.use_gpu())
+      slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
+    auto slateF11 = slate_matrix(F11_);
+    // TODO get return value
+    slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
-      info = F11_.LU(piv);
+    if (F11_.LU(piv))
+      err_code = ReturnCode::ZERO_PIVOT;
 #endif
-      if (info || opts.replace_tiny_pivots()) {
-        auto thresh = opts.pivot_threshold();
-        int prow = F11_.prow(), pcol = F11_.pcol();
-        for (int i=0; i<F11_.rows(); i++) {
-          int pr = F11_.rowg2p_fixed(i);
-          if (pr != prow) continue;
-          int pc = F11_.colg2p_fixed(i);
-          if (pc != pcol) continue;
-          auto& Fii = F11_.global_fixed(i,i);
-          if (std::abs(Fii) < thresh)
-            Fii = (std::real(Fii) < 0) ? -thresh : thresh;
-        }
+    if (opts.replace_tiny_pivots()) {
+      auto thresh = opts.pivot_threshold();
+      int prow = F11_.prow(), pcol = F11_.pcol();
+      for (int i=0; i<F11_.rows(); i++) {
+        int pr = F11_.rowg2p_fixed(i);
+        if (pr != prow) continue;
+        int pc = F11_.colg2p_fixed(i);
+        if (pc != pcol) continue;
+        auto& Fii = F11_.global_fixed(i,i);
+        if (std::abs(Fii) < thresh)
+          Fii = (std::real(Fii) < 0) ? -thresh : thresh;
       }
-      long long flops = LU_flops(F11_);
-      if (this->dim_upd()) {
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-        auto slateF12 = slate_matrix(F12_);
-        auto slateF21 = slate_matrix(F21_);
-        auto slateF22 = slate_matrix(F22_);
-        slate::getrs(slateF11, slate_piv_, slateF12, slate_opts_);
-        slate::gemm(scalar_t(-1.), slateF21, slateF12,
-                    scalar_t(1.), slateF22, slate_opts_);
-#else
-        F12_.laswp(piv, true);
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, F12_);
-        trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
-#endif
-        flops += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
-          trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
-          trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
-      }
-      if (Comm().is_root() && opts.verbose()) {
-        auto time = pf.elapsed();
-        std::cout << "# DenseMPI factorization complete, "
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-                  << "GPU=" << opts.use_gpu()
-#else
-                  << "no GPU support"
-#endif
-                  << ", P=" << Comm().size() << ", T=" << params::num_threads
-                  << ": " << time << " seconds, "
-                  << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
-                  << (float(flops)*F11_.npactives() / time) / 1.e9 << " GFLOP/s, "
-                  << " ds=" << this->dim_sep()
-                  << ", du=" << this->dim_upd() << std::endl;
-      }
-      STRUMPACK_FULL_RANK_FLOPS(flops);
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-      STRUMPACK_FLOPS(flops);
-#endif
     }
+    long long flops = LU_flops(F11_);
+    if (this->dim_upd()) {
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      auto slateF12 = slate_matrix(F12_);
+      auto slateF21 = slate_matrix(F21_);
+      auto slateF22 = slate_matrix(F22_);
+      slate::getrs(slateF11, slate_piv_, slateF12, slate_opts_);
+      slate::gemm(scalar_t(-1.), slateF21, slateF12,
+                  scalar_t(1.), slateF22, slate_opts_);
+#else
+      F12_.laswp(piv, true);
+      trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11_, F12_);
+      trsm(Side::R, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11_, F21_);
+      gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.), F22_);
+#endif
+      flops += gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
+        trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
+        trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
+    }
+    if (Comm().is_root() && opts.verbose()) {
+      auto time = pf.elapsed();
+      std::cout << "# DenseMPI factorization complete, "
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+                << "GPU=" << opts.use_gpu()
+#else
+                << "no GPU support"
+#endif
+                << ", P=" << Comm().size() << ", T=" << params::num_threads
+                << ": " << time << " seconds, "
+                << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
+                << (float(flops)*F11_.npactives() / time) / 1.e9 << " GFLOP/s, "
+                << " ds=" << this->dim_sep()
+                << ", du=" << this->dim_upd() << std::endl;
+    }
+    STRUMPACK_FULL_RANK_FLOPS(flops);
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    STRUMPACK_FLOPS(flops);
+#endif
+    return err_code;
   }
+
 
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
   template<typename scalar_t,typename integer_t> slate::Matrix<scalar_t>
   FrontalMatrixDenseMPI<scalar_t,integer_t>::slate_matrix(const DistM_t& M) const {
     return slate::Matrix<scalar_t>::fromScaLAPACK
       (M.rows(), M.cols(), const_cast<scalar_t*>(M.data()), M.ld(),
-       M.MB(), M.nprows(), M.npcols(), M.comm());
+       M.MB(), M.nprows(), M.npcols(), M.grid()->Comm_active().comm());
   }
 #endif
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDenseMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    if (visit(lchild_))
-      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (visit(rchild_))
-      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    // TaskTimer t("FrontalMatrixDenseMPI_factor");
-    // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (visit(lchild_)) {
+      auto el = lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (el != ReturnCode::SUCCESS) err_code = el;
+    }
+    if (visit(rchild_)) {
+      auto er = rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) err_code = er;
+    }
     build_front(A);
     if (etree_level == 0 && opts.write_root_front()) {
-      //F11_.print_to_files("Froot");
       auto Fs = F11_.gather();
       std::string fname = is_complex<scalar_t>() ?
         "Froot_colmajor_complex_" : "Froot_colmajor_real_";
@@ -251,16 +258,12 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
-    partial_factorization(opts);
+    auto ef = partial_factorization(opts);
+    if (ef != ReturnCode::SUCCESS) err_code = ef;
 #if defined(STRUMPACK_USE_ZFP)
     compress(opts);
 #endif
-    // if (etree_level == 0 && opts.print_root_front_stats()) {
-    //   auto time = t.elapsed();
-    //   if (Comm().is_root())
-    //     std::cout << "#   - DenseMPI root front: Nsep= " << this->dim_sep()
-    //               << " , time= " << time << " sec" << std::endl;
-    // }
+    return err_code;
   }
 
 #if defined(STRUMPACK_USE_ZFP)
@@ -299,6 +302,7 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::fwd_solve_phase2
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& b, DistM_t& bupd) const {
+    if (!grid()->active()) return;
     TIMER_TIME(TaskType::SOLVE_LOWER, 0, t_s);
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
     if (this->dim_sep()) {
@@ -364,6 +368,7 @@ namespace strumpack {
   FrontalMatrixDenseMPI<scalar_t,integer_t>::bwd_solve_phase1
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& y, DistM_t& yupd) const {
+    if (!grid()->active()) return;
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
     if (this->dim_sep()) {
       if (this->dim_upd()) {
@@ -493,6 +498,43 @@ namespace strumpack {
     F21_ = DistM_t();
     F22_ = DistM_t();
     piv = std::vector<int>();
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::matrix_inertia
+  (const DistM_t& F, integer_t& neg, integer_t& zero, integer_t& pos) const {
+    using real_t = typename RealType<scalar_t>::value_type;
+    int prow = F.prow(), pcol = F.pcol();
+    for (int i=0; i<F.rows(); i++) {
+      int pr = F.rowg2p_fixed(i);
+      if (pr != prow) continue;
+      int pc = F.colg2p_fixed(i);
+      if (pc != pcol) continue;
+      if (piv[F.rowg2l(i)] != int(i+1))
+        return ReturnCode::INACCURATE_INERTIA;
+      real_t Fii = std::abs(F.global(i,i));
+      if (Fii > real_t(0.)) pos++;
+      else if (Fii < real_t(0.)) neg++;
+      else if (Fii == real_t(0.)) zero++;
+      else std::cerr << "F(" << i << "," << i << ")=" << Fii << std::endl;
+    }
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    if (!this->dim_sep() || !grid()->active())
+      return ReturnCode::SUCCESS;
+#if defined(STRUMPACK_USE_ZFP)
+    if (compressed_) {
+      DistM_t F11(grid(), this->dim_sep(), this->dim_sep());
+      auto f = F11.dense_wrapper();
+      F11c_.decompress(f);
+      return matrix_inertia(F11, neg, zero, pos);
+    }
+#endif
+    return matrix_inertia(F11_, neg, zero, pos);
   }
 
   // explicit template instantiations

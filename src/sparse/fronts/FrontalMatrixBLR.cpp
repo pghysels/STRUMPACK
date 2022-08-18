@@ -274,26 +274,46 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLR<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+    ReturnCode e;
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel default(shared)
 #pragma omp single nowait
-      factor_node(A, opts, etree_level, task_depth+1);
-    } else factor_node(A, opts, etree_level, task_depth);
+      e = factor_node(A, opts, etree_level, task_depth);
+    } else e = factor_node(A, opts, etree_level, task_depth);
+    return e;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (lchild_)
-      lchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
-    if (rchild_)
-      rchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
+    if (task_depth < params::task_recursion_cutoff_level) {
+      if (lchild_)
+#pragma omp task default(shared)                                        \
+  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
+        el = lchild_->multifrontal_factorization
+          (A, opts, etree_level+1, task_depth+1);
+      if (rchild_)
+#pragma omp task default(shared)                                        \
+  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
+        er = rchild_->multifrontal_factorization
+          (A, opts, etree_level+1, task_depth+1);
+#pragma omp taskwait
+    } else {
+      if (lchild_)
+        el = lchild_->multifrontal_factorization
+          (A, opts, etree_level+1, task_depth);
+      if (rchild_)
+        er = rchild_->multifrontal_factorization
+          (A, opts, etree_level+1, task_depth);
+    }
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (el != ReturnCode::SUCCESS) err_code = el;
+    if (er != ReturnCode::SUCCESS) err_code = er;
     TaskTimer t("");
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0 = 0, ftot = 0;
@@ -324,7 +344,7 @@ namespace strumpack {
             (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
              upd_tiles_, admissibility_, opts.BLR_options(),
              [&](int i, bool part, std::size_t CP) {
-               this->build_front_cols
+               build_front_cols
                  (A, i, part, CP, e11, e12, e21, task_depth, opts);
              });
         }
@@ -476,6 +496,7 @@ namespace strumpack {
     //   BLR::draw(F11blr_, "F11root_"
     //             + std::to_string(opts.BLR_options().leaf_size()) + "_"
     //             + BLR::get_name(opts.BLR_options().admissibility()));
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -605,24 +626,24 @@ namespace strumpack {
       auto g = A.extract_graph
         (opts.separator_ordering_level(), sep_begin_, sep_end_);
       auto sep_tree = g.recursive_bisection
-        (opts.compression_leaf_size(1), 0,
+        (opts.BLR_options().leaf_size(), 0,
          sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
       std::vector<integer_t> siorder(dim_sep());
       for (integer_t i=sep_begin_; i<sep_end_; i++)
         siorder[sorder[i]] = i - sep_begin_;
-      g.permute(sorder+sep_begin_, siorder.data());
-      for (integer_t i=sep_begin_; i<sep_end_; i++)
-        sorder[i] = sorder[i] + sep_begin_;
-      sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
-      if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG)
+      if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG) {
+        g.permute(sorder+sep_begin_, siorder.data());
         admissibility_ = g.admissibility(sep_tiles_);
-      else {
+      } else {
         auto nt = sep_tiles_.size();
         admissibility_ = DenseMatrix<bool>(nt, nt);
         admissibility_.fill(true);
         for (std::size_t t=0; t<nt; t++)
           admissibility_(t, t) = false;
       }
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] += sep_begin_;
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

@@ -139,6 +139,7 @@ namespace strumpack {
         }
         for (int p=0; p<P; p++) { assert(ssize[p] == sbuf[p].size()); }
         auto rbuf = comm.all_to_all_v(sbuf);
+        Triplet<scalar_t>::free_mpi_type();
         if (ranges.leaf_procs(rank) == 1) {
           assert((ranges.chi(rank) - ranges.clo(rank)) == int(sub.rows()));
           assert(int(sub.cols()) == dist.cols());
@@ -225,6 +226,7 @@ namespace strumpack {
           }
         }
         auto rbuf = comm.all_to_all_v(sbuf);
+        Triplet<scalar_t>::free_mpi_type();
         if (dist.active()) {
           const auto rows = dist.rows();
           const auto cols = dist.cols();

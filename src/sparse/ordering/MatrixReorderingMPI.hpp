@@ -41,8 +41,8 @@ namespace strumpack {
    * A MatrixReorderingMPI has a distributed separator tree. This tree
    * is stored using 2 trees, one in the base class MatrixReordering
    * and one here in MatrixReorderingMPI. The tree in MatrixReordering
-   * (sep_tree_) is the top of the tree, corresponding to the
-   * distributed separators. The tree stored here (local_tree_)
+   * (tree_) is the top of the tree, corresponding to the
+   * distributed separators. The tree stored here (ltree_)
    * corresponds to the local subtree.
    *
    * The distributed tree should have P leafs.  Lets number the
@@ -87,12 +87,11 @@ namespace strumpack {
     MatrixReorderingMPI(integer_t n, const MPIComm& c);
     virtual ~MatrixReorderingMPI();
 
-    int nested_dissection
-    (const Opts_t& opts, const CSRMPI_t& A,
-     int nx, int ny, int nz, int components, int width);
+    int nested_dissection(const Opts_t& opts, const CSRMPI_t& A,
+                          int nx, int ny, int nz, int components, int width);
 
-    int set_permutation
-    (const Opts_t& opts, const CSRMPI_t& A, const int* p, int base);
+    int set_permutation(const Opts_t& opts, const CSRMPI_t& A,
+                        const int* p, int base);
 
     void separator_reordering(const Opts_t& opts, CSM_t& A, F_t* F);
 
@@ -126,34 +125,32 @@ namespace strumpack {
      */
     CSRGraph<integer_t> my_dist_sep;
 
-    std::vector<std::pair<integer_t,integer_t>> sub_graph_ranges;
-    std::vector<std::pair<integer_t,integer_t>> dist_sep_ranges;
+    std::vector<std::pair<integer_t,integer_t>> sub_graph_ranges,
+      dist_sep_ranges;
 
-    std::pair<integer_t,integer_t> sub_graph_range;
-    std::pair<integer_t,integer_t> dist_sep_range;
+    std::pair<integer_t,integer_t> sub_graph_range,
+      dist_sep_range;
 
-    /**
-     * Number of the node in sep_tree corresponding to the root of the
-     * local subtree.
-     */
-    integer_t dsep_leaf;
-
-    const SeparatorTree<integer_t>& local_tree() const { return *local_tree_; }
+    const SeparatorTree<integer_t>& ltree() const { return ltree_; }
 
   private:
     const MPIComm* comm_;
-    std::unique_ptr<SeparatorTree<integer_t>> local_tree_;
+    SeparatorTree<integer_t> ltree_;
+
+    /**
+     * Number of the node in tree corresponding to the root of the
+     * local subtree.
+     */
+    integer_t dsep_leaf_;
 
     void get_local_graphs(const CSRMPI_t& Ampi);
-
     void build_local_tree(const CSRMPI_t& Ampi);
-
-    void nested_dissection_print
-    (const SPOptions<scalar_t>& opts, integer_t nnz) const;
+    void nested_dissection_print(const SPOptions<scalar_t>& opts,
+                                 integer_t nnz) const;
 
     using MatrixReordering<scalar_t,integer_t>::perm_;
     using MatrixReordering<scalar_t,integer_t>::iperm_;
-    using MatrixReordering<scalar_t,integer_t>::sep_tree_;
+    using MatrixReordering<scalar_t,integer_t>::tree_;
   };
 
 } // end namespace strumpack

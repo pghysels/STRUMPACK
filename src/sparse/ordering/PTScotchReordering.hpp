@@ -37,18 +37,20 @@
 
 namespace strumpack {
 
-  template<typename integer_t> inline int WRAPPER_SCOTCH_dgraphOrderPerm
-  (SCOTCH_Dgraph* graph, SCOTCH_Dordering* ordeptr,
-   std::vector<integer_t>& order) {
+  template<typename integer_t> inline int
+  WRAPPER_SCOTCH_dgraphOrderPerm(SCOTCH_Dgraph* graph,
+                                 SCOTCH_Dordering* ordeptr,
+                                 std::vector<integer_t>& order) {
     std::vector<SCOTCH_Num> permloctab(order.size());
     int ierr = SCOTCH_dgraphOrderPerm(graph, ordeptr, permloctab.data());
     if (ierr) return ierr;
     order.assign(permloctab.begin(), permloctab.end());
     return 0;
   }
-  template<> inline int WRAPPER_SCOTCH_dgraphOrderPerm
-  (SCOTCH_Dgraph* graph, SCOTCH_Dordering* ordeptr,
-   std::vector<SCOTCH_Num>& order) {
+  template<> inline int
+  WRAPPER_SCOTCH_dgraphOrderPerm(SCOTCH_Dgraph* graph,
+                                 SCOTCH_Dordering* ordeptr,
+                                 std::vector<SCOTCH_Num>& order) {
     return SCOTCH_dgraphOrderPerm(graph, ordeptr, order.data());
   }
 
@@ -105,15 +107,13 @@ namespace strumpack {
    * return: the separator tree
    */
   template<typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> sep_tree_from_ptscotch_nd_tree
-  (std::vector<SCOTCH_Num>& ptscotch_tree,
-   std::vector<SCOTCH_Num>& ptscotch_sizes) {
+  SeparatorTree<integer_t>
+  sep_tree_from_ptscotch_nd_tree(std::vector<SCOTCH_Num>& ptscotch_tree,
+                                 std::vector<SCOTCH_Num>& ptscotch_sizes) {
     assert(std::count(ptscotch_tree.begin(), ptscotch_tree.end(), -1) == 1);
-    std::vector<integer_t> count(ptscotch_tree.size(), 0);
-    std::vector<integer_t> ptscotch_lchild
-      (ptscotch_tree.size(), integer_t(-1));
-    std::vector<integer_t> ptscotch_rchild
-      (ptscotch_tree.size(), integer_t(-1));
+    std::vector<integer_t> count(ptscotch_tree.size(), 0),
+      ptscotch_lchild(ptscotch_tree.size(), integer_t(-1)),
+      ptscotch_rchild(ptscotch_tree.size(), integer_t(-1));
     integer_t nr_sep = 0;
     for (size_t i=0; i<ptscotch_tree.size(); i++) {
       integer_t p = ptscotch_tree[i];
@@ -131,13 +131,12 @@ namespace strumpack {
       (ptscotch_tree.begin(),
        std::find(ptscotch_tree.begin(),
                  ptscotch_tree.end(), integer_t(-1)));
-    auto sep_tree = std::unique_ptr<SeparatorTree<integer_t>>
-      (new SeparatorTree<integer_t>(nr_sep));
-    sep_tree->sizes(0) = 0;
+    SeparatorTree<integer_t> sep_tree(nr_sep);
+    sep_tree.sizes[0] = 0;
     for (integer_t i=0; i<nr_sep; i++) {
-      sep_tree->pa(i) = -1;
-      sep_tree->lch(i) = -1;
-      sep_tree->rch(i) = -1;
+      sep_tree.parent[i] = -1;
+      sep_tree.lch[i] = -1;
+      sep_tree.rch[i] = -1;
     }
     std::function<void(integer_t,integer_t&)> f =
       [&](integer_t i, integer_t& pid) {
@@ -145,16 +144,16 @@ namespace strumpack {
         f(ptscotch_lchild[i], pid);
         integer_t left_root_id = pid - 1;
         f(ptscotch_rchild[i], pid);
-        sep_tree->rch(pid) = pid - 1;
-        sep_tree->pa(sep_tree->rch(pid)) = pid;
-        sep_tree->lch(pid) = left_root_id;
-        sep_tree->pa(sep_tree->lch(pid)) = pid;
+        sep_tree.rch[pid] = pid - 1;
+        sep_tree.parent[sep_tree.rch[pid]] = pid;
+        sep_tree.lch[pid] = left_root_id;
+        sep_tree.parent[sep_tree.lch[pid]] = pid;
       }
       auto size_pid = ptscotch_sizes[i];
       if (ptscotch_lchild[i] != -1 && ptscotch_rchild[i] != -1)
         size_pid -= ptscotch_sizes[ptscotch_lchild[i]]
           + ptscotch_sizes[ptscotch_rchild[i]];
-      sep_tree->sizes(pid+1) = sep_tree->sizes(pid) + size_pid;
+      sep_tree.sizes[pid+1] = sep_tree.sizes[pid] + size_pid;
       pid++;
     };
     nr_sep = 0;
@@ -163,9 +162,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> ptscotch_nested_dissection
-  (const CSRMatrixMPI<scalar_t,integer_t>& A, MPI_Comm comm, bool build_tree,
-   std::vector<integer_t>& perm, const SPOptions<scalar_t>& opts) {
+  SeparatorTree<integer_t>
+  ptscotch_nested_dissection(const CSRMatrixMPI<scalar_t,integer_t>& A,
+                             MPI_Comm comm, bool build_tree,
+                             std::vector<integer_t>& perm,
+                             const SPOptions<scalar_t>& opts) {
     auto local_rows = A.local_rows();
     auto ptr = A.ptr();
     auto ind = A.ind();
@@ -232,16 +233,15 @@ namespace strumpack {
         (local_order.data(), local_rows, mpi_type<integer_t>(),
          perm.data(), rcnts.get(), displs, mpi_type<integer_t>(), comm);
     }
-
-    std::unique_ptr<SeparatorTree<integer_t>> sep_tree;
+    SeparatorTree<integer_t> sep_tree;
     if (build_tree) {
       // get info about the distributed levels of nested-dissection
       integer_t dist_nr_sep = SCOTCH_dgraphOrderCblkDist(&graph, &ordeptr);
       if (ierr)
         std::cerr << "# ERROR: PTScotch failed to build the separator tree."
                   << std::endl;
-      std::vector<SCOTCH_Num> ptscotch_dist_tree(dist_nr_sep);
-      std::vector<SCOTCH_Num> ptscotch_dist_sizes(dist_nr_sep);
+      std::vector<SCOTCH_Num> ptscotch_dist_tree(dist_nr_sep),
+        ptscotch_dist_sizes(dist_nr_sep);
       ierr = SCOTCH_dgraphOrderTreeDist
         (&graph, &ordeptr, ptscotch_dist_tree.data(),
          ptscotch_dist_sizes.data());

@@ -124,7 +124,7 @@ namespace strumpack {
       }
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);    
+    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     release_work_memory();
   }
 
@@ -415,16 +415,21 @@ namespace strumpack {
       rchild_->extract_CB_sub_matrix_blocks(I, J, B, task_depth);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixHODLR<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (lchild_)
-      lchild_->multifrontal_factorization
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (lchild_) {
+      auto el = lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-    if (rchild_)
-      rchild_->multifrontal_factorization
+      if (el != ReturnCode::SUCCESS) err_code = el;
+    }
+    if (rchild_) {
+      auto er = rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-    if (!this->dim_blk()) return;
+      if (er != ReturnCode::SUCCESS) err_code = er;
+    }
+    if (!this->dim_blk()) return err_code;
     TaskTimer t("");
     if (opts.print_compressed_front_stats()) t.start();
     {
@@ -509,6 +514,7 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void

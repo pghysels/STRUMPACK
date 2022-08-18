@@ -43,6 +43,7 @@ endif()
 if(STRUMPACK_USE_CUDA)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cu
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.hpp)
   install(FILES CUDAWrapper.hpp DESTINATION include/dense)
 endif()
@@ -52,6 +53,12 @@ if(STRUMPACK_USE_HIP)
     ${CMAKE_CURRENT_LIST_DIR}/HIPWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/HIPWrapper.hpp)
   install(FILES HIPWrapper.hpp DESTINATION include/dense)
+endif()
+
+if(STRUMPACK_USE_SYCL)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/DPCPPWrapper.hpp)
+  install(FILES DPCPPWrapper.hpp DESTINATION include/dense)
 endif()
 
 if(STRUMPACK_USE_MAGMA)

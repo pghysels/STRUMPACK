@@ -180,6 +180,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DCMAKE_BUILD_TYPE=Debug \
           -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
+          -DBLA_VENDOR=OpenBLAS \
           -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
@@ -204,7 +205,8 @@ if ! $found_host; then
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_INSTALL_PREFIX=../install
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DTPL_SCALAPACK_LIBRARIES="/usr/lib64/openmpi/lib/libscalapack.so"
 
     ## if not found automatically, you can specify BLAS/LAPACK/SCALAPACK as:
     #  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a"

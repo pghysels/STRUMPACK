@@ -33,15 +33,15 @@
 
 extern "C" {
 #define GENRCM_FC STRUMPACK_FC_GLOBAL(genrcm,GENRCM)
-  void GENRCM_FC
-  (int* neqns, int* xadj, int* adjncy, int* perm, int* mask, int* xls);
+  void GENRCM_FC(int* neqns, int* xadj, int* adjncy,
+                 int* perm, int* mask, int* xls);
 }
 
 namespace strumpack {
 
-  template<typename integer_t> inline void WRAPPER_rcm
-  (std::vector<int>& xadj, std::vector<int>& adjncy,
-   std::vector<integer_t>& perm) {
+  template<typename integer_t> inline void
+  WRAPPER_rcm(std::vector<int>& xadj, std::vector<int>& adjncy,
+              std::vector<integer_t>& perm) {
     int n = perm.size();
     std::vector<int> mask(2*n), xls(2*n), int_perm(n);
     GENRCM_FC(&n, xadj.data(), adjncy.data(), int_perm.data(),
@@ -49,9 +49,9 @@ namespace strumpack {
     for (int i=0; i<n; i++)
       perm[i] = int_perm[i]-1;
   }
-  template<> inline void WRAPPER_rcm
-  (std::vector<int>& xadj, std::vector<int>& adjncy,
-   std::vector<int>& perm) {
+  template<> inline void
+  WRAPPER_rcm(std::vector<int>& xadj, std::vector<int>& adjncy,
+              std::vector<int>& perm) {
     int n = perm.size();
     std::vector<int> mask(2*n), xls(2*n);
     GENRCM_FC(&n, xadj.data(), adjncy.data(), perm.data(),
@@ -60,9 +60,10 @@ namespace strumpack {
   }
 
   template<typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> rcm_reordering
-  (integer_t n, const integer_t* ptr, const integer_t* ind,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
+  SeparatorTree<integer_t>
+  rcm_reordering(integer_t n, const integer_t* ptr, const integer_t* ind,
+                 std::vector<integer_t>& perm,
+                 std::vector<integer_t>& iperm) {
     std::vector<int> xadj(n+1), adjncy(ptr[n]);
     integer_t e = 0;
     for (integer_t j=0; j<n; j++) {
@@ -74,14 +75,18 @@ namespace strumpack {
     if (e==0)
       if (mpi_root())
         std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-    WRAPPER_rcm(xadj, adjncy, perm);
+    WRAPPER_rcm(xadj, adjncy, iperm);
+    for (integer_t i=0; i<n; i++)
+      perm[iperm[i]] = i;
     return build_sep_tree_from_perm(ptr, ind, perm, iperm);
   }
 
   template<typename integer_t,typename G>
-  std::unique_ptr<SeparatorTree<integer_t>> rcm_reordering
-  (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm) {
-    return rcm_reordering<integer_t>(A.size(), A.ptr(), A.ind(), perm, iperm);
+  SeparatorTree<integer_t>
+  rcm_reordering(const G& A, std::vector<integer_t>& perm,
+                 std::vector<integer_t>& iperm) {
+    return rcm_reordering<integer_t>
+      (A.size(), A.ptr(), A.ind(), perm, iperm);
   }
 
 } // end namespace strumpack

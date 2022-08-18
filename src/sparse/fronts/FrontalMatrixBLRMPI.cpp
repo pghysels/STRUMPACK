@@ -198,6 +198,7 @@ namespace strumpack {
       auto rbuf = Comm().all_to_all_v(sbuf);
       for (auto& e : rbuf) F21blr_.global(e.r, e.c) = e.v;
     }
+    Trip_t::free_mpi_type();
   }
 
 
@@ -228,15 +229,20 @@ namespace strumpack {
     extend_add_cols(i, part, CP, opts);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    if (visit(lchild_))
-      lchild_->multifrontal_factorization
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (visit(lchild_)) {
+      auto el = lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
-    if (visit(rchild_))
-      rchild_->multifrontal_factorization
+      if (el != ReturnCode::SUCCESS) err_code = el;
+    }
+    if (visit(rchild_)) {
+      auto er = rchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) err_code = er;
+    }
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     if (opts.BLR_options().BLR_factor_algorithm() ==
@@ -265,11 +271,12 @@ namespace strumpack {
           for (auto& e : e21)
             s3buf[upd_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
           auto r3buf = Comm().all_to_all_v(s3buf);
+          Trip_t::free_mpi_type();
           piv_ = BLRMPI_t::partial_factor_col
             (F11blr_, F12blr_, F21blr_, F22blr_,
             adm_, opts.BLR_options(),
             [&](int i, bool part, std::size_t CP) {
-              this->build_front_cols
+              build_front_cols
                 (A, i, part, CP, r1buf, r2buf, r3buf, opts);
             });
         } else {
@@ -283,6 +290,7 @@ namespace strumpack {
           for (auto& e : e11)
             sbuf[sep_rg2p(e.r)+sep_cg2p(e.c)*npr].push_back(e);
           auto r1buf = Comm().all_to_all_v(sbuf);
+          Trip_t::free_mpi_type();
           std::vector<Trip_t> r2buf, r3buf;
           piv_ = F11blr_.factor_col
             (adm_, opts.BLR_options(),
@@ -347,6 +355,7 @@ namespace strumpack {
         std::cout << std::endl;
       }
     }
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -437,27 +446,39 @@ namespace strumpack {
    integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
     if (dim_sep()) {
-      auto g = A.extract_graph
-        (opts.separator_ordering_level(), sep_begin_, sep_end_);
-      auto sep_tree = g.recursive_bisection
-        (opts.BLR_options().leaf_size(), 0,
-         sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      CSRGraph<integer_t> g;
+      if (Comm().is_root()) {
+        g = A.extract_graph
+          (opts.separator_ordering_level(), sep_begin_, sep_end_);
+        auto sep_tree = g.recursive_bisection
+          (opts.BLR_options().leaf_size(), 0,
+           sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+        sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
+      }
+      auto nt = sep_tiles_.size();
+      Comm().broadcast(nt);
+      sep_tiles_.resize(nt);
+      Comm().broadcast(sep_tiles_);
+      Comm().broadcast(sorder+sep_begin_, std::size_t(dim_sep()));
       std::vector<integer_t> siorder(dim_sep());
       for (integer_t i=sep_begin_; i<sep_end_; i++)
         siorder[sorder[i]] = i - sep_begin_;
-      g.permute(sorder+sep_begin_, siorder.data());
-      for (integer_t i=sep_begin_; i<sep_end_; i++)
-        sorder[i] += sep_begin_;
-      sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
-      if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG)
-        adm_ = g.admissibility(sep_tiles_);
-      else {
+      if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG) {
+        if (Comm().is_root()) {
+          g.permute(sorder+sep_begin_, siorder.data());
+          adm_ = g.admissibility(sep_tiles_);
+        } else
+          adm_ = DenseMatrix<bool>(nt, nt);
+        Comm().broadcast(adm_.data(), nt*nt);
+      } else {
         auto nt = sep_tiles_.size();
         adm_ = DenseMatrix<bool>(nt, nt);
         adm_.fill(true);
         for (std::size_t t=0; t<nt; t++)
           adm_(t, t) = false;
       }
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] += sep_begin_;
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

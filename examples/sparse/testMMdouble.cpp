@@ -41,6 +41,33 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
 
   int N = A.size();
   std::vector<scalar_t> b(N), x(N), x_exact(N);
+
+#if 0
+  std::ifstream file;
+  // std::cout<<argv[2]<<std::endl;
+  std::string ff(argv[2]);
+  file.open(ff);
+  int num_row, num_col, tmp, rowidx,colidx;
+  // Ignore comments headers
+  while (file.peek() == '%') file.ignore(2048, '\n');
+  //Read number of rows and columns
+  file >> num_row >> num_col>>tmp;
+  std::cout<<file.is_open()<<std::endl;
+  // std::vector<scalar_t>  b(N);
+  //std::complex<double> b[N];              
+  //b = new std::complex<double>[num_row * 1];      
+  //std::fill(b, b + num_row *1, 0.);
+
+  // fill the matrix with data
+  for (int l = 0; l < num_row; l++)
+  {
+      double data; 
+      file >>  rowidx>>colidx>>data ;
+      b.data()[l] = data;
+  }
+  file.close();
+
+#else
   {
     using real_t = typename RealType<scalar_t>::value_type;
     auto rgen = random::make_default_random_generator<real_t>();
@@ -49,6 +76,8 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   }
 
   A.spmv(x_exact.data(), b.data());
+#endif
+
 
   spss.set_matrix(A);
   if (spss.reorder() != ReturnCode::SUCCESS) {
@@ -60,6 +89,12 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
     return;
   }
   spss.solve(b.data(), x.data());
+
+  integer_t neg, zero, pos;
+  auto err = spss.inertia(neg, zero, pos);
+  std::cout << "# INERTIA neg,zero,pos = "
+            << neg << ", " << zero << ", " << pos
+            <<  " (" << err << ")" << std::endl;
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;
@@ -82,10 +117,10 @@ int main(int argc, char* argv[]) {
 
   CSRMatrix<double,int> A;
   if (A.read_matrix_market(f) == 0)
-    test<double,int>(argc, argv, A);
+    test(argc, argv, A);
   else {
     CSRMatrix<std::complex<double>,int> A;
     A.read_matrix_market(f);
-    test<std::complex<double>,int>(argc, argv, A);
+    test(argc, argv, A);
   }
 }

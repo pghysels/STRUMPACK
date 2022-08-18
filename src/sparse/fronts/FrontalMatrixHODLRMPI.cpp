@@ -81,11 +81,7 @@ namespace strumpack {
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
-    // auto dupd = dim_upd();
-    // DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
-    // eye.eye();
-    // F22_->mult(Trans::N, eye, dF22);
-    auto dF22 = get_dense_CB();
+    auto dF22 = F22_->dense(grid());
     ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
       (dF22, sbuf, pa, this->upd_to_parent(pa));
   }
@@ -107,6 +103,44 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+    if (!dim_upd()) return;
+    if (Comm().is_null()) return;
+    auto dF22 = F22_->dense(grid());
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
+      (dF22, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
+  integer_t begin_col, integer_t end_col, const SPOptions<scalar_t>& opts) const {
+    if (!dim_upd()) return;
+    if (Comm().is_null()) return;
+    auto dF22 = F22_->dense(grid());
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
+      (dF22, sbuf, pa, this->upd_to_parent(pa), begin_col, end_col);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
+      (F11, F12, F21, F22, pbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
+   scalar_t** pbuf, const FBLRMPI_t* pa,
+   integer_t begin_col, integer_t end_col) const {
+    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers_col
+      (F11, F12, F21, F22, pbuf, pa, this, begin_col, end_col);
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_CB
   (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const {
     if (!dim_upd()) return;
@@ -115,7 +149,6 @@ namespace strumpack {
     TIMER_TIME(TaskType::F22_MULT, 2, t_sprod);
     F22_->mult(op, R, S);
   }
-
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_children_CB
@@ -186,15 +219,21 @@ namespace strumpack {
         (B[i], oI[i], oJ[i], Bloc[i], pbuf);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    double tol_used;
-    if (visit(lchild_))
-      lchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (visit(rchild_))
-      rchild_->multifrontal_factorization(A, opts, etree_level+1, task_depth);
-    if (!dim_blk()) return;
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (visit(lchild_)) {
+      auto el = lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (el != ReturnCode::SUCCESS) err_code = el;
+    }
+    if (visit(rchild_)) {
+      auto er = rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+      if (er != ReturnCode::SUCCESS) err_code = er;
+    }
+    if (!dim_blk()) return err_code;
     TaskTimer t("FrontalMatrixHODLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     {
@@ -290,6 +329,7 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -651,16 +691,17 @@ namespace strumpack {
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
-    auto g = A.extract_graph
-      (opts.separator_ordering_level(), sep_begin_, sep_end_);
-    sep_tree_ = g.recursive_bisection
-      (opts.HODLR_options().leaf_size(), 0,
-       sorder+sep_begin_, nullptr, 0, 0, dim_sep());
-    std::vector<integer_t> siorder(dim_sep());
-    for (integer_t i=sep_begin_; i<sep_end_; i++)
-      siorder[sorder[i]] = i - sep_begin_;
-    for (integer_t i=sep_begin_; i<sep_end_; i++)
-      sorder[i] += sep_begin_;
+    if (Comm().is_root()) {
+      auto g = A.extract_graph
+        (opts.separator_ordering_level(), sep_begin_, sep_end_);
+      sep_tree_ = g.recursive_bisection
+        (opts.HODLR_options().leaf_size(), 0,
+         sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] += sep_begin_;
+    }
+    sep_tree_.broadcast(Comm());
+    Comm().broadcast(sorder+sep_begin_, dim_sep());
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -668,6 +709,11 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts) {
     TIMER_TIME(TaskType::CONSTRUCT_HIERARCHY, 0, t_construct_h);
     TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_11);
+    // g could be different on different ranks because of the length 2
+    // edges, which are not all available on every rank. This is why
+    // the sep_tree is broadcast (above in partition). Could this be
+    // an issue in the HODLR code if the neighbors are not all the
+    // same???
     auto g = A.extract_graph
       (opts.separator_ordering_level(), sep_begin_, sep_end_);
     TIMER_STOP(t_graph_11);
