@@ -513,6 +513,11 @@ namespace strumpack {
                              gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.))));
       auto Q3norm = Q3p.norm(); // TODO norm flops ?
+
+      if(opts.compression_sketch() == CompressionSketch::SJLT){
+          return (Q3norm / std::sqrt(double(opts.nnz())) < atol)
+            || (Q3norm / S3norm < rtol);
+      }
       return (Q3norm / std::sqrt(double(dd)) < atol)
         || (Q3norm / S3norm < rtol);
     }
