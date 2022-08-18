@@ -45,7 +45,8 @@ namespace strumpack {
           auto n = this->cols();
           DenseM_t Rr, Rc, Sr, Sc;
           SJLTGenerator<scalar_t, int> g;
-          SJLT_Matrix<scalar_t, int> S(g,0,n,0);
+          bool chunk = opts.sjlt_algo() == SJLTAlgo::CHUNK;
+          SJLT_Matrix<scalar_t, int> S(g,0,n,0,chunk);
 
           if(opts.verbose()){
                std::cout<< "# compressing with sjlt \n";
@@ -91,7 +92,7 @@ namespace strumpack {
 
                     begin = std::chrono::steady_clock::now();
                     SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
-                    opts.nnz(),n,dnew);
+                    opts.nnz(),n,dnew,chunk);
 
                     S.append_sjlt_matrix(Temp);
                     end = std::chrono::steady_clock::now();
@@ -512,6 +513,11 @@ namespace strumpack {
                              gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.))));
       auto Q3norm = Q3p.norm(); // TODO norm flops ?
+
+      if(opts.compression_sketch() == CompressionSketch::SJLT){
+          return (Q3norm / std::sqrt(double(opts.nnz())) < atol)
+            || (Q3norm / S3norm < rtol);
+      }
       return (Q3norm / std::sqrt(double(dd)) < atol)
         || (Q3norm / S3norm < rtol);
     }

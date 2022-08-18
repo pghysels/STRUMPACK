@@ -56,6 +56,14 @@ namespace strumpack {
       }
     }
 
+    std::string get_name(SJLTAlgo a) {
+      switch (a) {
+      case SJLTAlgo::CHUNK: return "chunking SJLT sampling ";
+      case SJLTAlgo::PERM: return "permutation SJLT sampling ";
+      default: return "unknown";
+      }
+    }
+
     template<typename scalar_t> void
     HSSOptions<scalar_t>::set_from_command_line
     (int argc, const char* const* cargv) {
@@ -81,13 +89,14 @@ namespace strumpack {
          {"hss_random_engine",         required_argument, 0, 11},
          {"hss_compression_algorithm", required_argument, 0, 12},
          {"hss_compression_sketch",    required_argument, 0, 13},
-         {"hss_clustering_algorithm",  required_argument, 0, 14},
-         {"hss_approximate_neighbors", required_argument, 0, 15},
-         {"hss_ann_iterations",        required_argument, 0, 16},
-         {"hss_user_defined_random",   no_argument, 0, 17},
-         {"hss_enable_sync",           no_argument, 0, 18},
-         {"hss_disable_sync",          no_argument, 0, 19},
-         {"hss_log_ranks",             no_argument, 0, 20},
+         {"sjlt_algo",                 required_argument, 0, 14},
+         {"hss_clustering_algorithm",  required_argument, 0, 15},
+         {"hss_approximate_neighbors", required_argument, 0, 16},
+         {"hss_ann_iterations",        required_argument, 0, 17},
+         {"hss_user_defined_random",   no_argument, 0, 18},
+         {"hss_enable_sync",           no_argument, 0, 19},
+         {"hss_disable_sync",          no_argument, 0, 20},
+         {"hss_log_ranks",             no_argument, 0, 21},
          {"hss_verbose",               no_argument, 0, 'v'},
          {"hss_quiet",                 no_argument, 0, 'q'},
          {"help",                      no_argument, 0, 'h'},
@@ -188,25 +197,40 @@ namespace strumpack {
                       << " use 'gaussian', or 'sjlt'."
                       << std::endl;
         } break;
+
         case 14: {
+          std::istringstream iss(optarg);
+          std::string s; iss >> s;
+          if (s.compare("chunk") == 0)
+            set_sjlt_algo(SJLTAlgo::CHUNK);
+          else if (s.compare("perm") == 0)
+            set_sjlt_algo(SJLTAlgo::PERM);
+          else
+            std::cerr << "# WARNING: compression sketch not recognized,"
+                      << " use 'chunk', or 'perm'."
+                      << std::endl;
+        } break;
+
+
+        case 15: {
           std::istringstream iss(optarg);
           std::string s; iss >> s;
           set_clustering_algorithm(get_clustering_algorithm(s));
         } break;
-        case 15: {
+        case 16: {
           std::istringstream iss(optarg);
           iss >> approximate_neighbors_;
           set_approximate_neighbors(approximate_neighbors_);
         } break;
-        case 16: {
+        case 17: {
           std::istringstream iss(optarg);
           iss >> ann_iterations_;
           set_ann_iterations(ann_iterations_);
         } break;
-        case 17: { set_user_defined_random(true); } break;
-        case 18: { set_synchronized_compression(true); } break;
-        case 19: { set_synchronized_compression(false); } break;
-        case 20: { set_log_ranks(true); } break;
+        case 18: { set_user_defined_random(true); } break;
+        case 19: { set_synchronized_compression(true); } break;
+        case 20: { set_synchronized_compression(false); } break;
+        case 21: { set_log_ranks(true); } break;
         case 'v': this->set_verbose(true); break;
         case 'q': this->set_verbose(false); break;
         case 'h': describe_options(); break;
@@ -244,6 +268,8 @@ namespace strumpack {
                 << get_name(compression_algorithm())<< ")" << std::endl
                 << "#   --hss_compression_sketch gaussian|sjlt (default "
                 << get_name(compression_sketch())<< ")" << std::endl
+                << "#   --sjlt_algo chunk|perm (default "
+                << get_name(sjlt_algo())<< ")" << std::endl
                 << "#   --hss_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
                 << get_name(clustering_algorithm())<< ")" << std::endl
                 << "#   --hss_user_defined_random (default "
