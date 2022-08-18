@@ -88,8 +88,8 @@ generateMatrix(int ndim, int nx, double corlen=0.2)
   std::cout << "Correlation: " << corlen << std::endl;
 
   Mesh cart_mesh = ndim == 2 ?
-    Mesh::MakeCartesian2D(nx, nx, Element::QUADRILATERAL, 1) :
-    Mesh::MakeCartesian3D(nx, nx, nx, Element::HEXAHEDRON, 1);
+    Mesh::MakeCartesian2D(nx, nx, Element::QUADRILATERAL, 1, 1., 1., false) :
+    Mesh::MakeCartesian3D(nx, nx, nx, Element::HEXAHEDRON, 1., 1., 1., false);
   Mesh* mesh = &cart_mesh;
 
   // 3. Define a linear finite element space on the mesh.
