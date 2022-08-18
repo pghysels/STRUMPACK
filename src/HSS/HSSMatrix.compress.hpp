@@ -45,7 +45,7 @@ namespace strumpack {
             if (opts.verbose())
                std::cout << "# Multiplying fast with SJLT format"  << std::endl;
               //do a fast SJLT multiply:
-        int d_old = 0, d = opts.d0() + opts.p(), total_nnz = 0;
+        int d_old = 0, d = opts.d0() + opts.p(), total_nnz = 0, nnz_cur = opts.nnz();
         auto n = this->cols();
         DenseM_t Rr, Rc, Sr, Sc;
         SJLTGenerator<scalar_t, int> g;
@@ -96,7 +96,9 @@ namespace strumpack {
 
          begin = std::chrono::steady_clock::now();
          SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
-         opts.nnz(),n,d-d_old);
+         nnz_cur,n,d-d_old);
+         total_nnz += nnz_cur;
+         nnz_cur *=2;
          S.append_sjlt_matrix(Temp);
          end = std::chrono::steady_clock::now();
          if (opts.verbose())
@@ -104,7 +106,6 @@ namespace strumpack {
 
 
          Rr_new.copy(Temp.SJLT_to_dense());
-         total_nnz += opts.nnz();
 
          begin = std::chrono::steady_clock::now();
          Matrix_times_SJLT(A,Temp,Sr_new);

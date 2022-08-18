@@ -43,8 +43,8 @@ int main(int argc, char* argv[]) {
   int shape = 1;
   double pos_src[] = {1.8, 1.8};
   int order = 2;
-  double w = M_PI * 8;
-  int N = 500;
+  double w = M_PI * 16;
+  int N = 1000;
   int center[] = {1, 1};
   int nquad = 4;
   double gamma = 1.781072418;
