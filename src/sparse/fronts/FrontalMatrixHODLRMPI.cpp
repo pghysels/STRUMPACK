@@ -85,22 +85,6 @@ namespace strumpack {
     ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
       (dF22, sbuf, pa, this->upd_to_parent(pa));
   }
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
-  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
-    auto dF22 = get_dense_CB();
-    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
-      (dF22, sbuf, pa, this->upd_to_parent(pa));
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
-  (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
-  integer_t begin_col, integer_t end_col, const SPOptions<scalar_t>& opts) const {
-    auto dF22 = get_dense_CB();
-    BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
-      (dF22, sbuf, pa, this->upd_to_parent(pa), begin_col, end_col);
-  }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
@@ -223,6 +207,7 @@ namespace strumpack {
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
+    double tol_used;
     if (visit(lchild_)) {
       auto el = lchild_->multifrontal_factorization
         (A, opts, etree_level+1, task_depth);
