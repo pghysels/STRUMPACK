@@ -653,18 +653,18 @@ namespace strumpack {
 */
 template<typename scalar_t, typename integer_t> class SJLT_Matrix {
 public:
-    SJLT_Matrix(SJLTGenerator<scalar_t, integer_t> g, std::size_t nnz,
+    SJLT_Matrix(SJLTGenerator<scalar_t, integer_t>& g, std::size_t nnz,
         std::size_t n_rows, std::size_t n_cols, bool chunk) :
-        g_(g), nnz_(nnz), n_rows_(n_rows), n_cols_(n_cols),
+        g_(&g), nnz_(nnz), n_rows_(n_rows), n_cols_(n_cols),
         A_(BinaryCRSMarix<scalar_t>(0, n_cols)),
         B_(BinaryCRSMarix<scalar_t>(0, n_cols)),
         Ac_(BinaryCCSMarix<scalar_t>(n_rows, 0)),
         Bc_(BinaryCCSMarix<scalar_t>(n_rows, 0)),chunk_(chunk)
     {
         if(chunk_)
-        g_.createSJLTCRS_Chunks(A_, B_, Ac_, Bc_, nnz_, n_rows_, n_cols_);
+        g_->createSJLTCRS_Chunks(A_, B_, Ac_, Bc_, nnz_, n_rows_, n_cols_);
         else
-        g_.createSJLTCRS(A_, B_, Ac_, Bc_, nnz_, n_rows_, n_cols_);
+        g_->createSJLTCRS(A_, B_, Ac_, Bc_, nnz_, n_rows_, n_cols_);
 
     }
 
@@ -679,10 +679,10 @@ public:
         BinaryCCSMarix<scalar_t> Ac_temp(n_rows_, 0);
         BinaryCCSMarix<scalar_t> Bc_temp(n_rows_, 0);
         if(chunk_)
-        g_.createSJLTCRS_Chunks(A_temp, B_temp, Ac_temp, Bc_temp,
+        g_->createSJLTCRS_Chunks(A_temp, B_temp, Ac_temp, Bc_temp,
                          nnz, n_rows_, new_cols);
         else
-        g_.createSJLTCRS(A_temp, B_temp, Ac_temp, Bc_temp,
+        g_->createSJLTCRS(A_temp, B_temp, Ac_temp, Bc_temp,
                          nnz, n_rows_, new_cols);
 
         A_.append_cols(A_temp);
@@ -766,7 +766,7 @@ public:
         return nnz_;
     }
     SJLTGenerator<scalar_t, integer_t> & get_g() {
-        return g_;
+        return *g_;
     }
 
     bool get_chunk(){
@@ -810,7 +810,7 @@ public:
 
 
 private:
-    SJLTGenerator<scalar_t, integer_t> g_;
+    SJLTGenerator<scalar_t, integer_t>* g_ = nullptr;
     std::size_t nnz_;
     std::size_t n_rows_;
     std::size_t n_cols_;
