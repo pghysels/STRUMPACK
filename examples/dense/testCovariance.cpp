@@ -144,32 +144,33 @@ generateMatrix(int ndim, int nx, double corlen=0.2)
   return M;
 }
 
+/* Modified to not do dissection, but bisection. */
 void ND1D(int bx, int ex, int by, int ey, int bz, int ez,
           int nx, int ny, int nz, int offset, int* order) {
   /* 1D Nested Dissection of a line of an nx x ny x nz cuboid mesh                  */
   /* Ordering is written in array order with starting positing "offset".            */
   int sx = ex-bx+1, sy = ey-by+1, sz = ez-bz+1;
-  if(sx<=0 || sy<=0 || sz <=0)
+  if (sx<=0 || sy<=0 || sz<=0)
     return;
   if (sx==1 && sy==1 && sz==1) {
     order[offset] = (bx-1)*ny*nz+(by-1)*nz+bz;
     return;
   }
   if (sy==1 && sz==1) {
-    int hx = bx+(ex-bx+1)/2;
-    ND1D(bx  ,hx-1,by,ey,bz,ez,nx,ny,nz,offset        ,order);
-    ND1D(hx+1,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx),order);
-    order[offset+ex-bx] = (hx-1)*ny*nz+(by-1)*nz+bz;
+    int hx = bx+sx/2;
+    ND1D(bx,hx-1,by,ey,bz,ez,nx,ny,nz,offset        ,order);
+    ND1D(hx,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx),order);
+    // order[offset+ex-bx] = (hx-1)*ny*nz+(by-1)*nz+bz;
   } else if (sx==1 && sz==1) {
-    int hy = by+(ey-by+1)/2;
-    ND1D(bx,ex,by  ,hy-1,bz,ez,nx,ny,nz,offset        ,order);
-    ND1D(bx,ex,hy+1,ey  ,bz,ez,nx,ny,nz,offset+(hy-by),order);
-    order[offset+ey-by] = (bx-1)*ny*nz+(hy-1)*nz+bz;
+    int hy = by+sy/2;
+    ND1D(bx,ex,by,hy-1,bz,ez,nx,ny,nz,offset        ,order);
+    ND1D(bx,ex,hy,ey  ,bz,ez,nx,ny,nz,offset+(hy-by),order);
+    //order[offset+ey-by] = (bx-1)*ny*nz+(hy-1)*nz+bz;
   } else if (sx==1 && sy==1) {
-    int hz = bz+(ez-bz+1)/2;
-    ND1D(bx,ex,by,ey,bz  ,hz-1,nx,ny,nz,offset        ,order);
-    ND1D(bx,ex,by,ey,hz+1,ez  ,nx,ny,nz,offset+(hz-bz),order);
-    order[offset+ez-bz] = (bx-1)*ny*nz+(by-1)*nz+hz;
+    int hz = bz+sz/2;
+    ND1D(bx,ex,by,ey,bz,hz-1,nx,ny,nz,offset        ,order);
+    ND1D(bx,ex,by,ey,hz,ez  ,nx,ny,nz,offset+(hz-bz),order);
+    //order[offset+ez-bz] = (bx-1)*ny*nz+(by-1)*nz+hz;
   } else {
     std::cerr << "Internal error ND1D\n";
     exit(1);
@@ -214,39 +215,39 @@ void ND2D(int bx, int ex, int by, int ey, int bz, int ez,
   }
   if (sz==1) {
     if (cut==0) {
-      int hx = bx+(ex-bx+1)/2;
-      ND2D(bx  ,hx-1,by,ey,bz,ez,nx,ny,nz,offset           ,1,order);
-      ND2D(hx+1,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx)*sy,1,order);
-      ND1D(hx  ,hx  ,by,ey,bz,ez,nx,ny,nz,offset+(ex-bx)*sy,  order);
+      int hx = bx+sx/2;
+      ND2D(bx,hx-1,by,ey,bz,ez,nx,ny,nz,offset           ,1,order);
+      ND2D(hx,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx)*sy,1,order);
+      //ND1D(hx  ,hx  ,by,ey,bz,ez,nx,ny,nz,offset+(ex-bx)*sy,  order);
     } else {
-      int hy = by+(ey-by+1)/2;
-      ND2D(bx,ex,by  ,hy-1,bz,ez,nx,ny,nz,offset           ,0,order);
-      ND2D(bx,ex,hy+1,ey  ,bz,ez,nx,ny,nz,offset+(hy-by)*sx,0,order);
-      ND1D(bx,ex,hy  ,hy  ,bz,ez,nx,ny,nz,offset+(ey-by)*sx,  order);
+      int hy = by+sy/2;
+      ND2D(bx,ex,by,hy-1,bz,ez,nx,ny,nz,offset           ,0,order);
+      ND2D(bx,ex,hy,ey  ,bz,ez,nx,ny,nz,offset+(hy-by)*sx,0,order);
+      //ND1D(bx,ex,hy  ,hy  ,bz,ez,nx,ny,nz,offset+(ey-by)*sx,  order);
     }
   } else if (sy==1) {
     if (cut==0) {
-      int hx = bx+(ex-bx+1)/2;
-      ND2D(bx  ,hx-1,by,ey,bz,ez,nx,ny,nz,offset           ,1,order);
-      ND2D(hx+1,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx)*sz,1,order);
-      ND1D(hx  ,hx  ,by,ey,bz,ez,nx,ny,nz,offset+(ex-bx)*sz,  order);
+      int hx = bx+sx/2;
+      ND2D(bx,hx-1,by,ey,bz,ez,nx,ny,nz,offset           ,1,order);
+      ND2D(hx,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx)*sz,1,order);
+      //ND1D(hx  ,hx  ,by,ey,bz,ez,nx,ny,nz,offset+(ex-bx)*sz,  order);
     } else {
-      int hz = bz+(ez-bz+1)/2;
-      ND2D(bx,ex,by,ey,bz  ,hz-1,nx,ny,nz,offset           ,0,order);
-      ND2D(bx,ex,by,ey,hz+1,ez  ,nx,ny,nz,offset+(hz-bz)*sx,0,order);
-      ND1D(bx,ex,by,ey,hz  ,hz  ,nx,ny,nz,offset+(ez-bz)*sx,  order);
+      int hz = bz+sz/2;
+      ND2D(bx,ex,by,ey,bz,hz-1,nx,ny,nz,offset           ,0,order);
+      ND2D(bx,ex,by,ey,hz,ez  ,nx,ny,nz,offset+(hz-bz)*sx,0,order);
+      //ND1D(bx,ex,by,ey,hz  ,hz  ,nx,ny,nz,offset+(ez-bz)*sx,  order);
     }
   } else if (sx==1) {
     if (cut==0) {
-      int hy = by+(ey-by+1)/2;
-      ND2D(bx,ex,by  ,hy-1,bz,ez,nx,ny,nz,offset           ,0,order);
-      ND2D(bx,ex,hy+1,ey  ,bz,ez,nx,ny,nz,offset+(hy-by)*sz,0,order);
-      ND1D(bx,ex,hy  ,hy  ,bz,ez,nx,ny,nz,offset+(ey-by)*sz,  order);
+      int hy = by+sy/2;
+      ND2D(bx,ex,by,hy-1,bz,ez,nx,ny,nz,offset           ,0,order);
+      ND2D(bx,ex,hy,ey  ,bz,ez,nx,ny,nz,offset+(hy-by)*sz,0,order);
+      //ND1D(bx,ex,hy  ,hy  ,bz,ez,nx,ny,nz,offset+(ey-by)*sz,  order);
     } else {
-      int hz = bz+(ez-bz+1)/2;
+      int hz = bz+sz/2;
       ND2D(bx,ex,by,ey,bz  ,hz-1,nx,ny,nz,offset           ,0,order);
-      ND2D(bx,ex,by,ey,hz+1,ez  ,nx,ny,nz,offset+(hz-bz)*sy,0,order);
-      ND1D(bx,ex,by,ey,hz  ,hz  ,nx,ny,nz,offset+(ez-bz)*sy,  order);
+      ND2D(bx,ex,by,ey,hz,ez  ,nx,ny,nz,offset+(hz-bz)*sy,0,order);
+      //ND1D(bx,ex,by,ey,hz  ,hz  ,nx,ny,nz,offset+(ez-bz)*sy,  order);
     }
   }
 }
@@ -279,20 +280,20 @@ void ND3D(int bx, int ex, int by, int ey, int bz, int ez,
     return;
   }
   if(cut==0) {
-    int hx = bx+(ex-bx+1)/2;
-    ND3D(bx  ,hx-1,by,ey,bz,ez,nx,ny,nz,offset              ,1,order);
-    ND3D(hx+1,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx)*sy*sz,1,order);
-    ND2D(hx  ,hx  ,by,ey,bz,ez,nx,ny,nz,offset+(ex-bx)*sy*sz,0,order);
+    int hx = bx+sx/2;
+    ND3D(bx,hx-1,by,ey,bz,ez,nx,ny,nz,offset              ,1,order);
+    ND3D(hx,ex  ,by,ey,bz,ez,nx,ny,nz,offset+(hx-bx)*sy*sz,1,order);
+    //ND2D(hx  ,hx  ,by,ey,bz,ez,nx,ny,nz,offset+(ex-bx)*sy*sz,0,order);
   } else if(cut==1) {
-    int hy=by+(ey-by+1)/2;
-    ND3D(bx,ex,by  ,hy-1,bz,ez,nx,ny,nz,offset              ,2,order);
-    ND3D(bx,ex,hy+1,ey  ,bz,ez,nx,ny,nz,offset+(hy-by)*sx*sz,2,order);
-    ND2D(bx,ex,hy  ,hy  ,bz,ez,nx,ny,nz,offset+(ey-by)*sx*sz,0,order);
+    int hy = by+sy/2;
+    ND3D(bx,ex,by,hy-1,bz,ez,nx,ny,nz,offset              ,2,order);
+    ND3D(bx,ex,hy,ey  ,bz,ez,nx,ny,nz,offset+(hy-by)*sx*sz,2,order);
+    //ND2D(bx,ex,hy  ,hy  ,bz,ez,nx,ny,nz,offset+(ey-by)*sx*sz,0,order);
   } else {
-    int hz=bz+(ez-bz+1)/2;
-    ND3D(bx,ex,by,ey,bz  ,hz-1,nx,ny,nz,offset              ,0,order);
-    ND3D(bx,ex,by,ey,hz+1,ez  ,nx,ny,nz,offset+(hz-bz)*sx*sy,0,order);
-    ND2D(bx,ex,by,ey,hz  ,hz  ,nx,ny,nz,offset+(ez-bz)*sx*sy,0,order);
+    int hz = bz+sz/2;
+    ND3D(bx,ex,by,ey,bz,hz-1,nx,ny,nz,offset              ,0,order);
+    ND3D(bx,ex,by,ey,hz,ez  ,nx,ny,nz,offset+(hz-bz)*sx*sy,0,order);
+    //ND2D(bx,ex,by,ey,hz  ,hz  ,nx,ny,nz,offset+(ez-bz)*sx*sy,0,order);
   }
 }
 
@@ -338,6 +339,14 @@ int main(int argc, char* argv[]) {
   }
   auto C = generateMatrix(ndim, nx, corlen);
   auto P = generatePermutation(ndim, nx);
+
+  {
+    auto Pc = P;
+    std::sort(Pc.begin(), Pc.end());
+    for (std::size_t i=0; i<Pc.size(); i++) {
+      if (i+1 != Pc[i]) std::cerr << "invalid permutation!" << std::endl;
+    }
+  }
 
   strumpack::DenseMatrix<double> M(C);
   for (int j=0; j<M.cols(); j++)
