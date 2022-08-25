@@ -695,10 +695,20 @@ namespace strumpack {
         (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
       std::size_t totssize = std::accumulate(ssizes, ssizes+P, std::size_t(0)),
         totrsize = std::accumulate(rsizes, rsizes+P, std::size_t(0));
+#if 1
+      if (true) {
+        // Always implement the all_to_all_v with Irecv/Isend loops.
+        // We noticed (on NERSC Cori) that MPI_Alltoallv gave wrong
+        // results for large problems (using double complex), likely
+        // due to some overflow, even tho the totssize/totrsize was <
+        // MAX_INT. Also, using Irecv/Isend directly avoids to copies
+        // from the separate send buffers to the single send buffer.
+#else
       if (totrsize >
-          static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
-          totssize >
-          static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+        totssize >
+        static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+#endif
         // This case will probably cause an overflow in the
         // rdispl/sdispl elements. Here we do the all_to_all_v
         // manually by just using Isend/Irecv. This might be slower
@@ -708,14 +718,18 @@ namespace strumpack {
         std::unique_ptr<MPI_Request[]> reqs(new MPI_Request[2*P]);
         std::size_t displ = 0;
         pbuf.resize(P);
+        int r = rank();
         for (int p=0; p<P; p++) {
-          pbuf[p] = rbuf.data() + displ;
-          MPI_Irecv(pbuf[p], rsizes[p], Ttype, p, 0, comm_, reqs.get()+p);
-          displ += rsizes[p];
+          auto dst = (r + p) % P;
+          pbuf[dst] = rbuf.data() + displ;
+          MPI_Irecv(pbuf[dst], rsizes[dst], Ttype, dst, 0, comm_, reqs.get()+dst);
+          displ += rsizes[dst];
         }
-        for (int p=0; p<P; p++)
+        for (int p=0; p<P; p++) {
+          auto dst = (r + p) % P;
           MPI_Isend
-            (sbuf[p].data(), ssizes[p], Ttype, p, 0, comm_, reqs.get()+P+p);
+            (sbuf[dst].data(), ssizes[dst], Ttype, dst, 0, comm_, reqs.get()+P+dst);
+        }
         MPI_Waitall(2*P, reqs.get(), MPI_STATUSES_IGNORE);
         std::vector<std::vector<T>>().swap(sbuf);
       } else {
