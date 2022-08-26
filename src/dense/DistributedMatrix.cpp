@@ -488,6 +488,18 @@ namespace strumpack {
           operator()(r,c) += sigma;
   }
 
+  template<typename scalar_t> scalar_t
+  DistributedMatrix<scalar_t>::trace() const {
+    int rlo, rhi, clo, chi;
+    lranges(rlo, rhi, clo, chi);
+    scalar_t t(0.);
+    for (int c=clo; c<chi; ++c)
+      for (int r=rlo; r<rhi; ++r)
+        if (rowl2g(r) == coll2g(c))
+          t += operator()(r,c);
+    return t;
+  }
+
   /** correct value only on the procs in the ctxt */
   template<typename scalar_t> scalar_t
   DistributedMatrix<scalar_t>::all_global(int r, int c) const {
