@@ -605,6 +605,7 @@ namespace strumpack {
                                            std::size_t)>& A);
     void eye();
     void shift(scalar_t sigma);
+    scalar_t trace() const;
     void clear();
     virtual void resize(std::size_t m, std::size_t n);
     virtual void hconcat(const DistributedMatrix<scalar_t>& b);
