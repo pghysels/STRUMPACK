@@ -497,7 +497,7 @@ namespace strumpack {
       for (int r=rlo; r<rhi; ++r)
         if (rowl2g(r) == coll2g(c))
           t += operator()(r,c);
-    return t;
+    return Comm().all_reduce(t, MPI_SUM);
   }
 
   /** correct value only on the procs in the ctxt */
