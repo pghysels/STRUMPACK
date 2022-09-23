@@ -110,7 +110,7 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
 }
  
 int main(int argc, char* argv[]) {
-  using realt = float;
+  using realt = double;
   using scalart = std::complex<realt>;
 
   int thread_level;
