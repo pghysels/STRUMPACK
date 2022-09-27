@@ -166,6 +166,8 @@ namespace strumpack {
         (opts_.Krylov_solver() != KrylovSolver::GMRES) &&
         (opts_.Krylov_solver() != KrylovSolver::BICGSTAB)) {
       ReturnCode ierr = this->factor();
+      // TODO there could be zero pivots, but replaced, and this
+      // should still continue!!
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
 
