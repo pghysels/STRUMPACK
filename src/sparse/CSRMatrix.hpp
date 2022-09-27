@@ -87,6 +87,9 @@ namespace strumpack {
     real_t max_scaled_residual(const DenseM_t& x, const DenseM_t& b)
       const override;
 
+    std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+    add_missing_diagonal(const scalar_t& s) const;
+
     int read_matrix_market(const std::string& filename) override;
     int read_binary(const std::string& filename);
     void print_dense(const std::string& name) const override;
@@ -183,6 +186,7 @@ namespace strumpack {
                const std::vector<scalar_t>& Dc) override;
     void scale_real(const std::vector<real_t>& Dr,
                     const std::vector<real_t>& Dc) override;
+    void sort_rows();
 
   private:
     using CSM_t::n_;
