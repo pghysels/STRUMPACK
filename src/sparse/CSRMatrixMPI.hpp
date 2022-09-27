@@ -82,6 +82,8 @@ namespace strumpack {
     CSRMatrixMPI(integer_t local_rows, const integer_t* row_ptr,
                  const integer_t* col_ind, const scalar_t* values,
                  const integer_t* dist, MPIComm comm, bool symm_sparse);
+    CSRMatrixMPI(integer_t rows, integer_t local_rows, integer_t local_nnz,
+                 const integer_t* dist, MPIComm comm, bool symm_sparse);
     CSRMatrixMPI(integer_t lrows, const integer_t* d_ptr,
                  const integer_t* d_ind, const scalar_t* d_val,
                  const integer_t* o_ptr, const integer_t* o_ind,
@@ -94,7 +96,10 @@ namespace strumpack {
     integer_t local_rows() const { return lrows_; }
     integer_t begin_row() const { return brow_; }
     integer_t end_row() const { return brow_ + lrows_; }
-    MPIComm Comm() const { return comm_; }
+
+    // TODO return reference???
+    const MPIComm& Comm() const { return comm_; }
+    // MPIComm Comm() const { return comm_; }
     MPI_Comm comm() const { return comm_.comm(); }
 
     const std::vector<integer_t>& dist() const { return dist_; }
@@ -145,6 +150,9 @@ namespace strumpack {
 
     real_t max_scaled_residual(const scalar_t* x, const scalar_t* b)
       const override;
+
+    std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+    add_missing_diagonal(const scalar_t& s) const;
 
     CSRGraph<integer_t>
     get_sub_graph(const std::vector<integer_t>& perm,
@@ -263,6 +271,8 @@ namespace strumpack {
                const std::vector<scalar_t>& gDc) override;
     void scale_real(const std::vector<real_t>& lDr,
                     const std::vector<real_t>& gDc) override;
+
+    void sort_rows();
 
     using CSM_t::n_;
     using CSM_t::nnz_;
