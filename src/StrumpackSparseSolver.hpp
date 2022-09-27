@@ -212,6 +212,11 @@ namespace strumpack {
     void separator_reordering() override;
 
     SpMat_t* matrix() override { return mat_.get(); }
+    std::unique_ptr<SpMat_t> matrix_nonzero_diag() override {
+      using real_t = typename RealType<scalar_t>::value_type;
+      return mat_->add_missing_diagonal
+        (std::sqrt(blas::lamch<real_t>('E')) * mat_->norm1());
+    }
     Reord_t* reordering() override { return nd_.get(); }
     Tree_t* tree() override { return tree_.get(); }
     const SpMat_t* matrix() const override { return mat_.get(); }
@@ -220,10 +225,10 @@ namespace strumpack {
 
     void permute_matrix_values();
 
-    ReturnCode solve_internal
-    (const scalar_t* b, scalar_t* x, bool use_initial_guess=false) override;
-    ReturnCode solve_internal
-    (const DenseM_t& b, DenseM_t& x, bool use_initial_guess=false) override;
+    ReturnCode solve_internal(const scalar_t* b, scalar_t* x,
+                              bool use_initial_guess=false) override;
+    ReturnCode solve_internal(const DenseM_t& b, DenseM_t& x,
+                              bool use_initial_guess=false) override;
 
     void delete_factors_internal() override;
 

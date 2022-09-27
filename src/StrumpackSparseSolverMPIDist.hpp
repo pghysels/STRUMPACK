@@ -297,6 +297,11 @@ namespace strumpack {
     MPIComm comm_;
 
     SpMat_t* matrix() override { return mat_mpi_.get(); }
+    std::unique_ptr<SpMat_t> matrix_nonzero_diag() override {
+      using real_t = typename RealType<scalar_t>::value_type;
+      return mat_mpi_->add_missing_diagonal
+        (std::sqrt(blas::lamch<real_t>('E')) * mat_mpi_->norm1());
+    }
     Reord_t* reordering() override;
     Tree_t* tree() override { return tree_mpi_dist_.get(); }
     const SpMat_t* matrix() const override { return mat_mpi_.get(); }
