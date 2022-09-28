@@ -135,8 +135,8 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   double nm1=0;
   double nm2=0;
   for(int64_t i=0; i<N; i++){
-    nm1 = std::max(nm1,abs(x.data()[i]));
-    nm2 = std::max(nm2,abs(x_exact.data()[i]));
+    nm1 = std::max(nm1,(double)abs(x.data()[i]));
+    nm2 = std::max(nm2,(double)abs(x_exact.data()[i]));
   }
   std::cout << "# RELATIVE ERROR (|x-xtrue|_inf) = " << nm1 <<std::endl;
 

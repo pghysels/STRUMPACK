@@ -25,10 +25,10 @@ blas=libsci
 
 # module unload darshan-runtime
 
-# exe=/project/projectdirs/m2957/liuyangz/my_research/STRUMPACK_thai_3D/build_$blas/examples/sparse/testMMdouble
+# exe=/project/projectdirs/m2957/liuyangz/my_research/STRUMPACK_thai_3D_no_tree_omp_subnormals/build_$blas/examples/sparse/testMMdouble
 
 # ##### MPI code shows wrong rank for openblas?? 
-exe=/project/projectdirs/m2957/liuyangz/my_research/STRUMPACK_thai_3D/build_$blas/examples/sparse/testMMdoubleMPIDist
+exe=/project/projectdirs/m2957/liuyangz/my_research/STRUMPACK_thai_3D_no_tree_omp_subnormals/build_$blas/examples/sparse/testMMdoubleMPIDist
 
 
 
@@ -180,34 +180,34 @@ inputxexact=${inputdir}/${geo}_${eps}/${geo}_${eps}_x.mtx
 
 
 
-    sepBLR=100
-    # sepHODLR=50000000
-    sepHODLR=5000
-    frontHODLR=50000000
-    front=300
-    comp=BLR_HODLR
-    blr_cb=COLWISE 
-    blr_leaf_size=256
+    # sepBLR=100
+    # # sepHODLR=50000000
+    # sepHODLR=5000
+    # frontHODLR=50000000
+    # front=300
+    # comp=BLR_HODLR
+    # blr_cb=COLWISE 
+    # blr_leaf_size=256
 
-    knnhodlrbf=256
-    knnlrbf=64
+    # knnhodlrbf=256
+    # knnlrbf=64
 
-    # knnhodlrbf=0
-    # knnlrbf=0
-    sample_param=1.2
-    tol=1e-2
-    tol2=1e-2
-    rankrate=1.2
-    srun -n $nmpi -c $THREADS_PER_RANK --cpu_bind=cores $exe $inputmat $inputrhs $inputxexact --sp_compression $comp\
-    --blr_factor_algorithm $blr_cb --blr_seq_CB_Compression --sp_proportional_mapping FACTOR_MEMORY \
-    --sp_print_root_front_stats --hodlr_rel_tol ${tol} \
-    --blr_leaf_size $blr_leaf_size \
-    --sp_compression_min_front_size ${front}\
-    --sp_blr_min_sep_size ${sepBLR} --blr_rel_tol ${tol2}\
-    --sp_hodlr_min_sep_size ${sepHODLR} --sp_hodlr_min_front_size ${frontHODLR}  --hodlr_quiet --hodlr_rank_rate ${rankrate} --hodlr_max_rank 1000\
-    --hodlr_butterfly_levels 100 --sp_maxit 1000 \
-    --hodlr_knn_hodlrbf ${knnhodlrbf} --hodlr_knn_lrbf ${knnlrbf} --hodlr_BF_sampling_parameter ${sample_param} --sp_enable_METIS_NodeNDP --sp_rel_tol 1e-10 --sp_abs_tol 1e-15 \
-    --help | tee ${out}/Thai_${DIM}D_geo_${geo}_eps${eps}_sep${sepBLR}_front${front}_t${tol}_nmpi_${nmpi}_nthread_${nthread}_${comp}_fastmath_${blas}_sepHODLR${sepHODLR}_frontHODLR_${frontHODLR}.log 
+    # # knnhodlrbf=0
+    # # knnlrbf=0
+    # sample_param=1.2
+    # tol=1e-2
+    # tol2=1e-2
+    # rankrate=1.2
+    # srun -n $nmpi -c $THREADS_PER_RANK --cpu_bind=cores $exe $inputmat $inputrhs $inputxexact --sp_compression $comp\
+    # --blr_factor_algorithm $blr_cb --blr_seq_CB_Compression --sp_proportional_mapping FACTOR_MEMORY \
+    # --sp_print_root_front_stats --hodlr_rel_tol ${tol} \
+    # --blr_leaf_size $blr_leaf_size \
+    # --sp_compression_min_front_size ${front}\
+    # --sp_blr_min_sep_size ${sepBLR} --blr_rel_tol ${tol2}\
+    # --sp_hodlr_min_sep_size ${sepHODLR} --sp_hodlr_min_front_size ${frontHODLR}  --hodlr_quiet --hodlr_rank_rate ${rankrate} --hodlr_max_rank 1000\
+    # --hodlr_butterfly_levels 100 --sp_maxit 1000 \
+    # --hodlr_knn_hodlrbf ${knnhodlrbf} --hodlr_knn_lrbf ${knnlrbf} --hodlr_BF_sampling_parameter ${sample_param} --sp_enable_METIS_NodeNDP --sp_rel_tol 1e-10 --sp_abs_tol 1e-15 \
+    # --help | tee ${out}/Thai_${DIM}D_geo_${geo}_eps${eps}_sep${sepBLR}_front${front}_t${tol}_nmpi_${nmpi}_nthread_${nthread}_${comp}_fastmath_${blas}_sepHODLR${sepHODLR}_frontHODLR_${frontHODLR}.log 
 
 
 
