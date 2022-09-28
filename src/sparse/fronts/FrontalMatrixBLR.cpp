@@ -282,7 +282,7 @@ namespace strumpack {
       // use tasking for children and for extend-add parallelism
 #pragma omp parallel default(shared)
 #pragma omp single nowait
-      e = factor_node(A, opts, etree_level, task_depth);
+      e = factor_node(A, opts, etree_level, task_depth+1);
     } else e = factor_node(A, opts, etree_level, task_depth);
     return e;
   }
@@ -291,26 +291,12 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
-    if (task_depth < params::task_recursion_cutoff_level) {
-      if (lchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        el = lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
-      if (rchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        er = rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth+1);
-#pragma omp taskwait
-    } else {
-      if (lchild_)
-        el = lchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
-      if (rchild_)
-        er = rchild_->multifrontal_factorization
-          (A, opts, etree_level+1, task_depth);
-    }
+    if (lchild_)
+      el = lchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
+    if (rchild_)
+      er = rchild_->multifrontal_factorization
+        (A, opts, etree_level+1, task_depth);
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (el != ReturnCode::SUCCESS) err_code = el;
     if (er != ReturnCode::SUCCESS) err_code = er;
