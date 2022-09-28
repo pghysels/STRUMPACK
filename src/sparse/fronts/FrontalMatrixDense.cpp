@@ -73,16 +73,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDense<scalar_t,integer_t>::node_inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
-    // using real_t = typename RealType<scalar_t>::value_type;
-    // for (std::size_t i=0; i<F11_.rows(); i++) {
-    //   if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
-    //   auto absFii = std::abs(F11_(i, i));
-    //   if (absFii > real_t(0.)) pos++;
-    //   else if (absFii < real_t(0.)) neg++;
-    //   else if (absFii == real_t(0.)) zero++;
-    //   else std::cerr << "F(" << i << "," << i << ")=" << F11_(i,i) << std::endl;
-    // }
-    // return ReturnCode::SUCCESS;
     return matrix_inertia(F11_, neg, zero, pos);
   }
 
@@ -195,20 +185,19 @@ namespace strumpack {
   FrontalMatrixDense<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
-    ReturnCode err;
+    ReturnCode e1, e2;
     if (task_depth == 0) {
-      // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
-      err = factor_phase1(A, opts, workspace, etree_level, task_depth);
-      // do not use tasking for blas/lapack parallelism (use system
-      // blas threading!)
-      factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
+      {
+        e1 = factor_phase1(A, opts, workspace, etree_level, task_depth+1);
+        e2 = factor_phase2(A, opts, etree_level, task_depth);
+      }
     } else {
-      err = factor_phase1(A, opts, workspace, etree_level, task_depth);
-      factor_phase2(A, opts, etree_level, task_depth);
+      e1 = factor_phase1(A, opts, workspace, etree_level, task_depth);
+      e2 = factor_phase2(A, opts, etree_level, task_depth);
     }
-    return err;
+    return (e1 == ReturnCode::SUCCESS) ? e2 : e1;
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
@@ -216,7 +205,8 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
-    if (task_depth < params::task_recursion_cutoff_level) {
+    if (opts.use_openmp_tree() &&
+        task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -232,9 +222,7 @@ namespace strumpack {
       if (rchild_)
         er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
     }
-    ReturnCode err_code = ReturnCode::SUCCESS;
-    if (el != ReturnCode::SUCCESS) err_code = el;
-    if (er != ReturnCode::SUCCESS) err_code = er;
+    ReturnCode err_code = (el == ReturnCode::SUCCESS) ? er : el;
     // TODO can we allocate the memory in one go??
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();

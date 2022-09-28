@@ -279,11 +279,11 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     ReturnCode e;
     if (task_depth == 0) {
-      // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
+      e = factor_node(A, opts, etree_level, task_depth+1);
+    } else
       e = factor_node(A, opts, etree_level, task_depth);
-    } else e = factor_node(A, opts, etree_level, task_depth);
     return e;
   }
 
@@ -291,7 +291,8 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::factor_node
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
-    if (task_depth < params::task_recursion_cutoff_level) {
+    if (opts.use_openmp_tree() &&
+        task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
@@ -311,9 +312,7 @@ namespace strumpack {
         er = rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
-    ReturnCode err_code = ReturnCode::SUCCESS;
-    if (el != ReturnCode::SUCCESS) err_code = el;
-    if (er != ReturnCode::SUCCESS) err_code = er;
+    ReturnCode err_code = (el == ReturnCode::SUCCESS) ? er : el;
     TaskTimer t("");
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f0 = 0, ftot = 0;

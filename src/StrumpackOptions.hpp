@@ -745,6 +745,20 @@ namespace strumpack {
     void set_gpu_streams(int s) { gpu_streams_ = s; }
 
     /**
+     * Enable OpenMP tasking traversal of the supernodal tree in the
+     * sparse solver. This requires more (peak) memory, but scales
+     * better with OpenMP threads.
+     */
+    void enable_openmp_tree() { use_openmp_tree_ = true; }
+
+    /**
+     * Disable OpenMP tasking traversal of the supernodal tree in the
+     * sparse solver. This reduces the peak memory requirements, but
+     * scales poorer with OpenMP threads.
+     */
+    void disable_openmp_tree() { use_openmp_tree_ = false; }
+
+    /**
      * Set the precision for lossy compression.
      */
     void set_lossy_precision(int p) { lossy_precision_ = p; }
@@ -1112,6 +1126,12 @@ namespace strumpack {
     bool use_gpu() const { return use_gpu_; }
 
     /**
+     * Check wheter or not to use OpenMP tree traversal is the sparse
+     * solver.
+     */
+    bool use_openmp_tree() const { return use_openmp_tree_; }
+
+    /**
      * Returns the number of GPU streams to use.
      */
     int gpu_streams() const { return gpu_streams_; }
@@ -1238,6 +1258,7 @@ namespace strumpack {
     bool write_root_front_ = false;
     bool print_comp_front_stats_ = false;
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
+    bool use_openmp_tree_ = true;
 
     /** GPU options */
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)

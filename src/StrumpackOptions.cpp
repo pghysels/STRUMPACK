@@ -182,6 +182,8 @@ namespace strumpack {
        {"sp_lossy_min_front_size",      required_argument, 0, 47},
        {"sp_nd_planar_levels",          required_argument, 0, 48},
        {"sp_proportional_mapping",      required_argument, 0, 49},
+       {"sp_enable_openmp_tree",        no_argument, 0, 50},
+       {"sp_disable_openmp_tree",       no_argument, 0, 51},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -418,6 +420,8 @@ namespace strumpack {
                " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
                        << std::endl;
       } break;
+      case 50: enable_openmp_tree(); break;
+      case 51: disable_openmp_tree(); break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -551,6 +555,14 @@ namespace strumpack {
     std::cout << "#   --sp_gpu_streams (default "
               << gpu_streams() << ")" << std::endl
               << "#          number of GPU streams" << std::endl;
+    std::cout << "#   --sp_enable_openmp_tree (default "
+              << std::boolalpha << use_openmp_tree_ << ")" << std::endl
+              << "#          uses more memory, but scales better with OpenMP threads"
+              << std::endl;
+    std::cout << "#   --sp_disable_openmp_tree (default "
+              << std::boolalpha << !use_openmp_tree_ << ")" << std::endl
+              << "#          uses less more memory, but scales worse with OpenMP threads"
+              << std::endl;
     std::cout << "#   --sp_lossy_precision [1-64] (default "
               << lossy_precision() << ")" << std::endl
               << "#          lossy compression precision" << std::endl
