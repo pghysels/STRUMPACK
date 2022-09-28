@@ -44,28 +44,42 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
 
 #if 0
   std::ifstream file;
-  // std::cout<<argv[2]<<std::endl;
+  std::cout<<argv[2]<<std::endl;
   std::string ff(argv[2]);
   file.open(ff);
   int num_row, num_col, tmp, rowidx,colidx;
   // Ignore comments headers
   while (file.peek() == '%') file.ignore(2048, '\n');
   //Read number of rows and columns
-  file >> num_row >> num_col>>tmp;
+  file >> num_row >> num_col;
   std::cout<<file.is_open()<<std::endl;
-  // std::vector<scalar_t>  b(N);
-  //std::complex<double> b[N];              
-  //b = new std::complex<double>[num_row * 1];      
-  //std::fill(b, b + num_row *1, 0.);
 
   // fill the matrix with data
   for (int l = 0; l < num_row; l++)
   {
       double data; 
-      file >>  rowidx>>colidx>>data ;
+      file >>data ;
       b.data()[l] = data;
   }
   file.close();
+
+  std::ifstream file1;
+  std::cout<<argv[3]<<std::endl;
+  std::string ff1(argv[3]);
+  file1.open(ff1);
+  // Ignore comments headers
+  while (file1.peek() == '%') file1.ignore(2048, '\n');
+  //Read number of rows and columns
+  file1 >> num_row >> num_col;
+  std::cout<<file1.is_open()<<std::endl;
+  // fill the matrix with data
+  for (int l = 0; l < num_row; l++)
+  {
+      double data; 
+      file1 >>data ;
+      x_exact.data()[l] = data;
+  }
+  file1.close();
 
 #else
   {
@@ -74,16 +88,24 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
     for (auto& xi : x_exact)
       xi = scalar_t(rgen->get());
   }
-
   A.spmv(x_exact.data(), b.data());
-#endif
+#endif  
 
-
+#if 0
+  spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
+  spss.set_matrix(A);
+  if (spss.reorder(cbrt(num_row),cbrt(num_row),cbrt(num_row)) != ReturnCode::SUCCESS) {
+    std::cout << "problem with reordering of the matrix." << std::endl;
+    return;
+  }
+#else 
   spss.set_matrix(A);
   if (spss.reorder() != ReturnCode::SUCCESS) {
     std::cout << "problem with reordering of the matrix." << std::endl;
     return;
   }
+#endif
+
   if (spss.factor() != ReturnCode::SUCCESS) {
     std::cout << "problem during factorization of the matrix." << std::endl;
     return;
@@ -108,7 +130,16 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   strumpack::blas::axpy(N, scalar_t(-1.), x_exact.data(), 1, x.data(), 1);
   auto nrm_error = strumpack::blas::nrm2(N, x.data(), 1);
   auto nrm_x_exact = strumpack::blas::nrm2(N, x_exact.data(), 1);
-  std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
+  std::cout << "# RELATIVE ERROR (|x-xtrue|_2/|xtrue|_2) = " << (nrm_error/nrm_x_exact) << std::endl;
+  
+  double nm1=0;
+  double nm2=0;
+  for(int64_t i=0; i<N; i++){
+    nm1 = std::max(nm1,abs(x.data()[i]));
+    nm2 = std::max(nm2,abs(x_exact.data()[i]));
+  }
+  std::cout << "# RELATIVE ERROR (|x-xtrue|_inf) = " << nm1 <<std::endl;
+
 }
 
 int main(int argc, char* argv[]) {
@@ -123,10 +154,10 @@ int main(int argc, char* argv[]) {
 
   CSRMatrix<double,int> A;
   if (A.read_matrix_market(f) == 0)
-    test(argc, argv, A);
+    test<double,int>(argc, argv, A);
   else {
     CSRMatrix<std::complex<double>,int> A;
     A.read_matrix_market(f);
-    test(argc, argv, A);
+    test<std::complex<double>,int>(argc, argv, A);
   }
 }

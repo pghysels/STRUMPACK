@@ -56,6 +56,15 @@ test(int argc, char* argv[], CSRMatrix<scalar,integer>& A) {
   }
   Adist.spmv(x_exact.data(), b.data());
 
+#if 1
+  spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
+  spss.set_matrix(Adist);
+  if (spss.reorder(cbrt(N),cbrt(N),cbrt(N)) != ReturnCode::SUCCESS) {
+    if (!rank)
+      std::cout << "problem with reordering of the matrix." << std::endl;
+    return;
+  }
+#else
   spss.set_matrix(Adist);
   //alternative interface:
   // spss.set_distributed_csr_matrix
@@ -67,6 +76,7 @@ test(int argc, char* argv[], CSRMatrix<scalar,integer>& A) {
       std::cout << "problem with reordering of the matrix." << std::endl;
     return;
   }
+#endif
   if (spss.factor() != ReturnCode::SUCCESS) {
     if (!rank)
       std::cout << "problem during factorization of the matrix."
@@ -121,15 +131,16 @@ int main(int argc, char* argv[]) {
 
   std::string f(argv[1]);
 
-  CSRMatrix<double,int> A;
-  CSRMatrix<std::complex<double>,int> Acomplex;
+  // CSRMatrix<double,int> A;
+  // CSRMatrix<std::complex<double>,int> Acomplex;
   //---- For 64bit integers use this instead: --------
-  // CSRMatrix<double,int64_t> A;
-  // CSRMatrix<std::complex<double>,int64_t> Acomplex;
+  CSRMatrix<double,int64_t> A;
+  CSRMatrix<std::complex<double>,int64_t> Acomplex;
   //--------------------------------------------------
 
   bool is_complex = false;
   if (rank == 0) {
+    if (A.read_binary(f)){
     if (A.read_matrix_market(f)) {
       is_complex = true;
       if (Acomplex.read_matrix_market(f)) {
@@ -137,6 +148,10 @@ int main(int argc, char* argv[]) {
         return 1;
       }
     }
+    }
+
+
+
   }
   MPI_Bcast(&is_complex, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (!is_complex)
