@@ -199,10 +199,10 @@ namespace strumpack {
     if (task_depth == 0) {
 #pragma omp parallel default(shared)
 #pragma omp single nowait
-      err = factor_phase1(A, opts, workspace, etree_level, task_depth);
-      // do not use tasking for blas/lapack parallelism (use system
-      // blas threading!)
-      factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
+      {
+        err = factor_phase1(A, opts, workspace, etree_level, task_depth+1);
+        factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
+      }
     } else {
       err = factor_phase1(A, opts, workspace, etree_level, task_depth);
       factor_phase2(A, opts, etree_level, task_depth);
@@ -215,22 +215,10 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
-    if (task_depth < params::task_recursion_cutoff_level) {
-      if (lchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
-      if (rchild_)
-#pragma omp task default(shared)                                        \
-  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
-#pragma omp taskwait
-    } else {
-      if (lchild_)
-        el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
-      if (rchild_)
-        er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
-    }
+    if (lchild_)
+      el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
+    if (rchild_)
+      er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (el != ReturnCode::SUCCESS) err_code = el;
     if (er != ReturnCode::SUCCESS) err_code = er;
