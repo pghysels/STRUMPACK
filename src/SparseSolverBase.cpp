@@ -78,6 +78,13 @@ namespace strumpack {
 #endif
     }
     opts_.HSS_options().set_synchronized_compression(true);
+
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    if (opts_.use_gpu()) gpu::init();
+#endif
+#if defined(STRUMPACK_USE_SYCL)
+    if (opts_.use_gpu()) dpcpp::init();
+#endif
   }
 
   template<typename scalar_t,typename integer_t>
@@ -551,12 +558,12 @@ namespace strumpack {
       ReturnCode ierr = reorder();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    if (opts_.use_gpu()) gpu::init();
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-    if (opts_.use_gpu()) dpcpp::init();
-#endif
+// #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+//     if (opts_.use_gpu()) gpu::init();
+// #endif
+// #if defined(STRUMPACK_USE_SYCL)
+//     if (opts_.use_gpu()) dpcpp::init();
+// #endif
     using real_t = typename RealType<scalar_t>::value_type;
     opts_.set_pivot_threshold
       (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
@@ -578,8 +585,11 @@ namespace strumpack {
     flop_breakdown_reset();
     ReturnCode err_code;
     TaskTimer t1("Sparse-factorization", [&]() {
+      // TODO add shift if opts_.replace...
+      // auto shifted_mat = matrix_nonzero_diag();
+      // err_code = tree()->multifrontal_factorization(*shifted_mat, opts_);
       err_code = tree()->multifrontal_factorization(*matrix(), opts_);
-      });
+    });
     perf_counters_stop("numerical factorization");
     if (opts_.verbose()) {
       auto fnnz = factor_nonzeros();
@@ -676,8 +686,8 @@ namespace strumpack {
       }
     }
     if (rank_out_) tree()->print_rank_statistics(*rank_out_);
-    if (err_code == ReturnCode::SUCCESS)
-      factored_ = true;
+    // if (err_code == ReturnCode::SUCCESS)
+    factored_ = true;
     return err_code;
   }
 

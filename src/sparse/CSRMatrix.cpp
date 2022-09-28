@@ -861,12 +861,18 @@ namespace strumpack {
     std::unique_ptr<integer_t[]> iperm(new integer_t[n_]);
     for (integer_t i=0; i<n_; i++) iperm[perm[i]] = i;
 #pragma omp parallel for
-    for (integer_t row=0; row<n_; row++) {
+    for (integer_t row=0; row<n_; row++)
       for (integer_t i=ptr_[row]; i<ptr_[row+1]; i++)
         ind_[i] = iperm[ind_[i]];
+    sort_rows();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::sort_rows() {
+#pragma omp parallel for
+    for (integer_t r=0; r<n_; r++)
       sort_indices_values<scalar_t>
-        (ind_.data(), val_.data(), ptr_[row], ptr_[row+1]);
-    }
+        (ind_.data(), val_.data(), ptr_[r], ptr_[r+1]);
   }
 
   template<typename scalar_t,typename integer_t> int
@@ -935,6 +941,38 @@ namespace strumpack {
     return max_scaled_residual(*X, *B);
   }
 
+  template<typename scalar_t,typename integer_t>
+  std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+  CSRMatrix<scalar_t,integer_t>::add_missing_diagonal
+  (const scalar_t& s) const {
+    integer_t diag_nnz = 0;
+    for (integer_t r=0; r<n_; r++)
+      for (integer_t k=ptr_[r]; k<ptr_[r+1]; k++)
+        if (ind_[k] == r) {
+          diag_nnz++;
+          break;
+        }
+    std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+      Anew(new CSRMatrix<scalar_t,integer_t>(n_, nnz_+n_-diag_nnz));
+    for (integer_t r=0, i=0; r<n_; r++) {
+      bool d = false;
+      for (integer_t k=ptr_[r]; k<ptr_[r+1]; k++) {
+        auto c = ind_[k];
+        if (c == r) d = true;
+        Anew->ind(i) = c;
+        Anew->val(i) = val_[k];
+        i++;
+      }
+      if (!d) {
+        Anew->ind(i) = r;
+        Anew->val(i) = s;
+        i++;
+      }
+      Anew->ptr(r+1) = i;
+    }
+    Anew->sort_rows();  // is this necessary?!
+    return Anew;
+  }
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void

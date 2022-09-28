@@ -200,19 +200,19 @@ namespace strumpack {
   FrontalMatrixDense<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
-    ReturnCode err;
+    ReturnCode e1, e2;
     if (task_depth == 0) {
-#pragma omp parallel default(shared)
+#pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
       {
-        err = factor_phase1(A, opts, workspace, etree_level, task_depth+1);
-        factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
+        e1 = factor_phase1(A, opts, workspace, etree_level, task_depth+1);
+        e2 = factor_phase2(A, opts, etree_level, task_depth);
       }
     } else {
-      err = factor_phase1(A, opts, workspace, etree_level, task_depth);
-      factor_phase2(A, opts, etree_level, task_depth);
+      e1 = factor_phase1(A, opts, workspace, etree_level, task_depth);
+      e2 = factor_phase2(A, opts, etree_level, task_depth);
     }
-    return err;
+    return (e1 == ReturnCode::SUCCESS) ? e2 : e1;
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
@@ -220,13 +220,24 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
-    if (lchild_)
-      el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
-    if (rchild_)
-      er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
-    ReturnCode err_code = ReturnCode::SUCCESS;
-    if (el != ReturnCode::SUCCESS) err_code = el;
-    if (er != ReturnCode::SUCCESS) err_code = er;
+    if (opts.use_openmp_tree() &&
+        task_depth < params::task_recursion_cutoff_level) {
+      if (lchild_)
+#pragma omp task default(shared)                                        \
+  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
+        el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
+      if (rchild_)
+#pragma omp task default(shared)                                        \
+  final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
+        er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
+#pragma omp taskwait
+    } else {
+      if (lchild_)
+        el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
+      if (rchild_)
+        er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
+    }
+    ReturnCode err_code = (el == ReturnCode::SUCCESS) ? er : el;
     // TODO can we allocate the memory in one go??
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();

@@ -173,12 +173,16 @@ or
   https://bitbucket.org/icl/slate \n
   Support for SLATE in STRUMPACK can be enabled with for instance:
 \code {.bash}
-> export SLATEHOME=$HOME/slate/
-> cmake ../ -DTPLE_ENABLE_SLATE=ON \
->   -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
->   -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so"
+> export blaspp_DIR=/blaspp/install/dir/
+> export lapackpp_DIR=/lapackpp/install/dir/
+> export slate_DIR=/slate/install/dir/
+> cmake ../ -DTPL_ENABLE_SLATE=ON
 \endcode
-  As SLATE is still under very active development, SLATE support in STRUMPACK is experimental.
+  This requires that SLATE was configured/installed using CMake, and
+  the blaspp_DIR, lapackpp_DIR and slate_DIR variables point to the
+  installation path. As SLATE is still under active development, SLATE
+  support in STRUMPACK is experimental.
+
 
 - __PARMETIS__ (optional, only used when compiling with MPI) for
 parallel nested dissection. ParMetis can be download from

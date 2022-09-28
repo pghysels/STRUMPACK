@@ -134,7 +134,6 @@ namespace strumpack {
    * sparse matrices.
    *
    * This is only for __square__ matrices!
-   * __TODO make this work on non-square matrices__
    *
    * The rows and the columns should always be __sorted__!
    *
@@ -363,7 +362,6 @@ namespace strumpack {
                                        const scalar_t* b) const = 0;
     virtual real_t max_scaled_residual(const DenseM_t& x,
                                        const DenseM_t& b) const = 0;
-
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     virtual CSRGraph<integer_t>
