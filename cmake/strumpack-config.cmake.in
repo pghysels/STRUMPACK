@@ -68,6 +68,14 @@ if(@STRUMPACK_USE_ZFP@) # STRUMPACK_USE_ZFP
   find_dependency(ZFP)
 endif()
 
+if(@STRUMPACK_USE_MAGMA@) # STRUMPACK_USE_MAGMA
+  set(zfp_PREFIX @TPL_MAGMA_PREFIX@)
+  set(zfp_INCLUDE_DIR @TPL_MAGMA_INCLUDE_DIRS@)
+  set(zfp_LIBRARY_DIR @TPL_MAGMA_LIBRARY_DIR@)
+  set(zfp_LIBRARIES @TPL_MAGMA_LIBRARIES@)
+  find_dependency(MAGMA)
+endif()
+
 if(@STRUMPACK_USE_BPACK@) # STRUMPACK_USE_BPACK
   find_dependency(ButterflyPACK)
 endif()

@@ -202,8 +202,7 @@ namespace strumpack {
    int etree_level, int task_depth) {
     ReturnCode err;
     if (task_depth == 0) {
-      // use tasking for children and for extend-add parallelism
-#pragma omp parallel if(!omp_in_parallel()) default(shared)
+#pragma omp parallel default(shared)
 #pragma omp single nowait
       err = factor_phase1(A, opts, workspace, etree_level, task_depth);
       // do not use tasking for blas/lapack parallelism (use system

@@ -31,6 +31,7 @@
 #include <iostream>
 #include <algorithm>
 #include <functional>
+#include <cassert>
 
 #include "StrumpackConfig.hpp"
 #include "SeparatorTree.hpp"

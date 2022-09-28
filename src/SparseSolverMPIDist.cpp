@@ -59,7 +59,7 @@ namespace strumpack {
     MPI_Query_thread(&thread_level);
     if (thread_level != MPI_THREAD_MULTIPLE &&
         mpi_rank(comm) == 0)
-      std::cerr << "MPI_THREAD_MULTIPLE is requires for SLATE"
+      std::cerr << "MPI_THREAD_MULTIPLE is required for SLATE"
                 << std::endl;
 #endif
     // Set the default reordering to PARMETIS?

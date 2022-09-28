@@ -96,8 +96,11 @@ int test_sparse_solver(int argc, const char* const argv[],
   if (!rank)
     cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << endl;
 
-  if (scaled_res > ERROR_TOLERANCE*spss.options().rel_tol())
+  if (scaled_res > ERROR_TOLERANCE*spss.options().rel_tol()) {
+    if (!rank)
+      cout << "residual too large" << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
+  }
   return 0;
 }
 
@@ -143,7 +146,7 @@ int main(int argc, char* argv[]) {
   }
   if (thread_level != MPI_THREAD_MULTIPLE && !rank)
     cout << "MPI implementation does not support MPI_THREAD_MULTIPLE, "
-      "which might be needed for pt-scotch!" << endl;
+      "which might be needed for pt-scotch and/or SLATE!" << endl;
 
   if (argc < 2) {
     if (!rank)
@@ -151,7 +154,7 @@ int main(int argc, char* argv[]) {
         << "Solve a linear system with a matrix given"
         << " in matrix market format\n"
         << "using the MPI fully distributed C++ STRUMPACK interface.\n\n"
-        << "Usage: \n\tmpirun -n 4 ./testMMdoubleMPIDist pde900.mtx"
+        << "Usage: \n\tmpirun -n 4 ./test_sparse_mpi pde900.mtx"
         << std::endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }

@@ -33,11 +33,6 @@
 #include <iostream>
 #include <thrust/complex.h>
 
-// this is valid for compute capability 3.5 -> 8.0 (and beyond?)
-//const unsigned int MAX_BLOCKS_X = 4294967295; // 2^32-1
-const unsigned int MAX_BLOCKS_Y = 65535;
-const unsigned int MAX_BLOCKS_Z = 65535;
-
 
 namespace strumpack {
   namespace gpu {

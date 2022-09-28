@@ -35,6 +35,10 @@
 #include "structured/ClusterTree.hpp"
 #include "dense/DenseMatrix.hpp"
 
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
+
 namespace strumpack {
 
 
@@ -96,6 +100,10 @@ namespace strumpack {
     admissibility(const std::vector<int_t>& tiles) const;
 
     void print_dense(const std::string& name, integer_t cols=-1) const;
+
+#if defined(STRUMPACK_USE_MPI)
+    void broadcast(const MPIComm& comm);
+#endif
 
   private:
     std::vector<integer_t> ptr_, ind_;

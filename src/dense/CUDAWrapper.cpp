@@ -29,6 +29,9 @@
 #include <stdlib.h>
 
 #include "CUDAWrapper.hpp"
+#if defined(STRUMPACK_USE_MAGMA)
+#include "MAGMAWrapper.hpp"
+#endif
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
 #endif
@@ -132,6 +135,14 @@ namespace strumpack {
       gpu_check(cudaFree(0));
       gpu::BLASHandle hb;
       gpu::SOLVERHandle hs;
+#if defined(STRUMPACK_USE_MAGMA)
+      magma_init();
+      magma_queue_t magma_q;
+      magma_queue_create(0, &magma_q);
+      magma_iset_pointer(nullptr, nullptr, 1, 0, 0, 0, 0, magma_q);
+      magma_queue_destroy(magma_q);
+      magma_finalize();
+#endif
     }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,

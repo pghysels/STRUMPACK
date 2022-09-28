@@ -280,7 +280,7 @@ namespace strumpack {
     ReturnCode e;
     if (task_depth == 0) {
       // use tasking for children and for extend-add parallelism
-#pragma omp parallel if(!omp_in_parallel()) default(shared)
+#pragma omp parallel default(shared)
 #pragma omp single nowait
       e = factor_node(A, opts, etree_level, task_depth);
     } else e = factor_node(A, opts, etree_level, task_depth);
@@ -641,24 +641,24 @@ namespace strumpack {
       auto g = A.extract_graph
         (opts.separator_ordering_level(), sep_begin_, sep_end_);
       auto sep_tree = g.recursive_bisection
-        (opts.compression_leaf_size(1), 0,
+        (opts.BLR_options().leaf_size(), 0,
          sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
       std::vector<integer_t> siorder(dim_sep());
       for (integer_t i=sep_begin_; i<sep_end_; i++)
         siorder[sorder[i]] = i - sep_begin_;
-      g.permute(sorder+sep_begin_, siorder.data());
-      for (integer_t i=sep_begin_; i<sep_end_; i++)
-        sorder[i] = sorder[i] + sep_begin_;
-      sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
-      if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG)
+      if (opts.BLR_options().admissibility() == BLR::Admissibility::STRONG) {
+        g.permute(sorder+sep_begin_, siorder.data());
         admissibility_ = g.admissibility(sep_tiles_);
-      else {
+      } else {
         auto nt = sep_tiles_.size();
         admissibility_ = DenseMatrix<bool>(nt, nt);
         admissibility_.fill(true);
         for (std::size_t t=0; t<nt; t++)
           admissibility_(t, t) = false;
       }
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] += sep_begin_;
     }
     if (dim_upd()) {
       auto leaf = opts.BLR_options().leaf_size();

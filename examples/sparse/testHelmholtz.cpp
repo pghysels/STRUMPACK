@@ -42,50 +42,73 @@ using namespace strumpack;
 
 extern "C" {
   void STRUMPACK_FC_GLOBAL_(genmatrix3d_anal,GENMATRIX3D_ANAL)
-    (void*,void*,void*,void*,void*,void*,void*,void*);
-  void STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
     (void*,void*,void*,void*,void*,void*,void*,void*,void*,void*);
+  void STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
+    (void*,void*,void*,void*,void*,void*,void*,void*,void*,void*,void*,void*,void*);
 }
 
 /**
  * Create 3D nx x nx x nx Helmholtz problem.
  */
 template<typename realt>
-CSRMatrix<std::complex<realt>,int> Helmholtz3D(int nx) {
+CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
   char datafile[] = "void";
-  int fromfile = 0, npml = 8, nnz, n;
-  nx = std::max(1, nx - 2 * npml);
+  std::int64_t fromfile = 0, npml = 8, nnz, n;
+  std::int64_t nx_ex = nx;
+  nx = std::max(std::int64_t(1), nx - 2 * npml);
+  MPIComm c;
+
+  std::int64_t rank = c.rank(), P = c.size();
+  std::int64_t n_local = std::round(std::floor(float(nx_ex) / P));
+  std::int64_t remaindar = nx_ex%P;
+  std::int64_t low_f;
+  std::int64_t high_f;
+  if(rank+1<=remaindar){
+    high_f = (rank+1)*(n_local+1);
+    low_f = high_f - (n_local+1) + 1;
+  }else{
+    high_f = remaindar*(n_local+1)+(rank+1-remaindar)*n_local;
+    low_f = high_f - (n_local) + 1;
+  }
+  n_local = high_f - low_f+1;
+
   STRUMPACK_FC_GLOBAL(genmatrix3d_anal,GENMATRIX3D_ANAL)
-    (&nx, &nx, &nx, &npml, &n, &nnz, &fromfile, datafile);
-  std::vector<std::tuple<int,int,std::complex<realt>>> rc;
-  {
-    std::vector<int> rowind(nnz), colind(nnz);
-    std::vector<std::complex<float>> val(nnz);
-    STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
-      (colind.data(), rowind.data(), val.data(), &nx, &nx, &nx, &npml, &nnz,
-       &fromfile, datafile);
-    rc.resize(nnz);
-    for (int i=0; i<nnz; i++)
-      rc[i] = std::tuple<int,int,std::complex<realt>>
-        (rowind[i], colind[i], val[i]);
+    (&nx, &nx, &nx, &n_local, &npml, &n, &nnz, &fromfile, datafile, &rank);
+
+  std::vector<std::int64_t> rowind(nnz), colind(nnz);
+  std::vector<std::complex<float>> val(nnz);
+  STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
+    (rowind.data(), colind.data(), val.data(), &nx, &nx, &nx,
+     &low_f, &high_f, &npml, &nnz, &fromfile, datafile, &rank);
+
+  std::int64_t is = nnz ? rowind[0] : 0, ie = nnz ? rowind[nnz-1] : 0;
+  // long int lrows = (nx+2*npml)*(nx+2*npml)*(nx+2*npml);
+  long int lrows = nnz ? ie-is+1 : 0;
+  std::vector<std::int64_t> ind_loc(nnz), ptr_loc(lrows+1), dist(P+1);
+  std::vector<std::complex<realt>> val_loc(nnz);
+
+  for (std::int64_t i=0; i<nnz; i++) {
+    ind_loc[i] = colind[i] - 1;
+    val_loc[i] = val[i];
   }
-  std::sort(rc.begin(), rc.end(),
-            [](const std::tuple<int,int,std::complex<realt>>& a,
-               const std::tuple<int,int,std::complex<realt>>& b) {
-              return std::get<0>(a) < std::get<0>(b); });
-  CSRMatrix<std::complex<realt>,int> A(n, nnz);
-  for (int i=0; i<nnz; i++) {
-    A.ind(i) = std::get<1>(rc[i]) - 1;
-    A.val(i) = std::get<2>(rc[i]);
-  }
-  A.ptr(0) = 0;
-  for (int i=0; i<nnz-1; i++)
-    if (std::get<0>(rc[i]) != std::get<0>(rc[i+1]))
-      A.ptr(std::get<0>(rc[i])) = i + 1;
-  A.ptr(n) = nnz;
+  ptr_loc[0]=0;
+  for (std::int64_t i=0; i<nnz-1; i++)
+    if (rowind[i] != rowind[i+1])
+      ptr_loc[rowind[i]-is+1] = i + 1;
+  ptr_loc[lrows] = nnz;
+
+  dist[0]=0;
+  dist[rank+1] = lrows;
+  c.all_gather(dist.data()+1, 1);
+  for (int p=0; p<P; p++) dist[p+1] += dist[p];
+
+  CSRMatrixMPI<std::complex<realt>,std::int64_t> A
+    (lrows, ptr_loc.data(), ind_loc.data(), val_loc.data(),
+     dist.data(), MPI_COMM_WORLD, false); 
+
   return A;
 }
-
+ 
 int main(int argc, char* argv[]) {
   using realt = double;
   using scalart = std::complex<realt>;
@@ -99,7 +122,7 @@ int main(int argc, char* argv[]) {
     std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED"
               << std::endl;
   {
-    int nx = 20;
+    std::int64_t nx = 20;
     if (argc < 2) {
       std::cout << "Solve a 3D nx^3 Helmholtz problem." << std::endl
                 << " usage: ./main nx" << std::endl
@@ -108,16 +131,15 @@ int main(int argc, char* argv[]) {
     }
     nx = std::stof(argv[1]);
 
-    SparseSolverMPIDist<scalart,int> spss(MPI_COMM_WORLD);
+    SparseSolverMPIDist<scalart,std::int64_t> spss(MPI_COMM_WORLD);
     spss.options().set_matching(MatchingJob::NONE);
     spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
     spss.options().set_from_command_line(argc, argv);
 
-    CSRMatrix<scalart,int> Aseq;
-    if (!rank) Aseq = Helmholtz3D<realt>(nx);
-    CSRMatrixMPI<scalart,int> A(&Aseq, MPI_COMM_WORLD, true);
-    Aseq = CSRMatrix<scalart,int>();
 
+    CSRMatrixMPI<scalart,std::int64_t> A;
+    A = Helmholtz3D<realt>(nx);
+    // std::cout<<"done here"<<std::endl;
     spss.set_matrix(A);
     if (spss.reorder(nx, nx, nx) != ReturnCode::SUCCESS) {
       std::cout << "problem with reordering of the matrix." << std::endl;
@@ -131,14 +153,14 @@ int main(int argc, char* argv[]) {
     auto N = A.size();
     auto n_local = A.local_rows();
     std::vector<scalart> b(n_local), x(n_local);
-#if 0
-    std::vector<scalart> x_exact(n_local, scalart(1.)/std::sqrt(N));
+#if 1
+    std::vector<scalart> x_exact(n_local, scalart(1.));
     A.spmv(x_exact.data(), b.data());
 #else
     MPIComm c;
     auto rank = c.rank();
     // pick 2 sources in the domain
-    long long int sources[2] =
+    std::int64_t sources[2] =
       {nx/2 + nx * (nx/2) + nx*nx * (nx/3),
        nx/2 + nx * (2*nx/3) + nx*nx * (nx/2)};
     auto begin_row = A.dist()[rank];
@@ -155,13 +177,13 @@ int main(int argc, char* argv[]) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << scaled_res << std::endl;
 
-    // strumpack::blas::axpy
-    //   (n_local, std::complex<realt>(-1.), x_exact.data(), 1, x.data(), 1);
-    // auto nrm_error = norm2(x, MPIComm());
-    // auto nrm_x_exact = norm2(x_exact, MPIComm());
-    // if (!rank)
-    //   std::cout << "# RELATIVE ERROR = "
-    //             << (nrm_error/nrm_x_exact) << std::endl;
+    strumpack::blas::axpy
+      (n_local, std::complex<realt>(-1.), x_exact.data(), 1, x.data(), 1);
+    auto nrm_error = norm2(x, MPIComm());
+    auto nrm_x_exact = norm2(x_exact, MPIComm());
+    if (!rank)
+      std::cout << "# RELATIVE ERROR = "
+                << (nrm_error/nrm_x_exact) << std::endl;
   }
   TimerList::Finalize();
   scalapack::Cblacs_exit(1);

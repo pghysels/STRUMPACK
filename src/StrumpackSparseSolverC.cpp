@@ -343,14 +343,14 @@ extern "C" {
     auto ierr = strumpack::ReturnCode::SUCCESS;
     int64_t neg64, zero64, pos64;
     switch (S.precision) {
-    case STRUMPACK_FLOAT:            ierr = CASTSMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
-    case STRUMPACK_DOUBLE:           ierr = CASTDMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
-    case STRUMPACK_FLOATCOMPLEX:     ierr = CASTCMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
-    case STRUMPACK_DOUBLECOMPLEX:    ierr = CASTZMPIDIST(S.solver)->inertia(*neg, *zero, *pos); break;
-    case STRUMPACK_FLOAT_64:         ierr = CASTS64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
-    case STRUMPACK_DOUBLE_64:        ierr = CASTD64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
-    case STRUMPACK_FLOATCOMPLEX_64:  ierr = CASTC64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
-    case STRUMPACK_DOUBLECOMPLEX_64: ierr = CASTZ64MPIDIST(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_FLOAT:            ierr = CASTS(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_DOUBLE:           ierr = CASTD(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_FLOATCOMPLEX:     ierr = CASTC(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_DOUBLECOMPLEX:    ierr = CASTZ(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_FLOAT_64:         ierr = CASTS64(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_DOUBLE_64:        ierr = CASTD64(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_FLOATCOMPLEX_64:  ierr = CASTC64(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_DOUBLECOMPLEX_64: ierr = CASTZ64(S.solver)->inertia(neg64, zero64, pos64); break;
     }
     switch (S.precision) {
     case STRUMPACK_FLOAT:

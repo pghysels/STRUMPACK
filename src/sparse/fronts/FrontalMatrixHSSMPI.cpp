@@ -389,13 +389,18 @@ namespace strumpack {
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
-    auto g = A.extract_graph
-      (opts.separator_ordering_level(), sep_begin_, sep_end_);
-    auto sep_tree = g.recursive_bisection
-      (opts.compression_leaf_size(), 0,
-       sorder+sep_begin_, nullptr, 0, 0, dim_sep());
-    for (integer_t i=sep_begin_; i<sep_end_; i++)
-      sorder[i] = sorder[i] + sep_begin_;
+    structured::ClusterTree sep_tree;
+    if (Comm().is_root()) {
+      auto g = A.extract_graph
+        (opts.separator_ordering_level(), sep_begin_, sep_end_);
+      sep_tree = g.recursive_bisection
+        (opts.compression_leaf_size(), 0,
+         sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] = sorder[i] + sep_begin_;
+    }
+    sep_tree.broadcast(Comm());
+    Comm().broadcast(sorder+sep_begin_, dim_sep());
     if (is_root)
       H_ = std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>>
         (new HSS::HSSMatrixMPI<scalar_t>

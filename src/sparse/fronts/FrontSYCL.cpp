@@ -73,9 +73,20 @@ namespace strumpack {
     }
   };
 
-  uintptr_t round_to_16(uintptr_t p) { return (p + 15) & ~15; }
-  uintptr_t round_to_16(void* p) {
-    return round_to_16(reinterpret_cast<uintptr_t>(p));
+  constexpr int align_max_struct() {
+    auto m = sizeof(std::complex<double>);
+    m = std::max(m, sizeof(AssembleData<std::complex<double>>));
+    m = std::max(m, sizeof(Triplet<std::complex<double>>));
+    int k = 16;
+    while (k < int(m)) k *= 2;
+    return k;
+  }
+  std::size_t round_up(std::size_t n) {
+    int k = align_max_struct();
+    return std::size_t((n + k - 1) / k) * k;
+  }
+  template<typename T> T* aligned_ptr(void* p) {
+    return (T*)(round_up(uintptr_t(p)));
   }
 
   template<typename scalar_t, typename integer_t> class LevelInfo {
@@ -127,20 +138,28 @@ namespace strumpack {
         }
       }
       factor_size = L_size + U_size;
-      work_bytes =
-        round_to_16(sizeof(scalar_t) * Schur_size) +
-        round_to_16(sizeof(std::int64_t) * piv_size);
-      ea_bytes =
-        round_to_16(sizeof(AssembleData<scalar_t>) * f.size()) +
-        round_to_16(sizeof(std::size_t) * Isize.back()) +
-        round_to_16(sizeof(Triplet<scalar_t>) *
-                    (elems11.back() + elems12.back() + elems21.back()));
+
+      factor_bytes = sizeof(scalar_t) * factor_size;
+      factor_bytes = round_up(factor_bytes);
+
+      work_bytes = sizeof(scalar_t) * Schur_size;
+      work_bytes = round_up(work_bytes);
+      work_bytes += sizeof(std::int64_t) * piv_size;
+      work_bytes = round_up(work_bytes);
+
+      ea_bytes = sizeof(AssembleData<scalar_t>) * f.size();
+      ea_bytes = round_up(ea_bytes);
+      ea_bytes += sizeof(std::size_t) * Isize.back();
+      ea_bytes = round_up(ea_bytes);
+      ea_bytes += sizeof(Triplet<scalar_t>) *
+        (elems11.back() + elems12.back() + elems21.back());
+      ea_bytes = round_up(ea_bytes);
     }
 
     void print_info(int l, int lvls) {
       std::cout << "#  level " << l << " of " << lvls
                 << " has " << f.size() << " nodes and "
-                << factor_size * sizeof(scalar_t) / 1.e6
+                << factor_bytes / 1.e6
                 << " MB for factors, "
                 << Schur_size * sizeof(scalar_t) / 1.e6
                 << " MB for Schur complements" << std::endl;
@@ -188,7 +207,7 @@ namespace strumpack {
           smem += dupd*dupd;
         }
       }
-      auto imem = reinterpret_cast<std::int64_t*>(round_to_16(smem));
+      auto imem = aligned_ptr<std::int64_t>(smem);
       for (auto F : f) {
         F->piv_ = imem;
         imem += F->dim_sep();
@@ -198,7 +217,7 @@ namespace strumpack {
     std::vector<FSYCL_t*> f;
     std::size_t L_size = 0, U_size = 0, factor_size = 0,
       Schur_size = 0, piv_size = 0, total_upd_size = 0,
-      work_bytes = 0, ea_bytes = 0;
+      factor_bytes = 0, work_bytes = 0, ea_bytes = 0;
     std::vector<std::size_t> elems11, elems12, elems21, Isize;
   };
 
@@ -274,9 +293,7 @@ namespace strumpack {
       // memory needed on this level: factors,
       // schur updates, pivot vectors, cuSOLVER work space,
       // assembly data (indices, sparse elements)
-      std::size_t level_mem =
-        round_to_16(L.factor_size*sizeof(scalar_t))
-        + L.work_bytes + L.ea_bytes;
+      std::size_t level_mem = L.factor_bytes + L.work_bytes + L.ea_bytes;
       // the contribution blocks of the previous level are still
       // needed for the extend-add
       if (l+1 < ldata.size())
@@ -361,17 +378,17 @@ namespace strumpack {
     using FSYCL_t = FrontSYCL<scalar_t,integer_t>;
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
-    auto hasmbl = reinterpret_cast<AssembleData<scalar_t>*>(hea_mem);
-    auto Iptr = reinterpret_cast<std::size_t*>(round_to_16(hasmbl + N));
-    auto e11 = reinterpret_cast<Trip_t*>(round_to_16(Iptr + L.Isize.back()));
-    auto e12 = e11 + L.elems11.back();
-    auto e21 = e12 + L.elems12.back();
-    auto dasmbl = reinterpret_cast<AssembleData<scalar_t>*>(dea_mem);
-    auto dIptr = reinterpret_cast<std::size_t*>(round_to_16(dasmbl + N));
-    auto delems = reinterpret_cast<Trip_t*>(round_to_16(dIptr + L.Isize.back()));
-    auto de11 = delems;
-    auto de12 = de11 + L.elems11.back();
-    auto de21 = de12 + L.elems12.back();
+    auto hasmbl = aligned_ptr<AssembleData<scalar_t>>(hea_mem);
+    auto Iptr   = aligned_ptr<std::size_t>(hasmbl + N);
+    auto e11    = aligned_ptr<Trip_t>(Iptr + L.Isize.back());
+    auto e12    = e11 + L.elems11.back();
+    auto e21    = e12 + L.elems12.back();
+    auto dasmbl = aligned_ptr<AssembleData<scalar_t>>(dea_mem);
+    auto dIptr  = aligned_ptr<std::size_t>(dasmbl + N);
+    auto de11   = aligned_ptr<Trip_t>(dIptr + L.Isize.back());
+    auto de12   = de11 + L.elems11.back();
+    auto de21   = de12 + L.elems12.back();
+
 #pragma omp parallel for
     for (std::size_t n=0; n<N; n++) {
       auto& f = *(L.f[n]);
@@ -453,26 +470,31 @@ namespace strumpack {
                   cl::sycl::queue& q) {
       std::size_t nb = 0;
       for (auto& l : L) nb = std::max(nb, l.f.size());
-      auto bytes =
-        round_to_16(nb * 2 * sizeof(std::int64_t)) +  // ds, du
-        round_to_16(nb * 5 * sizeof(void*)) +         // F11, F12, F21, F22, piv
-        round_to_16(nb * 2 * sizeof(scalar_t)) +      // alpha, beta
-        round_to_16(nb * sizeof(std::int64_t)) +      // group_sizes
-        round_to_16(nb * sizeof(oneapi::mkl::transpose)); // op
+      std::size_t bytes = nb * 2 * sizeof(std::int64_t);
+      bytes = round_up(bytes);
+      bytes += nb * 2 * sizeof(std::int64_t); // ds, du
+      bytes = round_up(bytes);
+      bytes += nb * 5 * sizeof(void*);        // F11, F12, F21, F22, piv
+      bytes = round_up(bytes);
+      bytes += nb * 2 * sizeof(scalar_t);     // alpha, beta
+      bytes = round_up(bytes);
+      bytes += nb * sizeof(std::int64_t);     // group_sizes
+      bytes = round_up(bytes);
+      bytes += nb * sizeof(oneapi::mkl::transpose); // op
+      bytes = round_up(bytes);
+
       hmem_ = dpcpp::HostMemory<char>(bytes, q);
       ds = hmem_.as<std::int64_t>();
       du = ds + nb;
-      F11 = reinterpret_cast<scalar_t**>(round_to_16(du + nb));
+      F11 = aligned_ptr<scalar_t*>(du + nb);
       F12 = F11 + nb;
       F21 = F12 + nb;
       F22 = F21 + nb;
-      piv = reinterpret_cast<std::int64_t**>(round_to_16(F22 + nb));
-      alpha = reinterpret_cast<scalar_t*>(round_to_16(piv + nb));
+      piv = aligned_ptr<std::int64_t*>(F22 + nb);
+      alpha = aligned_ptr<scalar_t>(piv + nb);
       beta = alpha + nb;
-      group_sizes = reinterpret_cast<std::int64_t*>
-        (round_to_16(beta + nb));
-      op = reinterpret_cast<oneapi::mkl::transpose*>
-        (round_to_16(group_sizes + nb));
+      group_sizes = aligned_ptr<std::int64_t>(beta + nb);
+      op = aligned_ptr<oneapi::mkl::transpose>(group_sizes + nb);
       dpcpp::fill(q, alpha, scalar_t(-1.), nb);
       dpcpp::fill(q, beta, scalar_t(1.), nb);
       dpcpp::fill(q, group_sizes, std::int64_t(1), nb);
@@ -893,12 +915,11 @@ namespace strumpack {
         if (l % 2) {
           work_mem = all_dmem;
           dea_mem = work_mem + L.work_bytes;
-          dev_factors = reinterpret_cast<scalar_t*>(dea_mem + L.ea_bytes);
+          dev_factors = aligned_ptr<scalar_t>(dea_mem + L.ea_bytes);
         } else {
           work_mem = all_dmem + peak_dmem - L.work_bytes;
           dea_mem = work_mem - L.ea_bytes;
-          dev_factors = reinterpret_cast<scalar_t*>
-            (dea_mem - round_to_16(L.factor_size * sizeof(scalar_t)));
+          dev_factors = aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
         }
         dpcpp::fill(q, dev_factors, scalar_t(0.), L.factor_size);
         dpcpp::fill(q, reinterpret_cast<scalar_t*>(work_mem),
@@ -909,7 +930,7 @@ namespace strumpack {
         old_work = work_mem;
         //factor_large_fronts(q, L, opts);
         factor_batch(q, L, batch, opts);
-        STRUMPACK_ADD_MEMORY(L.factor_size*sizeof(scalar_t));
+        STRUMPACK_ADD_MEMORY(L.factor_bytes);
         L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
         L.f[0]->pivot_mem_.resize(L.piv_size);
         q.wait_and_throw();

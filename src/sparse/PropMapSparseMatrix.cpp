@@ -59,14 +59,19 @@ namespace strumpack {
 
     std::vector<std::tuple<int,int,int>> dest(Ampi.local_nnz());
     std::vector<std::size_t> scnts(P);
+    integer_t lrows = Ampi.local_rows();
+    auto perm = nd.perm();
+    auto Aptr = Ampi.ptr();
+    auto Aind = Ampi.ind();
+    auto Aval = Ampi.val();
 #pragma omp parallel for
-    for (integer_t r=0; r<Ampi.local_rows(); r++) {
-      auto r_perm = nd.perm()[r + Ampi.begin_row()];
-      auto hij = Ampi.ptr(r+1) - Ampi.ptr(0);
-      for (integer_t j=Ampi.ptr(r)-Ampi.ptr(0); j<hij; j++) {
-        if (std::abs(Ampi.val(j)) > eps) {
-          auto indj = Ampi.ind(j);
-          auto c_perm = nd.perm()[indj];
+    for (integer_t r=0; r<lrows; r++) {
+      auto r_perm = perm[r + Ampi.begin_row()];
+      auto hij = Aptr[r+1] - Aptr[0];
+      for (integer_t j=Aptr[r]-Aptr[0]; j<hij; j++) {
+        if (std::abs(Aval[j]) > eps) {
+          auto indj = Aind[j];
+          auto c_perm = perm[indj];
           dest[j] = et.get_sparse_mapped_destination
             (Ampi, r, indj, r_perm, c_perm, duplicate_fronts);
           auto& d = dest[j];
@@ -82,13 +87,13 @@ namespace strumpack {
     std::vector<std::vector<Triplet>> sbuf(P);
     for (int p=0; p<P; p++)
       sbuf[p].reserve(scnts[p]);
-    for (integer_t r=0; r<Ampi.local_rows(); r++) {
-      auto r_perm = nd.perm()[r + Ampi.begin_row()];
-      auto hij = Ampi.ptr(r+1) - Ampi.ptr(0);
-      for (integer_t j=Ampi.ptr(r)-Ampi.ptr(0); j<hij; j++) {
-        auto a = Ampi.val(j);
+    for (integer_t r=0; r<lrows; r++) {
+      auto r_perm = perm[r + Ampi.begin_row()];
+      auto hij = Aptr[r+1] - Aptr[0];
+      for (integer_t j=Aptr[r]-Aptr[0]; j<hij; j++) {
+        auto a = Aval[j];
         if (std::abs(a) > eps) {
-          Triplet t = {r_perm, nd.perm()[Ampi.ind(j)], a};
+          Triplet t = {r_perm, perm[Aind[j]], a};
           auto& d = dest[j];
           auto hip = std::get<0>(d) + std::get<1>(d);
           for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d))
@@ -1436,21 +1441,43 @@ namespace strumpack {
     const auto clo = find_global(lo);
     const auto chi = find_global(hi);
     const auto n = hi - lo;
+    std::vector<bool> mark(n);
     std::vector<integer_t> gptr, gind;
     gptr.reserve(n+1);
-    gptr.push_back(0);
-    for (integer_t c=clo; c<chi; c++) {
-      gptr.push_back(gptr.back());
-      const auto phij = ind_.data() + ptr_[c+1];
-      for (auto pj=ind_.data()+ptr_[c]; pj!=phij; pj++) {
-        auto j = *pj;
-        const auto row = j - lo;
-        if (row >= 0 && row < n) {
-          gind.push_back(row);
-          gptr.back()++;
+    gind.reserve(n*5);
+    for (integer_t c=clo, e=0; c<chi; c++) {
+      gptr.push_back(e);
+      std::fill(mark.begin(), mark.end(), false);
+      auto gc = global_col_[c];
+      for (auto j=ptr_[c]; j<ptr_[c+1]; j++) {
+        auto r = ind_[j];
+        if (r == gc) continue;
+        auto lr = r - lo;
+        if (lr >= 0 && lr < n) {
+          if (!mark[lr]) {
+            mark[lr] = true;
+            gind.push_back(lr);
+            e++;
+          }
+        } else {
+          if (ordering_level > 0) {
+            auto klo = find_global(r);
+            if (klo < local_cols_) {
+              for (integer_t k=ptr_[klo]; k<ptr_[klo+1]; k++) {
+                auto rr = ind_[k];
+                auto lrr = rr - lo;
+                if (rr != gc && lrr >= 0 && lrr < n && !mark[lrr]) {
+                  mark[lrr] = true;
+                  gind.push_back(lrr);
+                  e++;
+                }
+              }
+            }
+          }
         }
       }
     }
+    gptr.push_back(gind.size());
     return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
   }
 
