@@ -2376,27 +2376,22 @@ namespace strumpack {
         auto Tik2 = A12.gather_rows_A22(B1, B2);
         auto Tk2j = A21.gather_cols_A22(B1, B2);
         if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
-#pragma omp parallel
-#pragma omp single nowait
-          {
-            std::size_t lj=0;
-            for (std::size_t i=0, li=0; i<B2; i++) {
-              if (g->is_local_row(i)) {
-                for (std::size_t j=0, lk=0; j<B2; j++) {
-                  if (g->is_local_col(j)) {
-                    lj=li;
-                    for (std::size_t k=0; k<B1; k++) {
-#pragma omp task default(shared) firstprivate(i,j,k,lj,lk)
-                      gemm(Trans::N, Trans::N, scalar_t(-1.),
-                           *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.),
-                           A22.tile_dense(i, j).D());
-                      lj++;
-                      lk++;
-                    }
+          std::size_t lj=0;
+          for (std::size_t i=0, li=0; i<B2; i++) {
+            if (g->is_local_row(i)) {
+              for (std::size_t j=0, lk=0; j<B2; j++) {
+                if (g->is_local_col(j)) {
+                  lj=li;
+                  for (std::size_t k=0; k<B1; k++) {
+                    gemm(Trans::N, Trans::N, scalar_t(-1.),
+                         *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.),
+                         A22.tile_dense(i, j).D());
+                    lj++;
+                    lk++;
                   }
                 }
-                li+=B1;
               }
+              li+=B1;
             }
           }
         } else { //LUAR - Star or Comb
