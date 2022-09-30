@@ -210,9 +210,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::separator_reordering() {
     // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
-    // using real_t = typename RealType<scalar_t>::value_type;
-    // auto shifted_mat = mat_mpi_->add_missing_diagonal
-    //   (std::sqrt(blas::lamch<real_t>('E')) * mat_mpi_->norm1());
+    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
     // tree_mpi_dist_->separator_reordering(opts_, *shifted_mat);
     tree_mpi_dist_->separator_reordering(opts_, *mat_mpi_);
   }
@@ -220,9 +218,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
     // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
-    // using real_t = typename RealType<scalar_t>::value_type;
-    // auto shifted_mat = mat_mpi_->add_missing_diagonal
-    //   (std::sqrt(blas::lamch<real_t>('E')) * mat_mpi_->norm1());
+    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
     // tree_mpi_dist_.reset
     //   (new EliminationTreeMPIDist<scalar_t,integer_t>
     //    (opts_, *shifted_mat, *nd_mpi_, comm_));

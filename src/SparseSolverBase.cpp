@@ -349,6 +349,10 @@ namespace strumpack {
                 << equil_.rcond << " , c_cond = " << equil_.ccond
                 << " , type = " << char(equil_.type) << std::endl;
 
+    using real_t = typename RealType<scalar_t>::value_type;
+    opts_.set_pivot_threshold
+      (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
+
     auto old_nnz = matrix()->nnz();
     TaskTimer t2("sparsity-symmetrization",
                  [&](){ matrix()->symmetrize_sparsity(); });
@@ -569,9 +573,6 @@ namespace strumpack {
 // #if defined(STRUMPACK_USE_SYCL)
 //     if (opts_.use_gpu()) dpcpp::init();
 // #endif
-    using real_t = typename RealType<scalar_t>::value_type;
-    opts_.set_pivot_threshold
-      (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
     float dfnnz = 0.;
     if (opts_.verbose()) {
       dfnnz = dense_factor_nonzeros();

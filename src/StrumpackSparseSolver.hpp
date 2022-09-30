@@ -213,9 +213,7 @@ namespace strumpack {
 
     SpMat_t* matrix() override { return mat_.get(); }
     std::unique_ptr<SpMat_t> matrix_nonzero_diag() override {
-      using real_t = typename RealType<scalar_t>::value_type;
-      return mat_->add_missing_diagonal
-        (std::sqrt(blas::lamch<real_t>('E')) * mat_->norm1());
+      return mat_->add_missing_diagonal(opts_.pivot_threshold());
     }
     Reord_t* reordering() override { return nd_.get(); }
     Tree_t* tree() override { return tree_.get(); }
