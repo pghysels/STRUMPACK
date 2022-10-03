@@ -270,7 +270,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::compress
   (const SPOptions<scalar_t>& opts) {
-    if (opts.compression() == CompressionType::LOSSY) {
+    if (opts.compression() == CompressionType::LOSSY ||
+        opts.compression() == CompressionType::LOSSLESS ||
+        opts.compression() == CompressionType::ZFP_BLR_HODLR) {
       auto prec = opts.lossy_precision();
       F11c_ = LossyMatrix<scalar_t>(F11_.dense_wrapper(), prec);
       F12c_ = LossyMatrix<scalar_t>(F12_.dense_wrapper(), prec);
