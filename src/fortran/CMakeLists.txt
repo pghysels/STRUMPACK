@@ -1,5 +1,6 @@
-target_sources(strumpack
-  PRIVATE ${CMAKE_CURRENT_LIST_DIR}/strumpack.f90)
+target_sources(strumpack PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/strumpack.c
+  ${CMAKE_CURRENT_LIST_DIR}/strumpack.f90)
 
 # This is really a problem. Using a wildcard to install the mod makes
 # CMake install a bunch of empty directories, which leads to an
