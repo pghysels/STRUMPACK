@@ -28,6 +28,7 @@
  */
 #include <algorithm>
 #include <stack>
+#include <vector>
 
 #include "ANDSparspak.hpp"
 
@@ -176,7 +177,6 @@ namespace strumpack {
       return ncomps;
     }
 
-
     template<typename integer>
     SeparatorTree<integer>
     gennd(integer n, integer* xadj, integer* adjncy, integer* perm) {
@@ -284,10 +284,8 @@ namespace strumpack {
     // explicit template instantiation
     template SeparatorTree<int>
     gennd(int neqns, int* xadj, int* adjncy, int* perm);
-
     template SeparatorTree<long int>
     gennd(long int neqns, long int* xadj, long int* adjncy, long int* perm);
-
     template SeparatorTree<long long int>
     gennd(long long int neqns, long long int* xadj, long long int* adjncy,
           long long int* perm);
