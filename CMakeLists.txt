@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(STRUMPACK VERSION 7.0.0 LANGUAGES CXX C Fortran)
+project(STRUMPACK VERSION 7.0.1 LANGUAGES CXX C Fortran)
 cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
@@ -562,7 +562,7 @@ add_subdirectory(src)
 target_sources(strumpack
   PRIVATE ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h)
 
-target_compile_features(strumpack PUBLIC cxx_std_17)
+target_compile_features(strumpack PUBLIC cxx_std_14)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 target_compile_options(strumpack PRIVATE
