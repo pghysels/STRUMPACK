@@ -702,20 +702,37 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compute_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
-     WorkCompress<scalar_t>& w, int d0, int d, int depth) {
+     WorkCompress<scalar_t>& w, int d0, int d, int depth,SJLT_Matrix<scalar_t, int>* S){ //, SJLT_Matrix<scalar_t, int>* S = nullptr) {
       TIMER_TIME(TaskType::COMPUTE_SAMPLES, 1, t_compute);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
       {
         if (this->leaf()) {
+
           DenseMW_t wSr(this->rows(), d, Sr, w.offset.second, d0);
-          DenseMW_t wRr(this->rows(), d, Rr, w.offset.second, d0);
-          gemm(Trans::N, Trans::N, scalar_t(-1), D_, wRr,
-               scalar_t(1.), wSr, depth);
-          STRUMPACK_UPDATE_SAMPLE_FLOPS
-            (gemm_flops
-             (Trans::N, Trans::N, scalar_t(-1), D_, wRr, scalar_t(1.)));
+
+          //submatrix D(i:i+m,j:j+n). DenseMW_t(m,n,D,i,j)
+
+          //wSr = -D_*wRr + wSr
+          if (S == nullptr){
+              //std::cout << "null sjlt\n";
+              DenseMW_t wRr(this->rows(), d, Rr, w.offset.second, d0);
+              gemm(Trans::N, Trans::N, scalar_t(-1), D_, wRr,
+                   scalar_t(1.), wSr, depth);
+              STRUMPACK_UPDATE_SAMPLE_FLOPS
+                (gemm_flops
+                 (Trans::N, Trans::N, scalar_t(-1), D_, wRr, scalar_t(1.)));
+          } else {
+              //doing SJLT case here
+              std::cout<< "efficient multipy of SJLT leaf \n";
+              DenseMatrix<scalar_t> temp( this -> rows(), d);
+              Matrix_times_SJLT(D_, *S, temp, this->rows(), d,w.offset.second, d0);
+              wSr.sub(temp); // verify subtraction in place
+
+
+          }
+
         } else {
           DenseMW_t wSr0(child(0)->U_rank(), d, Sr,
                          w.offset.second, d0);
@@ -751,6 +768,7 @@ namespace strumpack {
         if (this->leaf()) {
           DenseMW_t wSc(this->rows(), d, Sc, w.offset.second, d0);
           DenseMW_t wRc(this->rows(), d, Rc, w.offset.second, d0);
+          // same as line 717 but with complex conjugate
           gemm(Trans::C, Trans::N, scalar_t(-1), D_, wRc,
                scalar_t(1.), wSc, depth);
           STRUMPACK_UPDATE_SAMPLE_FLOPS

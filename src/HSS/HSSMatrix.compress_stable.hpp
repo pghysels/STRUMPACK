@@ -140,7 +140,7 @@ namespace strumpack {
     #pragma omp single nowait
             compress_recursive_stable
               (Rr, Rc, Sr, Sc, afunc, opts, w,
-               d, dd, this->openmp_task_depth_);
+               d, dd, this->openmp_task_depth_,&S);
             if (!this->is_compressed()) {
               d += dd;
               dd = std::min(dd, opts.max_rank()-d);
@@ -178,7 +178,7 @@ namespace strumpack {
 
          else if(opts.compression_sketch() == CompressionSketch::SJLT){
 
-             std::cout<< "compressing with sjlt \n";
+             std::cout<< "compressing with dense sjlt \n";
          }
          else{
              std::cout<< "unknown compression sketch \n";
@@ -246,7 +246,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::compress_recursive_stable
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
      const elem_t& Aelem, const opts_t& opts,
-     WorkCompress<scalar_t>& w, int d, int dd, int depth) {
+     WorkCompress<scalar_t>& w, int d, int dd, int depth,SJLT_Matrix<scalar_t, int>* S) {
       if (this->leaf()) {
         if (this->is_untouched()) {
           std::vector<std::size_t> I, J;
@@ -266,17 +266,17 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           child(0)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1, S);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           child(1)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1, S);
 #pragma omp taskwait
         } else {
           child(0)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1, S);
           child(1)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1, S);
         }
         if (!child(0)->is_compressed() ||
             !child(1)->is_compressed()) return;
@@ -299,8 +299,8 @@ namespace strumpack {
       if (w.lvl == 0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         if (this->is_untouched())
-          compute_local_samples(Rr, Rc, Sr, Sc, w, 0, d+dd, depth);
-        else compute_local_samples(Rr, Rc, Sr, Sc, w, d, dd, depth);
+          compute_local_samples(Rr, Rc, Sr, Sc, w, 0, d+dd, depth,S);
+        else compute_local_samples(Rr, Rc, Sr, Sc, w, d, dd, depth,S);
         if (!this->is_compressed()) {
           compute_U_basis_stable(Sr, opts, w, d, dd, depth);
           compute_V_basis_stable(Sc, opts, w, d, dd, depth);

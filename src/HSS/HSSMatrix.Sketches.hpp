@@ -823,14 +823,16 @@ private:
 
 
 
- //multiplication AS
+ //multiplication A <- M*S(i:i+m,j:j+n)
+ //where M is dense and S is sparse SJLT matrix
 template<typename scalar_t, typename integer_t> void
 Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
-    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
+    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A,
+    std::size_t m, std::size_t n, std::size_t i, std::size_t j)
          {
-             //std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
-
-             //begin = std::chrono::steady_clock::now();
+             // if the submatrix is 0x0 then we use the full S matrix
+             m = m > 0 ? m: S.get_n_rows();
+             n = n > 0 ? n: S.get_n_cols();
              //outer products method:
              A.zero();
              const auto rows_A = S.get_A().get_row_ptr();
@@ -840,51 +842,44 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
 
              std::size_t rows = M.rows();
 
-#if 0
-             for(size_t i = 0; i <rows_A.size() - 1 ;i++){
-               std::size_t start_A = rows_A[i], end_A = rows_A[i + 1];
-               std::size_t startB = rows_B[i],endB = rows_B[i + 1];
-               for(size_t r = 0; r < rows; r++) {
-                  auto Mri = M(r,i);
-                  for(std::size_t j =start_A;j < end_A; j++){
-                    auto cAj = col_A[j];
-                    //for(size_t r = 0; r < rows; r++)
-                    A(r,cAj)  +=   Mri; //Mi[r]; //M(r,i);
-                  }
 
-                  //subtract cols
-                 for(std::size_t j =startB; j < endB; j++){
-                   auto cBj = col_B[j];
-                   //for(size_t r = 0; r < rows; r++)
-                   A(r, cBj)  -=  Mri; //Mi[r]; //M(r,i);
+             for(size_t k = i; k < i+m ;k++){
+
+               std::size_t start_A = rows_A[k], end_A = rows_A[k + 1];
+               std::size_t startB = rows_B[k],endB = rows_B[k + 1];
+               auto Mk = M.ptr(0,k-i);
+
+               //add cols
+               for(std::size_t l =start_A;l < end_A; l++){
+                 auto cAl = col_A[l] - j;
+                 if (cAl < n && cAl >= 0){
+                 for(size_t r = 0; r < rows; r++)
+                     A(r,cAl)  +=   Mk[r]; //M(r,k);
+
                  }
                }
-             }
-#else
-             for(size_t i = 0; i <rows_A.size() - 1 ;i++){
-               std::size_t start_A = rows_A[i], end_A = rows_A[i + 1];
-               std::size_t startB = rows_B[i],endB = rows_B[i + 1];
-               auto Mi = M.ptr(0,i);
-               for(std::size_t j =start_A;j < end_A; j++){
-                 auto cAj = col_A[j];
-                 for(size_t r = 0; r < rows; r++)
-                   A(r,cAj)  +=   Mi[r]; //M(r,i);
-               }
+
                //subtract cols
-               for(std::size_t j =startB; j < endB; j++){
-                 auto cBj = col_B[j];
-                 for(size_t r = 0; r < rows; r++)
-                   A(r, cBj)  -=  Mi[r]; //M(r,i);
+               for(std::size_t l =startB; l < endB; l++){
+                 auto cBl = col_B[l] - j;
+
+                 if(cBl >= 0 && cBl < n){
+
+                     for(size_t r = 0; r < rows; r++)
+                       A(r, cBl)  -=  Mk[r]; //M(r,k);
+                 }
+
                }
+
              }
-#endif
-             //end = std::chrono::steady_clock::now();
-             //std::cout << "A*S outer products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
+
         }
 
+    //given M,S : A <- M * S
     template<typename scalar_t, typename integer_t> void
     Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
-    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
+    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A,
+    std::size_t m = 0 , std::size_t n=  0, std::size_t i = 0, std::size_t j = 0)
          {
 #if defined(_OPENMP)
            int rows = M.rows();
@@ -895,10 +890,10 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
              DenseMatrixWrapper<scalar_t> Asub(std::min(rows-r, B), A.cols(), A, r, 0);
              auto Msub = ConstDenseMatrixWrapperPtr<scalar_t>
                (std::min(rows-r, B), M.cols(), M, r, 0);
-             Matrix_times_SJLT_seq(*Msub, S, Asub);
+             Matrix_times_SJLT_seq(*Msub, S, Asub,m,n,i,j);
            }
 #else
-           Matrix_times_SJLT_seq(M, S, A);
+           Matrix_times_SJLT_seq(M, S, A,m,n,i,j);
 #endif
          }
 
