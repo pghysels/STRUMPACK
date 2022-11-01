@@ -725,10 +725,10 @@ namespace strumpack {
                  (Trans::N, Trans::N, scalar_t(-1), D_, wRr, scalar_t(1.)));
           } else {
               //doing SJLT case here
-              std::cout<< "efficient multipy of SJLT leaf \n";
               DenseMatrix<scalar_t> temp( this -> rows(), d);
               Matrix_times_SJLT(D_, *S, temp, this->rows(), d,w.offset.second, d0);
-              wSr.sub(temp); // verify subtraction in place
+              //wSr = -D_ S(i:i+m,j:j+n) + wSr
+              wSr.sub(temp,depth); // verify subtraction in place
 
 
           }
@@ -767,12 +767,26 @@ namespace strumpack {
       {
         if (this->leaf()) {
           DenseMW_t wSc(this->rows(), d, Sc, w.offset.second, d0);
-          DenseMW_t wRc(this->rows(), d, Rc, w.offset.second, d0);
-          // same as line 717 but with complex conjugate
-          gemm(Trans::C, Trans::N, scalar_t(-1), D_, wRc,
-               scalar_t(1.), wSc, depth);
-          STRUMPACK_UPDATE_SAMPLE_FLOPS
-            (gemm_flops(Trans::C, Trans::N, scalar_t(-1), D_, wRc, scalar_t(1.)));
+
+          if(S ==nullptr){
+              DenseMW_t wRc(this->rows(), d, Rc, w.offset.second, d0);
+
+              gemm(Trans::C, Trans::N, scalar_t(-1), D_, wRc,
+                   scalar_t(1.), wSc, depth);
+              STRUMPACK_UPDATE_SAMPLE_FLOPS
+                (gemm_flops(Trans::C, Trans::N, scalar_t(-1), D_, wRc, scalar_t(1.)));
+
+          }else {
+               //wSr = -D_^* S(i:i+m,j:j+n) + wSr
+
+            DenseMatrix<scalar_t> temp( this -> rows(), d);
+            MatrixT_times_SJLT(D_,*S,temp,this->rows(), d, w.offset.second, d0 );
+            wSc.sub(temp,depth);
+        }
+
+
+
+
         } else {
           DenseMW_t wSc0(child(0)->V_rank(), d, Sc, w.offset.second, d0);
           DenseMW_t wSc1(child(1)->V_rank(), d, Sc,

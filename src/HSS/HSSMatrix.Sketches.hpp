@@ -875,7 +875,7 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
 
         }
 
-    //given M,S : A <- M * S
+    //given M,S,m,n,i,j : A <- M *S(i:i+m,j:j+n)
     template<typename scalar_t, typename integer_t> void
     Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
     SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A,
@@ -1111,57 +1111,56 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
         }
 #endif
 
-    //given M,S : A <- M^T * S using inner products of columns of M and S
-       template<typename scalar_t, typename integer_t> void
-       MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
-           SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A)
-                {
+//given M,S,m,n,i,j : A <- M^* S(i:i+m,j:j+n)
+//using inner products of columns of M and S
 
-                //std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
-                //begin = std::chrono::steady_clock::now();
-                std::size_t rows = M.rows(), cols = M.cols(),
-                s_cols = A.cols();
-                DenseMatrix<scalar_t> temp(s_cols,rows);
+   template<typename scalar_t, typename integer_t> void
+   MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
+       SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A,
+    std::size_t m = 0 , std::size_t n=  0, std::size_t i = 0, std::size_t j = 0)
+            {
 
+            // if the submatrix is 0x0 then we use the full S matrix
+            m = m > 0 ? m: S.get_n_rows();
+            n = n > 0 ? n: S.get_n_cols();
 
-                    const auto col_ptr_A = S.get_Ac().get_col_ptr();
-                    const auto row_ind_A = S.get_Ac().get_row_inds();
-
-                    const auto col_ptr_B = S.get_Bc().get_col_ptr();
-                    const auto row_ind_B = S.get_Bc().get_row_inds();
-
-                    A.zero();
+            std::size_t cols = M.cols();
+            const auto col_ptr_A = S.get_Ac().get_col_ptr();
+            const auto row_ind_A = S.get_Ac().get_row_inds();
+            const auto col_ptr_B = S.get_Bc().get_col_ptr();
+            const auto row_ind_B = S.get_Bc().get_row_inds();
+            A.zero();
 
 
 #pragma omp parallel for
-                    for(std::size_t i = 0; i < cols; i++){
+    for(std::size_t k = 0; k < cols; k++){
 
 
-                      //iterate through the columns of A, B
-                      //#pragma omp parallel for
-                        for(size_t c = 0; c < s_cols; c++){
-                             std::size_t startA = col_ptr_A[c],
-                             endA = col_ptr_A[c + 1];
-                             scalar_t Aic = 0;
+      //iterate through the columns of A, B
+      //#pragma omp parallel for
+        for(size_t c = j; c < j+n; c++){
+             std::size_t startA = col_ptr_A[c],
+             endA = col_ptr_A[c + 1];
+             scalar_t Akc = 0;
 
-                            for(std::size_t j =startA; j < endA; j++){
-                              Aic += blas::my_conj(M(row_ind_A[j],i));
-                            }
+            for(std::size_t l =startA; l < endA; l++){
+              std::size_t r = row_ind_A[l] - i;
+              if (r >= 0 && r < m)
+              Akc += blas::my_conj(M(r,k));
+            }
 
-                            std::size_t startB = col_ptr_B[c],
-                            endB = col_ptr_B[c + 1];
-                            for(std::size_t j = startB; j < endB; j++){
-                              Aic -=  blas::my_conj(M(row_ind_B[j],i)) ;
-                            }
+            std::size_t startB = col_ptr_B[c],
+            endB = col_ptr_B[c + 1];
+            for(std::size_t l = startB; l < endB; l++){
+              std::size_t r = row_ind_B[l] - i;
+              if (r >= 0 && r < m)
+              Akc -= blas::my_conj(M(r,k));
+            }
 
-                            A(i,c) = Aic;
-                        }
-                    }
-
-                   // end = std::chrono::steady_clock::now();
-                   // std::cout << "AT*S mult = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
-
-               }
+            A(k,c-j) = Akc;
+        }
+    }
+}
 
 
     }
