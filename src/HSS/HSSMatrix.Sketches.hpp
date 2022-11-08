@@ -827,14 +827,21 @@ private:
  //where M is dense and S is sparse SJLT matrix
 template<typename scalar_t, typename integer_t> void
 Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
-    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A,
-    std::size_t m, std::size_t n, std::size_t i, std::size_t j)
+                      SJLT_Matrix<scalar_t, integer_t>& S,
+                      DenseMatrix<scalar_t>& A,
+                      scalar_t alpha, scalar_t beta,
+                      std::size_t m, std::size_t n, std::size_t i, std::size_t j)
          {
              // if the submatrix is 0x0 then we use the full S matrix
              m = m > 0 ? m: S.get_n_rows();
              n = n > 0 ? n: S.get_n_cols();
              //outer products method:
-             A.zero();
+
+             if (beta == scalar_t(0.))
+               A.zero();
+             else if (beta != scalar_t(1.))
+               A.scale(beta);
+
              const auto rows_A = S.get_A().get_row_ptr();
              const auto col_A = S.get_A().get_col_inds();
              const auto rows_B = S.get_B().get_row_ptr();
@@ -842,44 +849,58 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
 
              std::size_t rows = M.rows();
 
-
-             for(size_t k = i; k < i+m ;k++){
-
-               std::size_t start_A = rows_A[k], end_A = rows_A[k + 1];
-               std::size_t startB = rows_B[k],endB = rows_B[k + 1];
-               auto Mk = M.ptr(0,k-i);
-
-               //add cols
-               for(std::size_t l =start_A;l < end_A; l++){
-                 auto cAl = col_A[l] - j;
-                 if (cAl < n && cAl >= 0){
-                 for(size_t r = 0; r < rows; r++)
-                     A(r,cAl)  +=   Mk[r]; //M(r,k);
-
+             if (alpha == scalar_t(1.)) {
+               for(size_t k = i; k < i+m ;k++){
+                 std::size_t start_A = rows_A[k], end_A = rows_A[k + 1];
+                 std::size_t startB = rows_B[k],endB = rows_B[k + 1];
+                 auto Mk = M.ptr(0,k-i);
+                 //add cols
+                 for(std::size_t l =start_A;l < end_A; l++){
+                   auto cAl = col_A[l] - j;
+                   if (cAl < n && cAl >= 0)
+                     for(size_t r = 0; r < rows; r++)
+                       A(r,cAl)  +=   Mk[r]; //M(r,k);
                  }
-               }
-
-               //subtract cols
-               for(std::size_t l =startB; l < endB; l++){
-                 auto cBl = col_B[l] - j;
-
-                 if(cBl >= 0 && cBl < n){
-
+                 //subtract cols
+                 for(std::size_t l =startB; l < endB; l++){
+                   auto cBl = col_B[l] - j;
+                   if(cBl >= 0 && cBl < n)
                      for(size_t r = 0; r < rows; r++)
                        A(r, cBl)  -=  Mk[r]; //M(r,k);
                  }
-
                }
-
+             } else {
+               for(size_t k = i; k < i+m ;k++){
+                 std::size_t start_A = rows_A[k], end_A = rows_A[k + 1];
+                 std::size_t startB = rows_B[k],endB = rows_B[k + 1];
+                 auto Mk = M.ptr(0,k-i);
+                 //add cols
+                 for(std::size_t l =start_A;l < end_A; l++){
+                   auto cAl = col_A[l] - j;
+                   if (cAl < n && cAl >= 0)
+                     for(size_t r = 0; r < rows; r++)
+                       A(r,cAl)  += alpha * Mk[r]; //M(r,k);
+                 }
+                 //subtract cols
+                 for(std::size_t l =startB; l < endB; l++){
+                   auto cBl = col_B[l] - j;
+                   if(cBl >= 0 && cBl < n)
+                     for(size_t r = 0; r < rows; r++)
+                       A(r, cBl)  -= alpha * Mk[r]; //M(r,k);
+                 }
+               }
              }
 
         }
 
-    //given M,S,m,n,i,j : A <- M *S(i:i+m,j:j+n)
+    //given M,S,m,n,i,j : A <- alpha * M *S(i:i+m,j:j+n) + beta * A
     template<typename scalar_t, typename integer_t> void
     Matrix_times_SJLT(const DenseMatrix<scalar_t>& M ,
-    SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A,
-    std::size_t m = 0 , std::size_t n=  0, std::size_t i = 0, std::size_t j = 0)
+                      SJLT_Matrix<scalar_t, integer_t>& S,
+                      DenseMatrix<scalar_t>& A,
+                      std::size_t m = 0 , std::size_t n=  0,
+                      std::size_t i = 0, std::size_t j = 0,
+                      scalar_t alpha = 1., scalar_t beta = 0.)
          {
 #if defined(_OPENMP)
            int rows = M.rows();
@@ -890,13 +911,14 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
              DenseMatrixWrapper<scalar_t> Asub(std::min(rows-r, B), A.cols(), A, r, 0);
              auto Msub = ConstDenseMatrixWrapperPtr<scalar_t>
                (std::min(rows-r, B), M.cols(), M, r, 0);
-             Matrix_times_SJLT_seq(*Msub, S, Asub,m,n,i,j);
+             Matrix_times_SJLT_seq(*Msub, S, Asub, alpha, beta, m,n,i,j);
            }
 #else
-           Matrix_times_SJLT_seq(M, S, A,m,n,i,j);
+           Matrix_times_SJLT_seq(M, S, A, alpha, beta, m,n,i,j);
 #endif
          }
 
+    /*
         template<typename scalar_t, typename integer_t> void
         Matrix_times_SJLT_inner(const DenseMatrix<scalar_t>& M ,
             SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A){
@@ -948,7 +970,7 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
         // end = std::chrono::steady_clock::now();
         // std::cout << "A*S inner products time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[10e-3s]" << std::endl;
         }
-
+    */
 #if defined(STRUMPACK_USE_MKL)
     sparse_status_t
     wrapper_mkl_sparse_create_csr(sparse_matrix_t *A,
@@ -1111,58 +1133,80 @@ Matrix_times_SJLT_seq(const DenseMatrix<scalar_t>& M ,
         }
 #endif
 
-//given M,S,m,n,i,j : A <- M^* S(i:i+m,j:j+n)
-//using inner products of columns of M and S
+    //given M,S,m,n,i,j : A <- alpha * M^* S(i:i+m,j:j+n) + beta * A
+    //using inner products of columns of M and S
+    template<typename scalar_t, typename integer_t> void
+    MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
+                       SJLT_Matrix<scalar_t, integer_t>& S,
+                       DenseMatrix<scalar_t>& A,
+                       std::size_t m = 0 , std::size_t n=  0,
+                       std::size_t i = 0, std::size_t j = 0,
+                       scalar_t alpha = 1., scalar_t beta = 0.)
+    {
 
-   template<typename scalar_t, typename integer_t> void
-   MatrixT_times_SJLT(const DenseMatrix<scalar_t>& M ,
-       SJLT_Matrix<scalar_t, integer_t>& S, DenseMatrix<scalar_t>& A,
-    std::size_t m = 0 , std::size_t n=  0, std::size_t i = 0, std::size_t j = 0)
-            {
+      // if the submatrix is 0x0 then we use the full S matrix
+      m = m > 0 ? m: S.get_n_rows();
+      n = n > 0 ? n: S.get_n_cols();
 
-            // if the submatrix is 0x0 then we use the full S matrix
-            m = m > 0 ? m: S.get_n_rows();
-            n = n > 0 ? n: S.get_n_cols();
+      std::size_t cols = M.cols();
+      const auto col_ptr_A = S.get_Ac().get_col_ptr();
+      const auto row_ind_A = S.get_Ac().get_row_inds();
+      const auto col_ptr_B = S.get_Bc().get_col_ptr();
+      const auto row_ind_B = S.get_Bc().get_row_inds();
 
-            std::size_t cols = M.cols();
-            const auto col_ptr_A = S.get_Ac().get_col_ptr();
-            const auto row_ind_A = S.get_Ac().get_row_inds();
-            const auto col_ptr_B = S.get_Bc().get_col_ptr();
-            const auto row_ind_B = S.get_Bc().get_row_inds();
-            A.zero();
+      if (beta == scalar_t(0.))
+        A.zero();
+      else if (beta != scalar_t(1.))
+        A.scale(beta);
 
-
+      if (alpha == scalar_t(1.)) {
 #pragma omp parallel for
-    for(std::size_t k = 0; k < cols; k++){
-
-
-      //iterate through the columns of A, B
-      //#pragma omp parallel for
-        for(size_t c = j; c < j+n; c++){
-             std::size_t startA = col_ptr_A[c],
-             endA = col_ptr_A[c + 1];
-             scalar_t Akc = 0;
-
+        for(std::size_t k = 0; k < cols; k++){
+          //iterate through the columns of A, B
+          for(size_t c = j; c < j+n; c++){
+            std::size_t startA = col_ptr_A[c],
+              endA = col_ptr_A[c + 1];
+            scalar_t Akc = 0;
             for(std::size_t l =startA; l < endA; l++){
               std::size_t r = row_ind_A[l] - i;
               if (r >= 0 && r < m)
-              Akc += blas::my_conj(M(r,k));
+                Akc += blas::my_conj(M(r,k));
             }
-
             std::size_t startB = col_ptr_B[c],
-            endB = col_ptr_B[c + 1];
+              endB = col_ptr_B[c + 1];
             for(std::size_t l = startB; l < endB; l++){
               std::size_t r = row_ind_B[l] - i;
               if (r >= 0 && r < m)
-              Akc -= blas::my_conj(M(r,k));
+                Akc -= blas::my_conj(M(r,k));
             }
-
-            A(k,c-j) = Akc;
+            A(k,c-j) += Akc;
+          }
         }
+      } else {
+#pragma omp parallel for
+        for(std::size_t k = 0; k < cols; k++){
+          //iterate through the columns of A, B
+          for(size_t c = j; c < j+n; c++){
+            std::size_t startA = col_ptr_A[c],
+              endA = col_ptr_A[c + 1];
+            scalar_t Akc = 0;
+            for(std::size_t l =startA; l < endA; l++){
+              std::size_t r = row_ind_A[l] - i;
+              if (r >= 0 && r < m)
+                Akc += blas::my_conj(M(r,k));
+            }
+            std::size_t startB = col_ptr_B[c],
+              endB = col_ptr_B[c + 1];
+            for(std::size_t l = startB; l < endB; l++){
+              std::size_t r = row_ind_B[l] - i;
+              if (r >= 0 && r < m)
+                Akc -= blas::my_conj(M(r,k));
+            }
+            A(k,c-j) += alpha * Akc;
+          }
+        }
+      }
+    }
     }
 }
-
-
-    }
-    }
 #endif

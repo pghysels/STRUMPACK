@@ -725,12 +725,13 @@ namespace strumpack {
                  (Trans::N, Trans::N, scalar_t(-1), D_, wRr, scalar_t(1.)));
           } else {
               //doing SJLT case here
-              DenseMatrix<scalar_t> temp( this -> rows(), d);
-              Matrix_times_SJLT(D_, *S, temp, this->rows(), d,w.offset.second, d0);
+              //DenseMatrix<scalar_t> temp( this -> rows(), d);
+              // Matrix_times_SJLT(D_, *S, temp, this->rows(), d,w.offset.second, d0);
               //wSr = -D_ S(i:i+m,j:j+n) + wSr
-              wSr.sub(temp,depth); // verify subtraction in place
+              // wSr.sub(temp,depth); // verify subtraction in place
 
-
+            Matrix_times_SJLT(D_, *S, wSr, this->rows(), d,w.offset.second, d0,
+                              scalar_t(-1.), scalar_t(1.));
           }
 
         } else {
@@ -779,9 +780,11 @@ namespace strumpack {
           }else {
                //wSr = -D_^* S(i:i+m,j:j+n) + wSr
 
-            DenseMatrix<scalar_t> temp( this -> rows(), d);
-            MatrixT_times_SJLT(D_,*S,temp,this->rows(), d, w.offset.second, d0 );
-            wSc.sub(temp,depth);
+            // DenseMatrix<scalar_t> temp( this -> rows(), d);
+            MatrixT_times_SJLT(D_, *S, wSc,
+                               this->rows(), d, w.offset.second, d0,
+                               scalar_t(-1.), scalar_t(1.));
+            // wSc.sub(temp,depth);
         }
 
 
