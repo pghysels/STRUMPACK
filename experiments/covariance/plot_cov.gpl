@@ -1,20 +1,23 @@
-set terminal pdf enhanced color size 4,3
+set terminal pdf enhanced color size 3,3
 
 set key top left
 set pointsize .6
 set grid
 set xlabel 'N'
-set ylabel 'HSS rank'
+
+set logscale x
+set logscale y
+
+set xtics ("15^3" 3375, "20^3" 8000, "25^3" 15625, "30^3" 27000, "35^3" 42875)
 
 set output 'cov_rank.pdf'
+set ylabel 'HSS rank'
 plot \
 'tmp_N_rank_gaussian' u 1:2 w lp t 'Gaussian', \
 'tmp_N_rank_nnz2' u 1:2 w lp t 'SJLT(nnz=2)', \
 'tmp_N_rank_nnz4' u 1:2 w lp t 'SJLT(nnz=4)', \
 'tmp_N_rank_nnz8' u 1:2 w lp t 'SJLT(nnz=8)'
 
-set logscale x
-set logscale y
 
 set ylabel 'time (10^{-3} sec)'
 set output 'cov_time.pdf'
@@ -25,8 +28,11 @@ plot \
 'tmp_N_sample_append_nnz8' u 1:($2+$3) w lp t 'SJLT(nnz=8)'
 
 
+# unset logscale y
+
 set output 'cov_err.pdf'
-set ylabel 'relative compression error ||A-H||_F/||A||_F'
+# set ylabel 'relative compression error ||A-H||_F/||A||_F'
+set ylabel '||A-H||_F/||A||_F'
 plot \
 'tmp_N_rel_err_gaussian' u 1:2 w lp t 'Gaussian', \
 'tmp_N_rel_err_nnz2' u 1:2 w lp t 'SJLT(nnz=2)', \
