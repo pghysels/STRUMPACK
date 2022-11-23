@@ -36,9 +36,6 @@ namespace strumpack {
   const int OMPThreshold = OMPTileSize*OMPTileSize*OMPTileSize;
   const int gemmOMPThreshold = OMPThreshold;
   const int trsmOMPThreshold = OMPThreshold;
-  const int trsvOMPThreshold = OMPTileSize*OMPTileSize;
-  const int getrfOMPPanelWidth = 1;
-  const int OMPPanelWidth = 8;
 
   template<typename scalar>
   void gemm_omp_task(char ta, char tb, int m, int n, int k, scalar alpha,
