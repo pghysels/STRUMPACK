@@ -42,9 +42,9 @@ FortranCInterface_VERIFY(CXX)
 
 message(STATUS "$ENV{FFLAGS}")
 message(STATUS "$ENV{FCLAGS}")
-message(STATUS $CMAKE_C_FLAGS)
-message(STATUS $CMAKE_CXX_FLAGS)
-message(STATUS $CMAKE_Fortran_FLAGS)
+message(STATUS "${CMAKE_C_FLAGS}")
+message(STATUS "${CMAKE_CXX_FLAGS}")
+message(STATUS "${CMAKE_Fortran_FLAGS}")
 
 # Get all properties that cmake supports
 execute_process(COMMAND cmake --help-property-list OUTPUT_VARIABLE CMAKE_PROPERTY_LIST)
