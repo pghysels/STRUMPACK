@@ -586,7 +586,7 @@ endif()
 
 if(STRUMPACK_USE_MPI)
   target_link_libraries(strumpack PUBLIC
-    MPI::MPI_CXX MPI::MPI_C MPI::MPI_Fortran)
+    MPI::MPI_CXX MPI::MPI_C) # MPI::MPI_Fortran)
 endif()
 
 if(OpenMP_FOUND)
