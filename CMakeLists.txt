@@ -43,7 +43,7 @@ if(STRUMPACK_USE_MPI)
   find_package(MPI)
 
   include(CMakePrintHelpers)
-  cmake_print_properties(TARGETS MPI::MPI_C) # PROPERTIES LOCATION INTERFACE_INCLUDE_DIRECTORIES)
+  cmake_print_properties(TARGETS MPI::MPI_C PROPERTIES LOCATION INTERFACE_INCLUDE_DIRECTORIES)
   # cmake_print_properties(MPI::MPI_CXX)
   # cmake_print_properties(MPI::MPI_Fortran)
 
