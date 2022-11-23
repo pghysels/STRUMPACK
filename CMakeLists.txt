@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.25)
 project(STRUMPACK VERSION 7.0.1 LANGUAGES CXX C Fortran)
 cmake_policy(SET CMP0074 NEW)
 
