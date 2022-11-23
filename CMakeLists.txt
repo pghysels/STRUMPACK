@@ -42,6 +42,7 @@ FortranCInterface_VERIFY(CXX)
 if(STRUMPACK_USE_MPI)
   find_package(MPI)
 
+  include(CMakePrintHelpers)
   cmake_print_properties(MPI::MPI_C)
   cmake_print_properties(MPI::MPI_CXX)
   cmake_print_properties(MPI::MPI_Fortran)
