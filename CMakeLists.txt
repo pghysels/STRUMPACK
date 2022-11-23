@@ -98,6 +98,8 @@ if(STRUMPACK_USE_MPI)
   include(CMakePrintHelpers)
 
   print_target_properties(MPI::MPI_C)
+  print_target_properties(MPI::MPI_CXX)
+  print_target_properties(MPI::MPI_Fortran)
   # cmake_print_properties(TARGETS MPI::MPI_C PROPERTIES LOCATION INTERFACE_INCLUDE_DIRECTORIES)
   # cmake_print_properties(MPI::MPI_CXX)
   # cmake_print_properties(MPI::MPI_Fortran)
