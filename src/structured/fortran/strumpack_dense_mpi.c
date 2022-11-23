@@ -197,49 +197,57 @@ int SP_s_struct_from_dense2d_f(CSPStructMat* S, int comm,
                                int rows, int cols, const float* A,
                                int IA, int JA, int* DESCA,
                                const CSPOptions* opts) {
-  SP_s_struct_from_dense2d(S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
+  return SP_s_struct_from_dense2d
+    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
 }
 int SP_d_struct_from_dense2d_f(CSPStructMat* S, int comm,
                                int rows, int cols, const double* A,
                                int IA, int JA, int* DESCA,
                                const CSPOptions* opts) {
-  SP_d_struct_from_dense2d(S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
+  return SP_d_struct_from_dense2d
+    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
 }
 int SP_c_struct_from_dense2d_f(CSPStructMat* S, int comm,
                                int rows, int cols, const float _Complex* A,
                                int IA, int JA, int* DESCA,
                                const CSPOptions* opts) {
-  SP_c_struct_from_dense2d(S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
+  return SP_c_struct_from_dense2d
+    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
 }
 int SP_z_struct_from_dense2d_f(CSPStructMat* S, int comm,
                                int rows, int cols, const double _Complex* A,
                                int IA, int JA, int* DESCA,
                                const CSPOptions* opts) {
-  SP_z_struct_from_dense2d(S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
+  return SP_z_struct_from_dense2d
+    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
 }
 int SP_s_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
                                     int rows, int cols,
                                     float A(int i, int j),
                                     const CSPOptions* opts) {
-  SP_s_struct_from_elements_mpi(S, MPI_Comm_f2c(comm), rows, cols, A, opts);
+  return SP_s_struct_from_elements_mpi
+    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
 }
 int SP_d_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
                                     int rows, int cols,
                                     double A(int i, int j),
                                     const CSPOptions* opts) {
-  SP_d_struct_from_elements_mpi(S, MPI_Comm_f2c(comm), rows, cols, A, opts);
+  return SP_d_struct_from_elements_mpi
+    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
 }
 int SP_c_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
                                     int rows, int cols,
                                     float _Complex A(int i, int j),
                                     const CSPOptions* opts) {
-  SP_c_struct_from_elements_mpi(S, MPI_Comm_f2c(comm), rows, cols, A, opts);
+  return SP_c_struct_from_elements_mpi
+    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
 }
 int SP_z_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
                                     int rows, int cols,
                                     double _Complex A(int i, int j),
                                     const CSPOptions* opts) {
-  SP_z_struct_from_elements_mpi(S, MPI_Comm_f2c(comm), rows, cols, A, opts);
+  return SP_z_struct_from_elements_mpi
+    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
 }
 
 #ifdef __cplusplus
