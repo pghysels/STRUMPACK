@@ -215,8 +215,10 @@ namespace strumpack {
     auto max_dupd = max_dim_upd();
     auto lvls = levels();
     std::vector<DenseM_t> CB(lvls);
-    for (auto& cb : CB)
-      cb = DenseM_t(max_dupd, b.cols());
+    // for (auto& cb : CB)
+    //   cb = DenseM_t(max_dupd, b.cols());
+    for (std::size_t i=0; i<CB.size(); i++)
+      CB[i] = DenseM_t(max_dupd, b.cols());
     TIMER_TIME(TaskType::FORWARD_SOLVE, 0, t_fwd);
     forward_multifrontal_solve(b, CB.data());
     TIMER_STOP(t_fwd);
@@ -240,8 +242,10 @@ namespace strumpack {
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
         {
           std::vector<DenseM_t> work2(rchild_->levels());
-          for (auto& cb : work2)
-            cb = DenseM_t(rchild_->max_dim_upd(), b.cols());
+          // for (auto& cb : work2)
+          //   cb = DenseM_t(rchild_->max_dim_upd(), b.cols());
+          for (std::size_t i=0; i<work2.size(); i++)
+            work2[i] = DenseM_t(rchild_->max_dim_upd(), b.cols());
           rchild_->forward_multifrontal_solve
             (b, work2.data(), etree_level+1, task_depth+1);
           DenseMW_t CBch(rchild_->dim_upd(), b.cols(), work2[0], 0, 0);
@@ -283,18 +287,21 @@ namespace strumpack {
             (y, work+1, etree_level+1, task_depth+1);
         }
       }
-      if (rchild_)
+      if (rchild_) {
 #pragma omp task untied default(shared)                                 \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
         {
           std::vector<DenseM_t> work2(rchild_->levels());
-          for (auto& cb : work2)
-            cb = DenseM_t(rchild_->max_dim_upd(), y.cols());
+          // for (auto& cb : work2)
+          //   cb = DenseM_t(rchild_->max_dim_upd(), y.cols());
+          for (std::size_t i=0; i<work2.size(); i++)
+            work2[i] = DenseM_t(rchild_->max_dim_upd(), y.cols());
           DenseMW_t CB(rchild_->dim_upd(), y.cols(), work2[0], 0, 0);
           rchild_->extract_b(y, yupd, CB, this);
           rchild_->backward_multifrontal_solve
             (y, work2.data(), etree_level+1, task_depth+1);
         }
+      }
 #pragma omp taskwait
     } else {
       if (lchild_) {
@@ -375,8 +382,10 @@ namespace strumpack {
     auto max_dupd = max_dim_upd();
     auto lvls = levels();
     std::vector<DenseM_t> CB(lvls);
-    for (auto& cb : CB)
-      cb = DenseM_t(max_dupd, bloc.cols());
+    // for (auto& cb : CB)
+    //   cb = DenseM_t(max_dupd, bloc.cols());
+    for (std::size_t i=0; i<CB.size(); i++)
+      CB[i] = DenseM_t(max_dupd, bloc.cols());
     forward_multifrontal_solve(bloc, CB.data(), etree_level, 0);
     seqbupd = CB[0];
   }
@@ -388,8 +397,10 @@ namespace strumpack {
     auto max_dupd = max_dim_upd();
     auto lvls = levels();
     std::vector<DenseM_t> CB(lvls);
-    for (auto& cb : CB)
-      cb = DenseM_t(max_dupd, yloc.cols());
+    // for (auto& cb : CB)
+    //   cb = DenseM_t(max_dupd, yloc.cols());
+    for (std::size_t i=0; i<CB.size(); i++)
+      CB[i] = DenseM_t(max_dupd, yloc.cols());
     CB[0] = seqyupd;
     backward_multifrontal_solve(yloc, CB.data(), etree_level, 0);
   }
