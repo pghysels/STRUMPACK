@@ -586,7 +586,8 @@ endif()
 
 if(STRUMPACK_USE_MPI)
   target_link_libraries(strumpack PUBLIC
-    MPI::MPI_CXX MPI::MPI_C MPI::MPI_Fortran)
+    MPI::MPI_CXX MPI::MPI_C ${MPI_Fortran_LIBRARIES})
+  ## adding the MPI::MPI_Fortran target risks adding unwanted compile flags
 endif()
 
 if(OpenMP_FOUND)
@@ -654,11 +655,7 @@ if(ButterflyPACK_FOUND)
     ButterflyPACK::sbutterflypack
     ButterflyPACK::dbutterflypack
     ButterflyPACK::cbutterflypack
-    ButterflyPACK::zbutterflypack
-    MPI::MPI_Fortran ${MPI_Fortran_LIBRARIES})
-  ## for some reason just adding the MPI::MPI_Fortran target only
-  ## links with the f08 module, not with the regular fortran MPI
-  ## library
+    ButterflyPACK::zbutterflypack)
 endif()
 
 if(slate_FOUND)
