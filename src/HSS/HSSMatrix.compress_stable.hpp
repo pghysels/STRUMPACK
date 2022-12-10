@@ -38,126 +38,106 @@ namespace strumpack {
       AFunctor<scalar_t> afunc(A);
 
       if(opts.compression_sketch() == CompressionSketch::SJLT){
-          auto d = opts.d0();
-          auto dd = opts.dd();
-          auto total_nnz = opts.nnz0();
-          // assert(dd <= d);
-          auto n = this->cols();
-          DenseM_t Rr, Rc, Sr, Sc;
-          SJLTGenerator<scalar_t, int> g;
-          bool chunk = opts.sjlt_algo() == SJLTAlgo::CHUNK;
-          SJLT_Matrix<scalar_t, int> S(g,0,n,0,chunk);
+        auto d = opts.d0();
+        auto dd = opts.dd();
+        auto total_nnz = opts.nnz0();
+        // assert(dd <= d);
+        auto n = this->cols();
+        DenseM_t Rr, Rc, Sr, Sc;
+        SJLTGenerator<scalar_t, int> g;
+        bool chunk = opts.sjlt_algo() == SJLTAlgo::CHUNK;
+        SJLT_Matrix<scalar_t, int> S(g,0,n,0,chunk);
+        if (opts.verbose())
+          std::cout<< "# compressing with sjlt \n";
+        WorkCompress<scalar_t> w;
+        while (!this->is_compressed()) {
+          Rr.resize(n, d+dd);
+          Rc.resize(n, d+dd);
+          Sr.resize(n, d+dd);
+          Sc.resize(n, d+dd);
+          int c = (d == opts.d0()) ? 0 : d;
+          int dnew = (d == opts.d0()) ? d+dd : dd;
+          DenseMW_t Rr_new(n, dnew, Rr, 0, c);
+          DenseMW_t Rc_new(n, dnew, Rc, 0, c);
+          DenseMW_t Sr_new(n, dnew, Sr, 0, c);
+          DenseMW_t Sc_new(n, dnew, Sc, 0, c);
+          std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
+          if (c == 0) {
+            begin = std::chrono::steady_clock::now();
+            S.add_columns(dnew,opts.nnz0());
+            end = std::chrono::steady_clock::now();
+            if (opts.verbose())
+              std::cout << "# S init creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+            Rr_new.copy(S.SJLT_to_dense());
+            begin = std::chrono::steady_clock::now();
+            Matrix_times_SJLT(A,S,Sr_new);
+            end = std::chrono::steady_clock::now();
+            if (opts.verbose())
+              std::cout << "# A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+            begin = std::chrono::steady_clock::now();
+            MatrixT_times_SJLT(A,S,Sc_new);
+            end = std::chrono::steady_clock::now();
+            if (opts.verbose())
+              std::cout << "# AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+          } else {
+            begin = std::chrono::steady_clock::now();
+            SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
+                                            opts.nnz(),n,dnew,chunk);
+            S.append_sjlt_matrix(Temp);
+            end = std::chrono::steady_clock::now();
+            if (opts.verbose())
+              std::cout << "# S append cols creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+            Rr_new.copy(Temp.SJLT_to_dense());
+            begin = std::chrono::steady_clock::now();
+            Matrix_times_SJLT(A,Temp,Sr_new);
+            end = std::chrono::steady_clock::now();
+            if (opts.verbose())
+              // std::cout << "# A*S appended cols time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+              std::cout << "# A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
 
-          if(opts.verbose()){
-               std::cout<< "# compressing with sjlt \n";
+            begin = std::chrono::steady_clock::now();
+            MatrixT_times_SJLT(A,Temp,Sc_new);
+            end = std::chrono::steady_clock::now();
+            if (opts.verbose())
+              // std::cout << "# AT*S appended cols time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+              std::cout << "# AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+            total_nnz += opts.nnz();
           }
-
-          WorkCompress<scalar_t> w;
-          while (!this->is_compressed()) {
-            Rr.resize(n, d+dd);
-            Rc.resize(n, d+dd);
-            Sr.resize(n, d+dd);
-            Sc.resize(n, d+dd);
-            int c = (d == opts.d0()) ? 0 : d;
-            int dnew = (d == opts.d0()) ? d+dd : dd;
-            DenseMW_t Rr_new(n, dnew, Rr, 0, c);
-            DenseMW_t Rc_new(n, dnew, Rc, 0, c);
-            DenseMW_t Sr_new(n, dnew, Sr, 0, c);
-            DenseMW_t Sc_new(n, dnew, Sc, 0, c);
-            std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
-
-                if(c == 0){
-
-                    begin = std::chrono::steady_clock::now();
-                    S.add_columns(dnew,opts.nnz0());
-                    end = std::chrono::steady_clock::now();
-                    if (opts.verbose())
-                    std::cout << "# S init creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
-
-                    Rr_new.copy(S.SJLT_to_dense());
-
-                    begin = std::chrono::steady_clock::now();
-                    Matrix_times_SJLT(A,S,Sr_new);
-                    end = std::chrono::steady_clock::now();
-                    if (opts.verbose())
-                    std::cout << "# A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
-
-                    begin = std::chrono::steady_clock::now();
-                    MatrixT_times_SJLT(A,S,Sc_new);
-                    end = std::chrono::steady_clock::now();
-                    if (opts.verbose())
-                    std::cout << "# AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
-
-                }else {
-
-                    begin = std::chrono::steady_clock::now();
-                    SJLT_Matrix<scalar_t, int> Temp(S.get_g(),
-                    opts.nnz(),n,dnew,chunk);
-
-                    S.append_sjlt_matrix(Temp);
-                    end = std::chrono::steady_clock::now();
-                    if (opts.verbose())
-                    std::cout << "# S append cols creation time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
-
-
-                    Rr_new.copy(Temp.SJLT_to_dense());
-
-                    begin = std::chrono::steady_clock::now();
-                    Matrix_times_SJLT(A,Temp,Sr_new);
-                    end = std::chrono::steady_clock::now();
-                    if (opts.verbose())
-                    std::cout << "# A*S appended cols time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
-
-                    begin = std::chrono::steady_clock::now();
-                    MatrixT_times_SJLT(A,Temp,Sc_new);
-                    end = std::chrono::steady_clock::now();
-                    if (opts.verbose())
-                    std::cout << "# AT*S appended cols time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
-                    total_nnz += opts.nnz();
-                }
-
-
-                Rc_new.copy(Rr_new);
-                DenseM_t temp1(Sr_new);
-                DenseM_t temp2(Sc_new);
-
-                begin = std::chrono::steady_clock::now();
-                afunc(Rr_new, Rc_new, temp1, temp2);
-                end = std::chrono::steady_clock::now();
-                if (opts.verbose()){
-                std::cout << "A*S and AT*S gemm = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
-                //check compression integrity:
-                std::cout << "# A*S gemm - A*S fast normsq = " << temp1.sub(Sr_new).normF() << "\n";
-                std::cout << "# AT*S gemm - AT*S fast normsq = " << temp2.sub(Sc_new).normF() << "\n";
-                }
-
-            if (opts.verbose()){
-              std::cout << "# compressing with d+dd = " << d << "+" << dd
-                        << " (stable)" << std::endl;
-              std::cout << "# nnz total = " << total_nnz << std::endl;
-                }
-    #pragma omp parallel if(!omp_in_parallel())
-    #pragma omp single nowait
-            compress_recursive_stable
-              (Rr, Rc, Sr, Sc, afunc, opts, w,
-               d, dd, this->openmp_task_depth_,&S);
-            if (!this->is_compressed()) {
-              d += dd;
-              dd = std::min(dd, opts.max_rank()-d);
-            }
+          Rc_new.copy(Rr_new);
+          // if (opts.verbose()) {
+          //   DenseM_t temp1(Sr_new);
+          //   DenseM_t temp2(Sc_new);
+          //   begin = std::chrono::steady_clock::now();
+          //   afunc(Rr_new, Rc_new, temp1, temp2);
+          //   end = std::chrono::steady_clock::now();
+          //   std::cout << "A*S and AT*S gemm = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+          //   //check compression integrity:
+          //   std::cout << "# A*S gemm - A*S fast normsq = " << temp1.sub(Sr_new).normF() << "\n";
+          //   std::cout << "# AT*S gemm - AT*S fast normsq = " << temp2.sub(Sc_new).normF() << "\n";
+          // }
+          if (opts.verbose()){
+            std::cout << "# compressing with d+dd = " << d << "+" << dd
+                      << " (stable)" << std::endl;
+            std::cout << "# nnz total = " << total_nnz << std::endl;
           }
-
-          if(opts.verbose()){
-          std::cout<<"# Final length of row: " << d+dd << std::endl
-                   <<"# Total nnz in each row: "
-                   << total_nnz << std::endl;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+          compress_recursive_stable
+            (Rr, Rc, Sr, Sc, afunc, opts, w,
+             d, dd, this->openmp_task_depth_,&S);
+          if (!this->is_compressed()) {
+            d += dd;
+            dd = std::min(dd, opts.max_rank()-d);
           }
-
-
-      }else {
-          compress_stable(afunc, afunc, opts);
+        }
+        if (opts.verbose()) {
+          std::cout << "# Final length of row: " << d+dd << std::endl
+                    << "# Total nnz in each row: "
+                    << total_nnz << std::endl;
+        }
+      } else {
+        compress_stable(afunc, afunc, opts);
       }
-
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_stable
@@ -170,19 +150,15 @@ namespace strumpack {
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
       SJLTGenerator<scalar_t, int> g;
-      if (!opts.user_defined_random()){
-          if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
-            rgen = random::make_random_generator<real_t>
-                (opts.random_engine(), opts.random_distribution());
-          }
-
-         else if(opts.compression_sketch() == CompressionSketch::SJLT){
-
-             std::cout<< "compressing with dense sjlt \n";
-         }
-         else{
-             std::cout<< "unknown compression sketch \n";
-         }
+      if (!opts.user_defined_random()) {
+        if (opts.compression_sketch() == CompressionSketch::GAUSSIAN) {
+          rgen = random::make_random_generator<real_t>
+            (opts.random_engine(), opts.random_distribution());
+        } else if (opts.compression_sketch() == CompressionSketch::SJLT) {
+          std::cout<< "compressing with dense sjlt \n";
+        } else {
+          std::cout<< "unknown compression sketch \n";
+        }
       }
       WorkCompress<scalar_t> w;
       while (!this->is_compressed()) {
@@ -197,32 +173,27 @@ namespace strumpack {
         DenseMW_t Sr_new(n, dnew, Sr, 0, c);
         DenseMW_t Sc_new(n, dnew, Sc, 0, c);
         if (!opts.user_defined_random()) {
-           if(opts.compression_sketch() == CompressionSketch::GAUSSIAN){
-               Rr_new.random(*rgen);
-               STRUMPACK_RANDOM_FLOPS
-                (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-
-
-           }
-
-           else if(opts.compression_sketch() == CompressionSketch::SJLT){
-               if(c == 0){
-
-                   g.SJLTDenseSketch(Rr_new,total_nnz);
-               } else{
-                   g.SJLTDenseSketch(Rr_new,  opts.nnz());
-                   total_nnz += opts.nnz();
-               }
-           }
-            Rc_new.copy(Rr_new);
+          if (opts.compression_sketch() == CompressionSketch::GAUSSIAN) {
+            Rr_new.random(*rgen);
+            STRUMPACK_RANDOM_FLOPS
+              (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          }  else if(opts.compression_sketch() == CompressionSketch::SJLT){
+            if (c == 0) {
+              g.SJLTDenseSketch(Rr_new,total_nnz);
+            } else{
+              g.SJLTDenseSketch(Rr_new,  opts.nnz());
+              total_nnz += opts.nnz();
+            }
+          }
+          Rc_new.copy(Rr_new);
         }
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
         if (opts.verbose())
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
         if (opts.verbose() && opts.compression_sketch()
-        == CompressionSketch::SJLT)
-            std::cout << "# nnz total = " << total_nnz << std::endl;
+            == CompressionSketch::SJLT)
+          std::cout << "# nnz total = " << total_nnz << std::endl;
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_stable
@@ -233,13 +204,12 @@ namespace strumpack {
           dd = std::min(dd, opts.max_rank()-d);
         }
       }
-
-      if(opts.verbose() && opts.compression_sketch() == CompressionSketch::SJLT){
-      std::cout<<"# Final length of row: " << d << std::endl
-               <<"total nnz in each row: "
-               << total_nnz << std::endl;
+      if (opts.verbose() && opts.compression_sketch() ==
+          CompressionSketch::SJLT) {
+        std::cout << "# Final length of row: " << d << std::endl
+                  << "total nnz in each row: "
+                  << total_nnz << std::endl;
       }
-
     }
 
     template<typename scalar_t> void

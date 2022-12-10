@@ -235,8 +235,15 @@ namespace strumpack {
       const DenseM_t& _A;
       void operator()
       (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+        // std::chrono::steady_clock::time_point end, begin = std::chrono::steady_clock::now();
+        auto begin = std::chrono::steady_clock::now();
         gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
+        auto end = std::chrono::steady_clock::now();
+        std::cout << "# A*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
+        begin = std::chrono::steady_clock::now();
         gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
+        end = std::chrono::steady_clock::now();
+        std::cout << "# AT*S time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " [10e-3s]" << std::endl;
       }
       void operator()(const std::vector<size_t>& I,
                       const std::vector<size_t>& J, DenseM_t& B) {

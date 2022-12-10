@@ -36,6 +36,7 @@
 #include <memory>
 #include <random>
 #include <iostream>
+#include <chrono>
 
 namespace strumpack {
 
@@ -237,7 +238,10 @@ namespace strumpack {
      */
     template<typename real_t> std::unique_ptr<RandomGeneratorBase<real_t>>
     make_random_generator(RandomEngine e, RandomDistribution d) {
-      return make_random_generator<real_t>(0, e, d);
+      // return make_random_generator<real_t>(0, e, d);
+      return make_random_generator<real_t>
+        (std::chrono::system_clock::now().time_since_epoch().count(),
+         e, d);
     }
 
     /**
