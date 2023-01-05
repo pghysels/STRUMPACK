@@ -464,8 +464,8 @@ namespace strumpack {
     private:
       int d0_ = 128;
       int dd_ = 64;
-      int nnz0_ = 3;
-      int nnz_ = 3;
+      int nnz0_ = 4;
+      int nnz_ = 4;
       int p_ = 10;
       random::RandomEngine random_engine_ =
         random::RandomEngine::LINEAR;
