@@ -6,7 +6,6 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/RCMReordering.hpp
   ${CMAKE_CURRENT_LIST_DIR}/ANDSparspak.hpp
   ${CMAKE_CURRENT_LIST_DIR}/ANDSparspak.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/NDBFS.cpp
   ${CMAKE_CURRENT_LIST_DIR}/ScotchReordering.hpp
   ${CMAKE_CURRENT_LIST_DIR}/MatrixReordering.hpp
   ${CMAKE_CURRENT_LIST_DIR}/MetisReordering.hpp)
