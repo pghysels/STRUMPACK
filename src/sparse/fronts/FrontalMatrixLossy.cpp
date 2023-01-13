@@ -81,7 +81,6 @@ namespace strumpack {
     zfp_field_free(f);
     zfp_stream_close(destream);
     stream_close(bstream);
-    return;
   }
 
   template<typename T> LossyMatrix<std::complex<T>>::LossyMatrix
