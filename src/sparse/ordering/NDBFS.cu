@@ -32,6 +32,7 @@
 #include <thrust/sequence.h>
 #include <thrust/logical.h>
 #include <thrust/functional.h>
+#include <thrust/gather.h>
 
 #include "ANDSparspak.hpp"
 
@@ -40,19 +41,21 @@ namespace strumpack {
 
     template<typename integer> struct bfs_label_prop_ftor {
       integer *ptr, *ind;
-      bool *elim, *running;
-      int *root;
+      bool *eliminated, *running;
+      int *label;
       bfs_label_prop_ftor(integer* ptr_, integer* ind_,
-                          bool* elim_, int* root_, bool* running_)
-        : ptr(ptr_), ind(ind_), elim(elim_),
-          root(root_), running(running_) {}
+                          bool* eliminated_, int* label_,
+                          bool* running_)
+        : ptr(ptr_), ind(ind_), eliminated(eliminated_),
+          label(label_), running(running_) {}
       __device__ void operator()(int i) {
-        if (elim[i]) return;
-        for (auto k=ptr[i]; k<ptr[i+1]; k++) {
+        if (eliminated[i]) return;
+        auto khi = ptr[i+1];
+        for (auto k=ptr[i]; k<khi; k++) {
           auto j = ind[k];
-          if (elim[j]) continue;
-          if (root[j] < root[i]) {
-            root[i] = root[j];
+          if (eliminated[j]) continue;
+          if (label[j] < label[i]) {
+            label[i] = label[j];
             *running = true;
           }
         }
@@ -61,24 +64,26 @@ namespace strumpack {
 
     template<typename integer> struct bfs_layer_ftor {
       integer *ptr, *ind;
-      bool *elim, *running;
-      int *root, *mask, *sc, n, it;
+      bool *eliminated, *running;
+      int *label, *comp, *comp_start, n, it;
       bfs_layer_ftor(int n_, int it_, integer* ptr_, integer* ind_,
-                     bool* elim_, int* root_, int* mask_,
-                     int* sc_, bool* running_)
-        : n(n_), it(it_), ptr(ptr_), ind(ind_), elim(elim_),
-          root(root_), mask(mask_), sc(sc_), running(running_) {}
+                     bool* eliminated_, int* label_, int* comp_,
+                     int* comp_start_, bool* running_)
+        : n(n_), it(it_), ptr(ptr_), ind(ind_), eliminated(eliminated_),
+          label(label_), comp(comp_), comp_start(comp_start_),
+          running(running_) {}
       __device__ void operator()(int i) {
-        if (elim[i]) return;
-        auto ri = root[i];
-        auto l = sc[mask[i]] + it;
-        if (ri == l) {
+        if (eliminated[i]) return;
+        auto li = label[i];
+        auto l = comp_start[comp[i]] + it;
+        if (li == l) {
           bool run = false;
-          for (auto k=ptr[i]; k<ptr[i+1]; k++) {
+          auto khi = ptr[i+1];
+          for (auto k=ptr[i]; k<khi; k++) {
             auto j = ind[k];
-            if (elim[j]) continue;
-            if (root[j] == n) {
-              root[j] = l + 1;
+            if (eliminated[j]) continue;
+            if (label[j] == n) {
+              label[j] = l + 1;
               run = true;
             }
           }
@@ -89,242 +94,254 @@ namespace strumpack {
     };
 
     struct find_components_ftor {
-      int *nc, *root, *mask, *rc;
-      bool *elim;
-      find_components_ftor(int* nc_, bool* elim_, int* root_,
-                           int* mask_, int* rc_)
-        : nc(nc_), elim(elim_), root(root_), mask(mask_), rc(rc_) {}
+      int *nr_comps, *label, *comp, *comp_root;
+      bool *eliminated;
+      find_components_ftor(int* nr_comps_, bool* eliminated_, int* label_,
+                           int* comp_, int* comp_root_)
+        : nr_comps(nr_comps_), eliminated(eliminated_), label(label_),
+          comp(comp_), comp_root(comp_root_) {}
       __device__ void operator()(int i) {
-        if (!elim[i] && root[i] == i) {
-          auto c = atomicAdd(nc, 1);
-          mask[i] = c;
-          rc[c] = i;
+        if (!eliminated[i] && label[i] == i) {
+          auto c = atomicAdd(nr_comps, 1);
+          comp[i] = c;
+          comp_root[c] = i;
         }
       }
     };
 
-    struct assign_component_ftor {
-      bool *elim;
-      int *root, *mask;
-      assign_component_ftor(bool* elim_, int* root_, int* mask_)
-        : elim(elim_), root(root_), mask(mask_) {}
+    struct count_comps_ftor {
+      bool *eliminated;
+      int *comp, *comp_size;
+      count_comps_ftor(bool* eliminated_, int* comp_, int* comp_size_)
+        : eliminated(eliminated_), comp(comp_), comp_size(comp_size_) {}
       __device__ void operator()(int i) {
-        if (!elim[i])
-          mask[i] = mask[root[i]];
-      }
-    };
-
-    struct count_components_ftor {
-      bool* elim;
-      int *mask, *sc;
-      count_components_ftor(bool* elim_, int* mask_, int* sc_)
-        : elim(elim_), mask(mask_), sc(sc_) {}
-      __device__ void operator()(int i) {
-        if (!elim[i])
-          atomicAdd(sc+mask[i], 1);
+        if (!eliminated[i])
+          atomicAdd(comp_size+comp[i], 1);
       }
     };
 
     struct count_layers_ftor {
-      bool *elim;
-      int n, *root, *mask, *ls, *sc;
-      count_layers_ftor(int n_, bool* elim_, int* root_,
-                        int* mask_, int* ls_, int* sc_)
-        : n(n_), elim(elim_), root(root_), mask(mask_), ls(ls_), sc(sc_) {}
+      bool *eliminated;
+      int n, *label, *comp, *levels, *comp_start;
+      count_layers_ftor(int n_, bool* eliminated_, int* label_,
+                        int* comp_, int* levels_, int* comp_start_)
+        : n(n_), eliminated(eliminated_), label(label_), comp(comp_),
+          levels(levels_), comp_start(comp_start_) {}
       __device__ void operator()(int i) {
-        if (elim[i]) return;
-        auto ri = root[i];
-        if (ri == n) return;
-        auto m = mask[i];
-        auto l = ri - sc[m] + 1;
-        if (l > ls[m])
-          atomicMax(ls+m, l);
+        if (eliminated[i]) return;
+        auto li = label[i];
+        if (li == n) return;
+        auto ci = comp[i];
+        auto lvl = li - comp_start[ci] + 1;
+        if (lvl > levels[ci])
+          atomicMax(levels+ci, lvl);
       }
     };
 
-    template<typename integer> struct find_peripheral_node_1_ftor {
+    template<typename integer> struct peripheral_node_1_ftor {
       integer *ptr, *ind;
-      bool *elim;
-      int *root, *mask, *ls, *old_ls, *d, *sc;
-      find_peripheral_node_1_ftor(integer* ptr_, integer* ind_,
-                                  bool* elim_, int* root_, int* mask_,
-                                  int* ls_, int* old_ls_, int* d_, int* sc_)
-        : ptr(ptr_), ind(ind_), elim(elim_), root(root_), mask(mask_),
-          ls(ls_), old_ls(old_ls_), d(d_), sc(sc_) {}
+      bool *eliminated;
+      int *label, *comp, *levels, *old_levels, *d, *comp_start;
+      peripheral_node_1_ftor(integer* ptr_, integer* ind_,
+                             bool* eliminated_, int* label_, int* comp_,
+                             int* levels_, int* old_levels_,
+                             int* d_, int* comp_start_)
+        : ptr(ptr_), ind(ind_), eliminated(eliminated_),
+          label(label_), comp(comp_),
+          levels(levels_), old_levels(old_levels_),
+          d(d_), comp_start(comp_start_) {}
       __device__ void operator()(int i) {
         // find the node with the minimum degree in the last layer, for
         // each of the components. We cannot atomically update both the
         // degree and the index of the node which had the minimum
         // degree, hence the two loops.
-        if (elim[i]) return;
-        auto mi = mask[i];
-        if (ls[mi] <= old_ls[mi]) return;
-        if (root[i] == sc[mi] + ls[mi] - 1) {
+        if (eliminated[i]) return;
+        auto ci = comp[i];
+        auto nlvls = levels[ci];
+        if (nlvls <= old_levels[ci]) return;
+        if (label[i] == comp_start[ci] + nlvls - 1) {
           // in the last layer
           int deg = 0;
-          for (auto k=ptr[i]; k<ptr[i+1]; k++)
-            if (!elim[ind[k]])
+          auto khi = ptr[i+1];
+          for (auto k=ptr[i]; k<khi; k++)
+            if (!eliminated[ind[k]])
               deg++;
-          atomicMin(d+mi, deg);
+          atomicMin(d+ci, deg);
         }
       }
     };
 
-    template<typename integer> struct find_peripheral_node_2_ftor {
+    template<typename integer> struct peripheral_node_2_ftor {
       integer *ptr, *ind;
-      bool *elim;
-      int *root, *mask, *ls, *old_ls, *d, *sc, *rc;
-      find_peripheral_node_2_ftor(integer* ptr_, integer* ind_,
-                                  bool* elim_, int* root_, int* mask_,
-                                  int* ls_, int* old_ls_,
-                                  int* d_, int* sc_, int* rc_)
-        : ptr(ptr_), ind(ind_), elim(elim_), root(root_), mask(mask_),
-          ls(ls_), old_ls(old_ls_), d(d_), sc(sc_), rc(rc_) {}
+      bool *eliminated;
+      int *label, *comp, *levels, *old_levels,
+        *d, *comp_start, *comp_root;
+      peripheral_node_2_ftor(integer* ptr_, integer* ind_,
+                             bool* eliminated_, int* label_, int* comp_,
+                             int* levels_, int* old_levels_, int* d_,
+                             int* comp_start_, int* comp_root_)
+        : ptr(ptr_), ind(ind_), eliminated(eliminated_), label(label_),
+          comp(comp_), levels(levels_), old_levels(old_levels_), d(d_),
+          comp_start(comp_start_), comp_root(comp_root_) {}
       __device__ void operator()(int i) {
-        if (elim[i]) return;
-        auto mi = mask[i];
-        if (ls[mi] <= old_ls[mi]) return;
-        if (root[i] == sc[mi] + ls[mi] - 1) {
+        if (eliminated[i]) return;
+        auto ci = comp[i];
+        auto nlvls = levels[ci];
+        if (nlvls <= old_levels[ci]) return;
+        if (label[i] == comp_start[ci] + nlvls - 1) {
           // in the last layer
           int deg = 0;
-          for (auto k=ptr[i]; k<ptr[i+1]; k++)
-            if (!elim[ind[k]])
+          auto khi = ptr[i+1];
+          for (auto k=ptr[i]; k<khi; k++)
+            if (!eliminated[ind[k]])
               deg++;
-          if (deg == d[mi])
+          if (deg == d[ci])
             // multiple threads might be writing concurrently here if
             // multiple nodes have the same (minimum) degree
-            rc[mi] = i;
+            comp_root[ci] = i;
         }
       }
     };
 
-    // store layer cardinalities for the component starting at node i
-    // (== root[i]) at d[i], and at d[i+1] for the next layer, etc.
-    // count nr of nodes in each separator, where a separator is all
-    // nodes in a layer that are also connected to the next layer,
-    // store result in ns[i] for the root, in ns[i+1] for the next
-    // layer, etc
+    // Store layer cardinalities for the component starting at node i
+    // (== label[i]) at layer_size[i], and at layer_size[i+1] for the
+    // next layer, etc. Count nr of nodes in each separator, where a
+    // separator is all nodes in a layer that are also connected to
+    // the previous/next layer, store result in
+    // sep_size_prev[l]/sep_size_next[l] for level l.
     template<typename integer> struct cardinalities_ftor {
       integer *ptr, *ind;
-      bool *elim;
-      int *root, *mask, *ls, *sc, *d, *ns, *ns2;
+      bool *eliminated;
+      int *label, *comp, *levels, *comp_start,
+        *layer_size, *sep_size_prev, *sep_size_next;
       cardinalities_ftor(integer* ptr_, integer* ind_,
-                         bool* elim_, int* root_, int* mask_,
-                         int* ls_, int* sc_, int* d_,
-                         int* ns_, int* ns2_)
-        : ptr(ptr_), ind(ind_), elim(elim_), root(root_), mask(mask_),
-          ls(ls_), sc(sc_), d(d_), ns(ns_), ns2(ns2_) {}
+                         bool* eliminated_, int* label_, int* comp_,
+                         int* levels_, int* comp_start_, int* layer_size_,
+                         int* sep_size_prev_, int* sep_size_next_)
+        : ptr(ptr_), ind(ind_), eliminated(eliminated_), label(label_),
+          comp(comp_), levels(levels_), comp_start(comp_start_),
+          layer_size(layer_size_),
+          sep_size_prev(sep_size_prev_), sep_size_next(sep_size_next_) {}
       __device__ void operator()(int i) {
-        if (elim[i]) return;
-        auto mi = mask[i];
-        auto nl = ls[mi];
-        if (nl < 3) return; // whole component eliminated
-        auto lr = sc[mi];
-        auto ri = root[i];
-        atomicAdd(d+ri, 1);
-        if (ri == lr || ri == lr+nl-1) return; // ignore first/last
-        for (auto k=ptr[i]; k<ptr[i+1]; k++) {
+        if (eliminated[i]) return;
+        auto ci = comp[i];
+        auto nlvls = levels[ci];
+        if (nlvls < 3) // whole component eliminated
+          return;
+        auto l0 = comp_start[ci];
+        auto li = label[i];
+        atomicAdd(layer_size+li, 1);
+        if (li == l0 || li == l0+nlvls-1) // ignore first/last
+          return;
+        auto khi = ptr[i+1];
+        for (auto k=ptr[i]; k<khi; k++) {
           auto j = ind[k];
-          if (elim[j]) continue;
-          if (root[j] == ri - 1) {
-            atomicAdd(ns+ri, 1);
-            // return;
+          if (eliminated[j]) continue;
+          if (label[j] == li - 1) {
+            atomicAdd(sep_size_prev+li, 1);
             break;
           }
         }
-        for (auto k=ptr[i]; k<ptr[i+1]; k++) {
+        for (auto k=ptr[i]; k<khi; k++) {
           auto j = ind[k];
-          if (elim[j]) continue;
-          if (root[j] == ri + 1) {
-            atomicAdd(ns2+ri, 1);
-            // return;
+          if (eliminated[j]) continue;
+          if (label[j] == li + 1) {
+            atomicAdd(sep_size_next+li, 1);
             break;
           }
         }
       }
     };
 
-    template<typename integer> struct minimize_separator_ftor {
+    template<typename integer> struct minimize_sep_ftor {
       integer *ptr, *ind;
-      bool *elim;
-      int *root, *mask, *ls, *sc, *ns, *ns2, *d;
-      minimize_separator_ftor(integer* ptr_, integer* ind_,
-                              bool* elim_, int* root_, int* mask_,
-                              int* ls_, int* sc_,
-                              int* ns_, int* ns2_, int* d_)
-        : ptr(ptr_), ind(ind_), elim(elim_), root(root_), mask(mask_),
-          ls(ls_), sc(sc_), ns(ns_), ns2(ns2_), d(d_) {}
+      bool *eliminated;
+      int *label, *comp, *levels, *comp_start,
+        *layer_size, *sep_size_prev, *sep_size_next;
+      minimize_sep_ftor(integer* ptr_, integer* ind_,
+                        bool* eliminated_, int* label_, int* comp_,
+                        int* levels_, int* comp_start_,
+                        int* layer_size_, int* sep_size_prev_,
+                        int* sep_size_next_)
+        : ptr(ptr_), ind(ind_),
+          eliminated(eliminated_), label(label_), comp(comp_),
+          levels(levels_), comp_start(comp_start_),
+          layer_size(layer_size_), sep_size_prev(sep_size_prev_),
+          sep_size_next(sep_size_next_) {}
       __device__ void operator()(int i) {
-        if (elim[i]) return;
-        auto mi = mask[i];
-        auto nl = ls[mi];
-        if (nl < 3 || root[i] != sc[mi]) return;
+        if (eliminated[i]) return;
+        auto ci = comp[i];
+        auto nlvls = levels[ci];
+        if (nlvls < 3 || label[i] != comp_start[ci]) return;
         // I'm the root of this component
-        auto scmi = sc[mi];
-        auto cG = sc[mi+1] - scmi;
-        auto cA = d[scmi];
-        auto cB = cG - cA;
+        auto c0 = comp_start[ci];
+        auto cA = layer_size[c0];
+        auto cB = comp_start[ci+1] - c0 - cA;
         float minNS;
         int minl;
-        for (auto l=1; l<nl-1; l++) {
-          auto dl = d[scmi+l];
-          auto sl = ns[scmi+l];
-          cB -= dl;
-          auto NS = sl * (1. / cA + 1. / (cB+dl-sl));
+        for (auto l=1; l<nlvls-1; l++) {
+          auto cL = layer_size[c0+l];
+          auto cS = sep_size_prev[c0+l];
+          cB -= cL;
+          auto NS = cS * (1. / cA + 1. / (cB+cL-cS));
           if (l == 1 || NS < minNS) {
             minNS = NS;
             minl = -l;
           }
-          sl = ns2[scmi+l];
-          NS = sl * (1. / (cA+dl-sl) + 1. / cB);
+          cS = sep_size_next[c0+l];
+          NS = cS * (1. / (cA+cL-cS) + 1. / cB);
           if (NS < minNS) {
             minNS = NS;
             minl = l;
           }
-          cA += dl;
+          cA += cL;
         }
-        ns[mi] = (minl < 0) ? -scmi + minl : scmi + minl;
+        sep_size_prev[ci] = (minl < 0) ? -c0 + minl : c0 + minl;
       }
     };
 
-    template<typename integer> struct eliminate_separators_ftor {
+    template<typename integer> struct eliminate_sep_ftor {
       integer *ptr, *ind, *perm;
-      bool *elim;
-      int *root, *mask, *ls, *ns, *nelim;
-      eliminate_separators_ftor(integer* ptr_, integer* ind_, bool* elim_,
-                                int* root_, int* mask_, int* ls_, int* ns_,
-                                int* nelim_, integer* perm_)
-        : ptr(ptr_), ind(ind_), elim(elim_), root(root_), mask(mask_),
-          ls(ls_), ns(ns_), nelim(nelim_), perm(perm_) {}
+      bool *eliminated;
+      int *label, *comp, *levels, *sep_size_prev, *nr_eliminated;
+      eliminate_sep_ftor(integer* ptr_, integer* ind_,
+                         bool* eliminated_, int* label_, int* comp_,
+                         int* levels_, int* sep_size_prev_,
+                         int* nr_eliminated_, integer* perm_)
+        : ptr(ptr_), ind(ind_), eliminated(eliminated_), label(label_),
+          comp(comp_), levels(levels_), sep_size_prev(sep_size_prev_),
+          nr_eliminated(nr_eliminated_), perm(perm_) {}
       __device__ void operator()(int i) {
-        if (elim[i]) return;
-        auto mi = mask[i];
-        if (ls[mi] < 3) {
-          elim[i] = true;
-          perm[atomicAdd(nelim, 1)] = i;
+        if (eliminated[i]) return;
+        auto ci = comp[i];
+        if (levels[ci] < 3) {
+          eliminated[i] = true;
+          perm[atomicAdd(nr_eliminated, 1)] = i;
           return;
         }
-        // the separator are the nodes in layer ns[root[i]] (see
+        // the separator are the nodes in layer ns[label[i]] (see
         // above) which are also connected to the next layer.
-        auto ri = root[i];
-        if (ri == -ns[mi]) { // best layer
-          for (auto k=ptr[i]; k<ptr[i+1]; k++) {
+        auto li = label[i];
+        if (li == -sep_size_prev[ci]) { // best layer
+          auto khi = ptr[i+1];
+          for (auto k=ptr[i]; k<khi; k++) {
             auto j = ind[k];
-            if (elim[j]) continue;
-            if (root[j] == ri - 1) {
-              elim[i] = true;
-              perm[atomicAdd(nelim, 1)] = i;
+            if (eliminated[j]) continue;
+            if (label[j] == li - 1) {
+              eliminated[i] = true;
+              perm[atomicAdd(nr_eliminated, 1)] = i;
               return;
             }
           }
         }
-        if (ri == ns[mi]) { // best layer
-          for (auto k=ptr[i]; k<ptr[i+1]; k++) {
+        if (li == sep_size_prev[ci]) { // best layer
+          auto khi = ptr[i+1];
+          for (auto k=ptr[i]; k<khi; k++) {
             auto j = ind[k];
-            if (elim[j]) continue;
-            if (root[j] == ri + 1) {
-              elim[i] = true;
-              perm[atomicAdd(nelim, 1)] = i;
+            if (eliminated[j]) continue;
+            if (label[j] == li + 1) {
+              eliminated[i] = true;
+              perm[atomicAdd(nr_eliminated, 1)] = i;
               return;
             }
           }
@@ -333,12 +350,14 @@ namespace strumpack {
     };
 
     struct tuple_less_equal_ftor {
-      __device__ bool operator()(const thrust::tuple<int,int>& t) {
+      __device__ __forceinline__
+      bool operator()(const thrust::tuple<int,int>& t) {
         return thrust::get<0>(t) <= thrust::get<1>(t);
       }
     };
     struct tuple_equal_ftor {
-      __device__ bool operator()(const thrust::tuple<int,int>& t) {
+      __device__ __forceinline__
+      bool operator()(const thrust::tuple<int,int>& t) {
         return thrust::get<0>(t) == thrust::get<1>(t);
       }
     };
@@ -347,74 +366,122 @@ namespace strumpack {
     nd_bfs_device(int n, thrust::device_vector<integer>& ptr,
                   thrust::device_vector<integer>& ind,
                   thrust::device_vector<integer>& perm) {
-      thrust::device_vector<int> root(n), mask(n), dnc(1), nelim(1, 0),
-        d(n), old_ls(n), ls(n), sc(n+1), rc(n), ns2(n);
-      thrust::device_vector<bool> elim(n, false), running(1);
+      thrust::device_vector<int>
+        d_nr_comps(1),        // nr of connected components,
+                              // stored on device
+        nr_eliminated(1, 0),  // nr of already eliminated nodes
+        label(n),             // node label, as used in label
+                              // propagation breadth first search for
+                              // finding connected components, and in
+                              // the BFS to find the level sets
+        comp(n),              // number of the component for each node
+        degree(n),            // node degrees, used to find a new
+                              // peripheral node, which is a node in
+                              // the last level with the smallest
+                              // degree. Also used to store the
+                              // caridnalities of the levels
+        levels(n),            // number of levels in the level sets
+                              // (one value per component)
+        old_levels(n),        // previous number of leves in the level
+                              // sets (one value per component)
+        comp_start(n+1),      // start index of each component (one
+                              // value per component)
+        comp_root(n),         // root node for each node
+        sep_size_prev(n),     // size of the separator corresponding
+                              // to each level in the level set, where
+                              // the separator is the subset of nodes
+                              // in the level that are connected to
+                              // the previous level
+        sep_size_next(n);     // size of the separator corresponding
+                              // to each level in the level set, where
+                              // the separator is the subset of nodes
+                              // in the level that are connected to
+                              // the next level
+      thrust::device_vector<bool> eliminated(n, false), running(1);
       thrust::counting_iterator<int> iter(0);
-      auto p = [](auto& v) { return thrust::raw_pointer_cast(v.data()); };
+      auto p = [](auto& v) {
+        return thrust::raw_pointer_cast(v.data());
+      };
       auto run = [&iter,&n](const auto& f) {
-        thrust::for_each_n(thrust::device, iter, n, f); };
+        thrust::for_each_n(thrust::device, iter, n, f);
+      };
       // int lvl = 0;
       do {
-        // std::cout << "lvl: " << lvl++ << " nelim: " << nelim[0] << std::endl;
-        thrust::sequence(root.begin(), root.end());
-        do { // find all conn. components using label propagation BFS
+        // std::cout << "lvl: " << lvl++
+        //           << " nr_eliminated: " << nr_eliminated[0] << std::endl;
+        thrust::sequence(label.begin(), label.end());
+        do {
+          // find all conn-comps using label prop BFS
           running[0] = false;
           run(bfs_label_prop_ftor<integer>
-              (p(ptr), p(ind), p(elim), p(root), p(running)));
+              (p(ptr), p(ind), p(eliminated), p(label), p(running)));
         } while (running[0]);
-        // count components. TODO thrust::reduce_by_key (after sort)?
-        dnc[0] = 0;
-        run(find_components_ftor(p(dnc), p(elim), p(root), p(mask), p(rc)));
-        int nc = dnc[0];
-        run(assign_component_ftor(p(elim), p(root), p(mask)));
-        thrust::fill_n(sc.begin(), nc+1, 0);
-        run(count_components_ftor(p(elim), p(mask), p(sc)));
-        thrust::exclusive_scan(sc.begin(), sc.begin()+nc+1, sc.begin());
-        thrust::fill_n(root.begin(), n, n);
-        thrust::scatter(sc.begin(), sc.begin()+nc, rc.begin(), root.begin());
-        thrust::fill_n(old_ls.begin(), nc, 1);
+        d_nr_comps[0] = 0;
+        run(find_components_ftor
+            (p(d_nr_comps), p(eliminated), p(label),
+             p(comp), p(comp_root)));
+        int nr_comps = d_nr_comps[0];
+        thrust::gather // comp[i] = comp[label[i]];
+          (label.begin(), label.end(), comp.begin(), comp.begin());
+        thrust::fill_n(comp_start.begin(), nr_comps+1, 0);
+        run(count_comps_ftor(p(eliminated), p(comp), p(comp_start)));
+        thrust::exclusive_scan
+          (comp_start.begin(), comp_start.begin()+nr_comps+1,
+           comp_start.begin());
+        thrust::fill_n(label.begin(), n, n);
+        thrust::fill_n(old_levels.begin(), nr_comps, 1);
         do {
+          thrust::scatter // label[comp_root[i]] = comp_start[i]
+            (comp_start.begin(), comp_start.begin()+nr_comps,
+             comp_root.begin(), label.begin());
           int it = 0;
-          do { // BFS from the root node of each component
+          do {
+            // BFS from the root node of each component
             running[0] = false;
             run(bfs_layer_ftor<integer>
-                (n, it++, p(ptr), p(ind), p(elim), p(root),
-                 p(mask), p(sc), p(running)));
-          } while (running[0]); // repeat until BFS for each component is done
-          thrust::fill_n(ls.begin(), nc, 1);
-          run(count_layers_ftor(n, p(elim), p(root), p(mask), p(ls), p(sc)));
+                (n, it++, p(ptr), p(ind), p(eliminated), p(label),
+                 p(comp), p(comp_start), p(running)));
+            // repeat until BFS for each component is done
+          } while (running[0]);
+          thrust::fill_n(levels.begin(), nr_comps, 1);
+          run(count_layers_ftor
+              (n, p(eliminated), p(label), p(comp),
+               p(levels), p(comp_start)));
           if (thrust::all_of
               (thrust::make_zip_iterator
-               (thrust::make_tuple(ls.begin(), old_ls.begin())),
+               (thrust::make_tuple(levels.begin(), old_levels.begin())),
                thrust::make_zip_iterator
-               (thrust::make_tuple(ls.begin()+nc, old_ls.begin()+nc)),
-               tuple_less_equal_ftor())) break;
-          thrust::fill_n(d.begin(), nc, n);
-          run(find_peripheral_node_1_ftor<integer>
-              (p(ptr), p(ind), p(elim), p(root), p(mask),
-               p(ls), p(old_ls), p(d), p(sc)));
-          run(find_peripheral_node_2_ftor<integer>
-              (p(ptr), p(ind), p(elim), p(root), p(mask),
-               p(ls), p(old_ls), p(d), p(sc), p(rc)));
-          old_ls = ls;
-          thrust::fill_n(root.begin(), n, n);
-          thrust::scatter(sc.begin(), sc.begin()+nc, rc.begin(), root.begin());
-        } while (1); // repeat BFS with new start nodes
-        auto& ns = rc;
-        thrust::fill_n(d.begin(), n, 0);
-        thrust::fill_n(ns.begin(), n, 0);
-        thrust::fill_n(ns2.begin(), n, 0);
+               (thrust::make_tuple(levels.begin()+nr_comps,
+                                   old_levels.begin()+nr_comps)),
+               tuple_less_equal_ftor()))
+            break;
+          thrust::fill_n(degree.begin(), nr_comps, n);
+          run(peripheral_node_1_ftor<integer>
+              (p(ptr), p(ind), p(eliminated), p(label), p(comp),
+               p(levels), p(old_levels), p(degree), p(comp_start)));
+          run(peripheral_node_2_ftor<integer>
+              (p(ptr), p(ind), p(eliminated), p(label), p(comp),
+               p(levels), p(old_levels), p(degree),
+               p(comp_start), p(comp_root)));
+          old_levels = levels;
+          thrust::fill_n(label.begin(), n, n);
+          // repeat BFS with new start nodes
+        } while (1);
+        // auto& sep_size_prev = comp_root;
+        thrust::fill_n(degree.begin(), n, 0);
+        thrust::fill_n(sep_size_prev.begin(), n, 0);
+        thrust::fill_n(sep_size_next.begin(), n, 0);
         run(cardinalities_ftor<integer>
-            (p(ptr), p(ind), p(elim), p(root), p(mask),
-             p(ls), p(sc), p(d), p(ns), p(ns2)));
-        run(minimize_separator_ftor<integer>
-            (p(ptr), p(ind), p(elim), p(root), p(mask),
-             p(ls), p(sc), p(ns), p(ns2), p(d)));
-        run(eliminate_separators_ftor<integer>
-            (p(ptr), p(ind), p(elim), p(root), p(mask),
-             p(ls), p(ns), p(nelim), p(perm)));
-      } while (nelim[0] < n);
+            (p(ptr), p(ind), p(eliminated), p(label), p(comp),
+             p(levels), p(comp_start), p(degree),
+             p(sep_size_prev), p(sep_size_next)));
+        run(minimize_sep_ftor<integer>
+            (p(ptr), p(ind), p(eliminated), p(label), p(comp), p(levels),
+             p(comp_start), p(degree), p(sep_size_prev), p(sep_size_next)));
+        run(eliminate_sep_ftor<integer>
+            (p(ptr), p(ind), p(eliminated), p(label), p(comp),
+             p(levels), p(sep_size_prev), p(nr_eliminated), p(perm)));
+      } while (nr_eliminated[0] < n);
       thrust::reverse(perm.begin(), perm.end());
     }
 
@@ -433,13 +500,13 @@ namespace strumpack {
     }
 
     template SeparatorTree<int>
-    nd_bfs_cuda(int neqns, int* ptr, int* ind,
+    nd_bfs_cuda(int n, int* ptr, int* ind,
                 std::vector<int>& perm, std::vector<int>& iperm);
     template SeparatorTree<long int>
-    nd_bfs_cuda(long int neqns, long int* ptr, long int* ind,
+    nd_bfs_cuda(long int n, long int* ptr, long int* ind,
                 std::vector<long int>& perm, std::vector<long int>& iperm);
     template SeparatorTree<long long int>
-    nd_bfs_cuda(long long int neqns, long long int* ptr, long long int* ind,
+    nd_bfs_cuda(long long int n, long long int* ptr, long long int* ind,
                 std::vector<long long int>& perm,
                 std::vector<long long int>& iperm);
 
