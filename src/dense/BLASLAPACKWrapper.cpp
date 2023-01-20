@@ -282,14 +282,14 @@ namespace strumpack {
         (strumpack_blas_int* n, std::complex<double>* a, strumpack_blas_int* lda, strumpack_blas_int* k1, strumpack_blas_int* k2,
          const strumpack_blas_int* ipiv, strumpack_blas_int* incx);
 
-      void STRUMPACK_FC_GLOBAL(slapmr,SLAPMR)
+      void STRUMPACK_FC_GLOBAL(myslapmr,MYSLAPMR)
         (strumpack_blas_int* fwd, strumpack_blas_int* m, strumpack_blas_int* n, float* a, strumpack_blas_int* lda, const strumpack_blas_int* ipiv);
-      void STRUMPACK_FC_GLOBAL(dlapmr,DLAPMR)
+      void STRUMPACK_FC_GLOBAL(mydlapmr,MYDLAPMR)
         (strumpack_blas_int* fwd, strumpack_blas_int* m, strumpack_blas_int* n, double* a, strumpack_blas_int* lda, const strumpack_blas_int* ipiv);
-      void STRUMPACK_FC_GLOBAL(clapmr,CLAPMR)
+      void STRUMPACK_FC_GLOBAL(myclapmr,MYCLAPMR)
         (strumpack_blas_int* fwd, strumpack_blas_int* m, strumpack_blas_int* n, std::complex<float>* a, strumpack_blas_int* lda,
          const strumpack_blas_int* ipiv);
-      void STRUMPACK_FC_GLOBAL(zlapmr,ZLAPMR)
+      void STRUMPACK_FC_GLOBAL(myzlapmr,MYZLAPMR)
         (strumpack_blas_int* fwd, strumpack_blas_int* m, strumpack_blas_int* n, std::complex<double>* a, strumpack_blas_int* lda,
          const strumpack_blas_int* ipiv);
 
@@ -995,46 +995,46 @@ namespace strumpack {
     void lapmr(bool fwd, int m, int n, float* a, int lda, const int* ipiv) {
       strumpack_blas_int forward = fwd ? 1 : 0, m_ = m, n_ = n, lda_ = lda;
       std::vector<strumpack_blas_int> ipiv_(ipiv, ipiv+m);
-      STRUMPACK_FC_GLOBAL(slapmr,SLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
+      STRUMPACK_FC_GLOBAL(myslapmr,MYSLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
       STRUMPACK_BYTES(4*lapmr_moves(n,m));
     }
     void lapmr(bool fwd, int m, int n, double* a, int lda, const int* ipiv) {
       strumpack_blas_int forward = fwd ? 1 : 0, m_ = m, n_ = n, lda_ = lda;
       std::vector<strumpack_blas_int> ipiv_(ipiv, ipiv+m);
-      STRUMPACK_FC_GLOBAL(dlapmr,DLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
+      STRUMPACK_FC_GLOBAL(mydlapmr,MYDLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
       STRUMPACK_BYTES(8*lapmr_moves(n,m));
     }
     void lapmr(bool fwd, int m, int n, std::complex<float>* a, int lda, const int* ipiv) {
       strumpack_blas_int forward = fwd ? 1 : 0, m_ = m, n_ = n, lda_ = lda;
       std::vector<strumpack_blas_int> ipiv_(ipiv, ipiv+m);
-      STRUMPACK_FC_GLOBAL(clapmr,CLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
+      STRUMPACK_FC_GLOBAL(myclapmr,MYCLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
       STRUMPACK_BYTES(2*4*lapmr_moves(n,m));
     }
     void lapmr(bool fwd, int m, int n, std::complex<double>* a, int lda, const int* ipiv) {
       strumpack_blas_int forward = fwd ? 1 : 0, m_ = m, n_ = n, lda_ = lda;
       std::vector<strumpack_blas_int> ipiv_(ipiv, ipiv+m);
-      STRUMPACK_FC_GLOBAL(zlapmr,ZLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
+      STRUMPACK_FC_GLOBAL(myzlapmr,MYZLAPMR)(&forward, &m_, &n_, a, &lda_, ipiv_.data());
       STRUMPACK_BYTES(2*8*lapmr_moves(n,m));
     }
 #else
     void lapmr(bool fwd, int m, int n, float* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      STRUMPACK_FC_GLOBAL(slapmr,SLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(myslapmr,MYSLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(4*lapmr_moves(n,m));
     }
     void lapmr(bool fwd, int m, int n, double* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      STRUMPACK_FC_GLOBAL(dlapmr,DLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(mydlapmr,MYDLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(8*lapmr_moves(n,m));
     }
     void lapmr(bool fwd, int m, int n, std::complex<float>* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      STRUMPACK_FC_GLOBAL(clapmr,CLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(myclapmr,MYCLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(2*4*lapmr_moves(n,m));
     }
     void lapmr(bool fwd, int m, int n, std::complex<double>* a, int lda, const int* ipiv) {
       int forward = fwd ? 1 : 0;
-      STRUMPACK_FC_GLOBAL(zlapmr,ZLAPMR)(&forward, &m, &n, a, &lda, ipiv);
+      STRUMPACK_FC_GLOBAL(myzlapmr,MYZLAPMR)(&forward, &m, &n, a, &lda, ipiv);
       STRUMPACK_BYTES(2*8*lapmr_moves(n,m));
     }
 #endif
