@@ -528,30 +528,15 @@ if(TPL_ENABLE_COMBBLAS)
   endif()
 endif()
 
-
-# TODO PIC
-# TODO libatomic?
-
-
 if(STRUMPACK_USE_HIP)
-  set_source_files_properties(
-    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-    src/dense/HIPWrapper.hip.cpp
-    PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
-  if(BUILD_SHARED_LIBS)
-    set(STATIC_OR_SHARED SHARED)
-  else()
-    set(STATIC_OR_SHARED STATIC)
-  endif()
-  hip_add_library(
+  add_library(
     strumpack
     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-    src/dense/HIPWrapper.hip.cpp
-    ${STATIC_OR_SHARED})
+    src/dense/HIPWrapper.hip.cpp)
+    target_link_libraries(strumpack PUBLIC hip::device)
 else()
   add_library(strumpack "")
 endif()
-
 
 # this is to fix a link issue for the fortran example when compiling
 # with clang
