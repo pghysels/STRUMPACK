@@ -653,7 +653,7 @@ namespace strumpack {
                              grid, block, 0, 0, nrhs, by, dat_+f);
         }
       }
-      hipDeviceSynchronize();
+      synchronize();
       for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
         int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
         for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
