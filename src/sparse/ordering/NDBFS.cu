@@ -34,13 +34,22 @@
 #include <thrust/functional.h>
 #include <thrust/gather.h>
 #include <thrust/random/linear_congruential_engine.h>
-#include <thrust/random/linear_feedback_shift_engine.h>
 #include <thrust/random/uniform_int_distribution.h>
+#include <thrust/transform_scan.h>
+
+// #include <cub/cub.cuh>
+
+#include <assert.h>
 
 #include "ANDSparspak.hpp"
 
 namespace strumpack {
   namespace ordering {
+
+    // For subgraphs with fewer than MD_SWITCH nodes, use a minimum
+    // degree ordering. Should be a multiple of 8*sizeof(unsigned int)
+    // == 32.
+    const int MD_SWITCH = 128;
 
     template<typename integer> struct bfs_label_prop_ftor {
       integer *ptr, *ind;
@@ -53,20 +62,22 @@ namespace strumpack {
           label(label_), running(running_) {}
       __device__ void operator()(int i) {
         if (eliminated[i]) return;
-        auto khi = ptr[i+1];
-        for (auto k=ptr[i]; k<khi; k++) {
+        bool run = false;
+        for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
           auto j = ind[k];
           if (eliminated[j]) continue;
           if (label[j] < label[i]) {
             label[i] = label[j];
-            // TODO atomicExch?
-            *running = true;
+            run = true;
           }
         }
+        if (run && !*running)
+          *running = true;
       }
     };
 
     // #define FRONT_BFS
+    // #define BFS_DEST
 #if defined(FRONT_BFS)
     template<typename integer> struct bfs_layer_front_ftor {
       integer *ptr, *ind;
@@ -82,12 +93,42 @@ namespace strumpack {
       __device__ void operator()(int fi) {
         auto i = current_front[fi];
         auto li1 = label[i]+1;
-        auto khi = ptr[i+1];
-        for (auto k=ptr[i]; k<khi; k++) {
+        for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
           auto j = ind[k];
           if (eliminated[j]) continue;
           if (atomicCAS(label+j, n, li1) == n)
             next_front[atomicAdd(next_front_size, 1)] = j;
+        }
+      }
+    };
+#else
+
+#if defined(BFS_DEST)
+    template<typename integer> struct bfs_layer_dest_ftor {
+      integer *ptr, *ind;
+      bool *eliminated, *running;
+      int *label, *comp, *comp_start, n, it;
+      bfs_layer_dest_ftor(int n_, int it_, integer* ptr_, integer* ind_,
+                          bool* eliminated_, int* label_, int* comp_,
+                          int* comp_start_, bool* running_)
+        : n(n_), it(it_), ptr(ptr_), ind(ind_), eliminated(eliminated_),
+          label(label_), comp(comp_), comp_start(comp_start_),
+          running(running_) {}
+      __device__ void operator()(int i) {
+        if (eliminated[i]) return;
+        if (label[i] == n) { // unvisited
+          auto lprev = comp_start[comp[i]] + it;
+          for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
+            auto j = ind[k];
+            if (eliminated[j]) continue;
+            if (label[j] == lprev) {
+              label[i] = lprev + 1;
+              if (!*running) {
+                *running = true;
+                return;
+              }
+            }
+          }
         }
       }
     };
@@ -103,24 +144,33 @@ namespace strumpack {
           label(label_), comp(comp_), comp_start(comp_start_),
           running(running_) {}
       __device__ void operator()(int i) {
-        // TODO write from the destination instead of the source?
         if (eliminated[i]) return;
         auto li = label[i];
         if (li == comp_start[comp[i]] + it) {
           bool run = false;
-          auto khi = ptr[i+1];
-          for (auto k=ptr[i]; k<khi; k++) {
+          for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
             auto j = ind[k];
             if (eliminated[j]) continue;
+#if 1
             if (atomicCAS(label+j, n, li+1) == n)
               run = true;
+#else
+            if (atomicMin(label+j, li+1) != li+1) {
+              run = true;
+              for (auto k2=ptr[j], k2hi=ptr[j+1]; k2<k2hi; k2++) {
+                auto j2 = ind[k2];
+                if (!eliminated[j2])
+                  atomicMin(label+j2, li+2);
+              }
+            }
+#endif
           }
           if (run && !*running)
-            // TODO atomicExch ?
             *running = true;
         }
       }
     };
+#endif
 #endif
 
     struct find_comps_ftor {
@@ -150,6 +200,8 @@ namespace strumpack {
         if (!eliminated[i])
           atomicAdd(comp_size+comp[i], 1);
         else
+          // this is set so the eliminated nodes end up last in the
+          // sort used when generating random start node for BFS
           comp[i] = nr_comps;
       }
     };
@@ -158,8 +210,7 @@ namespace strumpack {
       int seed, *root, *start, *map;
       random_roots_ftor(int seed_, int* root_, int* start_, int* map_)
         : seed(seed_), root(root_), start(start_), map(map_) {}
-      __device__ //__forceinline__
-      void operator()(int i) {
+      __device__ void operator()(int i) {
         thrust::minstd_rand gen(seed);
         thrust::uniform_int_distribution<int>
           dist(start[i], start[i+1]-1);
@@ -188,14 +239,12 @@ namespace strumpack {
     template<typename integer> struct peripheral_node_1_ftor {
       integer *ptr, *ind;
       bool *eliminated;
-      int *label, *comp, *levels, *old_levels, *d, *comp_start;
+      int *label, *comp, *levels, *d, *comp_start;
       peripheral_node_1_ftor(integer* ptr_, integer* ind_,
                              bool* eliminated_, int* label_, int* comp_,
-                             int* levels_, int* old_levels_,
-                             int* d_, int* comp_start_)
+                             int* levels_, int* d_, int* comp_start_)
         : ptr(ptr_), ind(ind_), eliminated(eliminated_),
-          label(label_), comp(comp_),
-          levels(levels_), old_levels(old_levels_),
+          label(label_), comp(comp_), levels(levels_),
           d(d_), comp_start(comp_start_) {}
       __device__ void operator()(int i) {
         // find the node with the minimum degree in the last layer, for
@@ -205,12 +254,10 @@ namespace strumpack {
         if (eliminated[i]) return;
         auto ci = comp[i];
         auto nlvls = levels[ci];
-        if (nlvls <= old_levels[ci]) return;
         if (label[i] == comp_start[ci] + nlvls - 1) {
           // in the last layer
           int deg = 0;
-          auto khi = ptr[i+1];
-          for (auto k=ptr[i]; k<khi; k++)
+          for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++)
             if (!eliminated[ind[k]])
               deg++;
           atomicMin(d+ci, deg);
@@ -221,25 +268,22 @@ namespace strumpack {
     template<typename integer> struct peripheral_node_2_ftor {
       integer *ptr, *ind;
       bool *eliminated;
-      int *label, *comp, *levels, *old_levels,
-        *d, *comp_start, *comp_root;
+      int *label, *comp, *levels, *d, *comp_start, *comp_root;
       peripheral_node_2_ftor(integer* ptr_, integer* ind_,
                              bool* eliminated_, int* label_, int* comp_,
-                             int* levels_, int* old_levels_, int* d_,
-                             int* comp_start_, int* comp_root_)
+                             int* levels_, int* d_, int* comp_start_,
+                             int* comp_root_)
         : ptr(ptr_), ind(ind_), eliminated(eliminated_), label(label_),
-          comp(comp_), levels(levels_), old_levels(old_levels_), d(d_),
-          comp_start(comp_start_), comp_root(comp_root_) {}
+          comp(comp_), levels(levels_), d(d_), comp_start(comp_start_),
+          comp_root(comp_root_) {}
       __device__ void operator()(int i) {
         if (eliminated[i]) return;
         auto ci = comp[i];
         auto nlvls = levels[ci];
-        if (nlvls <= old_levels[ci]) return;
         if (label[i] == comp_start[ci] + nlvls - 1) {
           // in the last layer
           int deg = 0;
-          auto khi = ptr[i+1];
-          for (auto k=ptr[i]; k<khi; k++)
+          for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++)
             if (!eliminated[ind[k]])
               deg++;
           if (deg == d[ci])
@@ -251,11 +295,13 @@ namespace strumpack {
       }
     };
 
-    // Store layer cardinalities for the component starting at node i
-    // (== label[i]) at layer_size[i], and at layer_size[i+1] for the
-    // next layer, etc. Count nr of nodes in each separator, where a
-    // separator is all nodes in a layer that are also connected to
-    // the next layer, store result in sep_size[l] for level l.
+    /**
+     * Store layer cardinalities for the component starting at node i
+     * (== label[i]) at layer_size[i], and at layer_size[i+1] for the
+     * next layer, etc. Count nr of nodes in each separator, where a
+     * separator is all nodes in a layer that are also connected to
+     * the next layer, store result in sep_size[l] for level l.
+     */
     template<typename integer> struct cardinalities_ftor {
       integer *ptr, *ind;
       bool *eliminated;
@@ -279,8 +325,7 @@ namespace strumpack {
         atomicAdd(layer_size+li, 1);
         if (li == l0 || li == l0+nlvls-1) // ignore first/last
           return;
-        auto khi = ptr[i+1];
-        for (auto k=ptr[i]; k<khi; k++) {
+        for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
           auto j = ind[k];
           if (eliminated[j]) continue;
           if (label[j] == li + 1) {
@@ -343,30 +388,33 @@ namespace strumpack {
       integer *ptr, *ind, *perm;
       bool *eliminated;
       int *label, *comp, *levels, *sep_size, *nr_eliminated;
-      eliminate_sep_ftor(integer* ptr_, integer* ind_,
-                         bool* eliminated_, int* label_, int* comp_,
-                         int* levels_, int* sep_size_,
-                         int* nr_eliminated_, integer* perm_)
+      // *perm_off;
+      eliminate_sep_ftor(integer* ptr_, integer* ind_, bool* eliminated_,
+                         int* label_, int* comp_, int* levels_,
+                         int* sep_size_, int* nr_eliminated_,
+                         integer* perm_) //, int* perm_off_)
         : ptr(ptr_), ind(ind_), eliminated(eliminated_), label(label_),
           comp(comp_), levels(levels_), sep_size(sep_size_),
-          nr_eliminated(nr_eliminated_), perm(perm_) {}
+          nr_eliminated(nr_eliminated_),
+          perm(perm_) {} //, perm_off(perm_off_) {}
       __device__ void operator()(int i) {
         if (eliminated[i]) return;
-        auto ci = comp[i];
-        if (levels[ci] < 3) {
+        auto c = comp[i];
+        if (levels[c] < 3) {
           eliminated[i] = true;
           perm[atomicAdd(nr_eliminated, 1)] = i;
+          // perm[atomicAdd(perm_off+c, 1)] = i;
           return;
         }
         auto li = label[i];
-        if (li == sep_size[ci]) { // best layer
-          auto khi = ptr[i+1];
-          for (auto k=ptr[i]; k<khi; k++) {
+        if (li == sep_size[c]) { // best layer
+          for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
             auto j = ind[k];
             if (eliminated[j]) continue;
             if (label[j] == li + 1) {
               eliminated[i] = true;
               perm[atomicAdd(nr_eliminated, 1)] = i;
+              // perm[atomicAdd(perm_off+c, 1)] = i;
               return;
             }
           }
@@ -374,18 +422,153 @@ namespace strumpack {
       }
     };
 
+
+    /**
+     * Run minimum degree on graphs with up to NT nodes.  The ordering
+     * is written to perm+perm_off in reverse order.  This is called
+     * for different blocks c = blockIdx.x, blocks should have NT
+     * threads. l2g[comp_start[c],comp_star[c+1]) should have all
+     * indices of comp c. g2l is used as work space.
+     */
+    template<int NT, typename integer> __global__
+    void minimum_degree(integer* ptr, integer* ind, bool* eliminated,
+                        int* g2l, int* l2g, int* comp_start,
+                        integer* perm, int* perm_off) {
+      const int c = blockIdx.x;
+      const int c0 = comp_start[c];
+      const int n = comp_start[c+1] - c0;
+      if (n > NT) return;
+      perm += perm_off[c];
+      const int tid = threadIdx.x;
+      constexpr int BI = sizeof(unsigned int)*8; // bits per block
+      // x2 for the boundary nodes
+      constexpr int B = NT / BI;        // blocks per row
+      assert(BI*B == NT);
+      __shared__ unsigned int D[NT][B];
+      union atomic_int_int {
+        unsigned int ints[2];
+        long long int ulong;
+      };
+      __shared__ atomic_int_int min_idx_degree;
+      atomic_int_int idx_degree;
+      idx_degree.ints[0] = tid;
+      bool elim = tid >= n;
+      integer gi;
+      if (!elim) {
+        gi = l2g[c0+tid];
+        g2l[gi] = tid;
+      }
+      __syncthreads();
+      if (!elim) {
+#pragma unroll
+        for (int j=0; j<B; j++)
+          D[tid][j] = 0;
+        for (auto k=ptr[gi], khi=ptr[gi+1]; k<khi; k++) {
+          auto j = ind[k];
+          if (!eliminated[j]) {
+            auto lj = g2l[j];
+            D[tid][lj / BI] |= (1 << (lj % BI));
+          }
+        }
+      }
+      __syncthreads();
+
+      // TODO do this in parallel?
+      if (tid == 0) {
+        // also capture the boundary, see: "The Minimum Degree
+        // Ordering with Constraints", Joseph W. H. Liu.
+        // https://doi.org/10.1137/0910069 or section 2.8 in
+        // "Improving the Run Time and Quality of Nested Dissection
+        // Ordering", Bruce Hendrickson and Edward Rothberg.
+        // https://doi.org/10.1137/S1064827596300656
+        int nb = 0, bnodes[NT] = {};
+        for (int i=0; i<n; i++) {
+          auto ggi = l2g[c0+i];
+          for (auto k=ptr[ggi], khi=ptr[ggi+1]; k<khi; k++) {
+            auto j = ind[k];
+            if (eliminated[j]) {
+              int lj = 0;
+              for (; lj<nb; lj++)
+                if (bnodes[lj] == j)
+                  break;
+              if (lj < NT) {
+                D[i][(NT + lj) / BI] |= (1 << (lj % BI));
+                if (lj == nb)
+                  bnodes[nb++] = j;
+              }
+            }
+          }
+        }
+      }
+      // __syncthreads();
+
+      // typedef cub::BlockReduce<long long int, NT> BlockReduce;
+      // __shared__ typename BlockReduce::TempStorage temp_storage;
+      for (int i=0; i<n; i++) {
+        if (tid == 0)
+          min_idx_degree.ints[0] = min_idx_degree.ints[1] = 3*NT;
+        __syncthreads();
+        if (!elim) {
+          idx_degree.ints[1] = 0;
+#pragma unroll
+          for (int j=0; j<B; j++)
+            idx_degree.ints[1] += __popc(D[tid][j]);
+          atomicMin(&min_idx_degree.ulong, idx_degree.ulong);
+        }
+        // min_idx_degree.ulong = BlockReduce(temp_storage).
+        //   Reduce(idx_degree.ulong, cub::Min());
+        __syncthreads();
+        int min_i = min_idx_degree.ints[0];
+        if (!elim) {
+          // Schur update / create a clique
+          if (D[tid][min_i / BI] & (1 << min_i % BI))
+#pragma unroll
+            for (int j=0; j<B; j++)
+              D[tid][j] |= D[min_i][j];
+          // clear column min_i
+          D[tid][min_i / BI] &= ~(1 << (min_i % BI));
+        }
+        __syncthreads();
+        if (!elim && tid == min_i) {
+          elim = true;
+          // order is reversed
+          perm[n-1-i] = gi;
+          eliminated[gi] = true;
+        }
+      }
+    }
+
     struct tuple_less_equal_ftor {
       __device__ __forceinline__
-      bool operator()(const thrust::tuple<int,int>& t) {
-        return thrust::get<0>(t) <= thrust::get<1>(t);
-      }
+      bool operator()(const thrust::tuple<int,int>& t)
+      { return thrust::get<0>(t) <= thrust::get<1>(t); }
     };
     struct tuple_equal_ftor {
       __device__ __forceinline__
-      bool operator()(const thrust::tuple<int,int>& t) {
-        return thrust::get<0>(t) == thrust::get<1>(t);
-      }
+      bool operator()(const thrust::tuple<int,int>& t)
+      { return thrust::get<0>(t) == thrust::get<1>(t); }
     };
+    struct larger_to_zero_ftor {
+      int v;
+      larger_to_zero_ftor(int v_) : v(v_) {}
+      __device__ __forceinline__ int operator()(int a)
+      { return a > v ? 0 : a; }
+    };
+    struct less_equal_to_zero_ftor {
+      int v;
+      less_equal_to_zero_ftor(int v_) : v(v_) {}
+      __device__ __forceinline__ int operator()(int a)
+      { return a <= v ? 0 : a; }
+    };
+
+    template<typename T>
+    bool less_equal_n(int n, const T& a, const T& b) {
+      return thrust::all_of
+        (thrust::make_zip_iterator(thrust::make_tuple(a.begin(), b.begin())),
+         thrust::make_zip_iterator(thrust::make_tuple(a.begin()+n, b.begin()+n)),
+         tuple_less_equal_ftor());
+    }
+
 
     template<typename integer> void
     nd_bfs_device(int n, thrust::device_vector<integer>& ptr,
@@ -429,11 +612,9 @@ namespace strumpack {
                               // component
 #if defined(FRONT_BFS)
       thrust::device_vector<int>
-        current_front(n),
-        next_front(n),
-        next_front_size(1, 0);
+        current_front(n), next_front(n), next_front_size(1, 0);
 #endif
-        thrust::device_vector<float>
+      thrust::device_vector<float>
         min_norm_sep(n);      // the minimal normalized separator
                               // value, for each component
       thrust::device_vector<bool>
@@ -462,20 +643,13 @@ namespace strumpack {
         } while (running[0]);
         d_nr_comps[0] = 0;
         run(find_comps_ftor
-            (p(d_nr_comps), p(eliminated), p(label),
-             p(comp), p(comp_root)));
+            (p(d_nr_comps), p(eliminated), p(label), p(comp), p(comp_root)));
         int nr_comps = d_nr_comps[0];
         thrust::gather // comp[i] = comp[label[i]];
           (label.begin(), label.end(), comp.begin(), comp.begin());
         thrust::fill_n(comp_start.begin(), nr_comps+1, 0);
-        run(count_comps_ftor(p(eliminated), nr_comps, p(comp), p(comp_start)));
-        thrust::exclusive_scan
-          (comp_start.begin(), comp_start.begin()+nr_comps+1,
-           comp_start.begin());
-        thrust::fill_n(min_norm_sep.begin(), nr_comps,
-                       std::numeric_limits<float>::max());
-
-        // TODO eliminate small components with minimum degree
+        run(count_comps_ftor
+            (p(eliminated), nr_comps, p(comp), p(comp_start)));
 
         auto find_level_sets = [&](thrust::device_vector<int>& roots) {
           thrust::fill_n(label.begin(), n, n);
@@ -498,22 +672,85 @@ namespace strumpack {
             // repeat until BFS for each component is done
           }
 #else
+#if defined(BFS_DEST)
+          int it = 0;
+          do {
+            // BFS from the root node of each component
+            running[0] = false;
+            run(bfs_layer_dest_ftor<integer>
+                (n, it++, p(ptr), p(ind), p(eliminated), p(label),
+                 p(comp), p(comp_start), p(running)));
+            // repeat until BFS for each component is done
+          } while (running[0]);
+#else
           int it = 0;
           do {
             // BFS from the root node of each component
             running[0] = false;
             run(bfs_layer_ftor<integer>
-                (n, it++, p(ptr), p(ind), p(eliminated), p(label),
+                (n, it, p(ptr), p(ind), p(eliminated), p(label),
                  p(comp), p(comp_start), p(running)));
+            it += 1;
             // repeat until BFS for each component is done
           } while (running[0]);
+#endif
 #endif
           thrust::fill_n(levels.begin(), nr_comps, 1);
           run(count_layers_ftor
               (n, p(eliminated), p(label), p(comp),
                p(levels), p(comp_start)));
         };
-        for (int rep=0; rep<3; rep++) {
+
+        auto nr_elim_MD = (MD_SWITCH == 0) ? 0 :
+          thrust::transform_reduce
+          (comp_start.begin(), comp_start.begin()+nr_comps,
+           larger_to_zero_ftor(MD_SWITCH), 0, thrust::plus<int>());
+        if (nr_elim_MD) {
+          auto& perm_off = sep_level;
+          thrust::transform_exclusive_scan
+            (comp_start.begin(), comp_start.begin()+nr_comps,
+             perm_off.begin(), larger_to_zero_ftor(MD_SWITCH),
+             0, thrust::plus<int>());
+          thrust::exclusive_scan
+            (comp_start.begin(), comp_start.begin()+nr_comps+1,
+             comp_start.begin());
+
+          // RCM ordering for tie breaking in minimum degree
+          thrust::fill_n(old_levels.begin(), nr_comps, 1);
+          do {
+            find_level_sets(comp_root);
+            if (less_equal_n(nr_comps, levels, old_levels))
+              break;
+            thrust::fill_n(degree.begin(), nr_comps, n);
+            run(peripheral_node_1_ftor<integer>
+                (p(ptr), p(ind), p(eliminated), p(label), p(comp),
+                 p(levels), p(degree), p(comp_start)));
+            run(peripheral_node_2_ftor<integer>
+                (p(ptr), p(ind), p(eliminated), p(label), p(comp),
+                 p(levels), p(degree), p(comp_start), p(comp_root)));
+            std::swap(old_levels, levels);
+          } while (1);
+          thrust::sequence(degree.begin(), degree.end());
+          // order based on the levels (levels in comp c+1 are number
+          // higher than in comp c), and by using stable, preserve
+          // natural ordering in the levels
+          thrust::stable_sort_by_key
+            (label.begin(), label.end(), degree.begin());
+          auto nel = nr_eliminated[0];
+          minimum_degree<MD_SWITCH,integer><<<nr_comps,MD_SWITCH>>>
+            (p(ptr), p(ind), p(eliminated), p(label), p(degree),
+             p(comp_start), p(perm)+nel, p(perm_off));
+          if (nel + nr_elim_MD == n)
+            break;
+          nr_eliminated[0] = nel + nr_elim_MD;
+        } else
+          thrust::exclusive_scan
+            (comp_start.begin(), comp_start.begin()+nr_comps+1,
+             comp_start.begin());
+
+        thrust::fill_n(min_norm_sep.begin(), nr_comps,
+                       std::numeric_limits<float>::max());
+        for (int rep=0; rep<1; rep++) {
           // find level sets with different random initial nodes
           if (rep > 0) {
             thrust::copy_n(comp.begin(), n, label.begin());
@@ -521,8 +758,8 @@ namespace strumpack {
             thrust::sort_by_key(label.begin(), label.end(), degree.begin());
             thrust::for_each_n
               (thrust::device, thrust::counting_iterator<int>(0), nr_comps,
-               random_roots_ftor
-               (rng(), p(comp_root), p(comp_start), p(degree)));
+               random_roots_ftor(rng(), p(comp_root), p(comp_start),
+                                 p(degree)));
           }
           thrust::fill_n(old_levels.begin(), nr_comps, 1);
           do {
@@ -537,29 +774,32 @@ namespace strumpack {
                 (p(ptr), p(ind), p(eliminated), p(label), p(comp), p(levels),
                  p(comp_start), p(degree), p(sep_size), p(comp_root),
                  p(comp_root_opt), p(sep_level), p(min_norm_sep)));
-            if (thrust::all_of
-                (thrust::make_zip_iterator
-                 (thrust::make_tuple(levels.begin(), old_levels.begin())),
-                 thrust::make_zip_iterator
-                 (thrust::make_tuple(levels.begin()+nr_comps,
-                                     old_levels.begin()+nr_comps)),
-                 tuple_less_equal_ftor()))
+            if (less_equal_n(nr_comps, levels, old_levels))
               break;
             thrust::fill_n(degree.begin(), nr_comps, n);
             run(peripheral_node_1_ftor<integer>
                 (p(ptr), p(ind), p(eliminated), p(label), p(comp),
-                 p(levels), p(old_levels), p(degree), p(comp_start)));
+                 p(levels), p(degree), p(comp_start)));
             run(peripheral_node_2_ftor<integer>
                 (p(ptr), p(ind), p(eliminated), p(label), p(comp),
-                 p(levels), p(old_levels), p(degree),
-                 p(comp_start), p(comp_root)));
-            old_levels = levels;
+                 p(levels), p(degree), p(comp_start), p(comp_root)));
+            std::swap(old_levels, levels);
             // repeat level set BFS with new start nodes, so that the
             // start nodes converge to peripheral nodes of the
             // different components
           } while (1);
         }
+        if (nr_eliminated[0] == n) break;
         find_level_sets(comp_root_opt);
+        // TODO use offsets for perm, so that separators are ordered
+        // consecutively?
+        // TODO wrong, this is not the size of the separator?!
+        // use sep_size[sep_level]
+        // auto& perm_off = comp_root;
+        //   thrust::transform_exclusive_scan
+        //     (comp_start.begin(), comp_start.begin()+nr_comps,
+        //      perm_off.begin(), less_equal_to_zero_ftor(MD_SWITCH),
+        //      0, thrust::plus<int>());
         run(eliminate_sep_ftor<integer>
             (p(ptr), p(ind), p(eliminated), p(label), p(comp),
              p(levels), p(sep_level), p(nr_eliminated), p(perm)));
