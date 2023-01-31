@@ -336,6 +336,7 @@ namespace strumpack {
       }
     };
 
+    // TODO only launch once per component
     template<typename integer> struct minimize_sep_ftor {
       integer *ptr, *ind;
       bool *eliminated;
@@ -358,8 +359,13 @@ namespace strumpack {
         if (eliminated[i]) return;
         auto ci = comp[i];
         auto nlvls = levels[ci];
-        if (nlvls < 3 || label[i] != comp_start[ci]) return;
+        if (label[i] != comp_start[ci])
+          return;
         // I'm the root of this component
+        if (nlvls < 3) {
+          comp_root_opt[ci] = comp_root[ci];
+          return;
+        }
         auto c0 = comp_start[ci];
         auto cA = layer_size[c0];
         auto cB = comp_start[ci+1] - c0 - cA;
@@ -384,37 +390,30 @@ namespace strumpack {
       }
     };
 
-    template<typename integer> struct eliminate_sep_ftor {
+    template<typename integer> struct separator_offset_ftor {
       integer *ptr, *ind, *perm;
       bool *eliminated;
-      int *label, *comp, *levels, *sep_size, *nr_eliminated;
-      // *perm_off;
-      eliminate_sep_ftor(integer* ptr_, integer* ind_, bool* eliminated_,
-                         int* label_, int* comp_, int* levels_,
-                         int* sep_size_, int* nr_eliminated_,
-                         integer* perm_) //, int* perm_off_)
+      int *label, *comp, *levels, *sep_level, *perm_off;
+      separator_offset_ftor(integer* ptr_, integer* ind_, bool* eliminated_,
+                            int* label_, int* comp_, int* levels_,
+                            int* sep_level_, int* perm_off_)
         : ptr(ptr_), ind(ind_), eliminated(eliminated_), label(label_),
-          comp(comp_), levels(levels_), sep_size(sep_size_),
-          nr_eliminated(nr_eliminated_),
-          perm(perm_) {} //, perm_off(perm_off_) {}
+          comp(comp_), levels(levels_), sep_level(sep_level_),
+          perm_off(perm_off_) {}
       __device__ void operator()(int i) {
         if (eliminated[i]) return;
         auto c = comp[i];
         if (levels[c] < 3) {
-          eliminated[i] = true;
-          perm[atomicAdd(nr_eliminated, 1)] = i;
-          // perm[atomicAdd(perm_off+c, 1)] = i;
+          atomicAdd(perm_off+c, 1);
           return;
         }
         auto li = label[i];
-        if (li == sep_size[c]) { // best layer
+        if (li == sep_level[c]) { // best layer
           for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
             auto j = ind[k];
             if (eliminated[j]) continue;
             if (label[j] == li + 1) {
-              eliminated[i] = true;
-              perm[atomicAdd(nr_eliminated, 1)] = i;
-              // perm[atomicAdd(perm_off+c, 1)] = i;
+              atomicAdd(perm_off+c, 1);
               return;
             }
           }
@@ -422,6 +421,38 @@ namespace strumpack {
       }
     };
 
+    template<typename integer> struct eliminate_sep_ftor {
+      integer *ptr, *ind, *perm;
+      bool *eliminated;
+      int *label, *comp, *levels, *sep_level, *perm_off;
+      eliminate_sep_ftor(integer* ptr_, integer* ind_, bool* eliminated_,
+                         int* label_, int* comp_, int* levels_,
+                         int* sep_level_, integer* perm_, int* perm_off_)
+        : ptr(ptr_), ind(ind_), eliminated(eliminated_), label(label_),
+          comp(comp_), levels(levels_), sep_level(sep_level_),
+          perm(perm_), perm_off(perm_off_) {}
+      __device__ void operator()(int i) {
+        if (eliminated[i]) return;
+        auto c = comp[i];
+        if (levels[c] < 3) {
+          eliminated[i] = true;
+          perm[atomicAdd(perm_off+c, 1)] = i;
+          return;
+        }
+        auto li = label[i];
+        if (li == sep_level[c]) { // best layer
+          for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
+            auto j = ind[k];
+            if (eliminated[j]) continue;
+            if (label[j] == li + 1) {
+              eliminated[i] = true;
+              perm[atomicAdd(perm_off+c, 1)] = i;
+              return;
+            }
+          }
+        }
+      }
+    };
 
     /**
      * Run minimum degree on graphs with up to NT nodes.  The ordering
@@ -442,7 +473,7 @@ namespace strumpack {
       const int tid = threadIdx.x;
       constexpr int BI = sizeof(unsigned int)*8; // bits per block
       // x2 for the boundary nodes
-      constexpr int B = NT / BI;        // blocks per row
+      constexpr int B = 2 * NT / BI;        // blocks per row
       assert(BI*B == NT);
       __shared__ unsigned int D[NT][B];
       union atomic_int_int {
@@ -750,7 +781,7 @@ namespace strumpack {
 
         thrust::fill_n(min_norm_sep.begin(), nr_comps,
                        std::numeric_limits<float>::max());
-        for (int rep=0; rep<1; rep++) {
+        for (int rep=0; rep<3; rep++) {
           // find level sets with different random initial nodes
           if (rep > 0) {
             thrust::copy_n(comp.begin(), n, label.begin());
@@ -791,18 +822,23 @@ namespace strumpack {
         }
         if (nr_eliminated[0] == n) break;
         find_level_sets(comp_root_opt);
-        // TODO use offsets for perm, so that separators are ordered
-        // consecutively?
-        // TODO wrong, this is not the size of the separator?!
-        // use sep_size[sep_level]
-        // auto& perm_off = comp_root;
-        //   thrust::transform_exclusive_scan
-        //     (comp_start.begin(), comp_start.begin()+nr_comps,
-        //      perm_off.begin(), less_equal_to_zero_ftor(MD_SWITCH),
-        //      0, thrust::plus<int>());
+        auto& perm_off = comp_root;
+        thrust::fill_n(perm_off.begin(), nr_comps, 0);
+        // TODO the offsets are sep_size[sep_level], but this didn't
+        // work due to the components with < 3 levels?
+        run(separator_offset_ftor
+            (p(ptr), p(ind), p(eliminated), p(label), p(comp),
+             p(levels), p(sep_level), p(perm_off)));
+        int nr_elim_sep = thrust::reduce
+          (perm_off.begin(), perm_off.begin()+nr_comps);
+        thrust::exclusive_scan
+          (perm_off.begin(), perm_off.begin()+nr_comps,
+           perm_off.begin(), 0, thrust::plus<int>());
+        int nel = nr_eliminated[0];
         run(eliminate_sep_ftor<integer>
             (p(ptr), p(ind), p(eliminated), p(label), p(comp),
-             p(levels), p(sep_level), p(nr_eliminated), p(perm)));
+             p(levels), p(sep_level), p(perm)+nel, p(perm_off)));
+        nr_eliminated[0] = nel + nr_elim_sep;
       } while (nr_eliminated[0] < n);
       thrust::reverse(perm.begin(), perm.end());
     }
