@@ -715,12 +715,12 @@ namespace strumpack {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (lchild_) {
       auto el = lchild_->multifrontal_factorization
-	(A, opts, etree_level+1, task_depth);
+        (A, opts, etree_level+1, task_depth);
       if (el != ReturnCode::SUCCESS) err_code = el;
     }
     if (rchild_) {
       auto er = rchild_->multifrontal_factorization
-	(A, opts, etree_level+1, task_depth);
+        (A, opts, etree_level+1, task_depth);
       if (er != ReturnCode::SUCCESS) err_code = er;
     }
 
