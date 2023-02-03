@@ -128,6 +128,27 @@ set(test_name "HSS_seq_21")
 add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 500 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 64 --hss_dd 4)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
 
+set(test_name "HSS_seq_22")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch Gaussian)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_23")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo chunk --hss_nnz0 2 --hss_nnz 2)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_24")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo chunk --hss_nnz0 4 --hss_nnz 4)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_25")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo perm --hss_nnz0 2 --hss_nnz 2)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_26")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo perm --hss_nnz0 4 --hss_nnz 4)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+
 set(test_name "BLR_seq_1")
 add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm RL)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")

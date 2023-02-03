@@ -29,6 +29,7 @@
 #define HSS_MATRIX_COMPRESS_HPP
 
 #include "misc/RandomWrapper.hpp"
+#include "HSS/HSSMatrix.sketch.hpp"
 
 namespace strumpack {
   namespace HSS {
@@ -36,16 +37,77 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const DenseM_t& A, const opts_t& opts) {
       AFunctor<scalar_t> afunc(A);
-      compress_original(afunc, afunc, opts);
+      if (opts.compression_sketch() == CompressionSketch::SJLT) {
+        bool chunk = opts.SJLT_algo() == SJLTAlgo::CHUNK;
+        if (opts.verbose())
+          std::cout << "# compressing with SJLT" << std::endl;
+        int d_old = 0, d = opts.d0() + opts.p(),
+          total_nnz = 0, nnz_cur = opts.nnz();
+        auto n = this->cols();
+        DenseM_t Rr, Rc, Sr, Sc;
+        SJLTGenerator<scalar_t,int> g;
+        SJLTMatrix<scalar_t,int> S(g, 0, n, 0, chunk);
+        WorkCompress<scalar_t> w;
+        while (!this->is_compressed()) {
+          Rr.resize(n, d);
+          Rc.resize(n, d);
+          Sr.resize(n, d);
+          Sc.resize(n, d);
+          DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
+          DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
+          DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
+          DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
+          if (d_old == 0) {
+            S.add_columns(d,opts.nnz0());
+            Rr_new.copy(S.SJLT_to_dense());
+            matrix_times_SJLT(A, S, Sr_new);
+            matrixT_times_SJLT(A, S, Sc_new);
+            total_nnz += opts.nnz0();
+          } else{
+            SJLTMatrix<scalar_t,int> temp
+              (S.get_g(), nnz_cur, n, d-d_old, chunk);
+            total_nnz += nnz_cur;
+            nnz_cur *= 2;
+            S.append_sjlt_matrix(temp);
+            Rr_new.copy(temp.SJLT_to_dense());
+            matrix_times_SJLT(A, temp, Sr_new);
+            matrixT_times_SJLT(A, temp, Sc_new);
+          }
+          Rc_new.copy(Rr_new);
+          if (opts.verbose())
+            std::cout << "# compressing with d = " << d-opts.p()
+                      << " + " << opts.p() << " (original)" << std::endl
+                      << "# nnz total = " << total_nnz << std::endl;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+          compress_recursive_original
+            (Rr, Rc, Sr, Sc, afunc, opts, w, d-d_old,
+             this->openmp_task_depth_);
+          if (!this->is_compressed()) {
+            d_old = d;
+            d = 2 * (d_old - opts.p()) + opts.p();
+          }
+        }
+        if (opts.verbose() &&
+            opts.compression_sketch() == CompressionSketch::SJLT)
+          std::cout << "# final length of row: " << d << std::endl
+                    << "# total nnz in each row: "
+                    << total_nnz << std::endl;
+      } else
+        compress_original(afunc, afunc, opts);
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_original
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
-      int d_old = 0, d = opts.d0() + opts.p();
+      int d_old = 0, d = opts.d0() + opts.p(), total_nnz = 0;
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-      if (!opts.user_defined_random())
+      SJLTGenerator<scalar_t,int> g;
+      bool chunk = opts.SJLT_algo() == SJLTAlgo::CHUNK;
+      SJLTMatrix<scalar_t,int> S(g, 0, n, 0, chunk);
+      if (!opts.user_defined_random() &&
+          opts.compression_sketch() == CompressionSketch::GAUSSIAN)
         rgen = random::make_random_generator<real_t>
           (opts.random_engine(), opts.random_distribution());
       WorkCompress<scalar_t> w;
@@ -57,17 +119,34 @@ namespace strumpack {
         DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
         DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
         if (!opts.user_defined_random()) {
-          Rr_new.random(*rgen);
-          STRUMPACK_RANDOM_FLOPS
-            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          if (opts.compression_sketch() == CompressionSketch::GAUSSIAN) {
+            Rr_new.random(*rgen);
+            STRUMPACK_RANDOM_FLOPS
+              (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          } else if (opts.compression_sketch() == CompressionSketch::SJLT) {
+            if (d_old == 0) {
+              S.add_columns(d, opts.nnz0());
+              Rr_new.copy(S.SJLT_to_dense());
+              total_nnz += opts.nnz0();
+            } else{
+              SJLTMatrix<scalar_t,int> temp
+                (S.get_g(), opts.nnz(), n, d-d_old, chunk);
+              S.append_sjlt_matrix(temp);
+              Rr_new.copy(temp.SJLT_to_dense());
+              total_nnz += opts.nnz();
+            }
+          }
           Rc_new.copy(Rr_new);
         }
         DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
         DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
-        if (opts.verbose())
+        if (opts.verbose()) {
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original)" << std::endl;
+          if (opts.compression_sketch() == CompressionSketch::SJLT)
+            std::cout << "# nnz total = " << total_nnz << std::endl;
+        }
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
@@ -78,23 +157,91 @@ namespace strumpack {
           d = 2 * (d_old - opts.p()) + opts.p();
         }
       }
+      if (opts.verbose() &&
+          opts.compression_sketch() == CompressionSketch::SJLT)
+        std::cout << "# final length of row: " << d << std::endl
+                  << "# total nnz in each row: "
+                  << total_nnz << std::endl;
     }
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_hard_restart
     (const DenseM_t& A, const opts_t& opts) {
       AFunctor<scalar_t> afunc(A);
-      compress_hard_restart(afunc, afunc, opts);
+      if (opts.compression_sketch() == CompressionSketch::SJLT) {
+        bool chunk = opts.SJLT_algo() == SJLTAlgo::CHUNK;
+        int d_old = 0, d = opts.d0() + opts.p(), total_nnz = opts.nnz0();
+        auto n = this->cols();
+        DenseM_t Rr, Rc, Sr, Sc, R2, Sr2, Sc2;
+        SJLTGenerator<scalar_t,int> g;
+        SJLTMatrix<scalar_t,int> S(g, 0, n, 0, chunk);
+        if (opts.verbose())
+          std::cout<< "# compressing with SJLT" << std::endl;
+        while (!this->is_compressed()) {
+          WorkCompress<scalar_t> w;
+          Rr = DenseM_t(n, d);
+          Rc = DenseM_t(n, d);
+          Sr = DenseM_t(n, d);
+          Sc = DenseM_t(n, d);
+          strumpack::copy(R2,  Rr, 0, 0);
+          strumpack::copy(R2,  Rc, 0, 0);
+          strumpack::copy(Sr2, Sr, 0, 0);
+          strumpack::copy(Sc2, Sc, 0, 0);
+          DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
+          DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
+          DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
+          DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
+          if (d_old == 0) {
+            S.add_columns(d, opts.nnz0());
+            Rr_new.copy(S.SJLT_to_dense());
+            matrix_times_SJLT(A, S, Sr_new);
+            matrixT_times_SJLT(A, S, Sc_new);
+          } else {
+            SJLTMatrix<scalar_t, int> temp
+              (S.get_g(), opts.nnz(), n, d-d_old, chunk);
+            S.append_sjlt_matrix(temp);
+            Rr_new.copy(temp.SJLT_to_dense());
+            total_nnz += opts.nnz();
+            matrix_times_SJLT(A, temp, Sr_new);
+            matrixT_times_SJLT(A, temp, Sc_new);
+          }
+          Rc_new.copy(Rr_new);
+          R2 = Rr; Sr2 = Sr; Sc2 = Sc;
+          if (opts.verbose())
+            std::cout << "# compressing with d = " << d-opts.p()
+                      << " + " << opts.p() << " (original, hard restart)"
+                      << std::endl
+                      << "# compressing with nnz = " << total_nnz << std::endl;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+          compress_recursive_original
+            (Rr, Rc, Sr, Sc, afunc, opts, w, d,
+             this->openmp_task_depth_);
+          if (!this->is_compressed()) {
+            d_old = d;
+            d = 2 * (d_old - opts.p()) + opts.p();
+            total_nnz += opts.nnz();
+            reset();
+          }
+        }
+        if (opts.verbose())
+          std::cout << "# Final length of row: " << d << std::endl
+                    << "total nnz in each row: "
+                    << total_nnz << std::endl;
+      } else
+        compress_hard_restart(afunc, afunc, opts);
     }
 
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compress_hard_restart
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
-      int d_old = 0, d = opts.d0() + opts.p();
+      int d_old = 0, d = opts.d0() + opts.p(), total_nnz = opts.nnz0();
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc, R2, Sr2, Sc2;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-      if (!opts.user_defined_random())
+      SJLTGenerator<scalar_t,int> g;
+      if (!opts.user_defined_random() &&
+          opts.compression_sketch() == CompressionSketch::GAUSSIAN)
         rgen = random::make_random_generator<real_t>
           (opts.random_engine(), opts.random_distribution());
       while (!this->is_compressed()) {
@@ -110,19 +257,27 @@ namespace strumpack {
         DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old);
         DenseMW_t Rc_new(n, d-d_old, Rc, 0, d_old);
         if (!opts.user_defined_random()) {
-          Rr_new.random(*rgen);
-          STRUMPACK_RANDOM_FLOPS
-            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          if (opts.compression_sketch() == CompressionSketch::GAUSSIAN) {
+            Rr_new.random(*rgen);
+            STRUMPACK_RANDOM_FLOPS
+              (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          }
+          if (opts.compression_sketch() == CompressionSketch::SJLT)
+            g.SJLTDenseSketch(Rr_new,  total_nnz);
           Rc_new.copy(Rr_new);
         }
         DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
         DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
         R2 = Rr; Sr2 = Sr; Sc2 = Sc;
-        if (opts.verbose())
+        if (opts.verbose()) {
           std::cout << "# compressing with d = " << d-opts.p()
                     << " + " << opts.p() << " (original, hard restart)"
                     << std::endl;
+          if (opts.compression_sketch() == CompressionSketch::SJLT)
+            std::cout << "# compressing with nnz = "
+                      << total_nnz << std::endl;
+        }
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_original
@@ -131,9 +286,15 @@ namespace strumpack {
         if (!this->is_compressed()) {
           d_old = d;
           d = 2 * (d_old - opts.p()) + opts.p();
+          total_nnz += opts.nnz();
           reset();
         }
       }
+      if (opts.verbose() &&
+          opts.compression_sketch() == CompressionSketch::SJLT)
+          std::cout << "# Final length of row: " << d << std::endl
+                    << "total nnz in each row: "
+                    << total_nnz << std::endl;
     }
 
     template<typename scalar_t> void
@@ -363,7 +524,8 @@ namespace strumpack {
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::compute_local_samples
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
-     WorkCompress<scalar_t>& w, int d0, int d, int depth) {
+     WorkCompress<scalar_t>& w, int d0, int d, int depth,
+     SJLTMatrix<scalar_t,int>* S) {
       TIMER_TIME(TaskType::COMPUTE_SAMPLES, 1, t_compute);
 #pragma omp task default(shared)                                        \
   if(depth < params::task_recursion_cutoff_level)                       \
@@ -371,12 +533,23 @@ namespace strumpack {
       {
         if (this->leaf()) {
           DenseMW_t wSr(this->rows(), d, Sr, w.offset.second, d0);
-          DenseMW_t wRr(this->rows(), d, Rr, w.offset.second, d0);
-          gemm(Trans::N, Trans::N, scalar_t(-1), D_, wRr,
-               scalar_t(1.), wSr, depth);
-          STRUMPACK_UPDATE_SAMPLE_FLOPS
-            (gemm_flops
-             (Trans::N, Trans::N, scalar_t(-1), D_, wRr, scalar_t(1.)));
+          //wSr = -D_*wRr + wSr
+          if (true) { // TODO fix performance issue with SJLT
+            //if (S == nullptr) {
+            DenseMW_t wRr(this->rows(), d, Rr, w.offset.second, d0);
+            TIMER_TIME(TaskType::RANDOM_SAMPLING, 1, t_compute);
+            gemm(Trans::N, Trans::N, scalar_t(-1), D_, wRr,
+                 scalar_t(1.), wSr, depth);
+            STRUMPACK_UPDATE_SAMPLE_FLOPS
+              (gemm_flops
+               (Trans::N, Trans::N, scalar_t(-1), D_, wRr, scalar_t(1.)));
+          } else {
+            // doing SJLT case here
+            // wSr = -D_ S(i:i+m,j:j+n) + wSr
+            matrix_times_SJLT
+              (D_, *S, wSr, this->rows(), d,w.offset.second, d0,
+               scalar_t(-1.), scalar_t(1.));
+          }
         } else {
           DenseMW_t wSr0(child(0)->U_rank(), d, Sr,
                          w.offset.second, d0);
@@ -411,11 +584,20 @@ namespace strumpack {
       {
         if (this->leaf()) {
           DenseMW_t wSc(this->rows(), d, Sc, w.offset.second, d0);
-          DenseMW_t wRc(this->rows(), d, Rc, w.offset.second, d0);
-          gemm(Trans::C, Trans::N, scalar_t(-1), D_, wRc,
-               scalar_t(1.), wSc, depth);
-          STRUMPACK_UPDATE_SAMPLE_FLOPS
-            (gemm_flops(Trans::C, Trans::N, scalar_t(-1), D_, wRc, scalar_t(1.)));
+          if (true) { // TODO fix performance issue with SJLT
+            //S == nullptr) {
+            DenseMW_t wRc(this->rows(), d, Rc, w.offset.second, d0);
+            TIMER_TIME(TaskType::RANDOM_SAMPLING, 1, t_compute);
+            gemm(Trans::C, Trans::N, scalar_t(-1), D_, wRc,
+                 scalar_t(1.), wSc, depth);
+            STRUMPACK_UPDATE_SAMPLE_FLOPS
+              (gemm_flops(Trans::C, Trans::N, scalar_t(-1), D_, wRc, scalar_t(1.)));
+          } else {
+            //wSr = -D_^* S(i:i+m,j:j+n) + wSr
+            matrixT_times_SJLT
+              (D_, *S, wSc, this->rows(), d, w.offset.second, d0,
+               scalar_t(-1.), scalar_t(1.));
+          }
         } else {
           DenseMW_t wSc0(child(0)->V_rank(), d, Sc, w.offset.second, d0);
           DenseMW_t wSc1(child(1)->V_rank(), d, Sc,
