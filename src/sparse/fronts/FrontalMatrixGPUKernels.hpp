@@ -107,7 +107,8 @@ namespace strumpack {
     bwd_block_batch(int, unsigned int, FrontData<T>*);
 
 
-    constexpr int align_max_struct() {
+    // constexpr
+    inline int align_max_struct() {
       auto m = sizeof(std::complex<double>);
       m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
       m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
