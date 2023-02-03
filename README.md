@@ -20,7 +20,7 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
  - Wajih Boukaram - wajih.boukaram@lbl.gov
-
+ - Yotam Yaniv - yotamya@math.ucla.edu (UCLA)
 
 ## Past contributors
  - Ryan Synk
