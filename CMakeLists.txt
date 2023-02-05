@@ -111,16 +111,20 @@ if(STRUMPACK_USE_HIP)
       " proceeding with CUDA support instead of HIP.")
     set(STRUMPACK_USE_HIP OFF)
   else()
-    cmake_minimum_required(VERSION 3.21)
-    enable_language(HIP)
-    # find_package(hip REQUIRED)
-    # set(STRUMPACK_HIP_PLATFORM_HCC ON)
-    find_package(hipblas REQUIRED)
-    find_package(hipsparse REQUIRED)
-    find_package(rocsolver REQUIRED)
-    find_package(rocblas REQUIRED)
-    # find_package(rocthrust REQUIRED)
-    # find_package(rocprim REQUIRED)
+    find_package(HIP MODULE)
+    if(HIP_FOUND)
+      set(STRUMPACK_HIP_PLATFORM_HCC ON)
+      find_package(hipblas REQUIRED)
+      find_package(hipsparse REQUIRED)
+      find_package(rocsolver REQUIRED)
+      find_package(rocblas REQUIRED)
+      # find_package(rocthrust REQUIRED)
+      # find_package(rocprim REQUIRED)
+    else()
+      message(WARNING "HIP compiler not found,"
+        " proceeding without HIP support.")
+      set(STRUMPACK_USE_HIP OFF)
+    endif()
   endif()
 endif()
 
@@ -516,12 +520,20 @@ if(TPL_ENABLE_COMBBLAS)
 endif()
 
 if(STRUMPACK_USE_HIP)
-  set(CMAKE_CXX_STANDARD 17)
-  add_library(
+  set_source_files_properties(
+    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    src/dense/HIPWrapper.hip.cpp
+    PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
+  if(BUILD_SHARED_LIBS)
+    set(STATIC_OR_SHARED SHARED)
+  else()
+    set(STATIC_OR_SHARED STATIC)
+  endif()
+  hip_add_library(
     strumpack
     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-    src/dense/HIPWrapper.hip.cpp)
-  target_link_libraries(strumpack PUBLIC hip::device)
+    src/dense/HIPWrapper.hip.cpp
+    ${STATIC_OR_SHARED})
 else()
   add_library(strumpack "")
 endif()
