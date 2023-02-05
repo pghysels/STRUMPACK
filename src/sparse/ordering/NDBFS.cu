@@ -41,7 +41,8 @@
 
 #include <assert.h>
 
-#include "ANDSparspak.hpp"
+// #include "ANDSparspak.hpp"
+#include "sparse/SeparatorTree.hpp"
 
 namespace strumpack {
   namespace ordering {
@@ -76,8 +77,8 @@ namespace strumpack {
       }
     };
 
-    // #define FRONT_BFS
-    // #define BFS_DEST
+    // #define FRONT_BFS 1
+    // #define BFS_DEST 1
 #if defined(FRONT_BFS)
     template<typename integer> struct bfs_layer_front_ftor {
       integer *ptr, *ind;
@@ -315,24 +316,43 @@ namespace strumpack {
           comp(comp_), levels(levels_), comp_start(comp_start_),
           layer_size(layer_size_), sep_size(sep_size_) {}
       __device__ void operator()(int i) {
-        if (eliminated[i]) return;
-        auto ci = comp[i];
-        auto nlvls = levels[ci];
-        if (nlvls < 3) // whole component eliminated
-          return;
-        auto l0 = comp_start[ci];
-        auto li = label[i];
-        atomicAdd(layer_size+li, 1);
-        if (li == l0 || li == l0+nlvls-1) // ignore first/last
-          return;
-        for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
-          auto j = ind[k];
-          if (eliminated[j]) continue;
-          if (label[j] == li + 1) {
-            atomicAdd(sep_size+li, 1);
+        if (!eliminated[i]) {
+          auto c = comp[i];
+          auto nlvls = levels[c];
+          if (nlvls < 3) // whole component eliminated
             return;
+          auto l0 = comp_start[c];
+          auto l = label[i];
+          atomicAdd(layer_size+l, 1);
+          if (l == l0 || l == l0+nlvls-1) // ignore first/last
+            return;
+          for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
+            auto j = ind[k];
+            if (eliminated[j]) continue;
+            if (label[j] == l + 1) {
+              atomicAdd(sep_size+l, 1);
+              return;
+            }
           }
-        }
+        } // else {
+        //   // TODO need to do this for every neighboring component
+        //   for (auto k=ptr[i], khi=ptr[i+1]; k<khi; k++) {
+        //     int lmin = -1;
+        //     for (auto k2=ptr[i], k2hi=ptr[i+1]; k2<k2hi; k2++) {
+        //       auto j = ind[k2];
+        //       if (!eliminated[j]) {
+        //         auto c = comp[j];
+        //         auto l = label[j];
+        //         if (lmin == -1 || l < lmin)
+        //           lmin = l;
+        //       }
+        //     }
+        //     if (lmin != -1) {
+        //       auto l = lmin + 1;
+        //       // check if connected to layer l in component c
+        //     }
+        //   }
+        // }
       }
     };
 
@@ -357,18 +377,18 @@ namespace strumpack {
           sep_level(sep_level_), min_norm_sep(min_norm_sep_) {}
       __device__ void operator()(int i) {
         if (eliminated[i]) return;
-        auto ci = comp[i];
-        auto nlvls = levels[ci];
-        if (label[i] != comp_start[ci])
+        auto c = comp[i];
+        auto nlvls = levels[c];
+        if (label[i] != comp_start[c])
           return;
         // I'm the root of this component
         if (nlvls < 3) {
-          comp_root_opt[ci] = comp_root[ci];
+          comp_root_opt[c] = comp_root[c];
           return;
         }
-        auto c0 = comp_start[ci];
+        auto c0 = comp_start[c];
         auto cA = layer_size[c0];
-        auto cB = comp_start[ci+1] - c0 - cA;
+        auto cB = comp_start[c+1] - c0 - cA;
         float minNS;
         int minl;
         for (auto l=1; l<nlvls-1; l++) {
@@ -382,10 +402,10 @@ namespace strumpack {
           }
           cA += cL;
         }
-        if (minNS < min_norm_sep[ci]) {
-          sep_level[ci] = c0 + minl;
-          comp_root_opt[ci] = comp_root[ci];
-          min_norm_sep[ci] = minNS;
+        if (minNS < min_norm_sep[c]) {
+          sep_level[c] = c0 + minl;
+          comp_root_opt[c] = comp_root[c];
+          min_norm_sep[c] = minNS;
         }
       }
     };
@@ -461,6 +481,7 @@ namespace strumpack {
      * threads. l2g[comp_start[c],comp_star[c+1]) should have all
      * indices of comp c. g2l is used as work space.
      */
+    //#define MINIMUM_FILL 1
     template<int NT, typename integer> __global__
     void minimum_degree(integer* ptr, integer* ind, bool* eliminated,
                         int* g2l, int* l2g, int* comp_start,
@@ -537,13 +558,21 @@ namespace strumpack {
       // __shared__ typename BlockReduce::TempStorage temp_storage;
       for (int i=0; i<n; i++) {
         if (tid == 0)
-          min_idx_degree.ints[0] = min_idx_degree.ints[1] = 3*NT;
+          min_idx_degree.ints[0] = min_idx_degree.ints[1] = 2*NT*NT;
         __syncthreads();
         if (!elim) {
           idx_degree.ints[1] = 0;
+#if defined(MINIMUM_FILL)
+          for (int j=0; j<n; j++)
+            if (D[j][tid / BI] & (1 << tid % BI))
+#pragma unroll
+              for (int k=0; k<B; k++)
+                idx_degree.ints[1] += __popc(D[tid][k] & ~D[j][k]);
+#else
 #pragma unroll
           for (int j=0; j<B; j++)
             idx_degree.ints[1] += __popc(D[tid][j]);
+#endif
           atomicMin(&min_idx_degree.ulong, idx_degree.ulong);
         }
         // min_idx_degree.ulong = BlockReduce(temp_storage).
@@ -562,6 +591,12 @@ namespace strumpack {
         __syncthreads();
         if (!elim && tid == min_i) {
           elim = true;
+#if defined(MINIMUM_FILL)
+          // only for minimum fill
+#pragma unroll
+          for (int j=0; j<B; j++)
+            D[tid][j] = 0;
+#endif
           // order is reversed
           perm[n-1-i] = gi;
           eliminated[gi] = true;
@@ -826,7 +861,7 @@ namespace strumpack {
         thrust::fill_n(perm_off.begin(), nr_comps, 0);
         // TODO the offsets are sep_size[sep_level], but this didn't
         // work due to the components with < 3 levels?
-        run(separator_offset_ftor
+        run(separator_offset_ftor<integer>
             (p(ptr), p(ind), p(eliminated), p(label), p(comp),
              p(levels), p(sep_level), p(perm_off)));
         int nr_elim_sep = thrust::reduce
