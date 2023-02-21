@@ -62,8 +62,6 @@ namespace strumpack {
     multifrontal_factorization(const SpMat_t& A,
                                const SPOptions<scalar_t>& opts);
 
-    virtual void move_to_gpu();
-    virtual void remove_from_gpu();
     virtual void delete_factors();
 
     virtual void multifrontal_solve(DenseM_t& x) const;
@@ -91,7 +89,6 @@ namespace strumpack {
   protected:
     FrontCounter nr_fronts_;
     std::unique_ptr<F_t> root_;
-    std::unique_ptr<GPUFactors<scalar_t>> gpu_factors_;
 
   private:
     std::unique_ptr<F_t>

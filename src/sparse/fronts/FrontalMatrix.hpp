@@ -52,19 +52,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
   template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-  // for the implementation, see FrontalMatrixGPU.cpp
-  template<typename scalar_t> class GPUFactorsImpl;
-  template<typename scalar_t> class GPUFactors {
-  public:
-    GPUFactors(int lvls);
-    ~GPUFactors();
-    std::unique_ptr<GPUFactorsImpl<scalar_t>> data_;
-  };
-#else
-  template<typename scalar_t> class GPUFactors {};
-#endif
-
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -118,32 +105,29 @@ namespace strumpack {
       return multifrontal_factorization(A, opts, etree_level, task_depth);
     };
 
-    virtual std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const {
-      return nullptr;
-    }
-
     virtual void delete_factors() {}
 
-    virtual void
-    multifrontal_solve(DenseM_t& b, const GPUFactors<scalar_t>*) const {
-      multifrontal_solve(b);
-    }
     virtual void multifrontal_solve(DenseM_t& b) const;
 
     virtual void
     forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
                                int etree_level=0,
-                               int task_depth=0) const {};
+                               int task_depth=0) const;
     virtual void
     backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
                                 int etree_level=0,
-                                int task_depth=0) const {};
+                                int task_depth=0) const;
 
     void fwd_solve_phase1(DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
                           int etree_level, int task_depth) const;
+    virtual
+    void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
+                          int etree_level, int task_depth) const {};
     void bwd_solve_phase2(DenseM_t& y, DenseM_t& yupd, DenseM_t* work,
                           int etree_level, int task_depth) const;
-
+    virtual
+    void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
+                          int etree_level, int task_depth) const {};
 
     ReturnCode inertia(integer_t& neg,
                        integer_t& zero,

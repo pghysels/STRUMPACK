@@ -101,12 +101,12 @@ namespace strumpack {
                               VectorPool<scalar_t>& workspace,
                               int etree_level=0, int task_depth=0) override;
 
-    void
-    forward_multifrontal_solve(DenseM_t& b, DenseM_t* work, int etree_level=0,
-                               int task_depth=0) const override;
-    void
-    backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int etree_level=0,
-                                int task_depth=0) const override;
+    // void
+    // forward_multifrontal_solve(DenseM_t& b, DenseM_t* work, int etree_level=0,
+    //                            int task_depth=0) const override;
+    // void
+    // backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int etree_level=0,
+    //                             int task_depth=0) const override;
 
     void
     extract_CB_sub_matrix(const std::vector<std::size_t>& I,

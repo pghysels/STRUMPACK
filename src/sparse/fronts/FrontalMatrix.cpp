@@ -175,7 +175,7 @@ namespace strumpack {
    * Assemble CB=b(I^{upd}) from [b(I^{sep});b(I^{upd})] of the
    * parent.
    */
-  template<typename scalar_t,typename integer_t> inline void
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::extract_b
   (const DenseM_t& y, const DenseM_t& yupd, DenseM_t& CB, const F_t* pa) const {
     std::size_t upd2sep;
@@ -228,6 +228,24 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
+  (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
+    DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
+    bupd.zero();
+    if (task_depth == 0) {
+      // tasking when calling the children
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+      this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
+      // no tasking for the root node computations, use system blas threading!
+      fwd_solve_phase2(b, bupd, etree_level, params::task_recursion_cutoff_level);
+    } else {
+      this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
+      fwd_solve_phase2(b, bupd, etree_level, task_depth);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::fwd_solve_phase1
   (DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
    int etree_level, int task_depth) const {
@@ -269,6 +287,24 @@ namespace strumpack {
         DenseMW_t CBch(rchild_->dim_upd(), b.cols(), work[1], 0, 0);
         rchild_->extend_add_b(b, bupd, CBch, this);
       }
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
+  (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
+    DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
+    if (task_depth == 0) {
+      // no tasking in blas routines, use system threaded blas instead
+      bwd_solve_phase1
+        (y, yupd, etree_level, params::task_recursion_cutoff_level);
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+      // tasking when calling children
+      this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
+    } else {
+      bwd_solve_phase1(y, yupd, etree_level, task_depth);
+      this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
     }
   }
 

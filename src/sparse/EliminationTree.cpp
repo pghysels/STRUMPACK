@@ -159,16 +159,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  EliminationTree<scalar_t,integer_t>::move_to_gpu() {
-    gpu_factors_ = std::move(root_->move_to_gpu());
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  EliminationTree<scalar_t,integer_t>::remove_from_gpu() {
-    gpu_factors_.reset(nullptr);
-  }
-
-  template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::delete_factors() {
     root_->delete_factors();
   }
@@ -176,7 +166,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& x) const {
-    root_->multifrontal_solve(x, gpu_factors_.get());
+    root_->multifrontal_solve(x);
   }
 
   template<typename scalar_t,typename integer_t> integer_t
