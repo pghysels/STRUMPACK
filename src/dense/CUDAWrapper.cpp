@@ -132,18 +132,12 @@ namespace strumpack {
         cudaSetDevice(rank % devs);
       }
 #endif
-      gpu_check(cudaFree(0));
-      gpu::BLASHandle hb;
-      gpu::SOLVERHandle hs;
-#if defined(STRUMPACK_USE_MAGMA)
-      magma_init();
-      magma_queue_t magma_q;
-      magma_queue_create(0, &magma_q);
-      // This causes a configuration error?
-      // magma_iset_pointer(nullptr, nullptr, 1, 0, 0, 0, 0, magma_q);
-      magma_queue_destroy(magma_q);
-      magma_finalize();
-#endif
+//       gpu_check(cudaFree(0));
+//       gpu::BLASHandle hb;
+//       gpu::SOLVERHandle hs;
+// #if defined(STRUMPACK_USE_MAGMA)
+//       gpu::magma::MAGMAQueue mq;
+// #endif
     }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,
