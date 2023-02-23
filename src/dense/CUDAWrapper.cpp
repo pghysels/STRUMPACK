@@ -132,12 +132,12 @@ namespace strumpack {
         cudaSetDevice(rank % devs);
       }
 #endif
-//       gpu_check(cudaFree(0));
-//       gpu::BLASHandle hb;
-//       gpu::SOLVERHandle hs;
-// #if defined(STRUMPACK_USE_MAGMA)
-//       gpu::magma::MAGMAQueue mq;
-// #endif
+      gpu_check(cudaFree(0));
+      gpu::BLASHandle hb;
+      gpu::SOLVERHandle hs;
+#if defined(STRUMPACK_USE_MAGMA)
+      gpu::magma::MAGMAQueue mq;
+#endif
     }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,

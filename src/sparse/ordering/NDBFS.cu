@@ -481,7 +481,7 @@ namespace strumpack {
      * threads. l2g[comp_start[c],comp_star[c+1]) should have all
      * indices of comp c. g2l is used as work space.
      */
-    //#define MINIMUM_FILL 1
+    // #define MINIMUM_FILL 1
     template<int NT, typename integer> __global__
     void minimum_degree(integer* ptr, integer* ind, bool* eliminated,
                         int* g2l, int* l2g, int* comp_start,
@@ -495,7 +495,6 @@ namespace strumpack {
       constexpr int BI = sizeof(unsigned int)*8; // bits per block
       // x2 for the boundary nodes
       constexpr int B = 2 * NT / BI;        // blocks per row
-      assert(BI*B == NT);
       __shared__ unsigned int D[NT][B];
       union atomic_int_int {
         unsigned int ints[2];
@@ -608,11 +607,6 @@ namespace strumpack {
       __device__ __forceinline__
       bool operator()(const thrust::tuple<int,int>& t)
       { return thrust::get<0>(t) <= thrust::get<1>(t); }
-    };
-    struct tuple_equal_ftor {
-      __device__ __forceinline__
-      bool operator()(const thrust::tuple<int,int>& t)
-      { return thrust::get<0>(t) == thrust::get<1>(t); }
     };
     struct larger_to_zero_ftor {
       int v;
@@ -816,7 +810,7 @@ namespace strumpack {
 
         thrust::fill_n(min_norm_sep.begin(), nr_comps,
                        std::numeric_limits<float>::max());
-        for (int rep=0; rep<3; rep++) {
+        for (int rep=0; rep<2; rep++) {
           // find level sets with different random initial nodes
           if (rep > 0) {
             thrust::copy_n(comp.begin(), n, label.begin());
