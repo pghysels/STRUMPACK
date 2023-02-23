@@ -166,18 +166,16 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
 
     export SCOTCH_DIR=$HOME/local/scotch_6.1.0
     export ButterflyPACK_DIR=$HOME/LBL/ButterflyPACK/install/
-    export ZFP_DIR=$HOME/local/zfp-0.5.5/install/
-    export MAGMA_DIR=$HOME/local/magma-2.5.4/install/
-
-    export blaspp_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/blaspp-2020.10.02-tattjpyiyxzzgvasfk72auey3oawqs3i
-    export lapackpp_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/lapackpp-2020.10.02-mk2si37eqnft2da7yiv4o2cfyxawczlk
-    export slate_DIR=$HOME/local/spack_pghysels/opt/spack/linux-ubuntu20.04-zen2/gcc-10.2.0/slate-2020.10.00-utcue2tec7ly5kx27dy6rap6oxkglbbv
-
-    export COMBBLAS_DIR=/home/pieterg/local/CombBLAS/install
-    export COMBBLASAPP_DIR=/home/pieterg/local/CombBLAS/Applications
+    export ZFP_DIR=$HOME/local/zfp-1.0.0/install/
+    export MAGMA_DIR=$HOME/local/magma-2.7.0/install/
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_COMPILER=g++-11 \
+          -DCMAKE_C_COMPILER=gcc-11 \
+          -DCMAKE_Fortran_COMPILER=gfortran-11 \
+          -DCMAKE_CUDA_HOST_COMPILER=g++-11 \
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-11.7/bin/nvcc \
           -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
           -DBLA_VENDOR=OpenBLAS \
@@ -189,7 +187,7 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DSTRUMPACK_USE_HIP=OFF \
           -DTPL_ENABLE_MAGMA=OFF \
           -DTPL_ENABLE_SLATE=OFF \
-          -DTPL_ENABLE_COMBBLAS=ON \
+          -DTPL_ENABLE_COMBBLAS=OFF \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 
 fi
@@ -214,6 +212,7 @@ if ! $found_host; then
     #  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
+make -j8 # VERBOSE=1
 make install -j8
 make examples -j8
 # make test
