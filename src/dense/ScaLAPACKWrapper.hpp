@@ -255,7 +255,7 @@ namespace strumpack {
                 const int* ipiv, int ip, int jp, const int* descip,
                 int* iwork);
     void plapiv(char direc, char rowcol, char pivroc, int m, int n,
-                std::complex<double>* a, int ia, int ja, int* desca,
+                std::complex<double>* a, int ia, int ja, const int* desca,
                 const int* ipiv, int ip, int jp, const int* descip,
                 int* iwork);
 
@@ -299,18 +299,18 @@ namespace strumpack {
                   int ia, int ja, const int *desca, double *work);
 
     void pgeadd(char trans, int m, int n, float alpha,
-                const float* a, int ia, int ja, int *desca, float beta,
-                float *c, int ic, int jc, const int *descc);
+                const float* a, int ia, int ja, const int *desca,
+                float beta, float *c, int ic, int jc, const int *descc);
     void pgeadd(char trans, int m, int n, double alpha,
-                const double* a, int ia, int ja, int *desca, double beta,
-                double *c, int ic, int jc, const int *descC);
+                const double* a, int ia, int ja, const int *desca,
+                double beta, double *c, int ic, int jc, const int *descC);
     void pgeadd(char trans, int m, int n, std::complex<float> alpha,
-                const std::complex<float>* a, int ia, int ja, int *desca,
-                std::complex<float> beta,
+                const std::complex<float>* a, int ia, int ja,
+                const int *desca, std::complex<float> beta,
                 std::complex<float> *c, int ic, int jc, const int *descC);
     void pgeadd(char trans, int m, int n, std::complex<double> alpha,
-                const std::complex<double>* a, int ia, int ja, int *desca,
-                std::complex<double> beta,
+                const std::complex<double>* a, int ia, int ja,
+                const int *desca, std::complex<double> beta,
                 std::complex<double> *c, int ic, int jc, const int *descC);
 
     void placpy(char trans, int m, int n,
@@ -436,7 +436,7 @@ namespace strumpack {
                std::complex<double>* work, int lwork);
     template<typename T>
     int pxxgqr(int m, int n, int k, T* a, int ia, int ja,
-               int* desca, T* tau) {
+               const int* desca, T* tau) {
       T lwork;
       int info = pxxgqr(m, n, k, a, ia, ja, desca, tau, &lwork, -1);
       int ilwork = int(std::real(lwork));

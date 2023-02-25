@@ -47,7 +47,6 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
     for (auto& xi : x_exact)
       xi = scalar_t(rgen->get());
   }
-
   A.spmv(x_exact.data(), b.data());
 
   spss.set_matrix(A);
@@ -60,6 +59,12 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
     return;
   }
   spss.solve(b.data(), x.data());
+
+  integer_t neg, zero, pos;
+  auto err = spss.inertia(neg, zero, pos);
+  std::cout << "# INERTIA neg,zero,pos = "
+            << neg << ", " << zero << ", " << pos
+            <<  " (" << err << ")" << std::endl;
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;
@@ -82,10 +87,10 @@ int main(int argc, char* argv[]) {
 
   CSRMatrix<double,int> A;
   if (A.read_matrix_market(f) == 0)
-    test<double,int>(argc, argv, A);
+    test(argc, argv, A);
   else {
     CSRMatrix<std::complex<double>,int> A;
     A.read_matrix_market(f);
-    test<std::complex<double>,int>(argc, argv, A);
+    test(argc, argv, A);
   }
 }

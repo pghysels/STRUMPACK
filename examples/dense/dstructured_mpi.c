@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "structured/StructuredMatrix.h"
+#include "structured/StructuredMatrixMPI.h"
 #include "StrumpackFortranCInterface.h"
 
 

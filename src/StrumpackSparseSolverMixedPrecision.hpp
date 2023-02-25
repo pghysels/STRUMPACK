@@ -111,6 +111,9 @@ namespace strumpack {
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);
     void set_matrix(const CSRMatrix<factor_t,integer_t>& A);
 
+    void update_matrix_values(const CSRMatrix<refine_t,integer_t>& A);
+    void update_matrix_values(const CSRMatrix<factor_t,integer_t>& A);
+
     ReturnCode factor();
     ReturnCode reorder(int nx=1, int ny=1, int nz=1);
 
@@ -119,11 +122,17 @@ namespace strumpack {
                      bool use_initial_guess=false);
     ReturnCode solve(const refine_t* b, refine_t* x,
                      bool use_initial_guess=false);
+    ReturnCode solve(int nrhs, const refine_t* b, int ldb,
+                     refine_t* x, int ldx,
+                     bool use_initial_guess=false);
 
     ReturnCode solve(const DenseMatrix<factor_t>& b,
                      DenseMatrix<factor_t>& x,
                      bool use_initial_guess=false);
     ReturnCode solve(const factor_t* b, factor_t* x,
+                     bool use_initial_guess=false);
+    ReturnCode solve(int nrhs, const factor_t* b, int ldb,
+                     factor_t* x, int ldx,
                      bool use_initial_guess=false);
 
     SPOptions<refine_t>& options() { return opts_; }

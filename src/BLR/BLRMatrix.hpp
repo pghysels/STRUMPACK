@@ -90,6 +90,7 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
+      using real_t = typename RealType<scalar_t>::value_type;
 
     public:
       BLRMatrix() = default;
@@ -173,12 +174,8 @@ namespace strumpack {
       const DenseTile<scalar_t>& tile_dense(std::size_t i, std::size_t j) const;
 
       void compress_tile(std::size_t i, std::size_t j, const Opts_t& opts);
-      void compress_tile_gpu(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
-                             std::size_t i, std::size_t j, DenseM_t& A, scalar_t* d_U, 
-                             scalar_t* d_V, int* dpiv, char* gesvd_mem,
-                             const Opts_t& opts);
       void fill(scalar_t v);
-      void fill_col(scalar_t v, std::size_t k, bool part, std::size_t CP);
+      void fill_col(scalar_t v, std::size_t k, std::size_t CP);
 
       static void
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
@@ -193,6 +190,45 @@ namespace strumpack {
                                    const Opts_t& opts);
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      void compress_tile_gpu(gpu::SOLVERHandle& handle,
+                             gpu::BLASHandle& blashandle,
+                             std::size_t i, std::size_t j,
+                             DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
+                             int* dpiv, char* gesvd_mem,
+                             const Opts_t& opts);
+#if defined(STRUMPACK_USE_CUDA)
+      void compress_tile_CUDA(gpu::SOLVERHandle& handle,
+                              gpu::BLASHandle& blashandle,
+                              std::size_t i, std::size_t j,
+                              DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
+                              int* dpiv, char* gesvd_mem,
+                              const Opts_t& opts);
+#endif
+#if defined(STRUMPACK_USE_MAGMA)
+      void compress_tile_MAGMA(gpu::SOLVERHandle& handle,
+                               gpu::BLASHandle& blashandle,
+                               std::size_t i, std::size_t j,
+                               DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
+                               int* dpiv, char* gesvd_mem,
+                               const Opts_t& opts);
+#endif
+#if defined(STRUMPACK_USE_KBLAS)
+      void compress_tile_KBLAS(gpu::SOLVERHandle& handle,
+                               gpu::BLASHandle& blashandle,
+                               std::size_t i, std::size_t j,
+                               DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
+                               int* dpiv, char* gesvd_mem,
+                               const Opts_t& opts);
+#endif
+#if defined(STRUMPACK_USE_HIP)
+      void compress_tile_HIP(gpu::SOLVERHandle& handle,
+                             gpu::BLASHandle& blashandle,
+                             std::size_t i, std::size_t j,
+                             DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
+                             int* dpiv, char* gesvd_mem,
+                             const Opts_t& opts);
+#endif
+
       static void
       construct_and_partial_factor_gpu(DenseM_t& A11, DenseM_t& A12,
                                        DenseM_t& A21, DenseM_t& A22,

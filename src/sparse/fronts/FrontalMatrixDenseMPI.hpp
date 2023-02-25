@@ -76,19 +76,20 @@ namespace strumpack {
                                const FBLRMPI_t* pa) const override;
     void
     extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
-                               const FBLRMPI_t* pa, integer_t begin_col, 
-                               integer_t end_col, const SPOptions<scalar_t>& opts) const override;
+                                   const FBLRMPI_t* pa, integer_t begin_col,
+                                   integer_t end_col,
+                                   const SPOptions<scalar_t>& opts)
+      const override;
     void
     extadd_blr_copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
                                  BLRMPI_t& F21, BLRMPI_t& F22,
                                  scalar_t** pbuf, const FBLRMPI_t* pa)
       const override;
-    
     void
     extadd_blr_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
-                                 BLRMPI_t& F21, BLRMPI_t& F22,
-                                 scalar_t** pbuf, const FBLRMPI_t* pa, 
-                                 integer_t begin_col, integer_t end_col)
+                                     BLRMPI_t& F21, BLRMPI_t& F22,
+                                     scalar_t** pbuf, const FBLRMPI_t* pa,
+                                     integer_t begin_col, integer_t end_col)
       const override;
 
     void sample_CB(const DistM_t& R, DistM_t& Sr,
@@ -96,7 +97,7 @@ namespace strumpack {
     void sample_CB(Trans op, const DistM_t& R, DistM_t& S,
                    FrontalMatrix<scalar_t,integer_t>* pa) const override;
 
-    void
+    ReturnCode
     multifrontal_factorization(const SpMat_t& A,
                                const SPOptions<scalar_t>& opts,
                                int etree_level=0, int task_depth=0)
@@ -126,7 +127,7 @@ namespace strumpack {
     std::vector<int> piv;
 
     void build_front(const SpMat_t& A);
-    void partial_factorization(const SPOptions<scalar_t>& opts);
+    ReturnCode partial_factorization(const SPOptions<scalar_t>& opts);
 
     void fwd_solve_phase2(const DistM_t& F11, const DistM_t& F12,
                           const DistM_t& F21,
@@ -149,6 +150,14 @@ namespace strumpack {
     void compress(const SPOptions<scalar_t>& opts);
     void decompress(DistM_t& F11, DistM_t& F12, DistM_t& F21) const;
 #endif
+
+    ReturnCode matrix_inertia(const DistM_t& F,
+                              integer_t& neg,
+                              integer_t& zero,
+                              integer_t& pos) const;
+    ReturnCode node_inertia(integer_t& neg,
+                            integer_t& zero,
+                            integer_t& pos) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;

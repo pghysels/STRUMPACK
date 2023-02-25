@@ -53,34 +53,42 @@ namespace strumpack {
   public:
     EliminationTree() {}
 
-    EliminationTree
-    (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-     SeparatorTree<integer_t>& sep_tree);
+    EliminationTree(const SPOptions<scalar_t>& opts,
+                    const SpMat_t& A,
+                    SeparatorTree<integer_t>& sep_tree);
     virtual ~EliminationTree();
 
-    virtual void multifrontal_factorization
-    (const SpMat_t& A, const SPOptions<scalar_t>& opts);
+    virtual ReturnCode
+    multifrontal_factorization(const SpMat_t& A,
+                               const SPOptions<scalar_t>& opts);
 
-    virtual void move_to_gpu();
-    virtual void remove_from_gpu();
     virtual void delete_factors();
 
     virtual void multifrontal_solve(DenseM_t& x) const;
-    virtual void multifrontal_solve_dist
-    (DenseM_t& x, const std::vector<integer_t>& dist) {} // TODO const
+
+    virtual void
+    multifrontal_solve_dist(DenseM_t& x,
+                            const std::vector<integer_t>& dist) {} // TODO const
 
     virtual integer_t maximum_rank() const;
     virtual long long factor_nonzeros() const;
     virtual long long dense_factor_nonzeros() const;
+
+    virtual ReturnCode inertia(integer_t& neg,
+                               integer_t& zero,
+                               integer_t& pos) const;
+
     void print_rank_statistics(std::ostream &out) const;
+
     virtual FrontCounter front_counter() const { return nr_fronts_; }
+
     void draw(const SpMat_t& A, const std::string& name) const;
+
     F_t* root() const;
 
   protected:
     FrontCounter nr_fronts_;
     std::unique_ptr<F_t> root_;
-    std::unique_ptr<GPUFactors<scalar_t>> gpu_factors_;
 
   private:
     std::unique_ptr<F_t>

@@ -135,9 +135,19 @@ namespace strumpack {
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
   solve(const refine_t* b, refine_t* x, bool use_initial_guess) {
-    auto N = mat_.size();
+    auto N = mat_.local_rows();
     auto B = ConstDenseMatrixWrapperPtr(N, 1, b, N);
     DenseMatrixWrapper<refine_t> X(N, 1, x, N);
+    return solve(*B, X, use_initial_guess);
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  solve(int nrhs, const refine_t* b, int ldb, refine_t* x, int ldx,
+        bool use_initial_guess) {
+    auto N = mat_.local_rows();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMatrixWrapper<refine_t> X(N, nrhs, x, ldx);
     return solve(*B, X, use_initial_guess);
   }
 
@@ -160,8 +170,21 @@ namespace strumpack {
     solver_.set_matrix(cast_matrix<refine_t,integer_t,factor_t>(A));
   }
 
+  template<typename factor_t,typename refine_t,typename integer_t> void
+  SparseSolverMixedPrecisionMPIDist<factor_t,refine_t,integer_t>::
+  update_matrix_values(const CSRMatrixMPI<refine_t,integer_t>& A) {
+    mat_ = A;
+    solver_.update_matrix_values(cast_matrix<refine_t,integer_t,factor_t>(A));
+  }
+
   // explicit template instantiations
   template class SparseSolverMixedPrecisionMPIDist<float,double,int>;
   template class SparseSolverMixedPrecisionMPIDist<std::complex<float>,std::complex<double>,int>;
+
+  template class SparseSolverMixedPrecisionMPIDist<float,double,long int>;
+  template class SparseSolverMixedPrecisionMPIDist<std::complex<float>,std::complex<double>,long int>;
+
+  template class SparseSolverMixedPrecisionMPIDist<float,double,long long int>;
+  template class SparseSolverMixedPrecisionMPIDist<std::complex<float>,std::complex<double>,long long int>;
 
 } //end namespace strumpack

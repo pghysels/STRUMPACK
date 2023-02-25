@@ -38,6 +38,11 @@
 #include <cassert>
 #include <iostream>
 
+#include "StrumpackConfig.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "misc/MPIWrapper.hpp"
+#endif
+
 namespace strumpack {
   namespace structured {
 
@@ -232,6 +237,23 @@ namespace strumpack {
         serialize_rec(buf.data()+1, buf.data()+n+1, buf.data()+2*n+1, pid);
         return buf;
       }
+
+#if defined(STRUMPACK_USE_MPI)
+      void broadcast(const MPIComm& comm) {
+        if (comm.is_root()) {
+          auto v = serialize();
+          auto vsize = v.size();
+          comm.broadcast(vsize);
+          comm.broadcast(v);
+        } else {
+          std::size_t vsize = 0;
+          comm.broadcast(vsize);
+          std::vector<int> v(vsize);
+          comm.broadcast(v);
+          *this = deserialize(v);
+        }
+      }
+#endif
 
       /**
        * Check whether this tree is complete.

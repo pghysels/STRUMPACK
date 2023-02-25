@@ -32,16 +32,18 @@
 #include <memory>
 #include <scotch.h>
 #include "sparse/SeparatorTree.hpp"
-#include "sparse/ETree.hpp"
 
 namespace strumpack {
 
   // base template, integer_t != SCOTCH_Num, so need to copy everything
-  template<typename integer_t> inline int WRAPPER_SCOTCH_graphOrder
-  (integer_t n, SCOTCH_Graph* graph, SCOTCH_Strat* strat,
-   std::vector<integer_t>& permtab, std::vector<integer_t>& peritab,
-   integer_t& cblkptr, std::vector<SCOTCH_Num>& rangtab,
-   std::vector<SCOTCH_Num>& treetab) {
+  template<typename integer_t> inline int
+  WRAPPER_SCOTCH_graphOrder(integer_t n, SCOTCH_Graph* graph,
+                            SCOTCH_Strat* strat,
+                            std::vector<integer_t>& permtab,
+                            std::vector<integer_t>& peritab,
+                            integer_t& cblkptr,
+                            std::vector<SCOTCH_Num>& rangtab,
+                            std::vector<SCOTCH_Num>& treetab) {
     SCOTCH_Num scotch_cblkptr = cblkptr;
     std::vector<SCOTCH_Num> scotch_permtab(n), scotch_peritab(n);
     int ierr = SCOTCH_graphOrder
@@ -54,11 +56,14 @@ namespace strumpack {
     return 0;
   }
   // if integer_t == SCOTCH_Num, no need to copy
-  template<> inline int WRAPPER_SCOTCH_graphOrder
-  (SCOTCH_Num n, SCOTCH_Graph* graph, SCOTCH_Strat* strat,
-   std::vector<SCOTCH_Num>& permtab, std::vector<SCOTCH_Num>& peritab,
-   SCOTCH_Num& cblkptr, std::vector<SCOTCH_Num>& rangtab,
-   std::vector<SCOTCH_Num>& treetab) {
+  template<> inline int
+  WRAPPER_SCOTCH_graphOrder(SCOTCH_Num n, SCOTCH_Graph* graph,
+                            SCOTCH_Strat* strat,
+                            std::vector<SCOTCH_Num>& permtab,
+                            std::vector<SCOTCH_Num>& peritab,
+                            SCOTCH_Num& cblkptr,
+                            std::vector<SCOTCH_Num>& rangtab,
+                            std::vector<SCOTCH_Num>& treetab) {
     return SCOTCH_graphOrder
       (graph, strat, permtab.data(), peritab.data(), &cblkptr,
        rangtab.data(), treetab.data());
@@ -89,7 +94,7 @@ namespace strumpack {
     return strategy_string.str();
   }
 
-  template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
+  template<typename integer_t> SeparatorTree<integer_t>
   sep_tree_from_scotch_tree(std::vector<SCOTCH_Num>& scotch_tree,
                             std::vector<SCOTCH_Num>& scotch_sizes) {
     // if the graph is disconnected, add one root to connect all
@@ -134,32 +139,35 @@ namespace strumpack {
     }
     integer_t nbsep_non_empty = nbsep;
     nbsep = scotch_tree.size();
-    std::unique_ptr<SeparatorTree<integer_t>>
-      sep_tree(new SeparatorTree<integer_t>(nbsep));
+    SeparatorTree<integer_t> sep_tree(nbsep);
     for (integer_t i=0; i<nbsep+1; i++) {
-      if (i <= nbsep_non_empty) sep_tree->sizes(i) = scotch_sizes[i];
-      else sep_tree->sizes(i) = sep_tree->sizes(i-1);
+      if (i <= nbsep_non_empty) sep_tree.sizes[i] = scotch_sizes[i];
+      else sep_tree.sizes[i] = sep_tree.sizes[i-1];
     }
     for (integer_t i=0; i<nbsep; i++) {
-      sep_tree->lch(i) = scotch_lch[i];
-      sep_tree->rch(i) = scotch_rch[i];
-      if (sep_tree->lch(i)!=-1) sep_tree->pa(sep_tree->lch(i)) = i;
-      if (sep_tree->rch(i)!=-1) sep_tree->pa(sep_tree->rch(i)) = i;
+      sep_tree.lch[i] = scotch_lch[i];
+      sep_tree.rch[i] = scotch_rch[i];
+      if (sep_tree.lch[i] != -1)
+        sep_tree.parent[sep_tree.lch[i]] = i;
+      if (sep_tree.rch[i] != -1)
+        sep_tree.parent[sep_tree.rch[i]] = i;
     }
     integer_t root =
       std::distance(scotch_tree.begin(),
                     std::find(scotch_tree.begin(),
                               scotch_tree.end()+nbsep, integer_t(-1)));
-    sep_tree->pa(root) = -1;
+    sep_tree.parent[root] = -1;
     return sep_tree;
   }
 
   // TODO throw exception on error
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> scotch_nested_dissection
-  (integer_t n, const integer_t* ptr, const integer_t* ind,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   const SPOptions<scalar_t>& opts) {
+  SeparatorTree<integer_t>
+  scotch_nested_dissection(integer_t n,
+                           const integer_t* ptr, const integer_t* ind,
+                           std::vector<integer_t>& perm,
+                           std::vector<integer_t>& iperm,
+                           const SPOptions<scalar_t>& opts) {
     SCOTCH_Graph graph;
     SCOTCH_graphInit(&graph);
     std::vector<SCOTCH_Num> ptr_nodiag(n+1), ind_nodiag(ptr[n]-ptr[0]);
@@ -205,9 +213,10 @@ namespace strumpack {
   }
 
   template<typename scalar_t, typename integer_t, typename G>
-  std::unique_ptr<SeparatorTree<integer_t>> scotch_nested_dissection
-  (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   const SPOptions<scalar_t>& opts) {
+  SeparatorTree<integer_t>
+  scotch_nested_dissection(const G& A, std::vector<integer_t>& perm,
+                           std::vector<integer_t>& iperm,
+                           const SPOptions<scalar_t>& opts) {
     return scotch_nested_dissection
       (A.size(), A.ptr(), A.ind(), perm, iperm, opts);
   }

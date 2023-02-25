@@ -45,6 +45,9 @@
 namespace strumpack {
   namespace gpu {
 
+    const unsigned int MAX_BLOCKS_Y = 65535;
+    const unsigned int MAX_BLOCKS_Z = 65535;
+
 #define gpu_check(err) {                                              \
       strumpack::gpu::hip_assert((err), __FILE__, __LINE__);          \
     }
@@ -78,6 +81,7 @@ namespace strumpack {
     class BLASHandle {
     public:
       BLASHandle() { gpu_check(hipblasCreate(&h_)); }
+      BLASHandle(Stream& s) : BLASHandle() { set_stream(s); }
       ~BLASHandle() { gpu_check(hipblasDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(hipblasSetStream(h_, s)); }
       operator hipblasHandle_t&() { return h_; }
@@ -86,11 +90,11 @@ namespace strumpack {
       hipblasHandle_t h_;
     };
 
-
     // TODO there is no such thing as hipSOLVER yet :(
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(rocblas_create_handle(&h_)); }
+      SOLVERHandle(Stream& s) : SOLVERHandle() { set_stream(s); }
       ~SOLVERHandle() { gpu_check(rocblas_destroy_handle(h_)); }
       void set_stream(Stream& s) { rocblas_set_stream(h_, s); }
       operator rocblas_handle&() { return h_; }
@@ -111,99 +115,71 @@ namespace strumpack {
       hipEvent_t e_;
     };
 
-    template<typename T> void memset
-    (void* dptr, int value, std::size_t count) {
-      gpu_check(hipMemset(dptr, value, count*sizeof(T)));
+    template<typename T> hipError_t
+    memset(void* dptr, int value, std::size_t count) {
+      return hipMemset(dptr, value, count*sizeof(T));
     }
 
-    template<typename T> void copy_device_to_host
-    (T* hptr, const T* dptr, std::size_t count) {
-      gpu_check(hipMemcpy(hptr, dptr, count*sizeof(T),
-                           hipMemcpyDeviceToHost));
+    template<typename T> hipError_t
+    copy_device_to_host(T* hptr, const T* dptr, std::size_t count) {
+      return hipMemcpy(hptr, dptr, count*sizeof(T),
+                       hipMemcpyDeviceToHost);
     }
-    template<typename T> void copy_device_to_host_async
-    (T* hptr, const T* dptr, std::size_t count, const Stream& s) {
-      gpu_check(hipMemcpyAsync(hptr, dptr, count*sizeof(T),
-                                hipMemcpyDeviceToHost, s));
+    template<typename T> hipError_t
+    copy_device_to_host_async(T* hptr, const T* dptr,
+                              std::size_t count, const Stream& s) {
+      return hipMemcpyAsync(hptr, dptr, count*sizeof(T),
+                            hipMemcpyDeviceToHost, s);
     }
-    template<typename T> void copy_host_to_device
-    (T* dptr, const T* hptr, std::size_t count) {
-      gpu_check(hipMemcpy(dptr, hptr, count*sizeof(T),
-                           hipMemcpyHostToDevice));
+    template<typename T> hipError_t
+    copy_host_to_device(T* dptr, const T* hptr, std::size_t count) {
+      return hipMemcpy(dptr, hptr, count*sizeof(T),
+                       hipMemcpyHostToDevice);
     }
-    template<typename T> void copy_host_to_device_async
-    (T* dptr, const T* hptr, std::size_t count, const Stream& s) {
-      gpu_check(hipMemcpyAsync(dptr, hptr, count*sizeof(T),
-                                hipMemcpyHostToDevice, s));
+    template<typename T> hipError_t
+    copy_host_to_device_async(T* dptr, const T* hptr,
+                              std::size_t count, const Stream& s) {
+      return hipMemcpyAsync(dptr, hptr, count*sizeof(T),
+                            hipMemcpyHostToDevice, s);
     }
 
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> hipError_t
+    copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(hipMemcpy2D
-                  (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), hipMemcpyDeviceToHost));
-      } else
-        copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      return copy_device_to_host
+        (h.data(), d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_device_to_host_async
-    (DenseMatrix<T>& h, const DenseMatrix<T>& d, const Stream& s) {
-      if (!d.rows() || !d.cols()) return;
-      assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(hipMemcpy2DAsync
-                  (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), hipMemcpyDeviceToHost, s));
-      } else
-        copy_device_to_host_async(h.data(), d.data(), d.rows()*d.cols(), s);
-    }
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const T* d) {
-      if (!h.rows() || !h.cols()) return;
+    template<typename T> hipError_t
+    copy_device_to_host(DenseMatrix<T>& h, const T* d) {
       assert(h.rows() == h.ld());
-      copy_device_to_host(h.data(), d, h.rows()*h.cols());
+      return copy_device_to_host
+        (h.data(), d, std::size_t(h.rows())*h.cols());
     }
-    template<typename T> void copy_device_to_host
-    (T* h, const DenseMatrix<T>& d) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> hipError_t
+    copy_device_to_host(T* h, const DenseMatrix<T>& d) {
       assert(d.rows() == d.ld());
-      copy_device_to_host(h, d.data(), d.rows()*d.cols());
+      return copy_device_to_host
+        (h, d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> hipError_t
+    copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(hipMemcpy2D
-                  (d.data(), d.ld()*sizeof(T), h.data(), h.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), hipMemcpyHostToDevice));
-      } else
-        copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      return copy_host_to_device
+        (d.data(), h.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device_async
-    (DenseMatrix<T>& d, const DenseMatrix<T>& h, const Stream& s) {
-      if (!d.rows() || !d.cols()) return;
-      assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(hipMemcpy2DAsync
-                  (d.data(), d.ld()*sizeof(T), h.data(), h.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), hipMemcpyHostToDevice, s));
-      } else
-        copy_host_to_device_async(d.data(), h.data(), d.rows()*d.cols(), s);
-    }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const T* h) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> hipError_t
+    copy_host_to_device(DenseMatrix<T>& d, const T* h) {
       assert(d.rows() == d.ld());
-      copy_host_to_device(d.data(), h, d.rows()*d.cols());
+      return copy_host_to_device
+        (d.data(), h, std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (T* d, const DenseMatrix<T>& h) {
-      if (!h.rows() || !h.cols()) return;
+    template<typename T> hipError_t
+    copy_host_to_device(T* d, const DenseMatrix<T>& h) {
       assert(h.rows() == h.ld());
-      copy_host_to_device(d, h.data(), h.rows()*h.cols());
+      return copy_host_to_device
+        (d, h.data(), std::size_t(h.rows())*h.cols());
     }
     template<typename T> void copy_host_to_device_async
     (T* d, const DenseMatrix<T>& h, const Stream& s) {
@@ -230,13 +206,14 @@ namespace strumpack {
         copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
     }
 
-    template<typename scalar_t, typename real_t = typename RealType<scalar_t>::value_type>
-    void copy_real_to_scalar(scalar_t* dest, const real_t* src, std::size_t size) {
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type>
+    void copy_real_to_scalar(scalar_t* dest, const real_t* src,
+                             std::size_t size) {
       gpu_check(hipMemset(dest, 0, size*sizeof(scalar_t)));
-      gpu_check(hipMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t), 
+      gpu_check(hipMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t),
                 sizeof(real_t), size, hipMemcpyDeviceToDevice));
     }
-
 
     inline std::size_t available_memory() {
       std::size_t free_device_mem, total_device_mem;
@@ -277,7 +254,9 @@ namespace strumpack {
         }
       }
       DeviceMemory(const DeviceMemory&) = delete;
-      DeviceMemory(DeviceMemory<T>&& d) { *this = d;}
+      DeviceMemory(DeviceMemory<T>&& d) {
+        *this = std::forward<DeviceMemory<T>>(d);
+      }
       DeviceMemory<T>& operator=(const DeviceMemory<T>&) = delete;
       DeviceMemory<T>& operator=(DeviceMemory<T>&& d) {
         if (this != &d) {
@@ -291,11 +270,11 @@ namespace strumpack {
         return *this;
       }
       ~DeviceMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
-      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           if (is_managed_) {
@@ -336,7 +315,9 @@ namespace strumpack {
         }
       }
       HostMemory(const HostMemory&) = delete;
-      HostMemory(HostMemory<T>&& d) { *this = d; }
+      HostMemory(HostMemory<T>&& d) {
+        *this = std::forward<HostMemory<T>>(d);
+      }
       HostMemory<T>& operator=(const HostMemory<T>&) = delete;
       HostMemory<T>& operator=(HostMemory<T>&& d) {
         if (this != & d) {
@@ -350,11 +331,11 @@ namespace strumpack {
         return *this;
       }
       ~HostMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
-      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
@@ -390,7 +371,7 @@ namespace strumpack {
     trsm(BLASHandle& handle, Side side, UpLo uplo,
          Trans trans, Diag diag, const scalar_t alpha,
          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
-    
+
     /*template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> int
     gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n,
@@ -402,19 +383,19 @@ namespace strumpack {
            real_t* d_S, DenseMatrix<scalar_t>& U,
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
            int Lwork, int* devInfo, hipsolverGesvdjInfo_t params);*/
-    
+
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> void
-    gesvd(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, real_t* d_S, 
-          DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
+    gesvd(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, real_t* d_S,
+          DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
           real_t* E, int* devInfo);
-    
+
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> void
-    gesvd_hip(SOLVERHandle& handle, real_t* S, DenseMatrix<scalar_t>& A, 
-              DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
+    gesvd_hip(SOLVERHandle& handle, real_t* S, DenseMatrix<scalar_t>& A,
+              DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
               int* devInfo);
-    
+
     template<typename scalar_t> void
     geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
          const DenseMatrix<scalar_t>& A, const scalar_t beta,
@@ -423,7 +404,7 @@ namespace strumpack {
     template<typename scalar_t> void
     dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
          const scalar_t* x, DenseMatrix<scalar_t>& C);
-    
+
     template<typename scalar_t> void
     gemm(BLASHandle& handle, Trans ta, Trans tb,
          scalar_t alpha, const DenseMatrix<scalar_t>& a,
@@ -436,14 +417,15 @@ namespace strumpack {
          const DenseMatrix<scalar_t>& x, scalar_t beta,
          DenseMatrix<scalar_t>& y);
 
-    void laswp(SOLVERHandle& handle, DenseMatrix<float>& A,
-               int k1, int k2, int* ipiv, int inc);
-    void laswp(SOLVERHandle& handle, DenseMatrix<double>& A,
-               int k1, int k2, int* ipiv, int inc);
-    void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<float>>& A,
-               int k1, int k2, int* ipiv, int inc);
-    void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<double>>& A,
-               int k1, int k2, int* ipiv, int inc);
+    template<typename scalar_t> void
+    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
+          int k1, int k2, int* ipiv, int inc);
+
+    // assume inc = 1
+    template<typename scalar_t> void
+    laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
+                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
+                       unsigned int batchCount);
 
   } // end namespace gpu
 } // end namespace strumpack

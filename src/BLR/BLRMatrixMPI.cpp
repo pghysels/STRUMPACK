@@ -79,17 +79,14 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, int k, bool part, std::size_t CP) {
-      std::size_t j_end=0;
-      if (part) j_end = std::min(std::size_t(k+CP), colblocks());
-      else j_end = std::min(k+colblocks(), colblocks());
+    BLRMatrixMPI<scalar_t>::fill_col(scalar_t v, std::size_t k, std::size_t CP) {
+      std::size_t j_end = std::min(k + CP, colblocks());
       for (std::size_t i=0; i<brows_; i++)
         for (std::size_t j=k; j<j_end; j++)
           if (grid_->is_local(i, j)) {
-            std::unique_ptr<DenseTile<scalar_t>> t
+            block(i, j).reset
               (new DenseTile<scalar_t>(tilerows(i), tilecols(j)));
-            t->D().fill(v);
-            block(i, j) = std::move(t);
+            block(i, j)->D().fill(v);
           }
     }
 
@@ -1651,6 +1648,7 @@ namespace strumpack {
       auto CP = grid()->npcols();
       for (std::size_t i=0; i<colblocks(); i+=CP) {
         //construct the (i/CP+1) CP block-columns as dense tiles
+        fill_col(0., i, CP);
         blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++) {
 #pragma omp parallel
@@ -1812,6 +1810,8 @@ namespace strumpack {
       auto CP = g->npcols();
       for (std::size_t i=0; i<B1_c; i+=CP) { //F11 and F21
         //construct the (i/CP+1) CP block-columns as dense tiles
+        F11.fill_col(0., i, CP);
+        F21.fill_col(0., i, CP);
         blockcol(i, true, CP);
         for (std::size_t k=0; k<i; k++) {
 #pragma omp parallel
@@ -1993,8 +1993,10 @@ namespace strumpack {
           }
         }
       }
-      for (std::size_t i=0; i<B2_c; i+=CP) { //F12 and F22
-        //construct the B2_c CP block-columns as dense tiles
+      for (std::size_t i=0; i<B2_c; i+=CP) { // F12 and F22
+        // construct the B2_c CP block-columns as dense tiles
+        F12.fill_col(0., i, CP);
+        F22.fill_col(0., i, CP);
         blockcol(i, false, CP);
         for (std::size_t k=0; k<B1_r; k++) {
 #pragma omp parallel
@@ -2255,13 +2257,6 @@ namespace strumpack {
             }
           }
         } else { //LL and LUAR Update
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-          auto lrb = B1+B2;
-          // dummy for task synchronization
-          std::unique_ptr<int[]> B_(new int[lrb*lrb]());
-          auto B = B_.get();
-#pragma omp taskgroup
-#endif
           if (i+1 < B1) {
             if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
               for (std::size_t k=0; k<i+1; k++) {
@@ -2276,12 +2271,7 @@ namespace strumpack {
                     std::size_t lk=0;
                     for (std::size_t j=i+1; j<B1; j++) {
                       if (g->is_local_col(j)) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                        std::size_t ij = (i+1)+lrb*j;
-#pragma omp task default(shared) firstprivate(i,j,k,ij) \
-  depend(inout:B[ij])
-#endif
-                        //for (std::size_t k=0, lj=0; k<i+1; k++) {
+#pragma omp task default(shared) firstprivate(i,j,k,lk)
                         gemm(Trans::N, Trans::N, scalar_t(-1.),
                              *(Tkj[0]), *(Tik[lk]), scalar_t(1.),
                              A11.tile_dense(i+1, j).D());
@@ -2294,12 +2284,7 @@ namespace strumpack {
                     if (g->is_local_row(i+1)) lj=1;
                     for (std::size_t j=i+2; j<B1; j++) {
                       if (g->is_local_row(j)) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                        std::size_t ji = j+lrb*(i+1);
-#pragma omp task default(shared) firstprivate(i,j,k,ji) \
-  depend(inout:B[ji])
-#endif
-                        //for (std::size_t k=0, lk=0; k<i+1; k++) {
+#pragma omp task default(shared) firstprivate(i,j,k,lj)
                         gemm(Trans::N, Trans::N, scalar_t(-1.),
                              *(Tkj[lj]), *(Tik[0]), scalar_t(1.),
                              A11.tile_dense(j, i+1).D());
@@ -2311,12 +2296,7 @@ namespace strumpack {
                     std::size_t lk=0;
                     for (std::size_t j=0; j<B2; j++) {
                       if (g->is_local_col(j)) {
-                        //for (std::size_t k=0, lj=0; k<i+1; k++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                        std::size_t ij2 = (i+1)+lrb*(B1+j);
-#pragma omp task default(shared) firstprivate(i,k,j,ij2)        \
-  depend(inout:B[ij2])
-#endif
+#pragma omp task default(shared) firstprivate(i,k,j,lk) 
                         gemm(Trans::N, Trans::N, scalar_t(-1.),
                              *(Tkj[0]), *(Tik2[lk]), scalar_t(1.),
                              A12.tile_dense(i+1, j).D());
@@ -2328,12 +2308,7 @@ namespace strumpack {
                     std::size_t lj=0;
                     for (std::size_t j=0; j<B2; j++) {
                       if (g->is_local_row(j)) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                        std::size_t j2i = (j+B1)+lrb*(i+1);
-#pragma omp task default(shared) firstprivate(i,k,j,j2i)        \
-  depend(inout:B[j2i])
-#endif
-                        //for (std::size_t k=0, lk=0; k<i+1; k++) {
+#pragma omp task default(shared) firstprivate(i,k,j,lj)
                         gemm(Trans::N, Trans::N, scalar_t(-1.),
                              *(Tk2j[lj]), *(Tik[0]), scalar_t(1.),
                              A21.tile_dense(j, i+1).D());
@@ -2355,11 +2330,7 @@ namespace strumpack {
                   std::size_t lk=0;
                   for (std::size_t j=i+1; j<B1; j++) {
                     if (g->is_local_col(j)) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                      std::size_t ij = (i+1)+lrb*j;
-#pragma omp task default(shared) firstprivate(i,j,ij)   \
-  depend(inout:B[ij])
-#endif
+#pragma omp task default(shared) firstprivate(i,j)
                       LUAR(i+1, lk, Tkj, Tik, A11.tile_dense(i+1, j).D(), opts, 0); //*(Tkj[lj]), *(Tik[lk])
                       lk+=i+1;
                     }
@@ -2370,11 +2341,7 @@ namespace strumpack {
                   if (g->is_local_row(i+1)) lj=i+1;
                   for (std::size_t j=i+2; j<B1; j++) {
                     if (g->is_local_row(j)) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                      std::size_t ji = j+lrb*(i+1);
-#pragma omp task default(shared) firstprivate(i,j,ji)   \
-  depend(inout:B[ji])
-#endif
+#pragma omp task default(shared) firstprivate(i,j)
                       LUAR(i+1, lj, Tik, Tkj, A11.tile_dense(j, i+1).D(), opts, 1);
                       lj+=i+1;
                     }
@@ -2384,11 +2351,7 @@ namespace strumpack {
                   std::size_t lk=0;
                   for (std::size_t j=0; j<B2; j++) {
                     if (g->is_local_col(j)) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                      std::size_t ij2 = (i+1)+lrb*(B1+j);
-#pragma omp task default(shared) firstprivate(i,j,ij2)  \
-  depend(inout:B[ij2])
-#endif
+#pragma omp task default(shared) firstprivate(i,j)
                       LUAR(i+1, lk, Tkj, Tik2, A12.tile_dense(i+1, j).D(), opts, 0);
                       lk+=i+1;
                     }
@@ -2398,11 +2361,7 @@ namespace strumpack {
                   std::size_t lj=0;
                   for (std::size_t j=0; j<B2; j++) {
                     if (g->is_local_row(j)) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                      std::size_t j2i = (B1+j)+lrb*(i+1);
-#pragma omp task default(shared) firstprivate(i,j,j2i)  \
-  depend(inout:B[j2i])
-#endif
+#pragma omp task default(shared) firstprivate(i,j)
                       LUAR(i+1, lj, Tik, Tk2j, A21.tile_dense(j, i+1).D(), opts, 1);
                       lj+=i+1;
                     }
@@ -2416,39 +2375,23 @@ namespace strumpack {
       if (!(opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL)) { //LL and LUAR Update A22
         auto Tik2 = A12.gather_rows_A22(B1, B2);
         auto Tk2j = A21.gather_cols_A22(B1, B2);
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-        auto lrb = B1+B2;
-        // dummy for task synchronization
-        std::unique_ptr<int[]> B_(new int[lrb*lrb]());
-        auto B = B_.get();
-#pragma omp taskgroup
-#endif
         if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
-#pragma omp parallel
-#pragma omp single nowait
-          {
-            std::size_t lj=0;
-            for (std::size_t i=0, li=0; i<B2; i++) {
-              if (g->is_local_row(i)) {
-                for (std::size_t j=0, lk=0; j<B2; j++) {
-                  if (g->is_local_col(j)) {
-                    lj=li;
-                    for (std::size_t k=0; k<B1; k++) {
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                      std::size_t i2j2 = (B1+i)+lrb*(B1+j);
-#pragma omp task default(shared) firstprivate(i,j,k,i2j2)       \
-  depend(inout:B[i2j2])
-#endif
-                      gemm(Trans::N, Trans::N, scalar_t(-1.),
-                           *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.),
-                           A22.tile_dense(i, j).D());
-                      lj++;
-                      lk++;
-                    }
+          std::size_t lj=0;
+          for (std::size_t i=0, li=0; i<B2; i++) {
+            if (g->is_local_row(i)) {
+              for (std::size_t j=0, lk=0; j<B2; j++) {
+                if (g->is_local_col(j)) {
+                  lj=li;
+                  for (std::size_t k=0; k<B1; k++) {
+                    gemm(Trans::N, Trans::N, scalar_t(-1.),
+                         *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.),
+                         A22.tile_dense(i, j).D());
+                    lj++;
+                    lk++;
                   }
                 }
-                li+=B1;
               }
+              li+=B1;
             }
           }
         } else { //LUAR - Star or Comb
@@ -2461,11 +2404,7 @@ namespace strumpack {
                 for (std::size_t j=0, lk=0; j<B2; j++) {
                   if (g->is_local_col(j)) {
                     lj=li;
-#if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                    std::size_t i2j2 = (B1+i)+lrb*(B1+j);
-#pragma omp task default(shared) firstprivate(i,j,i2j2) \
-  depend(inout:B[i2j2])
-#endif
+#pragma omp task default(shared) firstprivate(i,j)
                     LUAR_A22(B1, lj, lk, Tk2j, Tik2, A22.tile_dense(i, j).D(), opts);
                     lk+=B1;
                   }

@@ -110,11 +110,10 @@ namespace strumpack {
   }
 
 
-  template<typename integer_t> std::unique_ptr<SeparatorTree<integer_t>>
-  sep_tree_from_metis_sizes
-  (integer_t nodes, integer_t separators, std::vector<idx_t>& sizes) {
-    std::unique_ptr<SeparatorTree<integer_t>>
-      sep_tree(new SeparatorTree<integer_t>(nodes));
+  template<typename integer_t> SeparatorTree<integer_t>
+  sep_tree_from_metis_sizes(integer_t nodes, integer_t separators,
+                            std::vector<idx_t>& sizes) {
+    SeparatorTree<integer_t> sep_tree(nodes);
 
     // Generates the parent positions of all the nodes in a
     // subtree, except for its root, and returns the number
@@ -132,13 +131,13 @@ namespace strumpack {
         s0 = parent(pos, 2 * v + 2);
         s1 = parent(pos + s0, 2 * v + 1);
         root = pos + s0 + s1;
-        sep_tree->pa(pos + s0 - 1) = root;
-        sep_tree->pa(pos + s0 + s1 - 1) = root;
+        sep_tree.parent[pos + s0 - 1] = root;
+        sep_tree.parent[pos + s0 + s1 - 1] = root;
       } else std::tie(s0, s1) = std::make_tuple(0, 0);
       return s0 + s1 + 1;
     };
     parent(0, 0);
-    sep_tree->pa(nodes - 1) = -1;
+    sep_tree.parent[nodes - 1] = -1;
 
     // Generates the children positions of all the nodes in
     // a subtree and returns the number of nodes in that
@@ -151,12 +150,12 @@ namespace strumpack {
         s0 = children(pos, 2 * v + 2);
         s1 = children(pos + s0, 2 * v + 1);
         root = pos + s0 + s1;
-        sep_tree->lch(root) = pos + s0 - 1;
-        sep_tree->rch(root) = pos + s0 + s1 - 1;
+        sep_tree.lch[root] = pos + s0 - 1;
+        sep_tree.rch[root] = pos + s0 + s1 - 1;
       } else {
         std::tie(s0, s1) = std::make_tuple(0, 0);
-        sep_tree->lch(pos) = -1;
-        sep_tree->rch(pos) = -1;
+        sep_tree.lch[pos] = -1;
+        sep_tree.rch[pos] = -1;
       }
       return s0 + s1 + 1;
     };
@@ -178,21 +177,23 @@ namespace strumpack {
         std::tie(s0, s1) = std::make_pair(0, 0);
         std::tie(q0, q1) = std::make_pair(0, 0);
       }
-      sep_tree->sizes(pos + s0 + s1) = offs + q0 + q1;
+      sep_tree.sizes[pos + s0 + s1] = offs + q0 + q1;
       return std::make_pair(s0 + s1 + 1, q0 + q1 + sizes[nodes - (v + 1)]);
     };
     integer_t vertices;
     std::tie(std::ignore, vertices) = offset(0, 0, 0);
-    sep_tree->sizes(nodes) = vertices;
+    sep_tree.sizes[nodes] = vertices;
     return sep_tree;
   }
 
   // TODO throw an exception
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<SeparatorTree<integer_t>> metis_nested_dissection
-  (integer_t n, const integer_t* ptr, const integer_t* ind,
-   std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   const SPOptions<scalar_t>& opts) {
+  SeparatorTree<integer_t>
+  metis_nested_dissection(integer_t n,
+                          const integer_t* ptr, const integer_t* ind,
+                          std::vector<integer_t>& perm,
+                          std::vector<integer_t>& iperm,
+                          const SPOptions<scalar_t>& opts) {
     std::vector<idx_t> xadj(n+1), adjncy(ptr[n]);
     integer_t e = 0;
     for (integer_t j=0; j<n; j++) {
@@ -205,9 +206,10 @@ namespace strumpack {
       if (mpi_root())
         std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
     int ierr;
-    std::unique_ptr<SeparatorTree<integer_t>> sep_tree;
-    // idx_t options[METIS_NOPTIONS];
-    // METIS_SetDefaultOptions(options);
+    SeparatorTree<integer_t> sep_tree;
+    idx_t options[METIS_NOPTIONS];
+    METIS_SetDefaultOptions(options);
+    // options[METIS_OPTION_CCORDER] = 1;
     // options[METIS_OPTION_SEED] = 42;
     if (opts.use_METIS_NodeNDP()) {
       integer_t nodes =
@@ -216,7 +218,7 @@ namespace strumpack {
       std::vector<idx_t> sizes(nodes + 1);
       ierr = WRAPPER_METIS_NodeNDP
         (xadj, adjncy, nullptr, separators + 1,
-         /*options*/ nullptr, iperm, perm, sizes);
+         options /*nullptr*/, iperm, perm, sizes);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(n, ptr, ind, perm, iperm, opts);
@@ -225,7 +227,7 @@ namespace strumpack {
         sep_tree = sep_tree_from_metis_sizes(nodes, separators, sizes);
     } else {
       ierr = WRAPPER_METIS_NodeND
-        (xadj, adjncy, nullptr, /*options*/ nullptr, iperm, perm);
+        (xadj, adjncy, nullptr, options /*nullptr*/, iperm, perm);
 #if defined(STRUMPACK_USE_MPI)
       if (opts.use_MUMPS_SYMQAMD())
         sep_tree = aggressive_amalgamation(n, ptr, ind, perm, iperm, opts);
@@ -242,9 +244,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t,typename G>
-  std::unique_ptr<SeparatorTree<integer_t>> metis_nested_dissection
-  (const G& A, std::vector<integer_t>& perm, std::vector<integer_t>& iperm,
-   const SPOptions<scalar_t>& opts) {
+  SeparatorTree<integer_t>
+  metis_nested_dissection(const G& A,
+                          std::vector<integer_t>& perm,
+                          std::vector<integer_t>& iperm,
+                          const SPOptions<scalar_t>& opts) {
     return metis_nested_dissection
       (A.size(), A.ptr(), A.ind(), perm, iperm, opts);
   }

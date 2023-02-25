@@ -68,24 +68,27 @@ namespace strumpack {
     const std::vector<integer_t>& perm() const { return perm_; }
     const std::vector<integer_t>& iperm() const { return iperm_; }
 
-    const SeparatorTree<integer_t>& tree() const { return *sep_tree_; }
-    SeparatorTree<integer_t>& tree() { return *sep_tree_; }
+    const SeparatorTree<integer_t>& tree() const { return tree_; }
+    SeparatorTree<integer_t>& tree() { return tree_; }
 
   protected:
-    virtual void separator_reordering_print
-    (integer_t max_nr_neighbours, integer_t max_dim_sep);
+    virtual void
+    separator_reordering_print(integer_t max_nr_neighbours,
+                               integer_t max_dim_sep);
 
-    void nested_dissection_print
-    (const Opts_t& opts, integer_t nnz, int max_level,
-     int total_separators, bool verbose) const;
+    void
+    nested_dissection_print(const Opts_t& opts, integer_t nnz,
+                            int max_level, int total_separators,
+                            bool verbose) const;
 
     std::vector<integer_t> perm_, iperm_;
 
-    std::unique_ptr<SeparatorTree<integer_t>> sep_tree_;
+    SeparatorTree<integer_t> tree_;
 
   private:
-    void nested_dissection_print
-    (const Opts_t& opts, integer_t nnz, bool verbose) const;
+    void
+    nested_dissection_print(const Opts_t& opts, integer_t nnz,
+                            bool verbose) const;
   };
 
 } // end namespace strumpack

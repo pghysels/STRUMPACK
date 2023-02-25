@@ -99,16 +99,22 @@ namespace strumpack {
       const DenseM_t& U() const override { assert(false); return *D_; }
       const DenseM_t& V() const override { assert(false); return *D_; }
 
-      LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
-      LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
-      LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      multiply(const BLRTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      left_multiply(const LRTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      left_multiply(const DenseTile<scalar_t>& a) const override;
 
-      void multiply(const BLRTile<scalar_t>& a,
+      void
+      multiply(const BLRTile<scalar_t>& a,
+               DenseM_t& b, DenseM_t& c) const override;
+      void
+      left_multiply(const LRTile<scalar_t>& a,
                     DenseM_t& b, DenseM_t& c) const override;
-      void left_multiply(const LRTile<scalar_t>& a,
-                         DenseM_t& b, DenseM_t& c) const override;
-      void left_multiply(const DenseTile<scalar_t>& a,
-                         DenseM_t& b, DenseM_t& c) const override;
+      void
+      left_multiply(const DenseTile<scalar_t>& a,
+                    DenseM_t& b, DenseM_t& c) const override;
 
       scalar_t operator()(std::size_t i, std::size_t j) const override {
         return D_->operator()(i, j);
@@ -121,7 +127,7 @@ namespace strumpack {
       void laswpx(const int* dpiv, magma_queue_t q, bool fwd) override;
 #endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) override;
+      void laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) override;
 #endif
 
       void move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned = NULL) override {

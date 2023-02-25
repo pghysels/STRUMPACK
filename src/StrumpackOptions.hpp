@@ -38,6 +38,7 @@
 #include "HSS/HSSOptions.hpp"
 #include "BLR/BLROptions.hpp"
 #include "HODLR/HODLROptions.hpp"
+// #include "sparse/ordering/spectral/NDOptions.hpp"
 
 namespace strumpack {
 
@@ -63,8 +64,13 @@ namespace strumpack {
     SCOTCH,     /*!< Use Scotch nested-dissection reordering        */
     PTSCOTCH,   /*!< Use PT-Scotch nested-dissection reordering     */
     RCM,        /*!< Use RCM reordering                             */
-    GEOMETRIC   /*!< A simple geometric nested dissection code that
+    GEOMETRIC,  /*!< A simple geometric nested dissection code that
                   only works for regular meshes. (see Sp::reorder)  */
+    AMD,        /*!< Approximate minimum degree                     */
+    MMD,        /*!< Multiple minimum degree                        */
+    AND,        /*!< Nested dissection                              */
+    MLF,        /*!< Minimum local fill                             */
+    SPECTRAL    /*!< Spectral nested dissection                     */
   };
 
   /**
@@ -236,6 +242,7 @@ namespace strumpack {
       hss_opts_.set_verbose(false);
       blr_opts_.set_verbose(false);
       hodlr_opts_.set_verbose(false);
+      // nd_opts_.set_verbose(false);
     }
 
     /**
@@ -738,6 +745,20 @@ namespace strumpack {
     void set_gpu_streams(int s) { gpu_streams_ = s; }
 
     /**
+     * Enable OpenMP tasking traversal of the supernodal tree in the
+     * sparse solver. This requires more (peak) memory, but scales
+     * better with OpenMP threads.
+     */
+    void enable_openmp_tree() { use_openmp_tree_ = true; }
+
+    /**
+     * Disable OpenMP tasking traversal of the supernodal tree in the
+     * sparse solver. This reduces the peak memory requirements, but
+     * scales poorer with OpenMP threads.
+     */
+    void disable_openmp_tree() { use_openmp_tree_ = false; }
+
+    /**
      * Set the precision for lossy compression.
      */
     void set_lossy_precision(int p) { lossy_precision_ = p; }
@@ -1105,6 +1126,12 @@ namespace strumpack {
     bool use_gpu() const { return use_gpu_; }
 
     /**
+     * Check wheter or not to use OpenMP tree traversal is the sparse
+     * solver.
+     */
+    bool use_openmp_tree() const { return use_openmp_tree_; }
+
+    /**
      * Returns the number of GPU streams to use.
      */
     int gpu_streams() const { return gpu_streams_; }
@@ -1112,7 +1139,10 @@ namespace strumpack {
     /**
      * Returns the precision for lossy compression.
      */
-    int lossy_precision() const { return lossy_precision_; }
+    int lossy_precision() const {
+      return (compression() == CompressionType::LOSSLESS) ?
+        -1 : lossy_precision_;
+    }
 
     /**
      * Info about the stats of the root front will be printed to
@@ -1160,6 +1190,18 @@ namespace strumpack {
      * to the HODLR code, and data structures.
      */
     HODLR::HODLROptions<scalar_t>& HODLR_options() { return hodlr_opts_; }
+
+    // /**
+    //  * Get a (const) reference to an object holding various options
+    //  * pertaining to the spectral nested dissection code.
+    //  */
+    // const ordering::NDOptions& ND_options() const { return nd_opts_; }
+
+    // /**
+    //  * Get a reference to an object holding various options pertaining
+    //  * to the spectral nested dissection code.
+    //  */
+    // ordering::NDOptions& ND_options() { return nd_opts_; }
 
     /**
      * Parse the command line options that were passed to this object
@@ -1216,16 +1258,21 @@ namespace strumpack {
     bool write_root_front_ = false;
     bool print_comp_front_stats_ = false;
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
+    bool use_openmp_tree_ = true;
 
     /** GPU options */
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
     bool use_gpu_ = true;
+#else
+    bool use_gpu_ = false;
+#endif
     int gpu_streams_ = default_gpu_streams();
 
     /** compression options */
     CompressionType comp_ = CompressionType::NONE;
 
     /** HSS options */
-    int hss_min_front_size_ = 5000;
+    int hss_min_front_size_ = 100000;
     int hss_min_sep_size_ = 1000;
     int sep_order_level_ = 1;
     bool indirect_sampling_ = false;
@@ -1233,18 +1280,20 @@ namespace strumpack {
 
     /** BLR options */
     BLR::BLROptions<scalar_t> blr_opts_;
-    int blr_min_front_size_ = 1000;
-    int blr_min_sep_size_ = 256;
+    int blr_min_front_size_ = 100000;
+    int blr_min_sep_size_ = 512;
 
     /** HODLR options */
     HODLR::HODLROptions<scalar_t> hodlr_opts_;
-    int hodlr_min_front_size_ = 10000;
+    int hodlr_min_front_size_ = 100000;
     int hodlr_min_sep_size_ = 5000;
 
     /** LOSSY/LOSSLESS options */
-    int lossy_min_front_size_ = 16;
+    int lossy_min_front_size_ = 100000;
     int lossy_min_sep_size_ = 8;
     int lossy_precision_ = 16;
+
+    // ordering::NDOptions nd_opts_;
 
     int argc_ = 0;
     const char* const* argv_ = nullptr;

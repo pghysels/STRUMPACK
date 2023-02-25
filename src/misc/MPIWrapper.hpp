@@ -33,6 +33,7 @@
 #ifndef STRUMPACK_MPI_WRAPPER_HPP
 #define STRUMPACK_MPI_WRAPPER_HPP
 
+#include <list>
 #include <vector>
 #include <complex>
 #include <cassert>
@@ -40,6 +41,7 @@
 #include <limits>
 #include <memory>
 #include <utility>
+#include "StrumpackConfig.hpp"
 
 #define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
@@ -177,7 +179,6 @@ namespace strumpack {
     MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   }
 
-
   /**
    * \class MPIComm
    * \brief Wrapper class around an MPI_Comm object.
@@ -301,6 +302,7 @@ namespace strumpack {
     broadcast(std::vector<T>& sbuf) const {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
     }
+
     template<typename T> void
     broadcast_from(std::vector<T>& sbuf, int src) const {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), src, comm_);
@@ -311,12 +313,10 @@ namespace strumpack {
       MPI_Bcast(sbuf.data(), sbuf.size(), mpi_type<T>(), 0, comm_);
     }
 
-    template<typename T> void
-    broadcast(T& data) const {
+    template<typename T> void broadcast(T& data) const {
       MPI_Bcast(&data, 1, mpi_type<T>(), 0, comm_);
     }
-    template<typename T> void
-    broadcast_from(T& data, int src) const {
+    template<typename T> void broadcast_from(T& data, int src) const {
       MPI_Bcast(&data, 1, mpi_type<T>(), src, comm_);
     }
     template<typename T> void
@@ -436,7 +436,8 @@ namespace strumpack {
     template<typename T>
     void send(const std::vector<T>& sbuf, int dest, int tag) const {
       // const_cast is necessary for ancient openmpi version used on Travis
-      MPI_Send(const_cast<T*>(sbuf.data()), sbuf.size(), mpi_type<T>(), dest, tag, comm_);
+      MPI_Send(const_cast<T*>(sbuf.data()), sbuf.size(),
+               mpi_type<T>(), dest, tag, comm_);
     }
 
     /**
@@ -694,10 +695,20 @@ namespace strumpack {
         (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
       std::size_t totssize = std::accumulate(ssizes, ssizes+P, std::size_t(0)),
         totrsize = std::accumulate(rsizes, rsizes+P, std::size_t(0));
+#if 1
+      if (true) {
+        // Always implement the all_to_all_v with Irecv/Isend loops.
+        // We noticed (on NERSC Cori) that MPI_Alltoallv gave wrong
+        // results for large problems (using double complex), likely
+        // due to some overflow, even tho the totssize/totrsize was <
+        // MAX_INT. Also, using Irecv/Isend directly avoids to copies
+        // from the separate send buffers to the single send buffer.
+#else
       if (totrsize >
-          static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
-          totssize >
-          static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+        totssize >
+        static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+#endif
         // This case will probably cause an overflow in the
         // rdispl/sdispl elements. Here we do the all_to_all_v
         // manually by just using Isend/Irecv. This might be slower
@@ -707,14 +718,18 @@ namespace strumpack {
         std::unique_ptr<MPI_Request[]> reqs(new MPI_Request[2*P]);
         std::size_t displ = 0;
         pbuf.resize(P);
+        int r = rank();
         for (int p=0; p<P; p++) {
-          pbuf[p] = rbuf.data() + displ;
-          MPI_Irecv(pbuf[p], rsizes[p], Ttype, p, 0, comm_, reqs.get()+p);
-          displ += rsizes[p];
+          auto dst = (r + p) % P;
+          pbuf[dst] = rbuf.data() + displ;
+          MPI_Irecv(pbuf[dst], rsizes[dst], Ttype, dst, 0, comm_, reqs.get()+dst);
+          displ += rsizes[dst];
         }
-        for (int p=0; p<P; p++)
+        for (int p=0; p<P; p++) {
+          auto dst = (r + p) % P;
           MPI_Isend
-            (sbuf[p].data(), ssizes[p], Ttype, p, 0, comm_, reqs.get()+P+p);
+            (sbuf[dst].data(), ssizes[dst], Ttype, dst, 0, comm_, reqs.get()+P+dst);
+        }
         MPI_Waitall(2*P, reqs.get(), MPI_STATUSES_IGNORE);
         std::vector<std::vector<T>>().swap(sbuf);
       } else {

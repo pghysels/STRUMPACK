@@ -49,9 +49,6 @@ export LD_LIBRARY_PATH=PATH-TO-STRUMPACK-LIB/:$LD_LIBRARY_PATH
   mpi environment does not allow oversubscription, those tests will
   fail.
 
-  The test executables are not build by default, but can be build
-  using \code{.bash} make tests \endcode
-
 
 ### Does the code keep track of the number of floating point operations performed?
 

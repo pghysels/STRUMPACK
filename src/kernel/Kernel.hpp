@@ -532,10 +532,10 @@ namespace strumpack {
      */
     inline std::string get_name(KernelType k) {
       switch (k) {
-      case KernelType::DENSE: return "dense"; break;
-      case KernelType::GAUSS: return "Gauss"; break;
-      case KernelType::LAPLACE: return "Laplace"; break;
-      case KernelType::ANOVA: return "ANOVA"; break;
+      case KernelType::DENSE: return "dense";
+      case KernelType::GAUSS: return "Gauss";
+      case KernelType::LAPLACE: return "Laplace";
+      case KernelType::ANOVA: return "ANOVA";
       default: return "UNKNOWN";
       }
     }

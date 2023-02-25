@@ -1,0 +1,99 @@
+name: Run Github CI tests.
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        compiler:
+          - gcc
+        test: [0,1,2,3,4,5]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          export BLUE="\033[34;1m"
+          mkdir -p installDir
+
+          printf  "${BLUE} PG; Installing gcc-9 via apt\n"
+          sudo apt-get update
+          sudo apt-get install build-essential software-properties-common -y
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install gcc-9 g++-9 -y
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
+          export CXX="g++-9"
+          export CC="gcc-9"
+          printf "${BLUE} PG; Done installing gcc-9 via apt\n"
+
+          printf "${BLUE} PG; Installing gfortran via apt\n"
+          sudo apt-get install gfortran-9 -y
+          sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
+          printf "${BLUE} PG; Done installing gfortran via apt\n"
+
+          printf "${BLUE} PG; Installing openmpi\n"
+          sudo apt-get install openmpi-bin libopenmpi-dev
+          printf "${BLUE} PG; Done installing openmpi\n"
+
+          printf "${BLUE} PG; Installing metis\n"
+          sudo apt-get install libmetis-dev libparmetis-dev
+          printf "${BLUE} PG; Done installing metis\n"
+
+          # printf "${BLUE} PG; Installing BLAS from apt\n"
+          # sudo apt-get install libblas-dev
+          # export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
+          # printf "${BLUE} PG; Done installing BLAS from apt\n"
+
+          # printf "${BLUE} PG; Installing LAPACK from apt\n"
+          # sudo apt-get install liblapack-dev
+          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
+          # printf "${BLUE} PG; Done installing LAPACK from apt\n"
+
+          printf "${BLUE} PG; Installing OpenBLAS from apt\n"
+          sudo apt-get install libopenblas-openmp-dev
+          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
+          printf "${BLUE} PG; Done installing OpenBLAS from apt\n"
+
+          printf "${BLUE} PG; Installing ScaLAPACK from apt\n"
+          sudo apt-get install libscalapack-mpi-dev
+          export SCALAPACK_LIB=/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so
+          printf "${BLUE} PG; Done installing ScaLAPACK from apt\n"
+
+      - name: Install package
+        run: |
+          export BLUE="\033[34;1m"
+          # export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
+          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
+          export SCALAPACK_LIB="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
+          printf "${BLUE} PG; Installing STRUMPACK from source\n"
+          cd $GITHUB_WORKSPACE
+          rm -rf build
+          mkdir -p build
+          cd build
+          export CRAYPE_LINK_TYPE=dynamic
+          cmake .. \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_C_COMPILER=mpicc \
+            -DCMAKE_CXX_COMPILER=mpic++ \
+            -DCMAKE_Fortran_COMPILER=mpif90 \
+            -DCMAKE_INSTALL_PREFIX=. \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
+            -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
+          make
+          make install
+          make examples
+          printf "${BLUE} PG; Done installing STRUMPACK from source\n"
+
+      - name: Test
+        run: |
+          cd $GITHUB_WORKSPACE
+          export TEST_NUMBER=${{ matrix.test }}
+          sh ./.ci_tests.sh

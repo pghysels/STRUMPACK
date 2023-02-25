@@ -101,7 +101,12 @@ typedef enum
    STRUMPACK_SCOTCH=3,
    STRUMPACK_PTSCOTCH=4,
    STRUMPACK_RCM=5,
-   STRUMPACK_GEOMETRIC=6
+   STRUMPACK_GEOMETRIC=6,
+   STRUMPACK_AMD=7,
+   STRUMPACK_MMD=8,
+   STRUMPACK_AND=9,
+   STRUMPACK_MLF=10,
+   STRUMPACK_SPECTRAL=11,
   } STRUMPACK_REORDERING_STRATEGY;
 
 typedef enum
@@ -137,7 +142,10 @@ typedef enum
   {
    STRUMPACK_SUCCESS=0,
    STRUMPACK_MATRIX_NOT_SET=1,
-   STRUMPACK_REORDERING_ERROR=2
+   STRUMPACK_REORDERING_ERROR=2,
+   STRUMPACK_ZERO_PIVOT=3,
+   STRUMPACK_NO_CONVERGENCE=4,
+   STRUMPACK_INACCURATE_INERTIA=5
   } STRUMPACK_RETURN_CODE;
 
 
@@ -145,62 +153,74 @@ typedef enum
 extern "C" {
 #endif
 
-  void STRUMPACK_init_mt
-  (STRUMPACK_SparseSolver* S, STRUMPACK_PRECISION precision,
-   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose);
+  void STRUMPACK_init_mt(STRUMPACK_SparseSolver* S,
+                         STRUMPACK_PRECISION precision,
+                         STRUMPACK_INTERFACE interface,
+                         int argc, char* argv[], int verbose);
 
 #if defined(STRUMPACK_USE_MPI)
-  void STRUMPACK_init
-  (STRUMPACK_SparseSolver* S, MPI_Comm comm, STRUMPACK_PRECISION precision,
-   STRUMPACK_INTERFACE interface, int argc, char* argv[], int verbose);
+  void STRUMPACK_init(STRUMPACK_SparseSolver* S, MPI_Comm comm,
+                      STRUMPACK_PRECISION precision,
+                      STRUMPACK_INTERFACE interface,
+                      int argc, char* argv[], int verbose);
+#endif
+
+#if defined(STRUMPACK_USE_MPI) || defined(SWIG)
+  void STRUMPACK_set_distributed_csr_matrix(STRUMPACK_SparseSolver S,
+                                            const void* local_rows,
+                                            const void* row_ptr, const void* col_ind,
+                                            const void* values, const void* dist,
+                                            int symmetric_pattern);
+
+  void STRUMPACK_update_distributed_csr_matrix_values(STRUMPACK_SparseSolver S,
+                                                      const void* local_rows,
+                                                      const void* row_ptr, const void* col_ind,
+                                                      const void* values, const void* dist,
+                                                      int symmetric_pattern);
+
+  void STRUMPACK_set_MPIAIJ_matrix(STRUMPACK_SparseSolver S, const void* n,
+                                   const void* d_ptr, const void* d_ind, const void* d_val,
+                                   const void* o_ptr, const void* o_ind, const void* o_val,
+                                   const void* garray);
+
+  void STRUMPACK_update_MPIAIJ_matrix_values(STRUMPACK_SparseSolver S, const void* n,
+                                             const void* d_ptr, const void* d_ind, const void* d_val,
+                                             const void* o_ptr, const void* o_ind, const void* o_val,
+                                             const void* garray);
 #endif
 
   void STRUMPACK_destroy(STRUMPACK_SparseSolver* S);
 
-  void STRUMPACK_set_csr_matrix
-  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
-   const void* col_ind, const void* values, int symmetric_pattern);
+  void STRUMPACK_set_csr_matrix(STRUMPACK_SparseSolver S,
+                                const void* N, const void* row_ptr,
+                                const void* col_ind, const void* values,
+                                int symmetric_pattern);
 
-  void STRUMPACK_update_csr_matrix_values
-  (STRUMPACK_SparseSolver S, const void* N, const void* row_ptr,
-   const void* col_ind, const void* values, int symmetric_pattern);
+  void STRUMPACK_update_csr_matrix_values(STRUMPACK_SparseSolver S,
+                                          const void* N, const void* row_ptr,
+                                          const void* col_ind, const void* values,
+                                          int symmetric_pattern);
 
-#if defined(STRUMPACK_USE_MPI)
-  void STRUMPACK_set_distributed_csr_matrix
-  (STRUMPACK_SparseSolver S, const void* local_rows,
-   const void* row_ptr, const void* col_ind, const void* values,
-   const void* dist, int symmetric_pattern);
+  STRUMPACK_RETURN_CODE STRUMPACK_solve(STRUMPACK_SparseSolver S,
+                                        const void* b, void* x,
+                                        int use_initial_guess);
 
-  void STRUMPACK_update_distributed_csr_matrix_values
-  (STRUMPACK_SparseSolver S, const void* local_rows,
-   const void* row_ptr, const void* col_ind, const void* values,
-   const void* dist, int symmetric_pattern);
-
-
-  void STRUMPACK_set_MPIAIJ_matrix
-  (STRUMPACK_SparseSolver S, const void* n,
-   const void* d_ptr, const void* d_ind, const void* d_val,
-   const void* o_ptr, const void* o_ind, const void* o_val,
-   const void* garray);
-
-  void STRUMPACK_update_MPIAIJ_matrix_values
-  (STRUMPACK_SparseSolver S, const void* n,
-   const void* d_ptr, const void* d_ind, const void* d_val,
-   const void* o_ptr, const void* o_ind, const void* o_val,
-   const void* garray);
-#endif
-
-  STRUMPACK_RETURN_CODE STRUMPACK_solve
-  (STRUMPACK_SparseSolver S, const void* b, void* x, int use_initial_guess);
+  STRUMPACK_RETURN_CODE STRUMPACK_matsolve(STRUMPACK_SparseSolver S, int nrhs,
+                                           const void* b, int ldb,
+                                           void* x, int ldx, int use_initial_guess);
 
   void STRUMPACK_set_from_options(STRUMPACK_SparseSolver S);
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder(STRUMPACK_SparseSolver S);
 
-  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular
-  (STRUMPACK_SparseSolver S, int nx, int ny, int nz);
+  STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S,
+                                                  int nx, int ny, int nz,
+                                                  int components, int width);
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S);
+
+  STRUMPACK_RETURN_CODE STRUMPACK_inertia(STRUMPACK_SparseSolver S,
+                                          int* neg, int* zero, int* pos);
 
   void STRUMPACK_move_to_gpu(STRUMPACK_SparseSolver S);
 
@@ -208,11 +228,6 @@ extern "C" {
 
   void STRUMPACK_delete_factors(STRUMPACK_SparseSolver S);
 
-  /*
-    TODO add
-    - routines to update the matrix values!!!!!
-    - solve with multiple rhs??!!!
-  */
 
   /*************************************************************
    ** Set options **********************************************
@@ -224,6 +239,13 @@ extern "C" {
   void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol);
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param);
   void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m);
+  void STRUMPACK_enable_METIS_NodeNDP(STRUMPACK_SparseSolver S);
+  void STRUMPACK_disable_METIS_NodeNDP(STRUMPACK_SparseSolver S);
+  void STRUMPACK_set_nx(STRUMPACK_SparseSolver S, int nx);
+  void STRUMPACK_set_ny(STRUMPACK_SparseSolver S, int ny);
+  void STRUMPACK_set_nz(STRUMPACK_SparseSolver S, int nz);
+  void STRUMPACK_set_components(STRUMPACK_SparseSolver S, int nc);
+  void STRUMPACK_set_separator_width(STRUMPACK_SparseSolver S, int w);
   void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t);
   void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, STRUMPACK_MATCHING_JOB job);
   void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type);
@@ -236,6 +258,7 @@ extern "C" {
   void STRUMPACK_set_compression_rel_tol(STRUMPACK_SparseSolver S, double rctol);
   void STRUMPACK_set_compression_abs_tol(STRUMPACK_SparseSolver S, double actol);
   void STRUMPACK_set_compression_butterfly_levels(STRUMPACK_SparseSolver S, int l);
+  void STRUMPACK_set_compression_lossy_precision(STRUMPACK_SparseSolver S, int p);
 
   /*************************************************************
    ** Get options **********************************************
@@ -247,8 +270,9 @@ extern "C" {
   double STRUMPACK_abs_tol(STRUMPACK_SparseSolver S);
   int STRUMPACK_nd_param(STRUMPACK_SparseSolver S);
   STRUMPACK_REORDERING_STRATEGY STRUMPACK_reordering_method(STRUMPACK_SparseSolver S);
-  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S);
+  int STRUMPACK_use_METIS_NodeNDP(STRUMPACK_SparseSolver S);
   STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S);
+  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S);
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S);
   int STRUMPACK_use_gpu(STRUMPACK_SparseSolver S);
   STRUMPACK_COMPRESSION_TYPE STRUMPACK_compression(STRUMPACK_SparseSolver S);
@@ -258,6 +282,7 @@ extern "C" {
   double STRUMPACK_compression_rel_tol(STRUMPACK_SparseSolver S);
   double STRUMPACK_compression_abs_tol(STRUMPACK_SparseSolver S);
   int STRUMPACK_compression_butterfly_levels(STRUMPACK_SparseSolver S);
+  int STRUMPACK_compression_lossy_precision(STRUMPACK_SparseSolver S);
 
   /*************************************************************
    ** Get solve statistics *************************************

@@ -129,18 +129,27 @@ namespace strumpack {
      * (PT-)Scotch, (Par)Metis or a simple geometric nested dissection
      * code which only works on regular meshes.
      *
+     * All parameters here are optional and only used with the
+     * geometric ordering, which only makes sense on a regular 1D, 2D
+     * or 3D mesh, in the natural ordering.
+     *
      * \param nx this (optional) parameter is only meaningful when the
-     * matrix corresponds to a stencil on a regular mesh. The stencil
-     * is assumed to be at most 3 points wide in each dimension and
-     * only contain a single degree of freedom per grid point. The nx
+     * matrix corresponds to a stencil on a regular mesh. The nx
      * parameter denotes the number of grid points in the first
      * spatial dimension.
      * \param ny see parameters nx. Parameter ny denotes the number of
-     * gridpoints in the second spatial dimension.
-     * This should only be set if the mesh is 2 or 3 dimensional.
+     * gridpoints in the second spatial dimension.  This should only
+     * be set if the mesh is 2 or 3 dimensional, otherwise it can be
+     * 1 (default).
      * \param nz See parameters nx. Parameter nz denotes the number of
-     * gridpoints in the third spatial dimension.
-     * This should only be set if the mesh is 3 dimensional.
+     * gridpoints in the third spatial dimension.  This should only be
+     * set if the mesh is 3 dimensional, otherwise it can be 1
+     * (default).
+     * \param components Number of degrees of freedom per grid point
+     * (default 1)
+     * \param width Width of the stencil, a 1D 3-point stencil needs a
+     * separator of width 1, a 1D 5-point wide stencil needs a
+     * separator of width 2 (default 1).
      * \return error code
      * \see SPOptions
      */
@@ -173,7 +182,15 @@ namespace strumpack {
      */
     ReturnCode factor();
 
+    /**
+     * OBSOLETE if the factors fit in device memory they will already
+     * be on the device
+     */
     void move_to_gpu();
+    /**
+     * TODO implement this to clear the device memory, but still keep
+     * the factors in host memory
+     */
     void remove_from_gpu();
 
     /**
@@ -227,6 +244,38 @@ namespace strumpack {
      * \see DenseMatrix, solve(), factor()
      */
     ReturnCode solve(const DenseM_t& b, DenseM_t& x,
+                     bool use_initial_guess=false);
+
+    /**
+     * Solve a linear system with a single or multiple right-hand
+     * sides. Before being able to solve a linear system, the matrix
+     * needs to be factored. One can call factor() explicitly, or if
+     * this was not yet done, this routine will call factor()
+     * internally.
+     *
+     * \param nrhs Number of right hand sides.
+     * \param b input, will not be modified. DenseMatrix containgin
+     * the right-hand side vector/matrix. Should have N rows, with N
+     * the dimension of the input matrix for SparseSolver and
+     * SparseSolverMPI. For SparseSolverMPIDist, the number or rows of
+     * b should be correspond to the partitioning of the block-row
+     * distributed input matrix.
+     * \param ldb leading dimension of b
+     * \param x Output, pointer to the solution vector.  Array should
+     * be lenght N, the dimension of the input matrix for SparseSolver
+     * and SparseSolverMPI. For SparseSolverMPIDist, the length of b
+     * should be correspond the partitioning of the block-row
+     * distributed input matrix.
+     * \param ldx leading dimension of x
+     * \param use_initial_guess set to true if x contains an intial
+     * guess to the solution.  This is mainly useful when using an
+     * iterative solver.  If set to false, x should not be set (but
+     * should be allocated).
+     * \return error code
+     * \see DenseMatrix, solve(), factor()
+     */
+    ReturnCode solve(int nrhs, const scalar_t* b, int ldb,
+                     scalar_t* x, int ldx,
                      bool use_initial_guess=false);
 
     /**
@@ -292,6 +341,32 @@ namespace strumpack {
      */
     int Krylov_iterations() const;
 
+
+    /**
+     * Return the inertia of the matrix. A sparse matrix needs to be
+     * set before inertia can be computed. The matrix needs to be
+     * factored. If this->factor() was not called already, then it is
+     * called inside the inertia routine.
+     *
+     * To get accurate inertia the matching needs to be disabled,
+     * because the matching applies a non-symmetric permutation.
+     * Matching can be disabled using
+     * this->options().set_matching(strumpack::MatchingJob::NONE);
+     *
+     * The inertia will not be correct if pivoting was performed, in
+     * which case the return value will be
+     * ReturnCode::INACCURATE_INERTIA.  Inertia also cannot be
+     * computed when compression is applied (fi, HSS, HODLR, ...).
+     *
+     * \param neg number of negative eigenvalues (if return value is
+     * ReturnCode::SUCCESS)
+     * \param zero number of zero eigenvalues (if return value is
+     * ReturnCode::SUCCESS)
+     * \param pos number of positive eigenvalues (if return value is
+     * ReturnCode::SUCCESS)
+     */
+    ReturnCode inertia(integer_t& neg, integer_t& zero, integer_t& pos);
+
     /**
      * Create a gnuplot script to draw/plot the sparse factors. Only
      * do this for small matrices! It is very slow!
@@ -320,6 +395,7 @@ namespace strumpack {
     virtual void separator_reordering() = 0;
 
     virtual SpMat_t* matrix() = 0;
+    virtual std::unique_ptr<SpMat_t> matrix_nonzero_diag() = 0;
     virtual Reord_t* reordering() = 0;
     virtual Tree_t* tree() = 0;
     virtual const SpMat_t* matrix() const = 0;
@@ -383,6 +459,11 @@ namespace strumpack {
     virtual
     ReturnCode solve_internal(const DenseM_t& b, DenseM_t& x,
                               bool use_initial_guess=false) = 0;
+
+    virtual
+    ReturnCode solve_internal(int nrhs, const scalar_t* b, int ldb,
+                              scalar_t* x, int ldx,
+                              bool use_initial_guess=false);
 
     virtual void delete_factors_internal() = 0;
   };

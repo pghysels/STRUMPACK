@@ -43,13 +43,6 @@
 #include "dense/DenseMatrix.hpp"
 #include "StrumpackOptions.hpp"
 
-// where is this used?? in MC64?
-#ifdef _LONGINT
-  typedef long long int int_t;
-#else // Default
-  typedef int int_t;
-#endif
-
 namespace strumpack {
 
   // forward declarations
@@ -57,12 +50,6 @@ namespace strumpack {
   template<typename scalar_t> class DenseMatrix;
   template<typename scalar_t> class DistributedMatrix;
 
-  extern "C" {
-    int_t strumpack_mc64id_(int_t*);
-    int_t strumpack_mc64ad_
-    (int_t*, int_t*, int_t*, int_t*, int_t*, double*, int_t*,
-     int_t*, int_t*, int_t*, int_t*, double*, int_t*, int_t*);
-  }
 
   template<typename scalar_t, typename integer_t,
            typename real_t = typename RealType<scalar_t>::value_type>
@@ -82,10 +69,10 @@ namespace strumpack {
     std::vector<integer_t> Q;
     std::vector<real_t> R, C;
 
-    int_t mc64_work_int(std::size_t n, std::size_t nnz) const {
+    integer_t mc64_work_int(std::size_t n, std::size_t nnz) const {
       switch (job) {
-      case MatchingJob::MAX_SMALLEST_DIAGONAL: return 4*n; break;
-      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 10*n + nnz; break;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL: return 4*n;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return 10*n + nnz;
       case MatchingJob::MAX_CARDINALITY:
       case MatchingJob::MAX_DIAGONAL_SUM:
       case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
@@ -93,14 +80,14 @@ namespace strumpack {
       }
     }
 
-    int_t mc64_work_double(std::size_t n, std::size_t nnz) const {
+    integer_t mc64_work_double(std::size_t n, std::size_t nnz) const {
       switch (job) {
-      case MatchingJob::MAX_CARDINALITY: return 0; break;
-      case MatchingJob::MAX_SMALLEST_DIAGONAL: return n; break;
-      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return nnz; break;
-      case MatchingJob::MAX_DIAGONAL_SUM: return 2*n + nnz; break;
+      case MatchingJob::MAX_CARDINALITY: return 0;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL: return n;
+      case MatchingJob::MAX_SMALLEST_DIAGONAL_2: return nnz;
+      case MatchingJob::MAX_DIAGONAL_SUM: return 2*n + nnz;
       case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
-      default: return 3*n + nnz; break;
+      default: return 3*n + nnz;
       }
     }
   };
@@ -147,7 +134,6 @@ namespace strumpack {
    * sparse matrices.
    *
    * This is only for __square__ matrices!
-   * __TODO make this work on non-square matrices__
    *
    * The rows and the columns should always be __sorted__!
    *
@@ -377,7 +363,6 @@ namespace strumpack {
     virtual real_t max_scaled_residual(const DenseM_t& x,
                                        const DenseM_t& b) const = 0;
 
-
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     virtual CSRGraph<integer_t>
     extract_graph(int ordering_level, integer_t lo, integer_t hi) const = 0;
@@ -405,6 +390,10 @@ namespace strumpack {
                         std::vector<Triplet<scalar_t>>&,
                         std::vector<Triplet<scalar_t>>&,
                         std::vector<Triplet<scalar_t>>&) const = 0;
+    virtual void
+    set_front_elements(integer_t, integer_t, const std::vector<integer_t>&,
+                       Triplet<scalar_t>*, Triplet<scalar_t>*,
+                       Triplet<scalar_t>*) const = 0;
     virtual void
     count_front_elements(integer_t, integer_t, const std::vector<integer_t>&,
                          std::size_t&, std::size_t&, std::size_t&) const = 0;

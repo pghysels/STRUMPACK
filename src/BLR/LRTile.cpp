@@ -250,8 +250,8 @@ namespace strumpack {
     }
 #endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    template<typename scalar_t> void 
-    LRTile<scalar_t>::laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) {
+    template<typename scalar_t> void
+    LRTile<scalar_t>::laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) {
       gpu::laswp(handle, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
     }
 #endif
@@ -267,9 +267,9 @@ namespace strumpack {
       } else {
         gpu::copy_device_to_host_async(pinned, U().data(), U().rows()*U().cols(), s);
         event.record(s);
-        event.synchronize(); 
+        event.synchronize();
         for (std::size_t i=0; i<U().rows(); i++) {
-          for (std::size_t j=0; j<U().cols(); j++) {             
+          for (std::size_t j=0; j<U().cols(); j++) {
             hU(i, j) = pinned[i+U().ld()*j];
           }
         }
@@ -277,7 +277,7 @@ namespace strumpack {
         event.record(s);
         event.synchronize();
         for (std::size_t i=0; i<V().rows(); i++) {
-          for (std::size_t j=0; j<V().cols(); j++) {             
+          for (std::size_t j=0; j<V().cols(); j++) {
             hV(i, j) = pinned[i+V().ld()*j];
           }
         }
@@ -294,8 +294,8 @@ namespace strumpack {
          params::task_recursion_cutoff_level);
     }
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    template<typename scalar_t> void 
-    LRTile<scalar_t>::trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
+    template<typename scalar_t> void
+    LRTile<scalar_t>::trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul,
                              Trans ta, Diag d, scalar_t alpha,
                              DenseM_t& a) {
       strumpack::gpu::trsm

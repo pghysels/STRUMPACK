@@ -81,7 +81,6 @@ namespace strumpack {
     zfp_field_free(f);
     zfp_stream_close(destream);
     stream_close(bstream);
-    return;
   }
 
   template<typename T> LossyMatrix<std::complex<T>>::LossyMatrix
@@ -146,11 +145,13 @@ namespace strumpack {
     F21 = F21c_.decompress();
   }
 
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
-    FD_t::multifrontal_factorization(A, opts, etree_level, task_depth);
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixLossy<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
+   int etree_level, int task_depth) {
+    auto e = FD_t::factor(A, opts, workspace, etree_level, task_depth);
     compress(opts);
+    return e;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -158,10 +159,9 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
-    //FD_t::fwd_solve_phase2(b, bupd, etree_level, task_depth);
     if (this->dim_sep()) {
       DenseMW_t bloc(this->dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      bloc.laswp(this->piv, true);
+      bloc.laswp(this->piv_, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11, bloc, task_depth);
         if (this->dim_upd())
@@ -182,7 +182,6 @@ namespace strumpack {
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
-    // FD_t::bwd_solve_phase1(y, yupd, etree_level, task_depth);
     if (this->dim_sep()) {
       DenseMW_t yloc(this->dim_sep(), y.cols(), y, this->sep_begin_, 0);
       if (y.cols() == 1) {
@@ -198,6 +197,12 @@ namespace strumpack {
              F11, yloc, task_depth);
       }
     }
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixLossy<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    return this->matrix_inertia(F11c_.decompress(), neg, zero, pos);
   }
 
   // explicit template instantiations

@@ -46,6 +46,7 @@
 #include "HSSExtra.hpp"
 #include "HSSMatrixBase.hpp"
 #include "kernel/Kernel.hpp"
+#include "HSSMatrix.sketch.hpp"
 
 namespace strumpack {
   namespace HSS {
@@ -551,10 +552,12 @@ namespace strumpack {
                                      const opts_t& opts,
                                      WorkCompress<scalar_t>& w,
                                      int d, int dd, int depth) override;
+      // SJLT_Matrix<scalar_t,int>* S=nullptr
       void compute_local_samples(DenseM_t& Rr, DenseM_t& Rc,
                                  DenseM_t& Sr, DenseM_t& Sc,
                                  WorkCompress<scalar_t>& w,
-                                 int d0, int d, int depth);
+                                 int d0, int d, int depth,
+                                 SJLTMatrix<scalar_t, int>* S=nullptr);
       bool compute_U_V_bases(DenseM_t& Sr, DenseM_t& Sc, const opts_t& opts,
                              WorkCompress<scalar_t>& w, int d, int depth);
       void compute_U_basis_stable(DenseM_t& Sr, const opts_t& opts,

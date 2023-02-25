@@ -291,14 +291,31 @@ extern "C" {
   STRUMPACK_solve(STRUMPACK_SparseSolver S, const void* b, void* x,
                   int use_initial_guess) {
     switch (S.precision) {
-    case STRUMPACK_FLOAT:            return static_cast<STRUMPACK_RETURN_CODE>(CASTS(S.solver)->solve(CRES(b), RES(x), use_initial_guess));   break;
-    case STRUMPACK_DOUBLE:           return static_cast<STRUMPACK_RETURN_CODE>(CASTD(S.solver)->solve(CRED(b), RED(x), use_initial_guess));   break;
-    case STRUMPACK_FLOATCOMPLEX:     return static_cast<STRUMPACK_RETURN_CODE>(CASTC(S.solver)->solve(CREC(b), REC(x), use_initial_guess));   break;
-    case STRUMPACK_DOUBLECOMPLEX:    return static_cast<STRUMPACK_RETURN_CODE>(CASTZ(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess));   break;
-    case STRUMPACK_FLOAT_64:         return static_cast<STRUMPACK_RETURN_CODE>(CASTS64(S.solver)->solve(CRES(b), RES(x), use_initial_guess)); break;
-    case STRUMPACK_DOUBLE_64:        return static_cast<STRUMPACK_RETURN_CODE>(CASTD64(S.solver)->solve(CRED(b), RED(x), use_initial_guess)); break;
-    case STRUMPACK_FLOATCOMPLEX_64:  return static_cast<STRUMPACK_RETURN_CODE>(CASTC64(S.solver)->solve(CREC(b), REC(x), use_initial_guess)); break;
-    case STRUMPACK_DOUBLECOMPLEX_64: return static_cast<STRUMPACK_RETURN_CODE>(CASTZ64(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess)); break;
+    case STRUMPACK_FLOAT:            return static_cast<STRUMPACK_RETURN_CODE>(CASTS(S.solver)->solve(CRES(b), RES(x), use_initial_guess));
+    case STRUMPACK_DOUBLE:           return static_cast<STRUMPACK_RETURN_CODE>(CASTD(S.solver)->solve(CRED(b), RED(x), use_initial_guess));
+    case STRUMPACK_FLOATCOMPLEX:     return static_cast<STRUMPACK_RETURN_CODE>(CASTC(S.solver)->solve(CREC(b), REC(x), use_initial_guess));
+    case STRUMPACK_DOUBLECOMPLEX:    return static_cast<STRUMPACK_RETURN_CODE>(CASTZ(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess));
+    case STRUMPACK_FLOAT_64:         return static_cast<STRUMPACK_RETURN_CODE>(CASTS64(S.solver)->solve(CRES(b), RES(x), use_initial_guess));
+    case STRUMPACK_DOUBLE_64:        return static_cast<STRUMPACK_RETURN_CODE>(CASTD64(S.solver)->solve(CRED(b), RED(x), use_initial_guess));
+    case STRUMPACK_FLOATCOMPLEX_64:  return static_cast<STRUMPACK_RETURN_CODE>(CASTC64(S.solver)->solve(CREC(b), REC(x), use_initial_guess));
+    case STRUMPACK_DOUBLECOMPLEX_64: return static_cast<STRUMPACK_RETURN_CODE>(CASTZ64(S.solver)->solve(CREZ(b), REZ(x), use_initial_guess));
+    }
+    return STRUMPACK_SUCCESS;
+  }
+
+  STRUMPACK_RETURN_CODE
+  STRUMPACK_matsolve(STRUMPACK_SparseSolver S, int nrhs,
+                     const void* b, int ldb, void* x, int ldx,
+                     int use_initial_guess) {
+    switch (S.precision) {
+    case STRUMPACK_FLOAT:            return static_cast<STRUMPACK_RETURN_CODE>(CASTS(S.solver)->solve(nrhs, CRES(b), ldb, RES(x), ldx, use_initial_guess));
+    case STRUMPACK_DOUBLE:           return static_cast<STRUMPACK_RETURN_CODE>(CASTD(S.solver)->solve(nrhs, CRED(b), ldb, RED(x), ldx, use_initial_guess));
+    case STRUMPACK_FLOATCOMPLEX:     return static_cast<STRUMPACK_RETURN_CODE>(CASTC(S.solver)->solve(nrhs, CREC(b), ldb, REC(x), ldx, use_initial_guess));
+    case STRUMPACK_DOUBLECOMPLEX:    return static_cast<STRUMPACK_RETURN_CODE>(CASTZ(S.solver)->solve(nrhs, CREZ(b), ldb, REZ(x), ldx, use_initial_guess));
+    case STRUMPACK_FLOAT_64:         return static_cast<STRUMPACK_RETURN_CODE>(CASTS64(S.solver)->solve(nrhs, CRES(b), ldb, RES(x), ldx, use_initial_guess));
+    case STRUMPACK_DOUBLE_64:        return static_cast<STRUMPACK_RETURN_CODE>(CASTD64(S.solver)->solve(nrhs, CRED(b), ldb, RED(x), ldx, use_initial_guess));
+    case STRUMPACK_FLOATCOMPLEX_64:  return static_cast<STRUMPACK_RETURN_CODE>(CASTC64(S.solver)->solve(nrhs, CREC(b), ldb, REC(x), ldx, use_initial_guess));
+    case STRUMPACK_DOUBLECOMPLEX_64: return static_cast<STRUMPACK_RETURN_CODE>(CASTZ64(S.solver)->solve(nrhs, CREZ(b), ldb, REZ(x), ldx, use_initial_guess));
     }
     return STRUMPACK_SUCCESS;
   }
@@ -312,20 +329,51 @@ extern "C" {
   }
 
   STRUMPACK_RETURN_CODE STRUMPACK_reorder_regular(STRUMPACK_SparseSolver S,
-                                                  int nx, int ny, int nz) {
-    switch_precision_return_as(reorder(nx, ny, nz), STRUMPACK_RETURN_CODE);
+                                                  int nx, int ny, int nz,
+                                                  int components, int width) {
+    switch_precision_return_as(reorder(nx, ny, nz, components, width), STRUMPACK_RETURN_CODE);
   }
 
   STRUMPACK_RETURN_CODE STRUMPACK_factor(STRUMPACK_SparseSolver S) {
     switch_precision_return_as(factor(), STRUMPACK_RETURN_CODE);
   }
 
+  STRUMPACK_RETURN_CODE STRUMPACK_inertia(STRUMPACK_SparseSolver S,
+                                          int* neg, int* zero, int* pos) {
+    auto ierr = strumpack::ReturnCode::SUCCESS;
+    int64_t neg64, zero64, pos64;
+    switch (S.precision) {
+    case STRUMPACK_FLOAT:            ierr = CASTS(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_DOUBLE:           ierr = CASTD(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_FLOATCOMPLEX:     ierr = CASTC(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_DOUBLECOMPLEX:    ierr = CASTZ(S.solver)->inertia(*neg, *zero, *pos); break;
+    case STRUMPACK_FLOAT_64:         ierr = CASTS64(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_DOUBLE_64:        ierr = CASTD64(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_FLOATCOMPLEX_64:  ierr = CASTC64(S.solver)->inertia(neg64, zero64, pos64); break;
+    case STRUMPACK_DOUBLECOMPLEX_64: ierr = CASTZ64(S.solver)->inertia(neg64, zero64, pos64); break;
+    }
+    switch (S.precision) {
+    case STRUMPACK_FLOAT:
+    case STRUMPACK_DOUBLE:
+    case STRUMPACK_FLOATCOMPLEX:
+    case STRUMPACK_DOUBLECOMPLEX:
+      break;
+    case STRUMPACK_FLOAT_64:
+    case STRUMPACK_DOUBLE_64:
+    case STRUMPACK_FLOATCOMPLEX_64:
+    case STRUMPACK_DOUBLECOMPLEX_64:
+      *neg = neg64; *zero = zero64; *pos = pos64;
+      break;
+    }
+    return static_cast<STRUMPACK_RETURN_CODE>(ierr);
+  }
+
   void STRUMPACK_move_to_gpu(STRUMPACK_SparseSolver S) {
-    switch_precision(move_to_gpu());
+    // switch_precision(move_to_gpu());
   }
 
   void STRUMPACK_remove_from_gpu(STRUMPACK_SparseSolver S) {
-    switch_precision(remove_from_gpu());
+    // switch_precision(remove_from_gpu());
   }
 
   void STRUMPACK_delete_factors(STRUMPACK_SparseSolver S) {
@@ -343,6 +391,13 @@ extern "C" {
   void STRUMPACK_set_abs_tol(STRUMPACK_SparseSolver S, double tol) { switch_precision(options().set_abs_tol(tol)); }
   void STRUMPACK_set_nd_param(STRUMPACK_SparseSolver S, int nd_param) { switch_precision(options().set_nd_param(nd_param)); }
   void STRUMPACK_set_reordering_method(STRUMPACK_SparseSolver S, STRUMPACK_REORDERING_STRATEGY m) { switch_precision(options().set_reordering_method(static_cast<ReorderingStrategy>(m))); }
+  void STRUMPACK_enable_METIS_NodeNDP(STRUMPACK_SparseSolver S) { switch_precision(options().enable_METIS_NodeNDP()); }
+  void STRUMPACK_disable_METIS_NodeNDP(STRUMPACK_SparseSolver S) { switch_precision(options().disable_METIS_NodeNDP()); }
+  void STRUMPACK_set_nx(STRUMPACK_SparseSolver S, int nx) { switch_precision(options().set_nx(nx)); }
+  void STRUMPACK_set_ny(STRUMPACK_SparseSolver S, int ny) { switch_precision(options().set_ny(ny)); }
+  void STRUMPACK_set_nz(STRUMPACK_SparseSolver S, int nz) { switch_precision(options().set_nz(nz)); }
+  void STRUMPACK_set_components(STRUMPACK_SparseSolver S, int nc) { switch_precision(options().set_components(nc)); }
+  void STRUMPACK_set_separator_width(STRUMPACK_SparseSolver S, int w) { switch_precision(options().set_separator_width(w)); }
   void STRUMPACK_set_GramSchmidt_type(STRUMPACK_SparseSolver S, STRUMPACK_GRAM_SCHMIDT_TYPE t) { switch_precision(options().set_GramSchmidt_type(static_cast<GramSchmidtType>(t))); }
   void STRUMPACK_set_matching(STRUMPACK_SparseSolver S, STRUMPACK_MATCHING_JOB job) { switch_precision(options().set_matching(static_cast<MatchingJob>(job))); }
   void STRUMPACK_set_Krylov_solver(STRUMPACK_SparseSolver S, STRUMPACK_KRYLOV_SOLVER solver_type) { switch_precision(options().set_Krylov_solver(static_cast<KrylovSolver>(solver_type))); }
@@ -355,6 +410,7 @@ extern "C" {
   void STRUMPACK_set_compression_rel_tol(STRUMPACK_SparseSolver S, double rctol) { switch_precision(options().set_compression_rel_tol(rctol)); }
   void STRUMPACK_set_compression_abs_tol(STRUMPACK_SparseSolver S, double actol) { switch_precision(options().set_compression_abs_tol(actol)); }
   void STRUMPACK_set_compression_butterfly_levels(STRUMPACK_SparseSolver S, int l) { switch_precision(options().HODLR_options().set_butterfly_levels(l)); }
+  void STRUMPACK_set_compression_lossy_precision(STRUMPACK_SparseSolver S, int p) { switch_precision(options().set_lossy_precision(p)); }
 
 
   /*************************************************************
@@ -367,10 +423,11 @@ extern "C" {
   double STRUMPACK_abs_tol(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().abs_tol(), double); }
   int STRUMPACK_nd_param(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().nd_param(), int); }
   STRUMPACK_REORDERING_STRATEGY STRUMPACK_reordering_method(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().reordering_method(), STRUMPACK_REORDERING_STRATEGY); }
-  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().GramSchmidt_type(), STRUMPACK_GRAM_SCHMIDT_TYPE); }
+  int STRUMPACK_use_METIS_NodeNDP(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_METIS_NodeNDP(), int); }
   STRUMPACK_MATCHING_JOB STRUMPACK_matching(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().matching(), STRUMPACK_MATCHING_JOB); }
+  STRUMPACK_GRAM_SCHMIDT_TYPE STRUMPACK_GramSchmidt_type(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().GramSchmidt_type(), STRUMPACK_GRAM_SCHMIDT_TYPE); }
   STRUMPACK_KRYLOV_SOLVER STRUMPACK_Krylov_solver(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().Krylov_solver(), STRUMPACK_KRYLOV_SOLVER); }
-  int STRUMPACK_use_GPU(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_gpu(), int); }
+  int STRUMPACK_use_gpu(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().use_gpu(), int); }
   STRUMPACK_COMPRESSION_TYPE STRUMPACK_compression(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression(), STRUMPACK_COMPRESSION_TYPE); }
   int STRUMPACK_compression_min_front_size(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_min_front_size(), int); }
   int STRUMPACK_compression_min_sep_size(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_min_sep_size(), int); }
@@ -378,6 +435,7 @@ extern "C" {
   double STRUMPACK_compression_rel_tol(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_rel_tol(), double); }
   double STRUMPACK_compression_abs_tol(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().compression_abs_tol(), double); }
   int STRUMPACK_compression_butterfly_levels(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().HODLR_options().butterfly_levels(), int); }
+  int STRUMPACK_compression_lossy_precision(STRUMPACK_SparseSolver S) { switch_precision_return_as(options().lossy_precision(), int); }
 
 
   /*************************************************************

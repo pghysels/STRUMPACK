@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.17)
-project(STRUMPACK VERSION 5.1.1 LANGUAGES CXX C Fortran)
-
+project(STRUMPACK VERSION 7.0.1 LANGUAGES CXX C Fortran)
+cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
 option(STRUMPACK_USE_OPENMP  "Use OpenMP for on-node threading tasking" ON)
-option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" ON)
-option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" ON)
+option(STRUMPACK_USE_CUDA    "Use CUDA for NVIDIA GPU acceleration" OFF)
+option(STRUMPACK_USE_HIP     "Use HIP for AMD or NVIDIA GPU acceleration" OFF)
+option(STRUMPACK_USE_SYCL    "Use SYCL/DPC++ for Intel GPU acceleration" OFF)
+option(STRUMPACK_USE_BLAS64  "Use 64 bit interfaces to BLAS and LAPACK, e.g., MKL ILP64 or openblas64" OFF)
 
 option(TPL_ENABLE_SLATE      "Use SLATE, the ECP ScaLAPACK replacement" ON)
 option(TPL_ENABLE_PARMETIS   "Build with support for ParMetis" ON)
@@ -15,16 +17,19 @@ option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
-option(TPL_ENABLE_MAGMA      "Build with support for MAGMA (requires CUDA)" ON)
+option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" OFF)
 option(TPL_ENABLE_KBLAS      "Build with support for KBLAS (requires CUDA)" OFF)
+option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
 option(STRUMPACK_TASK_TIMERS "Build with timers for internal routines" OFF)
-option(STRUMPACK_DEV_TESTING "Enable extensive testing" OFF)
+option(STRUMPACK_MESSAGE_COUNTER "Build with counter for MPI messages" OFF)
 
 include(CheckLibraryExists)
 # include(CMakePushCheckState)
 include(CheckCXXSourceCompiles)
+
+include(GNUInstallDirs)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
@@ -67,9 +72,9 @@ endif()
 if(TPL_ENABLE_PTSCOTCH)
   set(TPL_ENABLE_SCOTCH ON)
 endif()
-if(NOT STRUMPACK_USE_CUDA)
+if(NOT (STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP))
   if(TPL_ENABLE_MAGMA)
-    message(STATUS "Disabling MAGMA, it requires CUDA to be enabled.")
+    message(STATUS "Disabling MAGMA, it requires CUDA/HIP to be enabled.")
     set(TPL_ENABLE_MAGMA OFF)
   endif()
 endif()
@@ -104,31 +109,8 @@ else()
 endif()
 
 if(STRUMPACK_USE_CUDA)
-  include(CheckLanguage)
-  check_language(CUDA)
-  if(CMAKE_CUDA_COMPILER)
-    enable_language(CUDA)
-    # will be in CMake 3.17? for now we have a copy in cmake/Modules
-    find_package(CUDAToolkit REQUIRED)
-    if(TPL_ENABLE_MAGMA)
-      list(APPEND CMAKE_PREFIX_PATH
-        ${TPL_MAGMA_PREFIX} $ENV{MAGMA_DIR} $ENV{MAGMA_ROOT})
-      find_package(MAGMA)
-      if(MAGMA_FOUND)
-        option(STRUMPACK_USE_MAGMA "" ON)
-      endif()
-    endif()
-    if(TPL_ENABLE_KBLAS)
-      # TODO check for KBLAS
-      message(WARNING "To use KBLAS, set TPL_KBLAS_INCLUDE_DIR and "
-        " TPL_KBLAS_LIBRARIES.")
-      option(STRUMPACK_USE_KBLAS "" ON)
-    endif()
-  else()
-    message(WARNING "CUDA compiler not found,"
-      " proceeding without CUDA support.")
-    set(STRUMPACK_USE_CUDA OFF)
-  endif()
+  enable_language(CUDA)
+  find_package(CUDAToolkit REQUIRED)
 endif()
 
 if(STRUMPACK_USE_HIP)
@@ -141,6 +123,7 @@ if(STRUMPACK_USE_HIP)
     if(HIP_FOUND)
       set(STRUMPACK_HIP_PLATFORM_HCC ON)
       find_package(hipblas REQUIRED)
+      find_package(hipsparse REQUIRED)
       find_package(rocsolver REQUIRED)
       find_package(rocblas REQUIRED)
       # find_package(rocthrust REQUIRED)
@@ -153,6 +136,56 @@ if(STRUMPACK_USE_HIP)
   endif()
 endif()
 
+if(STRUMPACK_USE_SYCL)
+  message(STATUS "SYCL/DPC++ enabled, looking for MKL")
+  list(APPEND CMAKE_PREFIX_PATH $ENV{MKLROOT} $ENV{TBBROOT})
+  # set(MKL_LINK dynamic)
+  # set(MKL_LINK static)
+  # set(MKL_ARCH intel64)
+  # set(MKL_INTERFACE lp64)   ## this doesn't work, only ilp64 works
+  set(STRUMPACK_USE_BLAS64 ON)
+  find_package(MKL REQUIRED)
+endif()
+
+
+if(TPL_ENABLE_MATLAB)
+  find_package(Matlab REQUIRED COMPONENTS MEX_COMPILER)
+  if(Matlab_FOUND)
+    message("Found MATLAB, make sure to use BLAS/LAPACK with 64bit interface, such as Intel MKL ILP64")
+    set(STRUMPACK_USE_BLAS64 ON)
+    option(STRUMPACK_USE_MATLAB "" ON)
+  endif()
+endif()
+
+
+if(STRUMPACK_USE_BLAS64)
+  # BLA_SIZEOF_INTEGER is new in CMake 3.22
+  set(BLA_SIZEOF_INTEGER 8)
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+    ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+    PROPERTIES COMPILE_OPTIONS
+    "$<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>> $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>")
+endif()
+
+
+if(TPL_ENABLE_MAGMA)
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_MAGMA_PREFIX} $ENV{MAGMA_DIR} $ENV{MAGMA_ROOT})
+  find_package(MAGMA)
+  if(MAGMA_FOUND)
+    option(STRUMPACK_USE_MAGMA "" ON)
+  endif()
+endif()
+
+
+if(TPL_ENABLE_KBLAS)
+  # TODO check for KBLAS
+  message(WARNING "To use KBLAS, set TPL_KBLAS_INCLUDE_DIR and "
+    " TPL_KBLAS_LIBRARIES.")
+  option(STRUMPACK_USE_KBLAS "" ON)
+endif()
+
 
 if(DEFINED TPL_BLAS_LIBRARIES)
   # xSDK policies require the user be able to specify BLAS libraries
@@ -161,9 +194,15 @@ if(DEFINED TPL_BLAS_LIBRARIES)
   set(BLAS_LIBRARIES ${TPL_BLAS_LIBRARIES})
   set(BLAS_FOUND TRUE)
   set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
-  try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
-    SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
-    LINK_LIBRARIES ${TPL_BLAS_LIBRARIES})
+  if(TARGET OpenMP::OpenMP_Fortran)
+    try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+      LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} OpenMP::OpenMP_Fortran)
+  else()
+    try_compile(STRUMPACK_TPL_BLAS_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+      LINK_LIBRARIES ${TPL_BLAS_LIBRARIES})
+  endif()
   if(STRUMPACK_TPL_BLAS_WORKS)
     message(STATUS
       "Using BLAS from TPL_BLAS_LIBRARIES (${TPL_BLAS_LIBRARIES})")
@@ -175,16 +214,25 @@ if(DEFINED TPL_BLAS_LIBRARIES)
     # missing a threading library? Just guessing. One more try with
     # threading (pthreads) linked in and then we give up.
     find_package(Threads)
-    try_compile(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
-      LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} Threads::Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES ${TPL_BLAS_LIBRARIES}
+        Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES ${TPL_BLAS_LIBRARIES} Threads::Threads)
+    endif()
     if(STRUMPACK_TPL_BLAS_WITH_THREADS_WORKS)
       message(STATUS
         "Using BLAS (${TPL_BLAS_LIBRARIES}), with additional threading library.")
     else()
       message(FATAL_ERROR
-        "BLAS libraries defined in TPL_BLAS_LIBRARIES"
-        " (${TPL_BLAS_LIBRARIES}) cannot be used.")
+        "BLAS libraries defined in TPL_BLAS_LIBRARIES (${TPL_BLAS_LIBRARIES}) cannot be used. "
+        "If your BLAS library links to OpenMP, enable OpenMP with -DSTRUMPACK_USE_OPENMP=ON. "
+        "If that doesn't work, try running CMake with --debug-trycompile and check "
+        "the output in build/blas_compile_test/CMakeFiles/CMakeTmp/ .")
     endif()
   endif()
 else()
@@ -198,8 +246,16 @@ else()
       "A BLAS library could not be found on the system, "
       "checking if BLAS is implicitly linked by the compiler(wrapper).")
     set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/blas_compile_test)
-    try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90)
+    find_package(Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_BLAS_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_blas.f90
+        LINK_LIBRARIES Threads::Threads)
+    endif()
     if(NOT STRUMPACK_BLAS_JUST_WORKS)
       message(FATAL_ERROR
         "Could not find a BLAS library.\n"
@@ -216,9 +272,15 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
   set(LAPACK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
   set(LAPACK_FOUND TRUE)
   set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
-  try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
-    SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-    LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES})
+  if(TARGET OpenMP::OpenMP_Fortran)
+    try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES} OpenMP::OpenMP_Fortran)
+  else()
+    try_compile(STRUMPACK_TPL_LAPACK_WORKS ${_SCRATCH_DIR}
+      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+  endif()
   if(STRUMPACK_TPL_LAPACK_WORKS)
     message(STATUS
       "Using LAPACK from TPL_LAPACK_LIBRARIES (${TPL_LAPACK_LIBRARIES})")
@@ -230,17 +292,26 @@ if(DEFINED TPL_LAPACK_LIBRARIES)
     # missing a threading library? Just guessing. One more try with
     # threading (pthreads) linked in and then we give up.
     find_package(Threads)
-    try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
-      LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} Threads::Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES}
+        Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES ${TPL_LAPACK_LIBRARIES} ${BLAS_LIBRARIES} Threads::Threads)
+    endif()
     if(STRUMPACK_TPL_LAPACK_WITH_THREADS_WORKS)
       message(STATUS
         "Using LAPACK (${TPL_LAPACK_LIBRARIES}), "
         "with additional threading library.")
     else()
       message(FATAL_ERROR
-        "LAPACK libraries defined in TPL_LAPACK_LIBRARIES"
-        " (${TPL_LAPACK_LIBRARIES}) cannot be used.")
+        "LAPACK libraries defined in TPL_LAPACK_LIBRARIES (${TPL_LAPACK_LIBRARIES}) cannot be used. "
+        "If your LAPACK library links to OpenMP, enable OpenMP with -DSTRUMPACK_USE_OPENMP=ON. "
+        "If that doesn't work, try running CMake with --debug-trycompile and check "
+        "the output in build/lapack_compile_test/CMakeFiles/CMakeTmp/")
     endif()
   endif()
 else()
@@ -260,8 +331,16 @@ else()
       "A LAPACK library could not be found on the system, "
       "checking if LAPACK is implicitly linked by the compiler(wrapper).")
     set(_SCRATCH_DIR ${CMAKE_CURRENT_BINARY_DIR}/lapack_compile_test)
-    try_compile(STRUMPACK_LAPACK_JUST_WORKS ${_SCRATCH_DIR}
-      SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90)
+    find_package(Threads)
+    if(TARGET OpenMP::OpenMP_Fortran)
+      try_compile(STRUMPACK_LAPACK_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES Threads::Threads OpenMP::OpenMP_Fortran)
+    else()
+      try_compile(STRUMPACK_LAPACK_JUST_WORKS ${_SCRATCH_DIR}
+        SOURCES ${CMAKE_SOURCE_DIR}/cmake/test_lapack.f90
+        LINK_LIBRARIES Threads::Threads)
+    endif()
     if(NOT STRUMPACK_LAPACK_JUST_WORKS)
       message(FATAL_ERROR
         "Could not find a LAPACK library.\n"
@@ -425,6 +504,9 @@ if(TPL_ENABLE_BPACK)
 endif()
 
 if(TPL_ENABLE_SLATE)
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_SLATE_PREFIX}
+    $ENV{slate_DIR} $ENV{slate_ROOT}
+    $ENV{SLATE_DIR} $ENV{SLATE_ROOT})
   find_package(blaspp)
   find_package(lapackpp)
   find_package(slate)
@@ -433,7 +515,7 @@ if(TPL_ENABLE_SLATE)
     # option(STRUMPACK_USE_SLATE_LAPACK "" ON)
     option(STRUMPACK_USE_SLATE "" ON)
     option(STRUMPACK_USE_SLATE_SCALAPACK "" ON)
-    set(STRUMPACK_PBLAS_BLOCKSIZE "256")
+    set(STRUMPACK_PBLAS_BLOCKSIZE "512")
   else()
     message(WARNING "SLATE was not found."
       " SLATE is required for GPU support in the distributed memory code.")
@@ -453,35 +535,52 @@ if(TPL_ENABLE_COMBBLAS)
   endif()
 endif()
 
-# TODO PIC
-# TODO libatomic?
-
-
 if(STRUMPACK_USE_HIP)
   set_source_files_properties(
     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    src/dense/HIPWrapper.hip.cpp
     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
-  if (BUILD_SHARED_LIBS)
+  if(BUILD_SHARED_LIBS)
     set(STATIC_OR_SHARED SHARED)
   else()
     set(STATIC_OR_SHARED STATIC)
   endif()
-  hip_add_library(strumpack "src/sparse/fronts/FrontalMatrixHIP.hip.cpp" ${STATIC_OR_SHARED})
+  hip_add_library(
+    strumpack
+    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+    src/dense/HIPWrapper.hip.cpp
+    ${STATIC_OR_SHARED})
 else()
   add_library(strumpack "")
 endif()
 
-
 # this is to fix a link issue for the fortran example when compiling
 # with clang
 set_property(TARGET strumpack PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+
+# see https://github.com/pghysels/STRUMPACK/issues/82
+# TODO check if 32bit, check compiler??
+set(ATOMIC_TEST_SOURCE "#include <atomic>
+      int main() { std::atomic<int64_t> i(0); i++; return 0; }")
+check_cxx_source_compiles("${ATOMIC_TEST_SOURCE}" ATOMIC_INT64_IS_BUILTIN)
+if(NOT ATOMIC_INT64_IS_BUILTIN)
+  set(CMAKE_REQUIRED_LIBRARIES atomic)
+  check_cxx_source_compiles(
+    "${ATOMIC_TEST_SOURCE}" ATOMIC_INT64_REQUIRES_LIBATOMIC)
+  if (ATOMIC_INT64_REQUIRES_LIBATOMIC)
+    target_link_libraries(strumpack PRIVATE atomic)
+  endif()
+  unset(CMAKE_REQUIRED_LIBRARIES)
+endif()
+
 
 add_subdirectory(src)
 
 target_sources(strumpack
   PRIVATE ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h)
 
-target_compile_features(strumpack PUBLIC cxx_std_11)
+target_compile_features(strumpack PUBLIC cxx_std_14)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 target_compile_options(strumpack PRIVATE
@@ -496,10 +595,17 @@ if(COMPILER_SUPPORTS_NOOVERLOAD_WARNING)
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-overloaded-virtual>)
 endif()
 
+if(STRUMPACK_USE_BLAS64)
+  target_compile_options(strumpack PRIVATE
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<OR:$<Fortran_COMPILER_ID:Clang>,$<Fortran_COMPILER_ID:AppleClang>,$<Fortran_COMPILER_ID:GNU>>: -fdefault-integer-8>>
+    $<$<COMPILE_LANGUAGE:Fortran>:$<$<Fortran_COMPILER_ID:Intel>: -i8>>)
+endif()
+
 
 if(STRUMPACK_USE_MPI)
   target_link_libraries(strumpack PUBLIC
-    MPI::MPI_CXX MPI::MPI_C MPI::MPI_Fortran)
+    MPI::MPI_CXX MPI::MPI_C ${MPI_Fortran_LIBRARIES})
+  ## adding the MPI::MPI_Fortran target risks adding unwanted compile flags
 endif()
 
 if(OpenMP_FOUND)
@@ -535,6 +641,11 @@ if(BLAS_FOUND)
   target_link_libraries(strumpack PUBLIC ${BLAS_LIBRARIES})
 endif()
 
+if(MKL_FOUND)
+  target_link_libraries(strumpack PUBLIC MKL::MKL)
+  # target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
+endif()
+
 # the order is important
 #   - ParMETIS before METIS, since ParMETIS needs METIS
 #   - (ParMETIS) before Scotch to avoid confusion with the Scotch
@@ -559,12 +670,10 @@ endif()
 
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
+    ButterflyPACK::sbutterflypack
     ButterflyPACK::dbutterflypack
-    ButterflyPACK::zbutterflypack
-    MPI::MPI_Fortran ${MPI_Fortran_LIBRARIES})
-  ## for some reason just adding the MPI::MPI_Fortran target only
-  ## links with the f08 module, not with the regular fortran MPI
-  ## library
+    ButterflyPACK::cbutterflypack
+    ButterflyPACK::zbutterflypack)
 endif()
 
 if(slate_FOUND)
@@ -586,30 +695,8 @@ if(TPL_ENABLE_KBLAS)
 endif()
 
 if(hipblas_FOUND)
-  target_link_libraries(strumpack PUBLIC roc::hipblas roc::rocblas roc::rocsolver)
-  # target_link_libraries(strumpack PUBLIC roc::rocprim) # roc::rocprim_hip)
-  # target_link_libraries(strumpack PUBLIC roc::rocthrust)
-  # if(STRUMPACK_HIP_PLATFORM_HCC)
-  #   # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_HCC__)
-  #   if(STRUMPACK_HIP_AMDGPU)
-  #     foreach(target ${STRUMPACK_HIP_AMDGPU})
-  #       target_compile_options(strumpack PRIVATE $<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=${target}>)
-  #       target_link_libraries(strumpack PRIVATE --amdgpu-target=${target})
-  #     endforeach()
-  #   # endif()
-  #   # if(DEFINED STRUMPACK_HIP_AMDGPU)
-  #   #   target_compile_options(strumpack PRIVATE
-  #   #   $<$<COMPILE_LANGUAGE:CXX>:${STRUMPACK_HIP_AMDGPU}>)
-  #   else()
-  #     target_compile_options(strumpack PRIVATE
-  # 	$<$<COMPILE_LANGUAGE:CXX>:--amdgpu-target=none>)
-  #     message(WARNING "No AMD GPU architecture was specified,"
-  #       " specify -DSTRUMPACK_HIP_AMDGPU=\"xxx\" "
-  #       " where xxx can be for instance gfx906 (or a comma separated list)")
-  #   endif()
-  # elseif(STRUMPACK_HIP_PLATFORM_NVCC)
-  #   # target_compile_definitions(strumpack PUBLIC __HIP_PLATFORM_NVCC__)
-  # endif()
+  target_link_libraries(strumpack PUBLIC
+    roc::hipblas roc::rocblas roc::rocsolver roc::hipsparse)
 endif()
 
 if(CombBLAS_FOUND)
@@ -624,6 +711,7 @@ add_subdirectory(examples)
 # testing
 include(CTest)
 add_subdirectory(test)
+
 
 # documentation
 find_package(Doxygen)
@@ -643,7 +731,8 @@ install(FILES
   DESTINATION include)
 
 install(TARGETS strumpack EXPORT STRUMPACKTargets
-  LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 
 # export targets and all

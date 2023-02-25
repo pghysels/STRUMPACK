@@ -38,25 +38,19 @@ typedef int integer;
 using namespace strumpack;
 
 int main(int argc, char* argv[]) {
-  int thread_level;
-  //MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
-  int myrank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-  if (thread_level != MPI_THREAD_FUNNELED && myrank == 0)
-    std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED"
-              << std::endl;
-  // if (thread_level != MPI_THREAD_MULTIPLE && myrank == 0)
-  //   std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE,"
-  //     " which might be needed for pt-scotch!" << std::endl;
-
+  int thread_level, rank;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
+    std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE, "
+      " which might be required for PT-Scotch and/or SLATE" << std::endl;
   {
     int n = 30, nrhs = 1;
     if (argc > 1) n = atoi(argv[1]); // get grid size
     else std::cout << "# please provide grid size" << std::endl;
     // get number of right-hand sides
     if (argc > 2) nrhs = std::max(1, atoi(argv[2]));
-    if (!myrank)
+    if (!rank)
       std::cout << "solving 3D " << n << "^3 Poisson problem"
                 << " with " << nrhs << " right hand sides" << std::endl;
 
@@ -67,7 +61,7 @@ int main(int argc, char* argv[]) {
 
     // TODO directly build the distributed sparse matrix
     CSRMatrix<scalar,integer> A;
-    if (!myrank) {
+    if (!rank) {
       int n2 = n * n;
       int N = n * n2;
       int nnz = 7 * N - 6 * n2;
@@ -127,7 +121,7 @@ int main(int argc, char* argv[]) {
     auto scaled_res = Adist.max_scaled_residual(x, b);
     x.scaled_add(-1., x_exact);
     auto relerr = x.normF() / x_exact.normF();
-    if (!myrank) {
+    if (!rank) {
       std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
                 << scaled_res << std::endl;
       std::cout << "# relative error = ||x-x_exact||_F/||x_exact||_F = "

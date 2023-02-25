@@ -16,12 +16,17 @@ link with gcc and include -lstdc++.
 
 ## Fortran Interface
 
-A fortran module file is installed in the include folder under the
-CMAKE_INSTALL_PREFIX directory.  The use of this Fortran interface is
-illustrated in examples/sparse/fexample.f90, in the examples folder.
-The fortran module is build from the src/fortran/fortran.f90 file,
-which is generated from the C interface in
-src/StrumpackSparseSolver.h.
+Two fortran module files are installed in the include folder under the
+CMAKE_INSTALL_PREFIX directory, one for the sparse solvers
+strumpack.mod, and one for the dense solvers strumpack_dense.mod.  The
+use of this Fortran interfaces is illustrated in
+examples/sparse/fexample.f90 and examples/dense/fstructured.f90.
+
+The fortran modules are build from the src/fortran/fortran.f90 file,
+which is generated from the C interface in src/StrumpackSparseSolver.h
+using SWIG-Fortran ["Automated Fortran-C++ Bindings for Large-Scale
+Scientific Applications", \link
+https://ieeexplore.ieee.org/abstract/document/8745480 \endlink].
 
 To use the STRUMPACK Fortran interface and link to the Fortran library
 in an application, we recommend CMake. An example CMake project looks

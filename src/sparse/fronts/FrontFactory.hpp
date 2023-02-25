@@ -56,11 +56,10 @@ namespace strumpack {
 
   template<typename scalar_t> bool is_GPU
   (const SPOptions<scalar_t>& opts) {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
     return opts.use_gpu() && opts.compression() == CompressionType::NONE;
-#else
-    return false;
 #endif
+    return false;
   }
   template<typename scalar_t> bool is_HSS
   (int dsep, int dupd, bool compressed_parent,
@@ -73,7 +72,7 @@ namespace strumpack {
   template<typename scalar_t> bool is_BLR
   (int dsep, int dupd, bool compressed_parent,
    const SPOptions<scalar_t>& opts, int l=0) {
-    return (opts.compression() == CompressionType::BLR || 
+    return (opts.compression() == CompressionType::BLR ||
             opts.compression() == CompressionType::BLR_HODLR ||
             opts.compression() == CompressionType::ZFP_BLR_HODLR) &&
       (dsep >= opts.compression_min_sep_size(l) ||
@@ -83,7 +82,7 @@ namespace strumpack {
   (int dsep, int dupd, bool compressed_parent,
    const SPOptions<scalar_t>& opts, int l=0) {
 #if defined(STRUMPACK_USE_BPACK)
-    return (opts.compression() == CompressionType::HODLR || 
+    return (opts.compression() == CompressionType::HODLR ||
             opts.compression() == CompressionType::BLR_HODLR ||
             opts.compression() == CompressionType::ZFP_BLR_HODLR) &&
       (dsep >= opts.compression_min_sep_size(l) ||
@@ -96,6 +95,7 @@ namespace strumpack {
   (int dsep, int dupd, bool, const SPOptions<scalar_t>& opts, int l=0) {
 #if defined(STRUMPACK_USE_ZFP)
     return (opts.compression() == CompressionType::LOSSY ||
+            opts.compression() == CompressionType::LOSSLESS ||
             opts.compression() == CompressionType::ZFP_BLR_HODLR) &&
       (dsep >= opts.compression_min_sep_size(l) ||
        dsep + dupd >= opts.compression_min_front_size(l));

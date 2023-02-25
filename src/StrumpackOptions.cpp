@@ -40,26 +40,36 @@ namespace strumpack {
 
   std::string get_name(ReorderingStrategy method) {
     switch (method) {
-    case ReorderingStrategy::NATURAL: return "Natural"; break;
-    case ReorderingStrategy::METIS: return "Metis"; break;
-    case ReorderingStrategy::SCOTCH: return "Scotch"; break;
-    case ReorderingStrategy::GEOMETRIC: return "Geometric"; break;
-    case ReorderingStrategy::PARMETIS: return "ParMetis"; break;
-    case ReorderingStrategy::PTSCOTCH: return "PTScotch"; break;
-    case ReorderingStrategy::RCM: return "RCM"; break;
+    case ReorderingStrategy::NATURAL: return "Natural";
+    case ReorderingStrategy::METIS: return "Metis";
+    case ReorderingStrategy::PARMETIS: return "ParMetis";
+    case ReorderingStrategy::SCOTCH: return "Scotch";
+    case ReorderingStrategy::PTSCOTCH: return "PTScotch";
+    case ReorderingStrategy::RCM: return "RCM";
+    case ReorderingStrategy::GEOMETRIC: return "Geometric";
+    case ReorderingStrategy::AMD: return "AMD";
+    case ReorderingStrategy::MMD: return "MMD";
+    case ReorderingStrategy::AND: return "AND";
+    case ReorderingStrategy::MLF: return "MLF";
+    case ReorderingStrategy::SPECTRAL: return "Spectral";
     }
     return "UNKNOWN";
   }
 
   bool is_parallel(ReorderingStrategy method) {
     switch (method) {
-    case ReorderingStrategy::NATURAL: return false; break;
-    case ReorderingStrategy::METIS: return false; break;
-    case ReorderingStrategy::SCOTCH: return false; break;
-    case ReorderingStrategy::GEOMETRIC: return true; break;
-    case ReorderingStrategy::PARMETIS: return true; break;
-    case ReorderingStrategy::PTSCOTCH: return true; break;
-    case ReorderingStrategy::RCM: return false; break;
+    case ReorderingStrategy::NATURAL: return false;
+    case ReorderingStrategy::METIS: return false;
+    case ReorderingStrategy::PARMETIS: return true;
+    case ReorderingStrategy::SCOTCH: return false;
+    case ReorderingStrategy::PTSCOTCH: return true;
+    case ReorderingStrategy::RCM: return false;
+    case ReorderingStrategy::GEOMETRIC: return true;
+    case ReorderingStrategy::AMD: return false;
+    case ReorderingStrategy::MMD: return false;
+    case ReorderingStrategy::AND: return false;
+    case ReorderingStrategy::MLF: return false;
+    case ReorderingStrategy::SPECTRAL: return false;
     }
     return false;
   }
@@ -98,7 +108,7 @@ namespace strumpack {
     case MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING:
       return "maximum matching with row and column scaling";
     case MatchingJob::COMBBLAS:
-      return "approximate weigthed perfect matching, from CombBLAS";
+      return "approximate weighted perfect matching, from CombBLAS";
     }
     return "UNKNOWN";
   }
@@ -137,8 +147,8 @@ namespace strumpack {
        {"sp_disable_METIS_NodeND",      no_argument, 0, 12},
        {"sp_enable_MUMPS_SYMQAMD",      no_argument, 0, 13},
        {"sp_disable_MUMPS_SYMQAMD",     no_argument, 0, 14},
-       {"sp_enable_aggamal",            no_argument, 0, 15},
-       {"sp_disable_aggamal",           no_argument, 0, 16},
+       {"sp_enable_agg_amalg",          no_argument, 0, 15},
+       {"sp_disable_agg_amalg",         no_argument, 0, 16},
        {"sp_matching",                  required_argument, 0, 17},
        {"sp_enable_assembly_tree_log",  no_argument, 0, 18},
        {"sp_disable_assembly_tree_log", no_argument, 0, 19},
@@ -172,6 +182,8 @@ namespace strumpack {
        {"sp_lossy_min_front_size",      required_argument, 0, 47},
        {"sp_nd_planar_levels",          required_argument, 0, 48},
        {"sp_proportional_mapping",      required_argument, 0, 49},
+       {"sp_enable_openmp_tree",        no_argument, 0, 50},
+       {"sp_disable_openmp_tree",       no_argument, 0, 51},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -232,11 +244,17 @@ namespace strumpack {
         else if (s == "parmetis") set_reordering_method(ReorderingStrategy::PARMETIS);
         else if (s == "scotch") set_reordering_method(ReorderingStrategy::SCOTCH);
         else if (s == "ptscotch") set_reordering_method(ReorderingStrategy::PTSCOTCH);
-        else if (s == "geometric") set_reordering_method(ReorderingStrategy::GEOMETRIC);
         else if (s == "rcm") set_reordering_method(ReorderingStrategy::RCM);
+        else if (s == "geometric") set_reordering_method(ReorderingStrategy::GEOMETRIC);
+        else if (s == "amd") set_reordering_method(ReorderingStrategy::AMD);
+        else if (s == "mmd") set_reordering_method(ReorderingStrategy::MMD);
+        else if (s == "mlf") set_reordering_method(ReorderingStrategy::MLF);
+        else if (s == "and") set_reordering_method(ReorderingStrategy::AND);
+        else if (s == "spectral") set_reordering_method(ReorderingStrategy::SPECTRAL);
         else std::cerr << "# WARNING: matrix reordering strategy not"
                " recognized, use 'metis', 'parmetis', 'scotch', 'ptscotch',"
-               " 'geometric' or 'rcm'" << std::endl;
+               " 'rcm', 'geometric', 'amd', 'mmd', 'mlf', 'and' or 'spectral'"
+                       << std::endl;
       } break;
       case 8: {
         std::istringstream iss(optarg);
@@ -402,6 +420,8 @@ namespace strumpack {
                " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
                        << std::endl;
       } break;
+      case 50: enable_openmp_tree(); break;
+      case 51: disable_openmp_tree(); break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -418,6 +438,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_BPACK)
     HODLR_options().set_from_command_line(argc, cargv);
 #endif
+    // ND_options().set_from_command_line(argc, cargv);
 #else
     std::cerr << "WARNING: no support for getopt.h, "
       "not parsing command line options." << std::endl;
@@ -442,8 +463,8 @@ namespace strumpack {
               << " stopping tolerance" << std::endl;
     std::cout << "#   --sp_Krylov_solver [auto|direct|refinement|pgmres|"
               << "gmres|pbicgstab|bicgstab]" << std::endl;
-    std::cout << "#          default: auto (refinement when no HSS, pgmres"
-              << " (preconditioned) with HSS compression)" << std::endl;
+    std::cout << "#          default: auto (refinement when using compression, pgmres"
+              << " (preconditioned) with compression)" << std::endl;
     std::cout << "#   --sp_gmres_restart int (default " << gmres_restart()
               << ")" << std::endl;
     std::cout << "#          gmres restart length" << std::endl;
@@ -451,8 +472,8 @@ namespace strumpack {
               << std::endl;
     std::cout << "#          Gram-Schmidt type for GMRES" << std::endl;
     std::cout << "#   --sp_reordering_method [natural|metis|scotch|parmetis|"
-              << "ptscotch|rcm|geometric]" << std::endl;
-    std::cout << "#          Code for nested dissection." << std::endl;
+              << "ptscotch|rcm|geometric|amd|mmd|mlf|and|spectral]" << std::endl;
+    std::cout << "#          Select a fill-reducing ordering algorithm." << std::endl;
     std::cout << "#          Geometric only works on regular meshes and you"
               << " need to provide the sizes." << std::endl;
     std::cout << "#   --sp_nd_param int (default " << nd_param() << ")"
@@ -500,7 +521,7 @@ namespace strumpack {
       std::cout << "#      " << i << " " <<
         get_description(get_matching(i)) << std::endl;
     std::cout << "#   --sp_compression (default "
-              << get_name(comp_) << ")" << std::endl 
+              << get_name(comp_) << ")" << std::endl
               << "#          should be [none|hss|blr|hodlr|lossy|blr_hodlr|zfp_blr_hodlr]" << std::endl
               << "#          type of rank-structured compression to use"
               << std::endl;
@@ -534,6 +555,14 @@ namespace strumpack {
     std::cout << "#   --sp_gpu_streams (default "
               << gpu_streams() << ")" << std::endl
               << "#          number of GPU streams" << std::endl;
+    std::cout << "#   --sp_enable_openmp_tree (default "
+              << std::boolalpha << use_openmp_tree_ << ")" << std::endl
+              << "#          uses more memory, but scales better with OpenMP threads"
+              << std::endl;
+    std::cout << "#   --sp_disable_openmp_tree (default "
+              << std::boolalpha << !use_openmp_tree_ << ")" << std::endl
+              << "#          uses less more memory, but scales worse with OpenMP threads"
+              << std::endl;
     std::cout << "#   --sp_lossy_precision [1-64] (default "
               << lossy_precision() << ")" << std::endl
               << "#          lossy compression precision" << std::endl

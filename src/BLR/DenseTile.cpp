@@ -108,8 +108,8 @@ namespace strumpack {
     }
 #endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    template<typename scalar_t> void 
-    DenseTile<scalar_t>::laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) {
+    template<typename scalar_t> void
+    DenseTile<scalar_t>::laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) {
       gpu::laswp(handle, D(), 1, D().rows(), dpiv, fwd ? 1 : -1);
     }
 #endif
@@ -122,7 +122,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> void DenseTile<scalar_t>::trsm_b
-    (gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta, 
+    (gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta,
      Diag d, scalar_t alpha, DenseM_t& a) {
       strumpack::gpu::trsm
         (handle, s, ul, ta, d, alpha, a, D());

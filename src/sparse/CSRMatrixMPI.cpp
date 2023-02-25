@@ -76,6 +76,27 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
   CSRMatrixMPI<scalar_t,integer_t>::CSRMatrixMPI
+  (integer_t rows, integer_t lrows, integer_t lnnz,
+   const integer_t* dist, MPIComm c, bool symm_sparse)
+    : CSM_t(), comm_(std::move(c)) {
+    auto P = comm_.size();
+    auto rank = comm_.rank();
+    assert(dist[rank+1] - dist[rank] == lrows);
+    lrows_ = lrows;
+    lnnz_ = lnnz;
+    brow_ = dist[rank];
+    dist_.resize(P+1);
+    std::copy(dist, dist+P+1, dist_.data());
+    ptr_.resize(lrows_+1);
+    ind_.resize(lnnz_);
+    val_.resize(lnnz_);
+    n_ = dist[P];
+    nnz_ = comm_.all_reduce(lnnz_, MPI_SUM);
+    symm_sparse_ = symm_sparse;
+  }
+
+  template<typename scalar_t,typename integer_t>
+  CSRMatrixMPI<scalar_t,integer_t>::CSRMatrixMPI
   (integer_t lrows, const integer_t* d_ptr, const integer_t* d_ind,
    const scalar_t* d_val, const integer_t* o_ptr, const integer_t* o_ind,
    const scalar_t* o_val, const integer_t* garray, MPIComm c,
@@ -226,6 +247,52 @@ namespace strumpack {
       nrm1 = *std::max_element(n1.begin(), n1.end());
     comm_.broadcast(nrm1);
     return nrm1;
+  }
+
+  template<typename scalar_t,typename integer_t>
+  std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+  CSRMatrixMPI<scalar_t,integer_t>::add_missing_diagonal
+  (const scalar_t& s) const {
+    integer_t diag_nnz = 0;
+    for (integer_t r=0; r<lrows_; r++)
+      for (integer_t k=ptr_[r]; k<ptr_[r+1]; k++)
+        if (ind_[k] == r + brow_) {
+          diag_nnz++;
+          break;
+        }
+    std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
+      Anew(new CSRMatrixMPI<scalar_t,integer_t>
+           (n_, lrows_, lnnz_+lrows_-diag_nnz,
+            dist_.data(), Comm(), symm_sparse_));
+    for (integer_t r=0, i=0; r<lrows_; r++) {
+      bool d = false;
+      for (integer_t k=ptr_[r]; k<ptr_[r+1]; k++) {
+        auto c = ind_[k];
+        if (c == r + brow_) d = true;
+        Anew->ind(i) = c;
+        Anew->val(i) = val_[k];
+        i++;
+      }
+      if (!d) {
+        Anew->ind(i) = r + brow_;
+        Anew->val(i) = s;
+        i++;
+      }
+      Anew->ptr(r+1) = i;
+    }
+    Anew->sort_rows();
+    Anew->split_diag_offdiag();
+    Anew->check();
+    return Anew;
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrixMPI<scalar_t,integer_t>::sort_rows() {
+#pragma omp parallel for
+    for (integer_t r=0; r<lrows_; r++) {
+      sort_indices_values<scalar_t>
+        (ind_.data(), val_.data(), ptr_[r], ptr_[r+1]);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -738,8 +805,10 @@ namespace strumpack {
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
         eq.R[r] = std::max(eq.R[r], std::abs(val_[j]));
     auto mM = std::minmax_element(eq.R.begin(), eq.R.end());
-    real_t rmin = comm_.all_reduce(*(mM.first), MPI_MIN),
-      rmax = comm_.all_reduce(*(mM.second), MPI_MAX);
+    real_t rmin = lrows_ ? *(mM.first) : std::numeric_limits<real_t>::max();
+    real_t rmax = lrows_ ? *(mM.second) : 0;
+    rmin = comm_.all_reduce(rmin, MPI_MIN);
+    rmax = comm_.all_reduce(rmax, MPI_MAX);
     eq.Amax = rmax;
     if (rmin == 0.) {
       for (integer_t r=0; r<lrows_; r++)
@@ -763,8 +832,10 @@ namespace strumpack {
     }
     comm_.all_reduce(eq.C, MPI_MAX);
     mM = std::minmax_element(eq.C.begin(), eq.C.end());
-    real_t cmin = comm_.all_reduce(*(mM.first), MPI_MIN),
-      cmax = comm_.all_reduce(*(mM.second), MPI_MAX);
+    real_t cmin = lrows_ ? *(mM.first) : std::numeric_limits<real_t>::max();
+    real_t cmax = lrows_ ? *(mM.second) : 0;
+    cmin = comm_.all_reduce(cmin, MPI_MIN);
+    cmax = comm_.all_reduce(cmax, MPI_MAX);
     if (cmin == 0.) {
       for (integer_t i=0; i<n_; i++)
         if (eq.C[i] == 0.) {
@@ -866,6 +937,7 @@ namespace strumpack {
         sbuf[dest].emplace_back(col, row);
       }
     auto edges = comm_.all_to_all_v(sbuf);
+    IdxIJ::free_mpi_type();
     std::sort(edges.begin(), edges.end(),
               [](const IdxIJ& a, const IdxIJ& b) {
                 // sort according to rows, then columns
@@ -1030,6 +1102,14 @@ namespace strumpack {
     return comm_.all_reduce(m, MPI_MAX);
   }
 
+  template<typename scalar_t, typename integer_t, typename cast_t>
+  CSRMatrixMPI<cast_t,integer_t>
+  cast_matrix(const CSRMatrixMPI<scalar_t,integer_t>& mat) {
+    std::vector<cast_t> new_val(mat.val(), mat.val()+mat.local_nnz());
+    return CSRMatrixMPI<cast_t,integer_t>
+      (mat.local_rows(), mat.ptr(), mat.ind(), new_val.data(),
+       mat.dist().data(), mat.Comm(), mat.symm_sparse());
+  }
 
   // explicit template instantiations
   template class CSRMatrixMPI<float,int>;
@@ -1047,20 +1127,31 @@ namespace strumpack {
   template class CSRMatrixMPI<std::complex<float>,long long int>;
   template class CSRMatrixMPI<std::complex<double>,long long int>;
 
-
-  template<typename scalar_t, typename integer_t, typename cast_t>
-  CSRMatrixMPI<cast_t,integer_t>
-  cast_matrix(const CSRMatrixMPI<scalar_t,integer_t>& mat) {
-    std::vector<cast_t> new_val(mat.val(), mat.val()+mat.local_nnz());
-    return CSRMatrixMPI<cast_t,integer_t>
-      (mat.local_rows(), mat.ptr(), mat.ind(), new_val.data(),
-       mat.dist().data(), mat.Comm(), mat.symm_sparse());
-  }
-
   template CSRMatrixMPI<float,int>
   cast_matrix<double,int,float>(const CSRMatrixMPI<double,int>& mat);
+  template CSRMatrixMPI<double,int>
+  cast_matrix<float,int,double>(const CSRMatrixMPI<float,int>& mat);
   template CSRMatrixMPI<std::complex<float>,int>
-  cast_matrix<std::complex<double>,int,std::complex<float>>
-  (const CSRMatrixMPI<std::complex<double>,int>& mat);
+  cast_matrix<std::complex<double>,int,std::complex<float>>(const CSRMatrixMPI<std::complex<double>,int>& mat);
+  template CSRMatrixMPI<std::complex<double>,int>
+  cast_matrix<std::complex<float>,int,std::complex<double>>(const CSRMatrixMPI<std::complex<float>,int>& mat);
+
+  template CSRMatrixMPI<float,long int>
+  cast_matrix<double,long int,float>(const CSRMatrixMPI<double,long int>& mat);
+  template CSRMatrixMPI<double,long int>
+  cast_matrix<float,long int,double>(const CSRMatrixMPI<float,long int>& mat);
+  template CSRMatrixMPI<std::complex<float>,long int>
+  cast_matrix<std::complex<double>,long int,std::complex<float>>(const CSRMatrixMPI<std::complex<double>,long int>& mat);
+  template CSRMatrixMPI<std::complex<double>,long int>
+  cast_matrix<std::complex<float>,long int,std::complex<double>>(const CSRMatrixMPI<std::complex<float>,long int>& mat);
+
+  template CSRMatrixMPI<float,long long int>
+  cast_matrix<double,long long int,float>(const CSRMatrixMPI<double,long long int>& mat);
+  template CSRMatrixMPI<double,long long int>
+  cast_matrix<float,long long int,double>(const CSRMatrixMPI<float,long long int>& mat);
+  template CSRMatrixMPI<std::complex<float>,long long int>
+  cast_matrix<std::complex<double>,long long int,std::complex<float>>(const CSRMatrixMPI<std::complex<double>,long long int>& mat);
+  template CSRMatrixMPI<std::complex<double>,long long int>
+  cast_matrix<std::complex<float>,long long int,std::complex<double>>(const CSRMatrixMPI<std::complex<float>,long long int>& mat);
 
 } // end namespace strumpack

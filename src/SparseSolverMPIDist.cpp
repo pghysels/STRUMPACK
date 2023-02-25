@@ -54,6 +54,14 @@ namespace strumpack {
     if (opts_.verbose() && is_root_)
       std::cout << "# using " << comm_.size()
                 << " MPI processes" << std::endl;
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    int thread_level;
+    MPI_Query_thread(&thread_level);
+    if (thread_level != MPI_THREAD_MULTIPLE &&
+        mpi_rank(comm) == 0)
+      std::cerr << "MPI_THREAD_MULTIPLE is required for SLATE"
+                << std::endl;
+#endif
     // Set the default reordering to PARMETIS?
     //opts_.set_reordering_method(ReorderingStrategy::PARMETIS);
   }
@@ -78,7 +86,7 @@ namespace strumpack {
   SparseSolverMPIDist<scalar_t,integer_t>::broadcast_matrix
   (const CSRMatrix<scalar_t,integer_t>& A) {
     mat_mpi_.reset
-      (new CSRMatrixMPI<scalar_t,integer_t>(&A, comm_.comm(), true));
+      (new CSRMatrixMPI<scalar_t,integer_t>(&A, comm_, true));
     this->factored_ = this->reordered_ = false;
   }
 
@@ -89,7 +97,7 @@ namespace strumpack {
     CSRMatrix<scalar_t,integer_t> mat_seq
       (N, row_ptr, col_ind, values, symmetric_pattern);
     mat_mpi_.reset
-      (new CSRMatrixMPI<scalar_t,integer_t>(&mat_seq, comm_.comm(), true));
+      (new CSRMatrixMPI<scalar_t,integer_t>(&mat_seq, comm_, true));
     this->factored_ = this->reordered_ = false;
   }
 
@@ -107,7 +115,7 @@ namespace strumpack {
     mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, row_ptr, col_ind, values, dist,
-        comm_.comm(), symmetric_pattern));
+        comm_, symmetric_pattern));
     this->factored_ = this->reordered_ = false;
   }
 
@@ -119,7 +127,7 @@ namespace strumpack {
     mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, d_ptr, d_ind, d_val, o_ptr, o_ind, o_val,
-        garray, comm_.comm()));
+        garray, comm_));
     this->factored_ = this->reordered_ = false;
   }
 
@@ -149,7 +157,7 @@ namespace strumpack {
     mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, row_ptr, col_ind, values, dist,
-        comm_.comm(), symmetric_pattern));
+        comm_, symmetric_pattern));
     redistribute_values();
   }
 
@@ -166,7 +174,7 @@ namespace strumpack {
     mat_mpi_.reset
       (new CSRMatrixMPI<scalar_t,integer_t>
        (local_rows, d_ptr, d_ind, d_val, o_ptr, o_ind, o_val,
-        garray, comm_.comm()));
+        garray, comm_));
     redistribute_values();
   }
 
@@ -201,14 +209,36 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::separator_reordering() {
+    // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
+    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
+    // tree_mpi_dist_->separator_reordering(opts_, *shifted_mat);
     tree_mpi_dist_->separator_reordering(opts_, *mat_mpi_);
   }
 
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
+    // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
+    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
+    // tree_mpi_dist_.reset
+    //   (new EliminationTreeMPIDist<scalar_t,integer_t>
+    //    (opts_, *shifted_mat, *nd_mpi_, comm_));
     tree_mpi_dist_.reset
       (new EliminationTreeMPIDist<scalar_t,integer_t>
        (opts_, *mat_mpi_, *nd_mpi_, comm_));
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverMPIDist<scalar_t,integer_t>::solve_internal
+  (int nrhs, const scalar_t* b, int ldb,
+   scalar_t* x, int ldx, bool use_initial_guess) {
+    if (!nrhs) return ReturnCode::SUCCESS;
+    auto N = mat_mpi_->local_rows();
+    assert(ldb >= N);
+    assert(ldx >= N);
+    assert(nrhs >= 1);
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMW_t X(N, nrhs, x, N);
+    return this->solve(*B, X, use_initial_guess);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode

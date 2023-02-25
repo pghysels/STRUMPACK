@@ -36,6 +36,8 @@
 
 #include "LRTile.hpp"
 #include "DenseTile.hpp"
+// for gpu::round_up
+#include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
 
 namespace strumpack {
   namespace BLR {
@@ -75,8 +77,8 @@ namespace strumpack {
     }
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> void
-    trsm(gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta, Diag d, scalar_t alpha,
-         BLRTile<scalar_t>& a, BLRTile<scalar_t>& b) {
+    trsm(gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta, Diag d,
+         scalar_t alpha, BLRTile<scalar_t>& a, BLRTile<scalar_t>& b) {
       b.trsm_b(handle, s, ul, ta, d, alpha, a.D());
     }
 #endif
@@ -104,6 +106,112 @@ namespace strumpack {
      const BLRTile<scalar_t>& b, DenseMatrix<scalar_t>& c, scalar_t* work) {
       a.Schur_update_rows_a(rows, b, c, work);
     }
+
+
+    template<typename scalar_t> class VBatchedGEMM {
+    public:
+      VBatchedGEMM(std::size_t B, char* dmem) : dmem_(dmem) { reserve(B); }
+      void reserve(std::size_t B) {
+        m_.reserve(B+1);  ldA_.reserve(B+1);  A_.reserve(B);
+        n_.reserve(B+1);  ldB_.reserve(B+1);  B_.reserve(B);
+        k_.reserve(B+1);  ldC_.reserve(B+1);  C_.reserve(B);
+      }
+      void add(int m, int n, int k,
+               scalar_t* A, scalar_t* B, scalar_t* C) {
+        add(m, n, k, A, m, B, k, C, m);
+      }
+      void add(int m, int n, int k, scalar_t* A, int ldA,
+               scalar_t* B, int ldB, scalar_t* C, int ldC) {
+        assert(ldA >= m && ldB >= k && ldC >= m);
+        m_.push_back(m);  ldA_.push_back(ldA);  A_.push_back(A);
+        n_.push_back(n);  ldB_.push_back(ldB);  B_.push_back(B);
+        k_.push_back(k);  ldC_.push_back(ldC);  C_.push_back(C);
+      }
+
+      std::size_t count() { return m_.size(); }
+
+      static std::size_t dwork_bytes(int batchcount) {
+#if defined(STRUMPACK_USE_MAGMA)
+        return
+          gpu::round_up((batchcount+1)*6*sizeof(magma_int_t)) +
+          gpu::round_up(batchcount*3*sizeof(scalar_t*));
+#else
+        return 0;
+#endif
+      }
+
+#if defined(STRUMPACK_USE_MAGMA)
+      void run(scalar_t alpha, scalar_t beta,
+               magma_queue_t& q, gpu::Stream& s) {
+        magma_int_t batchcount = m_.size();
+        if (!batchcount) return;
+        auto dimem = reinterpret_cast<magma_int_t*>(dmem_);
+        auto dsmem = reinterpret_cast<scalar_t**>
+          (dmem_ + gpu::round_up((batchcount+1)*6*sizeof(magma_int_t)));
+
+        // TODO HostMemory?
+        std::vector<magma_int_t> imem((batchcount+1)*6);
+        auto iptr = imem.begin();
+        std::copy(m_.begin(), m_.end(), iptr);   iptr += batchcount+1;
+        std::copy(n_.begin(), n_.end(), iptr);   iptr += batchcount+1;
+        std::copy(k_.begin(), k_.end(), iptr);   iptr += batchcount+1;
+        std::copy(ldA_.begin(), ldA_.end(), iptr);   iptr += batchcount+1;
+        std::copy(ldB_.begin(), ldB_.end(), iptr);   iptr += batchcount+1;
+        std::copy(ldC_.begin(), ldC_.end(), iptr);   iptr += batchcount+1;
+        gpu_check(gpu::copy_host_to_device_async
+                  (dimem, imem.data(), (batchcount+1)*6, s));
+
+        std::vector<scalar_t*> smem(batchcount*3);
+        auto sptr = smem.begin();
+        std::copy(A_.begin(), A_.end(), sptr);   sptr += batchcount;
+        std::copy(B_.begin(), B_.end(), sptr);   sptr += batchcount;
+        std::copy(C_.begin(), C_.end(), sptr);   sptr += batchcount;
+        gpu_check(gpu::copy_host_to_device_async
+                  (dsmem, smem.data(), batchcount*3, s));
+
+        for (magma_int_t i=0; i<batchcount; i++) {
+          STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*
+                          blas::gemm_flops(m_[i],n_[i],k_[i],alpha,beta));
+          STRUMPACK_BYTES(sizeof(scalar_t)*
+                          blas::gemm_moves(m_[i],n_[i],k_[i]));
+        }
+        auto max_m = *std::max_element(m_.begin(), m_.end());
+        auto max_n = *std::max_element(n_.begin(), n_.end());
+        auto max_k = *std::max_element(k_.begin(), k_.end());
+        gpu::magma::gemm_vbatched_max_nocheck
+          (MagmaNoTrans, MagmaNoTrans,
+           dimem, dimem+(batchcount+1), dimem+2*(batchcount+1),
+           alpha, dsmem, dimem+3*(batchcount+1),
+           dsmem+batchcount, dimem+4*(batchcount+1),
+           beta, dsmem+2*batchcount, dimem+5*(batchcount+1),
+           batchcount, max_m, max_n, max_k, q);
+      }
+#endif
+      void run(scalar_t alpha, scalar_t beta, gpu::BLASHandle& h) {
+        std::size_t batchcount = m_.size();
+        if (!batchcount) return;
+        // gpu::synchronize();
+        for (std::size_t i=0; i<batchcount; i++) {
+          STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*
+                          blas::gemm_flops(m_[i],n_[i],k_[i],alpha,beta));
+          STRUMPACK_BYTES(sizeof(scalar_t)*
+                          blas::gemm_moves(m_[i],n_[i],k_[i]));
+          DenseMatrixWrapper<scalar_t>
+            A(m_[i], k_[i], A_[i], ldA_[i]),
+            B(k_[i], n_[i], B_[i], ldB_[i]),
+            C(m_[i], n_[i], C_[i], ldC_[i]);
+          gpu::gemm(h, Trans::N, Trans::N, alpha, A, B, beta, C);
+        }
+      }
+    private:
+#if defined(STRUMPACK_USE_MAGMA)
+      std::vector<magma_int_t> m_, n_, k_, ldA_, ldB_, ldC_;
+#else
+      std::vector<int> m_, n_, k_, ldA_, ldB_, ldC_;
+#endif
+      std::vector<scalar_t*> A_, B_, C_;
+      char* dmem_ = nullptr; // only needed for MAGMA
+    };
 
   } // end namespace BLR
 } // end namespace strumpack

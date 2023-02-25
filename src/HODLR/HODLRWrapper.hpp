@@ -37,67 +37,29 @@
 
 #include "dense/DenseMatrix.hpp"
 #include "misc/MPIWrapper.hpp"
-#include "dC_BPACK_wrapper.h"
-#include "zC_BPACK_wrapper.h"
+typedef void* F2Cptr;
+typedef void* C2Fptr;
 
 namespace strumpack {
   namespace HODLR {
 
     template<typename scalar_t> void HODLR_createptree
-    (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_createptree<double>
-    (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree);
-    template<> void HODLR_createptree<std::complex<double>>
     (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree);
 
-    template<typename scalar_t> void HODLR_createoptions(F2Cptr& options) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_createoptions<double>(F2Cptr& options);
-    template<> void HODLR_createoptions<std::complex<double>>(F2Cptr& options);
+    template<typename scalar_t> void HODLR_createoptions(F2Cptr& options);
 
-    template<typename scalar_t> void HODLR_copyoptions(F2Cptr& in, F2Cptr& out) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_copyoptions<double>(F2Cptr& in, F2Cptr& out);
-    template<> void HODLR_copyoptions<std::complex<double>>(F2Cptr& in, F2Cptr& out);
+    template<typename scalar_t> void HODLR_copyoptions(F2Cptr& in, F2Cptr& out);
 
-    template<typename scalar_t> void HODLR_printoptions(F2Cptr& options, F2Cptr& ptree) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_printoptions<double>(F2Cptr& options, F2Cptr& ptree);
-    template<> void HODLR_printoptions<std::complex<double>>(F2Cptr& options, F2Cptr& ptree);
+    template<typename scalar_t> void HODLR_printoptions(F2Cptr& options, F2Cptr& ptree);
 
-    template<typename scalar_t> void HODLR_printstats(F2Cptr& stats, F2Cptr& ptree) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_printstats<double>(F2Cptr& stats, F2Cptr& ptree);
-    template<> void HODLR_printstats<std::complex<double>>(F2Cptr& stats, F2Cptr& ptree);
+    template<typename scalar_t> void HODLR_printstats(F2Cptr& stats, F2Cptr& ptree);
 
-    template<typename scalar_t> void HODLR_createstats(F2Cptr& stats) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_createstats<double>(F2Cptr& stats);
-    template<> void HODLR_createstats<std::complex<double>>(F2Cptr& stats);
+    template<typename scalar_t> void HODLR_createstats(F2Cptr& stats);
 
     template<typename scalar_t> void HODLR_set_D_option
-    (F2Cptr options, const std::string& opt, double v) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_set_D_option<double>
-    (F2Cptr options, const std::string& opt, double v);
-    template<> void HODLR_set_D_option<std::complex<double>>
     (F2Cptr options, const std::string& opt, double v);
 
     template<typename scalar_t> void HODLR_set_I_option
-    (F2Cptr options, const std::string& opt, int v) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_set_I_option<double>
-    (F2Cptr options, const std::string& opt, int v);
-    template<> void HODLR_set_I_option<std::complex<double>>
     (F2Cptr options, const std::string& opt, int v);
 
     /**
@@ -116,15 +78,7 @@ namespace strumpack {
      *  Rank_max
      */
     template<typename scalar_t> double BPACK_get_stat
-    (F2Cptr stats, const std::string& name) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-      return 0.;
-    }
-    template<> double BPACK_get_stat<double>
     (F2Cptr stats, const std::string& name);
-    template<> double BPACK_get_stat<std::complex<double>>
-    (F2Cptr stats, const std::string& name);
-
 
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
@@ -133,24 +87,7 @@ namespace strumpack {
      int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
-     C2Fptr fdata) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_construct_init<double, double>
-    (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
-     int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
-     C2Fptr fdata);
-    template<> void HODLR_construct_init<std::complex<double>, double>
-    (int N, int d, double* data, int* nns, int lvls, int* tree,
-     int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
-     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr),
-     C2Fptr fdata);
+     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata);
 
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
@@ -163,30 +100,7 @@ namespace strumpack {
      (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
       int* allrows, int* allcols, scalar_t* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr fdata) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_construct_init_Gram<double, double>
-    (int N, int d, double* data, int* nns, int lvls, int* tree, int* perm,
-     int& lrow, F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
-      int* allrows, int* allcols, double* alldat_loc,
-      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata);
-    template<> void HODLR_construct_init_Gram<std::complex<double>, double>
-    (int N, int d, double* data, int* nns, int lvls, int* tree,
-     int* perm, int& lrow, F2Cptr& ho_bf, F2Cptr& options,
-     F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
-     void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
-      int* allrows, int* allcols, std::complex<double>* alldat_loc,
-      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr fdata);
-
 
     template<typename scalar_t> void HODLR_construct_element_compute
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
@@ -196,26 +110,6 @@ namespace strumpack {
      (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
       int* allrows, int* allcols, scalar_t* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr K) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_construct_element_compute<double>
-    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
-      int* allrows, int* allcols, double* alldat_loc,
-      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr K);
-    template<> void HODLR_construct_element_compute<std::complex<double>>
-    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
-     void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
-      int* allrows, int* allcols, std::complex<double>* alldat_loc,
-      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr K);
 
     template<typename scalar_t> void HODLR_construct_matvec_compute
@@ -223,37 +117,10 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*matvec)
      (char const*, int*, int*, int*, const scalar_t*, scalar_t*, C2Fptr),
-     C2Fptr fdata) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_construct_matvec_compute<double>
-    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*matvec)
-     (char const*, int*, int*, int*, const double*, double*, C2Fptr),
      C2Fptr fdata);
-    template<> void HODLR_construct_matvec_compute<std::complex<double>>
-    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*matvec)
-     (char const*, int*, int*, int*, const std::complex<double>*,
-      std::complex<double>*, C2Fptr), C2Fptr fdata);
 
-    template<typename scalar_t> void LRBF_construct_init
-    (int M, int N, int& lrows, int& lcols, int* nsr, int* nnsc,
-     F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void LRBF_construct_init<double>
-    (int M, int N, int& lrows, int& lcols, int* nsr, int* nnsc,
-     F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
-     F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
-     void (*C_FuncDistmn)(int*, int*, double*, C2Fptr),
-     void (*C_FuncNearFar)(int*, int*, int*, C2Fptr), C2Fptr fdata);
-    template<> void LRBF_construct_init<std::complex<double>>
+    template<typename scalar_t>
+    void LRBF_construct_init
     (int M, int N, int& lrows, int& lcols, int* nsr, int* nnsc,
      F2Cptr rmsh, F2Cptr cmsh, F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats,
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
@@ -264,20 +131,7 @@ namespace strumpack {
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*matvec)
      (const char*, int*, int*, int*, const scalar_t*,
-      scalar_t*, C2Fptr, scalar_t*, scalar_t*), C2Fptr fdata) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void LRBF_construct_matvec_compute<double>
-    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree, void (*matvec)
-     (const char*, int*, int*, int*, const double*,
-      double*, C2Fptr, double*, double*), C2Fptr fdata);
-    template<> void LRBF_construct_matvec_compute<std::complex<double>>
-    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree, void (*matvec)
-     (char const*, int*, int*, int*, const std::complex<double>*,
-      std::complex<double>*, C2Fptr, std::complex<double>*,
-      std::complex<double>*), C2Fptr fdata);
+      scalar_t*, C2Fptr, scalar_t*, scalar_t*), C2Fptr fdata);
 
     template<typename scalar_t> void LRBF_construct_element_compute
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
@@ -285,162 +139,52 @@ namespace strumpack {
      (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
       int* allrows, int* allcols, scalar_t* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr fdata) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void LRBF_construct_element_compute<double>
-    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree, void (*element)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
-      int* allrows, int* allcols, double* alldat_loc,
-      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
-      C2Fptr elems), C2Fptr fdata);
-    template<> void LRBF_construct_element_compute<std::complex<double>>
-    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
-     F2Cptr& kerquant, F2Cptr& ptree, void (*element)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
-      int* allrows, int* allcols, std::complex<double>* alldat_loc,
-      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata);
 
     template<typename scalar_t> void HODLR_extract_elements
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
      F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
-     int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_extract_elements<double>
-    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
-     int* allrows, int* allcols, double* alldat_loc,
-     int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps);
-    template<> void HODLR_extract_elements<std::complex<double>>
-    (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
-     int* allrows,int* allcols, std::complex<double>* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps);
 
     template<typename scalar_t> void LRBF_extract_elements
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
      F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
-     int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void LRBF_extract_elements<double>
-    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
-     int* allrows, int* allcols, double* alldat_loc,
-     int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps);
-    template<> void LRBF_extract_elements<std::complex<double>>
-    (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
-     int* allrows,int* allcols, std::complex<double>* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps);
 
     template<typename scalar_t> void HODLR_deletestats(F2Cptr&);
-    template<> void HODLR_deletestats<float>(F2Cptr& stats);
-    template<> void HODLR_deletestats<double>(F2Cptr& stats);
-    template<> void HODLR_deletestats<std::complex<float>>(F2Cptr& stats);
-    template<> void HODLR_deletestats<std::complex<double>>(F2Cptr& stats);
 
     template<typename scalar_t> void HODLR_deleteproctree(F2Cptr&);
-    template<> void HODLR_deleteproctree<float>(F2Cptr& ptree);
-    template<> void HODLR_deleteproctree<double>(F2Cptr& ptree);
-    template<> void HODLR_deleteproctree<std::complex<float>>(F2Cptr& ptree);
-    template<> void HODLR_deleteproctree<std::complex<double>>(F2Cptr& ptree);
 
     template<typename scalar_t> void HODLR_deletemesh(F2Cptr&);
-    template<> void HODLR_deletemesh<float>(F2Cptr& mesh);
-    template<> void HODLR_deletemesh<double>(F2Cptr& mesh);
-    template<> void HODLR_deletemesh<std::complex<float>>(F2Cptr& mesh);
-    template<> void HODLR_deletemesh<std::complex<double>>(F2Cptr& mesh);
 
     template<typename scalar_t> void HODLR_deletekernelquant(F2Cptr&);
-    template<> void HODLR_deletekernelquant<float>(F2Cptr& kerquant);
-    template<> void HODLR_deletekernelquant<double>(F2Cptr& kerquant);
-    template<> void HODLR_deletekernelquant<std::complex<float>>(F2Cptr& kerquant);
-    template<> void HODLR_deletekernelquant<std::complex<double>>(F2Cptr& kerquant);
 
     template<typename scalar_t> void HODLR_delete(F2Cptr&);
-    template<> void HODLR_delete<float>(F2Cptr& ho_bf);
-    template<> void HODLR_delete<double>(F2Cptr& ho_bf);
-    template<> void HODLR_delete<std::complex<float>>(F2Cptr& ho_bf);
-    template<> void HODLR_delete<std::complex<double>>(F2Cptr& ho_bf);
 
     template<typename scalar_t> void LRBF_deletebf(F2Cptr&);
-    template<> void LRBF_deletebf<float>(F2Cptr& lr_bf);
-    template<> void LRBF_deletebf<double>(F2Cptr& lr_bf);
-    template<> void LRBF_deletebf<std::complex<float>>(F2Cptr& lr_bf);
-    template<> void LRBF_deletebf<std::complex<double>>(F2Cptr& lr_bf);
 
     template<typename scalar_t> void HODLR_deleteoptions(F2Cptr&);
-    template<> void HODLR_deleteoptions<float>(F2Cptr& option);
-    template<> void HODLR_deleteoptions<double>(F2Cptr& option);
-    template<> void HODLR_deleteoptions<std::complex<float>>(F2Cptr& option);
-    template<> void HODLR_deleteoptions<std::complex<double>>(F2Cptr& option);
 
     template<typename scalar_t> void HODLR_mult
     (char op, const scalar_t* X, scalar_t* Y, int Xlrows, int Ylrows, int cols,
-     F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_mult<double>
-    (char op, const double* X, double* Y, int Xlrows, int Ylrows, int cols,
      F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree);
-    template<> void HODLR_mult<std::complex<double>>
-    (char op, const std::complex<double>* X, std::complex<double>* Y,
-     int Xlrows, int Ylrows, int cols, F2Cptr ho_bf, F2Cptr options,
-     F2Cptr stats, F2Cptr ptree);
 
     template<typename scalar_t> void LRBF_mult
     (char op, const scalar_t* X, scalar_t* Y, int Xlrows, int Ylrows, int cols,
-     F2Cptr lr_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void LRBF_mult<double>
-    (char op, const double* X, double* Y, int Xlrows, int Ylrows, int cols,
      F2Cptr lr_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree);
-    template<> void LRBF_mult<std::complex<double>>
-    (char op, const std::complex<double>* X, std::complex<double>* Y,
-     int Xlrows, int Ylrows, int cols, F2Cptr lr_bf, F2Cptr options,
-     F2Cptr stats, F2Cptr ptree);
 
     template<typename scalar_t> void HODLR_factor
-    (F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree, F2Cptr msh) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_factor<double>
-    (F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree, F2Cptr msh);
-    template<> void HODLR_factor<std::complex<double>>
     (F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree, F2Cptr msh);
 
     template<typename scalar_t> void HODLR_solve
     (scalar_t* X, const scalar_t* B, int lrows, int rhs,
-     F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_solve<double>
-    (double* X, const double* B, int lrows, int rhs,
      F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree);
-    template<> void HODLR_solve<std::complex<double>>
-    (std::complex<double>* X, const std::complex<double>* B,
-     int lrows, int rhs, F2Cptr ho_bf, F2Cptr options,
-     F2Cptr stats, F2Cptr ptree);
 
     template<typename scalar_t> void HODLR_inv_mult
     (char op, const scalar_t* B, scalar_t* X, int Xlrows, int Blrows, int rhs,
-     F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree) {
-      std::cout << "ERROR: HODLR code does not support this precision." << std::endl;
-    }
-    template<> void HODLR_inv_mult<double>
-    (char op, const double* B, double* X, int Xlrows, int Blrows, int rhs,
      F2Cptr ho_bf, F2Cptr options, F2Cptr stats, F2Cptr ptree);
-    template<> void HODLR_inv_mult<std::complex<double>>
-    (char op, const std::complex<double>* B, std::complex<double>* X,
-     int Xlrows, int Blrows, int rhs, F2Cptr ho_bf, F2Cptr options,
-     F2Cptr stats, F2Cptr ptree);
 
     int LRBF_treeindex_merged2child(int idx_merge);
 

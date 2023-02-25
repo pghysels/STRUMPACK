@@ -41,44 +41,36 @@ namespace strumpack {
 
     std::string get_name(LowRankAlgorithm a) {
       switch (a) {
-      case LowRankAlgorithm::RRQR: return "RRQR"; break;
-      case LowRankAlgorithm::ACA: return "ACA"; break;
-      case LowRankAlgorithm::BACA: return "BACA"; break;
+      case LowRankAlgorithm::RRQR: return "RRQR";
+      case LowRankAlgorithm::ACA: return "ACA";
+      case LowRankAlgorithm::BACA: return "BACA";
       default: return "unknown";
       }
     }
 
     std::string get_name(Admissibility a) {
       switch (a) {
-      case Admissibility::STRONG: return "strong"; break;
-      case Admissibility::WEAK: return "weak"; break;
+      case Admissibility::STRONG: return "strong";
+      case Admissibility::WEAK: return "weak";
       default: return "unknown";
       }
     }
 
     std::string get_name(BLRFactorAlgorithm a) {
       switch (a) {
-      case BLRFactorAlgorithm::RL: return "RL"; break;
-      case BLRFactorAlgorithm::LL: return "LL"; break;
-      case BLRFactorAlgorithm::COMB: return "Comb"; break;
-      case BLRFactorAlgorithm::STAR: return "Star"; break;
-      default: return "unknown";
-      }
-    }
-
-    std::string get_name(BLRCB a) {
-      switch (a) {
-      case BLRCB::COLWISE: return "COLWISE"; break;
-      case BLRCB::DENSE: return "DENSE"; break;
-      case BLRCB::BLR: return "BLR"; break;
+      case BLRFactorAlgorithm::COLWISE: return "COLWISE";
+      case BLRFactorAlgorithm::RL: return "RL";
+      case BLRFactorAlgorithm::LL: return "LL";
+      case BLRFactorAlgorithm::COMB: return "Comb";
+      case BLRFactorAlgorithm::STAR: return "Star";
       default: return "unknown";
       }
     }
 
     std::string get_name(CompressionKernel a) {
       switch (a) {
-      case CompressionKernel::FULL: return "full"; break;
-      case CompressionKernel::HALF: return "half"; break;
+      case CompressionKernel::FULL: return "full";
+      case CompressionKernel::HALF: return "half";
       default: return "unknown";
       }
     }
@@ -104,8 +96,6 @@ namespace strumpack {
          {"blr_BACA_blocksize",        required_argument, 0, 7},
          {"blr_factor_algorithm",      required_argument, 0, 8},
          {"blr_compression_kernel",    required_argument, 0, 9},
-         {"blr_seq_CB_Compression",    no_argument, 0, 10},
-         {"blr_cb",                    required_argument, 0, 11},
          {"blr_verbose",               no_argument, 0, 'v'},
          {"blr_quiet",                 no_argument, 0, 'q'},
          {"help",                      no_argument, 0, 'h'},
@@ -170,7 +160,9 @@ namespace strumpack {
         case 8: {
           std::istringstream iss(optarg);
           std::string s; iss >> s;
-          if (s == "RL")
+          if (s == "COLWISE")
+            set_BLR_factor_algorithm(BLRFactorAlgorithm::COLWISE);
+          else if (s == "RL")
             set_BLR_factor_algorithm(BLRFactorAlgorithm::RL);
           else if (s == "LL")
             set_BLR_factor_algorithm(BLRFactorAlgorithm::LL);
@@ -180,7 +172,7 @@ namespace strumpack {
             set_BLR_factor_algorithm(BLRFactorAlgorithm::STAR);
           else
             std::cerr << "# WARNING: BLR algorithm not"
-                      << " recognized, use 'RL', 'LL', 'Comb' or 'Star'."
+                      << " recognized, use 'COLWISE', 'RL', 'LL', 'Comb' or 'Star'."
                       << std::endl;
         } break;
         case 9: {
@@ -193,21 +185,6 @@ namespace strumpack {
           else
             std::cerr << "# WARNING: compression kernel not"
                       << " recognized, use 'full' or 'half'."
-                      << std::endl;
-        } break;
-        case 10: set_BLRseq_CB_Compression(true); break;
-        case 11: {
-          std::istringstream iss(optarg);
-          std::string s; iss >> s;
-          if (s == "COLWISE")
-            set_BLR_CB(BLRCB::COLWISE);
-          else if (s == "DENSE")
-            set_BLR_CB(BLRCB::DENSE);
-          else if (s == "BLR")
-            set_BLR_CB(BLRCB::BLR);
-          else
-            std::cerr << "# WARNING: BLR CB not"
-                      << " recognized, use 'COLWISE', 'DENSE' or 'BLR'."
                       << std::endl;
         } break;
         case 'v': this->set_verbose(true); break;
@@ -242,15 +219,10 @@ namespace strumpack {
                 << "#      should be one of [weak|strong]" << std::endl
                 << "#   --blr_factor_algorithm (default "
                 << get_name(blr_algo_) << ")" << std::endl
-                << "#      should be [RL|LL|Comb|Star]" << std::endl
+                << "#      should be [COLWISE|RL|LL|Comb|Star]" << std::endl
                 << "#   --blr_compression_kernel (default "
                 << get_name(crn_krnl_) << ")" << std::endl
                 << "#      should be [full|half]" << std::endl
-                << "#   --blr_cb (default "
-                << get_name(blr_cb_) << ")" << std::endl
-                << "#      should be [COLWISE|DENSE|BLR]" << std::endl
-                << "#   --blr_seq_CB_Compression (default "
-                << BLRseq_CB_Compression() << ")" << std::endl
                 << "#   --blr_BACA_blocksize int (default "
                 << BACA_blocksize() << ")" << std::endl
                 << "#   --blr_verbose or -v (default "

@@ -52,19 +52,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
   template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-  // for the implementation, see FrontalMatrixGPU.cpp
-  template<typename scalar_t> class GPUFactorsImpl;
-  template<typename scalar_t> class GPUFactors {
-  public:
-    GPUFactors(int lvls);
-    ~GPUFactors();
-    std::unique_ptr<GPUFactorsImpl<scalar_t>> data_;
-  };
-#else
-  template<typename scalar_t> class GPUFactors {};
-#endif
-
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix {
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -98,23 +85,27 @@ namespace strumpack {
     void find_upd_indices(const std::vector<std::size_t>& I,
                           std::vector<std::size_t>& lI,
                           std::vector<std::size_t>& oI) const;
+
+    void upd_to_parent(const F_t* pa, std::size_t& upd2sep,
+                       std::size_t* I) const;
+    void upd_to_parent(const F_t* pa, std::size_t* I) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa,
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
-    virtual void barrier_world() const {
-#if defined(STRUMPACK_USE_MPI)
-      MPIComm c;
-      c.barrier();
-      auto pmax = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MAX);
-      auto pmin = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MIN);
-      if (c.is_root())
-        std::cout << "# peak memory after sequential tree traversal: "
-                  << " pmin: " << pmin << " pmax: " << pmax
-                  << " imbalance: " << pmax/pmin
-                  << std::endl;
-#endif
-    }
+//     virtual void barrier_world() const {
+// #if defined(STRUMPACK_USE_MPI)
+//       MPIComm c;
+//       c.barrier();
+//       auto pmax = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MAX);
+//       auto pmin = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MIN);
+//       if (c.is_root())
+//         std::cout << "# peak memory after sequential tree traversal: "
+//                   << " pmin: " << pmin << " pmax: " << pmax
+//                   << " imbalance: " << pmax/pmin
+//                   << std::endl;
+// #endif
+//     }
 
     virtual void release_work_memory() {
       VectorPool<scalar_t> workspace;
@@ -124,47 +115,62 @@ namespace strumpack {
       release_work_memory();
     }
 
-    virtual void
+    virtual ReturnCode
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
                                int etree_level=0, int task_depth=0) = 0;
 
-    virtual void factor(const SpMat_t& A, const Opts_t& opts,
-                        VectorPool<scalar_t>& workspace,
-                        int etree_level=0, int task_depth=0) {
-      multifrontal_factorization(A, opts, etree_level, task_depth);
+    virtual ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
+                              VectorPool<scalar_t>& workspace,
+                              int etree_level=0, int task_depth=0) {
+      return multifrontal_factorization(A, opts, etree_level, task_depth);
     };
-
-    virtual std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const
-    { return nullptr; }
-    //{ return std::unique_ptr<GPUFactors<scalar_t>>(); }
 
     virtual void delete_factors() {}
 
-    virtual void
-    multifrontal_solve(DenseM_t& b, const GPUFactors<scalar_t>*) const {
-      multifrontal_solve(b);
-    }
     virtual void multifrontal_solve(DenseM_t& b) const;
 
     virtual void
     forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
                                int etree_level=0,
-                               int task_depth=0) const {};
+                               int task_depth=0) const;
     virtual void
     backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
                                 int etree_level=0,
-                                int task_depth=0) const {};
+                                int task_depth=0) const;
 
     void fwd_solve_phase1(DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
                           int etree_level, int task_depth) const;
+    virtual
+    void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
+                          int etree_level, int task_depth) const {};
     void bwd_solve_phase2(DenseM_t& y, DenseM_t& yupd, DenseM_t* work,
                           int etree_level, int task_depth) const;
+    virtual
+    void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
+                          int etree_level, int task_depth) const {};
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    virtual scalar_t* copy_F22_to_gpu(gpu::DeviceMemory<scalar_t>& dmemF22){return nullptr;};
-    virtual scalar_t* getF22(gpu::DeviceMemory<scalar_t>& dmemF22){return copy_F22_to_gpu(dmemF22);}
-#endif
-    
+    ReturnCode inertia(integer_t& neg,
+                       integer_t& zero,
+                       integer_t& pos) const;
+
+    // #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    // virtual scalar_t*
+    // get_device_F22(gpu::DeviceMemory<scalar_t>& dmemF22) {
+    //   std::cerr << "ERROR copy_F22_to_gpu not implemented for this front type"
+    //             << std::endl;;
+    //   assert(false);
+    //   return nullptr;
+    // }
+    virtual std::size_t get_device_F22_worksize() {
+      return dim_upd()*dim_upd();
+    };
+    virtual scalar_t* get_device_F22(scalar_t*) {
+      std::cerr << "ERROR get_device_F22 not implemented for this front type"
+                << std::endl;;
+      assert(false);
+    }
+    // #endif
+
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
@@ -223,14 +229,14 @@ namespace strumpack {
                           const std::vector<std::size_t>& J,
                           DenseM_t& B, int task_depth) const = 0;
 
-    virtual void extract_CB_sub_matrix_blocks
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DenseM_t>& Bseq, int task_depth) const;
-    virtual void extract_CB_sub_matrix_blocks
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DenseMW_t>& Bseq, int task_depth) const;
+    virtual void
+    extract_CB_sub_matrix_blocks(const std::vector<std::vector<std::size_t>>& I,
+                                 const std::vector<std::vector<std::size_t>>& J,
+                                 std::vector<DenseM_t>& Bseq, int task_depth) const;
+    virtual void
+    extract_CB_sub_matrix_blocks(const std::vector<std::vector<std::size_t>>& I,
+                                 const std::vector<std::vector<std::size_t>>& J,
+                                 std::vector<DenseMW_t>& Bseq, int task_depth) const;
 
     void extend_add_b(DenseM_t& b, DenseM_t& bupd,
                       const DenseM_t& CB, const F_t* pa) const;
@@ -279,89 +285,109 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
     void multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
-    virtual void forward_multifrontal_solve
-    (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
-     int etree_level=0) const;
-    virtual void backward_multifrontal_solve
-    (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
-     int etree_level=0) const;
+    virtual void
+    forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,
+                               DistM_t& bupd, DenseM_t& seqbupd,
+                               int etree_level=0) const;
+    virtual void
+    backward_multifrontal_solve(DenseM_t& yloc, DistM_t* ydist,
+                                DistM_t& yupd, DenseM_t& seqyupd,
+                                int etree_level=0) const;
 
-    virtual void sample_CB
-    (Trans op, const DistM_t& R, DistM_t& S,
-     const DenseM_t& seqR, DenseM_t& seqS, F_t* pa) const {
+    virtual void
+    sample_CB(Trans op, const DistM_t& R, DistM_t& S,
+              const DenseM_t& seqR, DenseM_t& seqS, F_t* pa) const {
       sample_CB(op, seqR, seqS, pa);
     };
-    virtual void sample_CB
-    (const Opts_t& opts, const DistM_t& R,
-     DistM_t& Sr, DistM_t& Sc, const DenseM_t& seqR,
-     DenseM_t& seqSr, DenseM_t& seqSc, F_t* pa) {
+    virtual void
+    sample_CB(const Opts_t& opts, const DistM_t& R,
+              DistM_t& Sr, DistM_t& Sc, const DenseM_t& seqR,
+              DenseM_t& seqSr, DenseM_t& seqSc, F_t* pa) {
       sample_CB(opts, seqR, seqSr, seqSc, pa, 0);
     }
 
-    virtual void extend_add_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
+    virtual void
+    extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FMPI_t* pa) const {
       std::cerr << "FrontalMatrix::extend_add_copy_to_buffers"
                 << " not implemented for this front type: "
                 << typeid(*this).name()
                 << std::endl;
       abort();
     }
-    virtual void extend_add_copy_from_buffers
-    (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
-     scalar_t** pbuf, const FMPI_t* pa) const;
+    virtual void
+    extend_add_copy_from_buffers(DistM_t& F11, DistM_t& F12,
+                                 DistM_t& F21, DistM_t& F22,
+                                 scalar_t** pbuf, const FMPI_t* pa) const;
 
-    virtual void extadd_blr_copy_to_buffers
-    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
+    virtual void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FBLRMPI_t* pa) const {
       std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers"
                 << " not implemented for this front type: "
                 << typeid(*this).name()
                 << std::endl;
       abort();
     }
-    virtual void extadd_blr_copy_to_buffers_col
-    (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
+    virtual void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FBLRMPI_t* pa,
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts) const {
       std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers_col"
                 << " not implemented for this front type: "
                 << typeid(*this).name()
                 << std::endl;
       abort();
     }
-    virtual void extadd_blr_copy_from_buffers
-    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-     scalar_t** pbuf, const FBLRMPI_t* pa) const;
+    virtual void
+    extadd_blr_copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
+                                 BLRMPI_t& F21, BLRMPI_t& F22,
+                                 scalar_t** pbuf, const FBLRMPI_t* pa) const;
 
-    virtual void extadd_blr_copy_from_buffers_col
-    (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-     scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const;
+    virtual void
+    extadd_blr_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                                     BLRMPI_t& F21, BLRMPI_t& F22,
+                                     scalar_t** pbuf, const FBLRMPI_t* pa,
+                                     integer_t begin_col, integer_t end_col) const;
 
-    virtual void extend_add_column_copy_to_buffers
-    (const DistM_t& CB, const DenseM_t& seqCB,
-     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const;
-    virtual void extend_add_column_copy_from_buffers
-    (DistM_t& B, DistM_t& Bupd, scalar_t** pbuf, const FMPI_t* pa) const;
-    virtual void extract_column_copy_to_buffers
-    (const DistM_t& b, const DistM_t& bupd, int ch_master,
-     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const;
-    virtual void extract_column_copy_from_buffers
-    (const DistM_t& b, DistM_t& CB, DenseM_t& seqCB,
-     std::vector<scalar_t*>& pbuf, const FMPI_t* pa) const;
-    virtual void skinny_ea_to_buffers
-    (const DistM_t& S, const DenseM_t& seqS,
-     std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const;
-    virtual void skinny_ea_from_buffers
-    (DistM_t& S, scalar_t** pbuf, const FMPI_t* pa) const;
+    virtual void
+    extend_add_column_copy_to_buffers(const DistM_t& CB, const DenseM_t& seqCB,
+                                      std::vector<std::vector<scalar_t>>& sbuf,
+                                      const FMPI_t* pa) const;
+    virtual void
+    extend_add_column_copy_from_buffers(DistM_t& B, DistM_t& Bupd,
+                                        scalar_t** pbuf, const FMPI_t* pa) const;
+    virtual void
+    extract_column_copy_to_buffers(const DistM_t& b, const DistM_t& bupd,
+                                   int ch_master,
+                                   std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FMPI_t* pa) const;
+    virtual void
+    extract_column_copy_from_buffers(const DistM_t& b, DistM_t& CB,
+                                     DenseM_t& seqCB,
+                                     std::vector<scalar_t*>& pbuf,
+                                     const FMPI_t* pa) const;
+    virtual void
+    skinny_ea_to_buffers(const DistM_t& S, const DenseM_t& seqS,
+                         std::vector<std::vector<scalar_t>>& sbuf,
+                         const FMPI_t* pa) const;
+    virtual void
+    skinny_ea_from_buffers(DistM_t& S, scalar_t** pbuf, const FMPI_t* pa) const;
 
-    virtual void extract_from_R2D
-    (const DistM_t& R, DistM_t& cR, DenseM_t& seqcR,
-     const FMPI_t* pa, bool visit) const;
+    virtual void
+    extract_from_R2D(const DistM_t& R, DistM_t& cR, DenseM_t& seqcR,
+                     const FMPI_t* pa, bool visit) const;
 
-    virtual void get_submatrix_2d
-    (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-     DistM_t& Bdist, DenseM_t& Bseq) const;
-    virtual void get_submatrix_2d
-    (const std::vector<std::vector<std::size_t>>& I,
-     const std::vector<std::vector<std::size_t>>& J,
-     std::vector<DistM_t>& Bdist, std::vector<DenseM_t>& Bseq) const;
+    virtual void
+    get_submatrix_2d(const std::vector<std::size_t>& I,
+                     const std::vector<std::size_t>& J,
+                     DistM_t& Bdist, DenseM_t& Bseq) const;
+    virtual void
+    get_submatrix_2d(const std::vector<std::vector<std::size_t>>& I,
+                     const std::vector<std::vector<std::size_t>>& J,
+                     std::vector<DistM_t>& Bdist,
+                     std::vector<DenseM_t>& Bseq) const;
 
     virtual BLACSGrid* grid() { return nullptr; }
     virtual const BLACSGrid* grid() const { return nullptr; }
@@ -376,9 +402,15 @@ namespace strumpack {
       return dense_node_factor_nonzeros();
     }
 
-    virtual void partition
-    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
-     bool is_root=true, int task_depth=0);
+    virtual void partition(const Opts_t& opts, const SpMat_t& A,
+                           integer_t* sorder,
+                           bool is_root=true, int task_depth=0);
+
+    virtual ReturnCode node_inertia(integer_t& neg,
+                                    integer_t& zero,
+                                    integer_t& pos) const {
+      return ReturnCode::INACCURATE_INERTIA;
+    }
 
   private:
     FrontalMatrix(const FrontalMatrix&) = delete;
@@ -387,8 +419,7 @@ namespace strumpack {
     virtual void draw_node(std::ostream& of, bool is_root) const;
 
     virtual long long dense_node_factor_nonzeros() const {
-      long long dsep = dim_sep();
-      long long dupd = dim_upd();
+      long long dsep = dim_sep(), dupd = dim_upd();
       return dsep * (dsep + 2 * dupd);
     }
   };

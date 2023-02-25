@@ -578,18 +578,16 @@ namespace strumpack {
   template<typename scalar_t> int
   DenseMatrix<scalar_t>::LU(std::vector<int>& piv, int depth) {
     piv.resize(rows());
-    int info = 0;
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
     if (in_par)
-      getrf_omp_task(rows(), cols(), data(), ld(), piv.data(), &info, depth);
+      return getrf_omp_task(rows(), cols(), data(), ld(), piv.data(), depth);
     else
-      blas::getrf(rows(), cols(), data(), ld(), piv.data(), &info);
-    return info;
+      return blas::getrf(rows(), cols(), data(), ld(), piv.data());
   }
 
   template<typename scalar_t> int
@@ -631,12 +629,11 @@ namespace strumpack {
    const std::vector<int>& piv, int depth) const {
     assert(b.rows() == rows());
     assert(piv.size() >= rows());
-    int info = 0;
     DenseMatrix<scalar_t> x(b);
     if (!rows()) return x;
-    getrs_omp_task
-      (char(Trans::N), rows(), b.cols(), data(), ld(), piv.data(),
-       x.data(), x.ld(), &info, depth);
+    int info = getrs_omp_task
+      (char(Trans::N), rows(), b.cols(), data(), ld(),
+       piv.data(), x.data(), x.ld(), depth);
     if (info) {
       std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
       exit(1);
@@ -655,11 +652,10 @@ namespace strumpack {
   DenseMatrix<scalar_t>::solve_LU_in_place
   (DenseMatrix<scalar_t>& b, const int* piv, int depth) const {
     assert(b.rows() == rows());
-    int info = 0;
     if (!rows()) return;
-    getrs_omp_task
-      (char(Trans::N), rows(), b.cols(), data(), ld(), piv,
-       b.data(), b.ld(), &info, depth);
+    int info = getrs_omp_task
+      (char(Trans::N), rows(), b.cols(), data(), ld(),
+       piv, b.data(), b.ld(), depth);
     if (info) {
       std::cerr << "ERROR: LU solve failed with info=" << info << std::endl;
       exit(1);
@@ -700,9 +696,8 @@ namespace strumpack {
   (DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q, int depth) const {
     auto minmn = std::min(rows(), cols());
     std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
-    int info;
     DenseMatrix<scalar_t> tmp(std::max(rows(), cols()), cols(), *this, 0, 0);
-    blas::gelqfmod(rows(), cols(), tmp.data(), tmp.ld(), tau.get(), &info, depth);
+    int info = blas::gelqf(rows(), cols(), tmp.data(), tmp.ld(), tau.get());
     if (info) {
       std::cerr << "ERROR: LQ factorization failed with info="
                 << info << std::endl;
@@ -715,8 +710,8 @@ namespace strumpack {
         std::cerr << "WARNING: small diagonal on L from LQ" << std::endl;
         break;
       }
-    blas::xxglqmod(cols(), cols(), std::min(rows(), cols()),
-                   tmp.data(), tmp.ld(), tau.get(), &info, depth);
+    info = blas::xxglq(cols(), cols(), std::min(rows(), cols()),
+                       tmp.data(), tmp.ld(), tau.get());
     Q = DenseMatrix<scalar_t>(cols(), cols(), tmp, 0, 0); // generate Q
     if (info) {
       std::cerr << "ERROR: generation of Q from LQ failed with info="
@@ -731,7 +726,7 @@ namespace strumpack {
     TIMER_TIME(TaskType::QR, 1, t_qr);
     int minmn = std::min(rows(), cols());
     std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
-    blas::geqrfmod(rows(), minmn, data(), ld(), tau.get(), depth);
+    blas::geqrf(rows(), minmn, data(), ld(), tau.get());
     real_t Rmax = std::abs(operator()(0, 0));
     real_t Rmin = Rmax;
     for (int i=0; i<minmn; i++) {
@@ -779,9 +774,8 @@ namespace strumpack {
     int rank = 0;
     // TODO make geqp3tol stop at max_rank
     if (m && n)
-      blas::geqp3tol
-        (m, n, data(), ld(), iind.data(), tau.get(),
-         rank, rel_tol, abs_tol, depth);
+      blas::geqp3tol(m, n, data(), ld(), iind.data(), tau.get(),
+                     rank, rel_tol, abs_tol);
     else std::iota(iind.begin(), iind.end(), 1);
     rank = std::min(rank, max_rank);
     for (int i=1; i<=n; i++) {
@@ -807,13 +801,11 @@ namespace strumpack {
     int rank;
     blas::geqp3tol
       (m, n, tmp.data(), tmp.ld(), ind.data(),
-       tau.get(), rank, rel_tol, abs_tol, depth);
-    //std::vector<int> piv(n);
+       tau.get(), rank, rel_tol, abs_tol);
     for (int i=1; i<=n; i++) {
       int j = ind[i-1];
       assert(j-1 >= 0 && j-1 < int(ind.size()));
       while (j < i) j = ind[j-1];
-      //piv[i-1] = j;
     }
     V = DenseMatrix<scalar_t>(rank, cols(), tmp.ptr(0, 0), tmp.ld());
     for (int c=0; c<rank; c++)
@@ -876,8 +868,8 @@ namespace strumpack {
     get_version(v[0], v[1], v[2]);
     os.write((const char*)v, sizeof(v));
     os.write((const char*)(&D), sizeof(DenseMatrix<scalar_t>));
-      os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
-      return os;
+    os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
+    return os;
   }
   template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<float>& D);
   template std::ofstream& operator<<(std::ofstream& os, const DenseMatrix<double>& D);
@@ -938,7 +930,7 @@ namespace strumpack {
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -947,11 +939,10 @@ namespace strumpack {
         (char(ta), char(tb), c.rows(), c.cols(),
          (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
          b.data(), b.ld(), beta, c.data(), c.ld(), depth);
-    else{
+    else
       blas::gemm(char(ta), char(tb), c.rows(), c.cols(),
                  (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
                  b.data(), b.ld(), beta, c.data(), c.ld());
-    }
   }
 
 
@@ -963,7 +954,7 @@ namespace strumpack {
            (ta!=Trans::N && a.cols()==c.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -989,7 +980,7 @@ namespace strumpack {
            (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1022,7 +1013,7 @@ namespace strumpack {
        int depth) {
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1055,7 +1046,7 @@ namespace strumpack {
        int depth) {
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1083,7 +1074,7 @@ namespace strumpack {
     assert(a.rows() == a.cols() && a.cols() == b.rows());
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1113,7 +1104,7 @@ namespace strumpack {
     assert(ta == Trans::N || (a.cols() == y.rows() && a.rows() == x.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1143,7 +1134,7 @@ namespace strumpack {
     assert(ta == Trans::N || (a.cols() == y.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1154,7 +1145,7 @@ namespace strumpack {
     else
       blas::gemv(char(ta), a.rows(), a.cols(), alpha, a.data(), a.ld(),
                  x, incx, beta, y.data(), 1);
- }
+  }
 
   /**
    * DGEMV performs one of the matrix-vector operations
@@ -1173,7 +1164,7 @@ namespace strumpack {
     assert(ta == Trans::N || (a.rows() == x.rows()));
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif
@@ -1200,7 +1191,7 @@ namespace strumpack {
        scalar_t* y, int incy, int depth) {
 #if defined(_OPENMP)
     bool in_par = depth < params::task_recursion_cutoff_level
-                          && omp_in_parallel();
+      && omp_in_parallel();
 #else
     bool in_par = false;
 #endif

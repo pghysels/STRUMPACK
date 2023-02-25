@@ -36,21 +36,81 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_stable
     (const DenseM_t& A, const opts_t& opts) {
       AFunctor<scalar_t> afunc(A);
-      compress_stable(afunc, afunc, opts);
+      if (opts.compression_sketch() == CompressionSketch::SJLT) {
+        auto d = opts.d0();
+        auto dd = opts.dd();
+        auto total_nnz = opts.nnz0();
+        // assert(dd <= d);
+        auto n = this->cols();
+        DenseM_t Rr, Rc, Sr, Sc;
+        SJLTGenerator<scalar_t,int> g;
+        bool chunk = opts.SJLT_algo() == SJLTAlgo::CHUNK;
+        SJLTMatrix<scalar_t,int> S(g, 0, n, 0, chunk);
+        if (opts.verbose())
+          std::cout<< "# compressing with SJLT \n";
+        WorkCompress<scalar_t> w;
+        while (!this->is_compressed()) {
+          Rr.resize(n, d+dd);
+          Rc.resize(n, d+dd);
+          Sr.resize(n, d+dd);
+          Sc.resize(n, d+dd);
+          int c = (d == opts.d0()) ? 0 : d;
+          int dnew = (d == opts.d0()) ? d+dd : dd;
+          DenseMW_t Rr_new(n, dnew, Rr, 0, c);
+          DenseMW_t Rc_new(n, dnew, Rc, 0, c);
+          DenseMW_t Sr_new(n, dnew, Sr, 0, c);
+          DenseMW_t Sc_new(n, dnew, Sc, 0, c);
+          if (c == 0) {
+            S.add_columns(dnew,opts.nnz0());
+            Rr_new.copy(S.SJLT_to_dense());
+            matrix_times_SJLT(A, S, Sr_new);
+            matrixT_times_SJLT(A, S, Sc_new);
+          } else {
+            SJLTMatrix<scalar_t,int> temp
+              (S.get_g(), opts.nnz(), n, dnew, chunk);
+            S.append_sjlt_matrix(temp);
+            Rr_new.copy(temp.SJLT_to_dense());
+            matrix_times_SJLT(A, temp, Sr_new);
+            matrixT_times_SJLT(A, temp, Sc_new);
+            total_nnz += opts.nnz();
+          }
+          Rc_new.copy(Rr_new);
+          if (opts.verbose())
+            std::cout << "# compressing with d+dd = " << d << "+" << dd
+                      << " (stable)" << std::endl
+                      << "# nnz total = " << total_nnz << std::endl;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+          compress_recursive_stable
+            (Rr, Rc, Sr, Sc, afunc, opts, w,
+             d, dd, this->openmp_task_depth_/*,&S*/);
+          if (!this->is_compressed()) {
+            d += dd;
+            dd = std::min(dd, opts.max_rank()-d);
+          }
+        }
+        if (opts.verbose())
+          std::cout << "# Final length of row: " << d+dd << std::endl
+                    << "# Total nnz in each row: "
+                    << total_nnz << std::endl;
+      } else
+        compress_stable(afunc, afunc, opts);
     }
 
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_stable
     (const mult_t& Amult, const elem_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
+      auto total_nnz = opts.nnz0();
       // assert(dd <= d);
       auto n = this->cols();
       DenseM_t Rr, Rc, Sr, Sc;
       std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-      if (!opts.user_defined_random()) {
+      SJLTGenerator<scalar_t,int> g;
+      if (!opts.user_defined_random() &&
+          opts.compression_sketch() == CompressionSketch::GAUSSIAN)
         rgen = random::make_random_generator<real_t>
           (opts.random_engine(), opts.random_distribution());
-      }
       WorkCompress<scalar_t> w;
       while (!this->is_compressed()) {
         Rr.resize(n, d+dd);
@@ -64,15 +124,27 @@ namespace strumpack {
         DenseMW_t Sr_new(n, dnew, Sr, 0, c);
         DenseMW_t Sc_new(n, dnew, Sc, 0, c);
         if (!opts.user_defined_random()) {
-          Rr_new.random(*rgen);
-          STRUMPACK_RANDOM_FLOPS
-            (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          if (opts.compression_sketch() == CompressionSketch::GAUSSIAN) {
+            Rr_new.random(*rgen);
+            STRUMPACK_RANDOM_FLOPS
+              (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+          } else if(opts.compression_sketch() == CompressionSketch::SJLT) {
+            if (c == 0)
+              g.SJLTDenseSketch(Rr_new, total_nnz);
+            else {
+              g.SJLTDenseSketch(Rr_new, opts.nnz());
+              total_nnz += opts.nnz();
+            }
+          }
           Rc_new.copy(Rr_new);
         }
         Amult(Rr_new, Rc_new, Sr_new, Sc_new);
-        if (opts.verbose())
+        if (opts.verbose()) {
           std::cout << "# compressing with d+dd = " << d << "+" << dd
                     << " (stable)" << std::endl;
+          if (opts.compression_sketch() == CompressionSketch::SJLT)
+            std::cout << "# nnz total = " << total_nnz << std::endl;
+        }
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
         compress_recursive_stable
@@ -83,6 +155,11 @@ namespace strumpack {
           dd = std::min(dd, opts.max_rank()-d);
         }
       }
+      if (opts.verbose() && opts.compression_sketch() ==
+          CompressionSketch::SJLT)
+        std::cout << "# Final length of row: " << d << std::endl
+                  << "total nnz in each row: "
+                  << total_nnz << std::endl;
     }
 
     template<typename scalar_t> void
@@ -90,6 +167,7 @@ namespace strumpack {
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
      const elem_t& Aelem, const opts_t& opts,
      WorkCompress<scalar_t>& w, int d, int dd, int depth) {
+      // SJLTMatrix<scalar_t,int>* S) {
       if (this->leaf()) {
         if (this->is_untouched()) {
           std::vector<std::size_t> I, J;
@@ -109,17 +187,17 @@ namespace strumpack {
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           child(0)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1/*,S*/);
 #pragma omp task default(shared)                                        \
   final(depth >= params::task_recursion_cutoff_level-1) mergeable
           child(1)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1/*,S*/);
 #pragma omp taskwait
         } else {
           child(0)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[0], d, dd, depth+1/*,S*/);
           child(1)->compress_recursive_stable
-            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1);
+            (Rr, Rc, Sr, Sc, Aelem, opts, w.c[1], d, dd, depth+1/*,S*/);
         }
         if (!child(0)->is_compressed() ||
             !child(1)->is_compressed()) return;
@@ -142,8 +220,8 @@ namespace strumpack {
       if (w.lvl == 0) this->U_state_ = this->V_state_ = State::COMPRESSED;
       else {
         if (this->is_untouched())
-          compute_local_samples(Rr, Rc, Sr, Sc, w, 0, d+dd, depth);
-        else compute_local_samples(Rr, Rc, Sr, Sc, w, d, dd, depth);
+          compute_local_samples(Rr, Rc, Sr, Sc, w, 0, d+dd, depth/*,S*/);
+        else compute_local_samples(Rr, Rc, Sr, Sc, w, d, dd, depth/*,S*/);
         if (!this->is_compressed()) {
           compute_U_basis_stable(Sr, opts, w, d, dd, depth);
           compute_V_basis_stable(Sc, opts, w, d, dd, depth);
@@ -356,6 +434,9 @@ namespace strumpack {
                              gemm_flops(Trans::C, Trans::N, scalar_t(1.), Q12, Q3, scalar_t(0.)) +
                              gemm_flops(Trans::N, Trans::N, scalar_t(-1.), Q12, Q12tQ3, scalar_t(1.))));
       auto Q3norm = Q3p.norm(); // TODO norm flops ?
+      if (opts.compression_sketch() == CompressionSketch::SJLT)
+        return (Q3norm / std::sqrt(double(opts.nnz())) < atol)
+          || (Q3norm / S3norm < rtol);
       return (Q3norm / std::sqrt(double(dd)) < atol)
         || (Q3norm / S3norm < rtol);
     }

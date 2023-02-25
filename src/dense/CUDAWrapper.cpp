@@ -29,6 +29,9 @@
 #include <stdlib.h>
 
 #include "CUDAWrapper.hpp"
+#if defined(STRUMPACK_USE_MAGMA)
+#include "MAGMAWrapper.hpp"
+#endif
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
 #endif
@@ -142,6 +145,19 @@ namespace strumpack {
       if (code != CUBLAS_STATUS_SUCCESS) {
         std::cerr << "cuBLAS assertion failed: " << code << " "
                   <<  file << " " << line << std::endl;
+        switch (code) {
+        case CUBLAS_STATUS_SUCCESS:          std::cerr << "CUBLAS_STATUS_SUCCESS" << std::endl; break;
+        case CUBLAS_STATUS_NOT_INITIALIZED:  std::cerr << "CUBLAS_STATUS_NOT_INITIALIZED" << std::endl; break;
+        case CUBLAS_STATUS_ALLOC_FAILED:     std::cerr << "CUBLAS_STATUS_ALLOC_FAILED" << std::endl; break;
+        case CUBLAS_STATUS_INVALID_VALUE:    std::cerr << "CUBLAS_STATUS_INVALID_VALUE" << std::endl; break;
+        case CUBLAS_STATUS_ARCH_MISMATCH:    std::cerr << "CUBLAS_STATUS_ARCH_MISMATCH" << std::endl; break;
+        case CUBLAS_STATUS_MAPPING_ERROR:    std::cerr << "CUBLAS_STATUS_MAPPING_ERROR" << std::endl; break;
+        case CUBLAS_STATUS_EXECUTION_FAILED: std::cerr << "CUBLAS_STATUS_EXECUTION_FAILED" << std::endl; break;
+        case CUBLAS_STATUS_INTERNAL_ERROR:   std::cerr << "CUBLAS_STATUS_INTERNAL_ERROR" << std::endl; break;
+        case CUBLAS_STATUS_NOT_SUPPORTED:    std::cerr << "CUBLAS_STATUS_NOT_SUPPORTED" << std::endl; break;
+        case CUBLAS_STATUS_LICENSE_ERROR:    std::cerr << "CUBLAS_STATUS_LICENSE_ERROR" << std::endl; break;
+        default: std::cerr << "unknown cublas error" << std::endl;
+        }
         if (abrt) exit(code);
       }
     }
@@ -151,13 +167,21 @@ namespace strumpack {
       int devs;
       cudaGetDeviceCount(&devs);
       if (devs > 1) {
-        MPIComm c;
-        cudaSetDevice(c.rank() % devs);
+        int flag, rank = 0;
+        MPI_Initialized(&flag);
+        if (flag) {
+          MPIComm c;
+          rank = c.rank();
+        }
+        cudaSetDevice(rank % devs);
       }
 #endif
       gpu_check(cudaFree(0));
-      BLASHandle b;
-      SOLVERHandle s;
+      gpu::BLASHandle hb;
+      gpu::SOLVERHandle hs;
+#if defined(STRUMPACK_USE_MAGMA)
+      gpu::magma::MAGMAQueue mq;
+#endif
     }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,
@@ -391,107 +415,101 @@ namespace strumpack {
                         const DenseMatrix<std::complex<double>>&, const int*,
                         DenseMatrix<std::complex<double>>&, int*);
 
-    void trsm(BLASHandle& handle, cublasSideMode_t side, 
+    void trsm(BLASHandle& handle, cublasSideMode_t side,
               cublasFillMode_t uplo, cublasOperation_t trans,
               cublasDiagType_t diag, int m, int n, const float* alpha,
               const float* A, int lda, float* B, int ldb) {
       STRUMPACK_FLOPS(blas::trsm_flops(m, n, alpha, side));
       STRUMPACK_BYTES(4*blas::trsm_moves(m, n));
-      gpu_check(cublasStrsm(handle, side, uplo, trans, diag, m, 
+      gpu_check(cublasStrsm(handle, side, uplo, trans, diag, m,
                             n, alpha, A, lda, B, ldb));
     }
-
-    void trsm(BLASHandle& handle, cublasSideMode_t side, 
+    void trsm(BLASHandle& handle, cublasSideMode_t side,
               cublasFillMode_t uplo, cublasOperation_t trans,
               cublasDiagType_t diag, int m, int n, const double* alpha,
               const double* A, int lda, double* B, int ldb) {
       STRUMPACK_FLOPS(blas::trsm_flops(m, n, alpha, side));
       STRUMPACK_BYTES(8*blas::trsm_moves(m, n));
-      gpu_check(cublasDtrsm(handle, side, uplo, trans, diag, m, 
+      gpu_check(cublasDtrsm(handle, side, uplo, trans, diag, m,
                             n, alpha, A, lda, B, ldb));
     }
-
-    void trsm(BLASHandle& handle, cublasSideMode_t side, 
+    void trsm(BLASHandle& handle, cublasSideMode_t side,
               cublasFillMode_t uplo, cublasOperation_t trans,
-              cublasDiagType_t diag, int m, int n, 
-              const std::complex<float>* alpha, const std::complex<float>* A, 
+              cublasDiagType_t diag, int m, int n,
+              const std::complex<float>* alpha, const std::complex<float>* A,
               int lda, std::complex<float>* B, int ldb) {
       STRUMPACK_FLOPS(4*blas::trsm_flops(m, n, alpha, side));
       STRUMPACK_BYTES(2*4*blas::trsm_moves(m, n));
-      gpu_check(cublasCtrsm(handle, side, uplo, trans, diag, m, n, 
-                            reinterpret_cast<const cuComplex*>(alpha), 
-                            reinterpret_cast<const cuComplex*>(A), lda, 
+      gpu_check(cublasCtrsm(handle, side, uplo, trans, diag, m, n,
+                            reinterpret_cast<const cuComplex*>(alpha),
+                            reinterpret_cast<const cuComplex*>(A), lda,
                             reinterpret_cast<cuComplex*>(B), ldb));
     }
-
-    void trsm(BLASHandle& handle, cublasSideMode_t side, 
+    void trsm(BLASHandle& handle, cublasSideMode_t side,
               cublasFillMode_t uplo, cublasOperation_t trans,
-              cublasDiagType_t diag, int m, int n, 
-              const std::complex<double>* alpha, 
-              const std::complex<double>* A, 
+              cublasDiagType_t diag, int m, int n,
+              const std::complex<double>* alpha,
+              const std::complex<double>* A,
               int lda, std::complex<double>* B, int ldb) {
       STRUMPACK_FLOPS(4*blas::trsm_flops(m, n, alpha, side));
       STRUMPACK_BYTES(2*8*blas::trsm_moves(m, n));
-      gpu_check(cublasZtrsm(handle, side, uplo, trans, diag, m, n, 
-                            reinterpret_cast<const cuDoubleComplex*>(alpha), 
-                            reinterpret_cast<const cuDoubleComplex*>(A), lda, 
+      gpu_check(cublasZtrsm(handle, side, uplo, trans, diag, m, n,
+                            reinterpret_cast<const cuDoubleComplex*>(alpha),
+                            reinterpret_cast<const cuDoubleComplex*>(A), lda,
                             reinterpret_cast<cuDoubleComplex*>(B), ldb));
     }
-
     template<typename scalar_t> void
     trsm(BLASHandle& handle, Side side, UpLo uplo,
          Trans trans, Diag diag, const scalar_t alpha,
          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B) {
-      trsm(handle, S2cuOp(side), U2cuOp(uplo), T2cuOp(trans), D2cuOp(diag), 
+      trsm(handle, S2cuOp(side), U2cuOp(uplo), T2cuOp(trans), D2cuOp(diag),
            B.rows(), B.cols(), &alpha, A.data(), A.ld(), B.data(), B.ld());
     }
-
     template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, const float,
                        DenseMatrix<float>&, DenseMatrix<float>&);
     template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, const double,
                        DenseMatrix<double>&, DenseMatrix<double>&);
-    template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, 
-                       const std::complex<float>, 
-                       DenseMatrix<std::complex<float>>&, 
+    template void trsm(BLASHandle&, Side, UpLo, Trans, Diag,
+                       const std::complex<float>,
+                       DenseMatrix<std::complex<float>>&,
                        DenseMatrix<std::complex<float>>&);
-    template void trsm(BLASHandle&, Side, UpLo, Trans, Diag, 
+    template void trsm(BLASHandle&, Side, UpLo, Trans, Diag,
                        const std::complex<double>,
-                       DenseMatrix<std::complex<double>>&, 
+                       DenseMatrix<std::complex<double>>&,
                        DenseMatrix<std::complex<double>>&);
 
     void gesvdj_info_create(gesvdjInfo_t *info) {
       gpu_check(cusolverDnCreateGesvdjInfo(info));
     }
-
     void gesvdj_info_destroy(gesvdjInfo_t& info) {
       gpu_check(cusolverDnDestroyGesvdjInfo(info));
     }
 
-    void gesvdj_buffersize
-    (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
-     const float* A, int lda, const float* S, const float* U, 
-     int ldu, const float* V, int ldv, int* lwork, 
-     gesvdjInfo_t& params) {
+    void gesvdj_buffersize(SOLVERHandle& handle, cusolverEigMode_t jobz,
+                           int econ, int m, int n, const float* A, int lda,
+                           const float* S, const float* U, int ldu,
+                           const float* V, int ldv, int* lwork,
+                           gesvdjInfo_t& params) {
       gpu_check(cusolverDnSgesvdj_bufferSize
                 (handle, jobz, econ, m, n, A, lda, S,
                  U, ldu, V, ldv, lwork, params));
     }
-
-    void gesvdj_buffersize
-    (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
-     const double* A, int lda, const double* S, const double* U, 
-     int ldu, const double* V, int ldv, int* lwork, 
-     gesvdjInfo_t& params) {
+    void gesvdj_buffersize(SOLVERHandle& handle, cusolverEigMode_t jobz,
+                           int econ, int m, int n, const double* A, int lda,
+                           const double* S, const double* U, int ldu,
+                           const double* V, int ldv, int* lwork,
+                           gesvdjInfo_t& params) {
       gpu_check(cusolverDnDgesvdj_bufferSize
                 (handle, jobz, econ, m, n, A, lda, S,
                  U, ldu, V, ldv, lwork, params));
     }
-
-    void gesvdj_buffersize
-    (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
-     const std::complex<float>* A, int lda, const float* S, 
-     const std::complex<float>* U, int ldu, const std::complex<float>* V, 
-     int ldv, int* lwork, gesvdjInfo_t& params) {
+    void gesvdj_buffersize(SOLVERHandle& handle, cusolverEigMode_t jobz,
+                           int econ, int m, int n,
+                           const std::complex<float>* A, int lda,
+                           const float* S,
+                           const std::complex<float>* U, int ldu,
+                           const std::complex<float>* V,
+                           int ldv, int* lwork, gesvdjInfo_t& params) {
       gpu_check(cusolverDnCgesvdj_bufferSize
                 (handle, jobz, econ, m, n,
                  reinterpret_cast<const cuComplex*>(A), lda, S,
@@ -499,12 +517,13 @@ namespace strumpack {
                  reinterpret_cast<const cuComplex*>(V), ldv,
                  lwork, params));
     }
-
-    void gesvdj_buffersize
-    (SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, int n, 
-     const std::complex<double>* A, int lda, const double* S, 
-     const std::complex<double>* U, int ldu, const std::complex<double>* V, 
-     int ldv, int* lwork, gesvdjInfo_t& params) {
+    void gesvdj_buffersize(SOLVERHandle& handle, cusolverEigMode_t jobz,
+                           int econ, int m, int n,
+                           const std::complex<double>* A, int lda,
+                           const double* S,
+                           const std::complex<double>* U, int ldu,
+                           const std::complex<double>* V,
+                           int ldv, int* lwork, gesvdjInfo_t& params) {
       gpu_check(cusolverDnZgesvdj_bufferSize
                 (handle, jobz, econ, m, n,
                  reinterpret_cast<const cuDoubleComplex*>(A), lda, S,
@@ -512,110 +531,108 @@ namespace strumpack {
                  reinterpret_cast<const cuDoubleComplex*>(V), ldv,
                  lwork, params));
     }
-
-    template<typename scalar_t, typename real_t> int gesvdj_buffersize
-    (SOLVERHandle& handle, Jobz jobz, int m, int n, gesvdjInfo_t& params) {
-      int econ = 1;
+    template<typename scalar_t, typename real_t>
+    int gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz,
+                          int m, int n, gesvdjInfo_t& params) {
       int Lwork;
       gesvdj_buffersize
-        (handle, E2cuOp(jobz), econ, m, n, static_cast<scalar_t*>(nullptr), n,
+        (handle, E2cuOp(jobz), 1, m, n, static_cast<scalar_t*>(nullptr), n,
          static_cast<real_t*>(nullptr), static_cast<scalar_t*>(nullptr), m,
          static_cast<scalar_t*>(nullptr), n, &Lwork, params);
       return Lwork;
     }
+    template
+    int gesvdj_buffersize<float,float>(SOLVERHandle&, Jobz,
+                                       int, int, gesvdjInfo_t&);
+    template
+    int gesvdj_buffersize<double,double>(SOLVERHandle&, Jobz,
+                                         int, int, gesvdjInfo_t&);
+    template
+    int gesvdj_buffersize<std::complex<float>,float>(SOLVERHandle&, Jobz,
+                                                     int, int, gesvdjInfo_t&);
+    template
+    int gesvdj_buffersize<std::complex<double>,double>(SOLVERHandle&, Jobz,
+                                                       int, int,
+                                                       gesvdjInfo_t&);
 
-    template int gesvdj_buffersize<float, float>
-      (SOLVERHandle&, Jobz, int, int, gesvdjInfo_t&);
-      
-    template int gesvdj_buffersize<double, double>
-      (SOLVERHandle&, Jobz, int, int, gesvdjInfo_t&);
-
-    template int gesvdj_buffersize<std::complex<float>, float>
-      (SOLVERHandle&, Jobz, int, int, gesvdjInfo_t&);
-      
-    template int gesvdj_buffersize<std::complex<double>, double>
-      (SOLVERHandle&, Jobz, int, int, gesvdjInfo_t&);
-    
-    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, 
-                int m, int n, float* A, int lda, float* S, float* U, int ldu, 
-                float* V, int ldv, float* Workspace, int lwork, int *info, 
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ,
+                int m, int n, float* A, int lda, float* S, float* U, int ldu,
+                float* V, int ldv, float* Workspace, int lwork, int *info,
                 gesvdjInfo_t& params) {
       STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
       gpu_check(cusolverDnSgesvdj
-                (handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, 
+                (handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv,
                  Workspace, lwork, info, params));
     }
-    
-    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, 
-                int m, int n, double* A, int lda, double* S, double* U, 
-                int ldu, double* V, int ldv, double* Workspace, int lwork, 
+
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ,
+                int m, int n, double* A, int lda, double* S, double* U,
+                int ldu, double* V, int ldv, double* Workspace, int lwork,
                 int *info, gesvdjInfo_t& params) {
       STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
       gpu_check(cusolverDnDgesvdj
-                (handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv, 
+                (handle, jobz, econ, m, n, A, lda, S, U, ldu, V, ldv,
                  Workspace, lwork, info, params));
     }
-    
-    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 
-                 int n, std::complex<float>* A, int lda, float* S, 
-                 std::complex<float>* U, int ldu, std::complex<float>* V, 
-                 int ldv, std::complex<float>* Workspace, int lwork, 
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m,
+                 int n, std::complex<float>* A, int lda, float* S,
+                 std::complex<float>* U, int ldu, std::complex<float>* V,
+                 int ldv, std::complex<float>* Workspace, int lwork,
                  int *info, gesvdjInfo_t& params) {
       STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
       gpu_check(cusolverDnCgesvdj
-                (handle, jobz, econ, m, n, reinterpret_cast<cuComplex*>(A), 
+                (handle, jobz, econ, m, n, reinterpret_cast<cuComplex*>(A),
                  lda, S, reinterpret_cast<cuComplex*>(U), ldu,
-                 reinterpret_cast<cuComplex*>(V), ldv, 
-                 reinterpret_cast<cuComplex*>(Workspace), lwork, info, params));
+                 reinterpret_cast<cuComplex*>(V), ldv,
+                 reinterpret_cast<cuComplex*>(Workspace),
+                 lwork, info, params));
     }
-
-    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m, 
-                 int n, std::complex<double>* A, int lda, double* S, 
-                 std::complex<double>* U, int ldu, std::complex<double>* V, 
-                 int ldv, std::complex<double>* Workspace, int lwork, 
-                 int *info, gesvdjInfo_t& params) {
+    void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ, int m,
+                int n, std::complex<double>* A, int lda, double* S,
+                std::complex<double>* U, int ldu, std::complex<double>* V,
+                int ldv, std::complex<double>* Workspace, int lwork,
+                int *info, gesvdjInfo_t& params) {
       STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
       gpu_check(cusolverDnZgesvdj
-                (handle, jobz, econ, m, n, 
-                 reinterpret_cast<cuDoubleComplex*>(A), lda, S, 
+                (handle, jobz, econ, m, n,
+                 reinterpret_cast<cuDoubleComplex*>(A), lda, S,
                  reinterpret_cast<cuDoubleComplex*>(U), ldu,
-                 reinterpret_cast<cuDoubleComplex*>(V), ldv, 
-                 reinterpret_cast<cuDoubleComplex*>(Workspace), lwork, info, 
+                 reinterpret_cast<cuDoubleComplex*>(V), ldv,
+                 reinterpret_cast<cuDoubleComplex*>(Workspace), lwork, info,
                  params));
     }
-
     template<typename scalar_t, typename real_t> void
-    gesvdj(SOLVERHandle& handle, Jobz jobz, DenseMatrix<scalar_t>& A, real_t* d_S, 
-           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
-           scalar_t* Workspace, int Lwork, int* devInfo, gesvdjInfo_t& params) {
-      int econ = 1;
-      gesvdj(handle, E2cuOp(jobz), econ, A.rows(), A.cols(), A.data(), A.ld(), d_S, 
-             U.data(), A.ld(), V.data(), A.cols(), Workspace, Lwork, devInfo, 
-             params);
+    gesvdj(SOLVERHandle& handle, Jobz jobz,
+           DenseMatrix<scalar_t>& A, real_t* d_S,
+           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
+           scalar_t* Workspace, int Lwork, int* devInfo,
+           gesvdjInfo_t& params) {
+      gesvdj(handle, E2cuOp(jobz), 1, A.rows(), A.cols(),
+             A.data(), A.ld(), d_S, U.data(), A.ld(), V.data(), A.cols(),
+             Workspace, Lwork, devInfo, params);
     }
-
     template void gesvdj(SOLVERHandle&, Jobz, DenseMatrix<float>&, float*,
-                         DenseMatrix<float>&, DenseMatrix<float>&, 
+                         DenseMatrix<float>&, DenseMatrix<float>&,
                          float*, int, int*, gesvdjInfo_t&);
-
     template void gesvdj(SOLVERHandle&, Jobz, DenseMatrix<double>&, double*,
-                         DenseMatrix<double>&, DenseMatrix<double>&, 
+                         DenseMatrix<double>&, DenseMatrix<double>&,
                          double*, int, int*, gesvdjInfo_t&);
-    
-    template void gesvdj(SOLVERHandle&, Jobz, DenseMatrix<std::complex<float>>&, 
-                         float*, DenseMatrix<std::complex<float>>&, 
-                         DenseMatrix<std::complex<float>>&, 
+    template void gesvdj(SOLVERHandle&, Jobz,
+                         DenseMatrix<std::complex<float>>&,
+                         float*, DenseMatrix<std::complex<float>>&,
+                         DenseMatrix<std::complex<float>>&,
                          std::complex<float>*, int, int*, gesvdjInfo_t&);
-    
-    template void gesvdj(SOLVERHandle&, Jobz, DenseMatrix<std::complex<double>>&, 
-                         double*, DenseMatrix<std::complex<double>>&, 
-                         DenseMatrix<std::complex<double>>&, 
+    template void gesvdj(SOLVERHandle&, Jobz,
+                         DenseMatrix<std::complex<double>>&,
+                         double*, DenseMatrix<std::complex<double>>&,
+                         DenseMatrix<std::complex<double>>&,
                          std::complex<double>*, int, int*, gesvdjInfo_t&);
 
     template<typename scalar_t, typename real_t> int
-    gesvd(SOLVERHandle& handle, Jobz jobz, real_t* S, DenseMatrix<scalar_t>& A, 
-          DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
-          int* devInfo, char* svd_mem, const double tol) {
+    gesvd(SOLVERHandle& handle, Jobz jobz, real_t* S,
+          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U,
+          DenseMatrix<scalar_t>& V, int* devInfo,
+          char* svd_mem, const double tol) {
       std::size_t minmn = std::min(U.rows(), V.rows());
       gesvdjInfo_t params;
       gesvdj_info_create(&params);
@@ -627,160 +644,151 @@ namespace strumpack {
       DenseMatrixWrapper<scalar_t> d_A(A.rows(), A.cols(), svd_ptr, A.rows());
       copy_device_to_device(d_A, A);
       svd_ptr += A.rows() * A.cols();
-      gesvdj<scalar_t>(handle, jobz, d_A, S, U, V, svd_ptr, 
+      gesvdj<scalar_t>(handle, jobz, d_A, S, U, V, svd_ptr,
                        gesvd_work_size, devInfo, params);
       gesvdj_info_destroy(params);
       return gesvd_work_size;
     }
 
     template int gesvd(SOLVERHandle&, Jobz, float*, DenseMatrix<float>&,
-                        DenseMatrix<float>&, DenseMatrix<float>&, 
-                        int*, char*, const double);
-    
+                       DenseMatrix<float>&, DenseMatrix<float>&,
+                       int*, char*, const double);
     template int gesvd(SOLVERHandle&, Jobz, double*, DenseMatrix<double>&,
-                        DenseMatrix<double>&, DenseMatrix<double>&, 
+                        DenseMatrix<double>&, DenseMatrix<double>&,
                         int*, char*, const double);
-    
-    template int gesvd(SOLVERHandle&, Jobz, float*, 
-                        DenseMatrix<std::complex<float>>&,
-                        DenseMatrix<std::complex<float>>&, 
-                        DenseMatrix<std::complex<float>>&, 
-                        int*, char*, const double);
-    
-    template int gesvd(SOLVERHandle&, Jobz, double*, 
-                        DenseMatrix<std::complex<double>>&,
-                        DenseMatrix<std::complex<double>>&, 
-                        DenseMatrix<std::complex<double>>&, 
-                        int*, char*, const double);
-    
-    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
-              int m, int n, const float* alpha, const float* A, int lda, 
-              const float* beta, const float* B, int ldb, float* C, int ldc){
-      STRUMPACK_FLOPS(blas::geam_flops(m, n, alpha, beta));
-      gpu_check(cublasSgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, 
-                            ldb, C, ldc));
-    }
+    template int gesvd(SOLVERHandle&, Jobz, float*,
+                       DenseMatrix<std::complex<float>>&,
+                       DenseMatrix<std::complex<float>>&,
+                       DenseMatrix<std::complex<float>>&,
+                       int*, char*, const double);
+    template int gesvd(SOLVERHandle&, Jobz, double*,
+                       DenseMatrix<std::complex<double>>&,
+                       DenseMatrix<std::complex<double>>&,
+                       DenseMatrix<std::complex<double>>&,
+                       int*, char*, const double);
 
-    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
-              int m, int n, const double* alpha, const double* A, int lda, 
-              const double* beta, const double* B, int ldb, double* C, int ldc){
+    void geam(BLASHandle& handle, cublasOperation_t transa,
+              cublasOperation_t transb, int m, int n, const float* alpha,
+              const float* A, int lda, const float* beta,
+              const float* B, int ldb, float* C, int ldc) {
       STRUMPACK_FLOPS(blas::geam_flops(m, n, alpha, beta));
-      gpu_check(cublasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, 
-                            ldb, C, ldc));
+      gpu_check(cublasSgeam(handle, transa, transb, m, n, alpha,
+                            A, lda, beta, B, ldb, C, ldc));
     }
-
-    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
-              int m, int n, const std::complex<float>* alpha, 
-              const std::complex<float>* A, int lda, 
-              const std::complex<float>* beta, const std::complex<float>* B, int ldb, 
-              std::complex<float>* C, int ldc){
+    void geam(BLASHandle& handle, cublasOperation_t transa,
+              cublasOperation_t transb, int m, int n, const double* alpha,
+              const double* A, int lda, const double* beta,
+              const double* B, int ldb, double* C, int ldc){
+      STRUMPACK_FLOPS(blas::geam_flops(m, n, alpha, beta));
+      gpu_check(cublasDgeam(handle, transa, transb, m, n, alpha,
+                            A, lda, beta, B, ldb, C, ldc));
+    }
+    void geam(BLASHandle& handle, cublasOperation_t transa,
+              cublasOperation_t transb, int m, int n,
+              const std::complex<float>* alpha,
+              const std::complex<float>* A, int lda,
+              const std::complex<float>* beta,
+              const std::complex<float>* B, int ldb,
+              std::complex<float>* C, int ldc) {
       STRUMPACK_FLOPS(4*blas::geam_flops(m, n, alpha, beta));
-      gpu_check(cublasCgeam(handle, transa, transb, m, n, 
-                            reinterpret_cast<const cuComplex*>(alpha), 
-                            reinterpret_cast<const cuComplex*>(A), lda, 
-                            reinterpret_cast<const cuComplex*>(beta), 
-                            reinterpret_cast<const cuComplex*>(B), ldb, 
+      gpu_check(cublasCgeam(handle, transa, transb, m, n,
+                            reinterpret_cast<const cuComplex*>(alpha),
+                            reinterpret_cast<const cuComplex*>(A), lda,
+                            reinterpret_cast<const cuComplex*>(beta),
+                            reinterpret_cast<const cuComplex*>(B), ldb,
                             reinterpret_cast<cuComplex*>(C), ldc));
     }
-
-    void geam(BLASHandle& handle, cublasOperation_t transa, cublasOperation_t transb, 
-              int m, int n, const std::complex<double>* alpha, 
-              const std::complex<double>* A, int lda, 
-              const std::complex<double>* beta, const std::complex<double>* B, int ldb, 
-              std::complex<double>* C, int ldc){
+    void geam(BLASHandle& handle, cublasOperation_t transa,
+              cublasOperation_t transb, int m, int n,
+              const std::complex<double>* alpha,
+              const std::complex<double>* A, int lda,
+              const std::complex<double>* beta,
+              const std::complex<double>* B, int ldb,
+              std::complex<double>* C, int ldc) {
       STRUMPACK_FLOPS(4*blas::geam_flops(m, n, alpha, beta));
-      gpu_check(cublasZgeam(handle, transa, transb, m, n, 
-                            reinterpret_cast<const cuDoubleComplex*>(alpha), 
-                            reinterpret_cast<const cuDoubleComplex*>(A), lda, 
-                            reinterpret_cast<const cuDoubleComplex*>(beta), 
-                            reinterpret_cast<const cuDoubleComplex*>(B), ldb, 
+      gpu_check(cublasZgeam(handle, transa, transb, m, n,
+                            reinterpret_cast<const cuDoubleComplex*>(alpha),
+                            reinterpret_cast<const cuDoubleComplex*>(A), lda,
+                            reinterpret_cast<const cuDoubleComplex*>(beta),
+                            reinterpret_cast<const cuDoubleComplex*>(B), ldb,
                             reinterpret_cast<cuDoubleComplex*>(C), ldc));
     }
-    
-    template<typename scalar_t> void
-    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
-         const DenseMatrix<scalar_t>& A, const scalar_t beta, 
-         const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C){
-      geam(handle, T2cuOp(transa), T2cuOp(transb), C.rows(), C.cols(), &alpha, 
+    template<typename scalar_t>
+    void geam(BLASHandle& handle, Trans transa, Trans transb,
+              const scalar_t alpha, const DenseMatrix<scalar_t>& A,
+              const scalar_t beta, const DenseMatrix<scalar_t>& B,
+              DenseMatrix<scalar_t>& C) {
+      geam(handle, T2cuOp(transa), T2cuOp(transb), C.rows(), C.cols(), &alpha,
            A.data(), A.ld(), &beta, B.data(), B.ld(), C.data(), C.ld());
     }
-
-    template void geam(BLASHandle&, Trans, Trans, const float, 
-                       const DenseMatrix<float>&, const float, 
+    template void geam(BLASHandle&, Trans, Trans, const float,
+                       const DenseMatrix<float>&, const float,
                        const DenseMatrix<float>&, DenseMatrix<float>&);
-
-    template void geam(BLASHandle&, Trans, Trans, const double, 
-                       const DenseMatrix<double>&, const double, 
+    template void geam(BLASHandle&, Trans, Trans, const double,
+                       const DenseMatrix<double>&, const double,
                        const DenseMatrix<double>&, DenseMatrix<double>&);
-    
-    template void geam(BLASHandle&, Trans, Trans, const std::complex<float>, 
-                       const DenseMatrix<std::complex<float>>&, 
-                       const std::complex<float>, 
-                       const DenseMatrix<std::complex<float>>&, 
+    template void geam(BLASHandle&, Trans, Trans, const std::complex<float>,
+                       const DenseMatrix<std::complex<float>>&,
+                       const std::complex<float>,
+                       const DenseMatrix<std::complex<float>>&,
                        DenseMatrix<std::complex<float>>&);
-
-    template void geam(BLASHandle&, Trans, Trans, const std::complex<double>, 
-                       const DenseMatrix<std::complex<double>>&, 
-                       const std::complex<double>, 
-                       const DenseMatrix<std::complex<double>>&, 
+    template void geam(BLASHandle&, Trans, Trans, const std::complex<double>,
+                       const DenseMatrix<std::complex<double>>&,
+                       const std::complex<double>,
+                       const DenseMatrix<std::complex<double>>&,
                        DenseMatrix<std::complex<double>>&);
-    
+
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
-              const float* A, int lda, const float* x, int incx, float* C, 
-              int ldc){
+              const float* A, int lda, const float* x, int incx,
+              float* C, int ldc) {
       STRUMPACK_FLOPS(blas::dgmm_flops(m, n));
       gpu_check(cublasSdgmm(handle, side, m, n, A, lda, x, incx, C, ldc));
     }
-
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
-              const double* A, int lda, const double* x, int incx, double* C, 
-              int ldc){
+              const double* A, int lda, const double* x, int incx,
+              double* C, int ldc) {
       STRUMPACK_FLOPS(blas::dgmm_flops(m, n));
       gpu_check(cublasDdgmm(handle, side, m, n, A, lda, x, incx, C, ldc));
     }
-
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
-              const std::complex<float>* A, int lda, 
-              const std::complex<float>* x, int incx, 
-              std::complex<float>* C, int ldc){
+              const std::complex<float>* A, int lda,
+              const std::complex<float>* x, int incx,
+              std::complex<float>* C, int ldc) {
       STRUMPACK_FLOPS(4*blas::dgmm_flops(m, n));
-      gpu_check(cublasCdgmm(handle, side, m, n, 
-                            reinterpret_cast<const cuComplex*>(A), lda, 
-                            reinterpret_cast<const cuComplex*>(x), incx, 
+      gpu_check(cublasCdgmm(handle, side, m, n,
+                            reinterpret_cast<const cuComplex*>(A), lda,
+                            reinterpret_cast<const cuComplex*>(x), incx,
                             reinterpret_cast<cuComplex*>(C), ldc));
     }
-
     void dgmm(BLASHandle& handle, cublasSideMode_t side, int m, int n,
-              const std::complex<double>* A, int lda, 
-              const std::complex<double>* x, int incx, 
+              const std::complex<double>* A, int lda,
+              const std::complex<double>* x, int incx,
               std::complex<double>* C, int ldc){
       STRUMPACK_FLOPS(4*blas::dgmm_flops(m, n));
-      gpu_check(cublasZdgmm(handle, side, m, n, 
-                            reinterpret_cast<const cuDoubleComplex*>(A), lda, 
-                            reinterpret_cast<const cuDoubleComplex*>(x), incx, 
+      gpu_check(cublasZdgmm(handle, side, m, n,
+                            reinterpret_cast<const cuDoubleComplex*>(A), lda,
+                            reinterpret_cast<const cuDoubleComplex*>(x), incx,
                             reinterpret_cast<cuDoubleComplex*>(C), ldc));
     }
-    
     template<typename scalar_t> void
     dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
          const scalar_t* x, DenseMatrix<scalar_t>& C){
-      int incx = 1;
-      dgmm(handle, S2cuOp(side), A.rows(), A.cols(), A.data(), A.ld(), x, incx,
-           C.data(), C.ld());
+      dgmm(handle, S2cuOp(side), A.rows(), A.cols(),
+           A.data(), A.ld(), x, 1, C.data(), C.ld());
     }
-
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<float>&, 
+    template void dgmm(BLASHandle&, Side, const DenseMatrix<float>&,
                        const float*, DenseMatrix<float>&);
-
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<double>&, 
+    template void dgmm(BLASHandle&, Side, const DenseMatrix<double>&,
                        const double*, DenseMatrix<double>&);
+    template void dgmm(BLASHandle&, Side,
+                       const DenseMatrix<std::complex<float>>&,
+                       const std::complex<float>*,
+                       DenseMatrix<std::complex<float>>&);
+    template void dgmm(BLASHandle&, Side,
+                       const DenseMatrix<std::complex<double>>&,
+                       const std::complex<double>*,
+                       DenseMatrix<std::complex<double>>&);
 
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<float>>&, 
-                       const std::complex<float>*, DenseMatrix<std::complex<float>>&);
-
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<double>>&, 
-                       const std::complex<double>*, DenseMatrix<std::complex<double>>&);
-    
     void gemv(BLASHandle& handle, cublasOperation_t transa,
               int m, int n, float alpha,
               const float* A, int lda, const float* B, int incb,

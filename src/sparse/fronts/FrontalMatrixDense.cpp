@@ -42,12 +42,6 @@ namespace strumpack {
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
-  // template<typename scalar_t,typename integer_t> void
-  // FrontalMatrixDense<scalar_t,integer_t>::release_work_memory() {
-  //   STRUMPACK_SUB_MEMORY(CBstorage_.size()*sizeof(scalar_t));
-  //   CBstorage_.clear();
-  //   F22_.clear();
-  // }
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
   (VectorPool<scalar_t>& workspace) {
@@ -55,16 +49,34 @@ namespace strumpack {
     F22_.clear();
   }
 
+  template<typename scalar_t,typename integer_t> scalar_t*
+  FrontalMatrixDense<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-  template<typename scalar_t,typename integer_t> scalar_t* 
-  FrontalMatrixDense<scalar_t,integer_t>::copy_F22_to_gpu(gpu::DeviceMemory<scalar_t>& dmemF22) {
-    auto d2 = F22_.rows();
-    dmemF22 = gpu::DeviceMemory<scalar_t>(d2*d2);
-    DenseMW_t dF22(d2, d2, dmemF22, d2);
-    gpu::copy_host_to_device(dF22, F22_);
-    return dF22.data();
-  }
+    gpu_check(gpu::copy_host_to_device(dF22, F22_));
 #endif
+    return dF22;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDense<scalar_t,integer_t>::matrix_inertia
+  (const DenseM_t& F, integer_t& neg, integer_t& zero, integer_t& pos) const {
+    using real_t = typename RealType<scalar_t>::value_type;
+    for (std::size_t i=0; i<F.rows(); i++) {
+      if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
+      auto absFii = std::abs(F(i, i));
+      if (absFii > real_t(0.)) pos++;
+      else if (absFii < real_t(0.)) neg++;
+      else if (absFii == real_t(0.)) zero++;
+      else std::cerr << "F(" << i << "," << i << ")=" << F(i,i) << std::endl;
+    }
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDense<scalar_t,integer_t>::node_inertia
+  (integer_t& neg, integer_t& zero, integer_t& pos) const {
+    return matrix_inertia(F11_, neg, zero, pos);
+  }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
@@ -162,9 +174,8 @@ namespace strumpack {
         for (std::size_t r=upd2sep; r<dupd; r++)
           paF21(I[r]-pdsep,pc) += F22_(r,c);
       } else {
-        for (std::size_t r=0; r<upd2sep; r++){
+        for (std::size_t r=0; r<upd2sep; r++)
           paF12(I[r],pc-pdsep) += F22_(r, c);
-        }
         for (std::size_t r=upd2sep; r<dupd; r++)
           paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
       }
@@ -173,46 +184,48 @@ namespace strumpack {
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDense<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
+    ReturnCode e1, e2;
     if (task_depth == 0) {
-      // use tasking for children and for extend-add parallelism
 #pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single nowait
       {
-        factor_phase1(A, opts, workspace, etree_level, task_depth);
-        // do not use tasking for blas/lapack parallelism (use system
-        // blas threading!)
-        factor_phase2(A, opts, etree_level, params::task_recursion_cutoff_level);
+        e1 = factor_phase1(A, opts, workspace, etree_level, task_depth+1);
+        e2 = factor_phase2(A, opts, etree_level, task_depth);
       }
     } else {
-      factor_phase1(A, opts, workspace, etree_level, task_depth);
-      factor_phase2(A, opts, etree_level, task_depth);
+      e1 = factor_phase1(A, opts, workspace, etree_level, task_depth);
+      e2 = factor_phase2(A, opts, etree_level, task_depth);
     }
+    return (e1 == ReturnCode::SUCCESS) ? e2 : e1;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase1
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
-    if (task_depth < params::task_recursion_cutoff_level) {
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
+    if (opts.use_openmp_tree() &&
+        task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        lchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
+        el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
       if (rchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        rchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
+        er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
       if (lchild_)
-        lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
+        el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
       if (rchild_)
-        rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
+        er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
     }
+    ReturnCode err_code = (el == ReturnCode::SUCCESS) ? er : el;
     // TODO can we allocate the memory in one go??
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
@@ -223,7 +236,12 @@ namespace strumpack {
       (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
        this->upd_, task_depth);
     if (dupd) {
-      CBstorage_ = workspace.get(dupd*dupd);
+      CBstorage_ = workspace.get();
+      integer_t old_size = CBstorage_.size();
+      if (dupd*dupd > old_size) {
+        STRUMPACK_ADD_MEMORY((dupd*dupd - old_size)*sizeof(scalar_t));
+      }
+      CBstorage_.resize(dupd*dupd);
       F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
       F22_.zero();
     }
@@ -234,24 +252,25 @@ namespace strumpack {
       rchild_->extend_add_to_dense
         (F11_, F12_, F21_, F22_, this, workspace, task_depth);
     if (etree_level == 0 && opts.write_root_front()) F11_.write("Froot");
+    return err_code;
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
+    ReturnCode err_code = ReturnCode::SUCCESS;
     if (dim_sep()) {
-      // TaskTimer t("FrontalMatrixDense_factor");
-      // if (etree_level == 0 && opts.print_root_front_stats()) t.start();
-      int info = F11_.LU(piv, task_depth);
-      if (info || opts.replace_tiny_pivots()) {
+      if (F11_.LU(piv_, task_depth))
+        err_code = ReturnCode::ZERO_PIVOT;
+      if (opts.replace_tiny_pivots()) {
         auto thresh = opts.pivot_threshold();
         for (std::size_t i=0; i<F11_.rows(); i++)
           if (std::abs(F11_(i,i)) < thresh)
             F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
       }
       if (dim_upd()) {
-        F12_.laswp(piv, true);
+        F12_.laswp(piv_, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U,
              scalar_t(1.), F11_, F12_, task_depth);
         trsm(Side::R, UpLo::U, Trans::N, Diag::N,
@@ -259,36 +278,13 @@ namespace strumpack {
         gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_,
              scalar_t(1.), F22_, task_depth);
       }
-      // if (etree_level == 0 && opts.print_root_front_stats()) {
-      //   auto time = t.elapsed();
-      //   std::cout << "#   - dense root front: N = " << dim_sep()
-      //             << " , N^2 = " << dim_sep() * dim_sep()
-      //             << " time = " << time << " sec" << std::endl;
-      // }
     }
     STRUMPACK_FULL_RANK_FLOPS
       (LU_flops(F11_) +
        gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
        trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
        trsm_flops(Side::R, scalar_t(1.), F11_, F21_));
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
-    DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
-    bupd.zero();
-    if (task_depth == 0) {
-      // tasking when calling the children
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
-      this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
-      // no tasking for the root node computations, use system blas threading!
-      fwd_solve_phase2(b, bupd, etree_level, params::task_recursion_cutoff_level);
-    } else {
-      this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
-      fwd_solve_phase2(b, bupd, etree_level, task_depth);
-    }
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -296,7 +292,7 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      bloc.laswp(piv, true);
+      bloc.laswp(piv_, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11_, bloc, task_depth);
         if (dim_upd())
@@ -309,24 +305,6 @@ namespace strumpack {
           gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, bloc,
                scalar_t(1.), bupd, task_depth);
       }
-    }
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
-    DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
-    if (task_depth == 0) {
-      // no tasking in blas routines, use system threaded blas instead
-      bwd_solve_phase1
-        (y, yupd, etree_level, params::task_recursion_cutoff_level);
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
-      // tasking when calling children
-      this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
-    } else {
-      bwd_solve_phase1(y, yupd, etree_level, task_depth);
-      this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
     }
   }
 
@@ -526,7 +504,7 @@ namespace strumpack {
     F12_ = DenseM_t();
     F21_ = DenseM_t();
     F22_ = DenseMW_t();
-    piv = std::vector<int>();
+    piv_ = std::vector<int>();
   }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -549,8 +527,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, integer_t begin_col,
-   integer_t end_col, const Opts_t& opts) const {
+   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa,
+   integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::
       seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
   }

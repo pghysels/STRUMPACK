@@ -41,8 +41,8 @@ namespace strumpack {
 
     std::string get_name(CompressionAlgorithm a) {
       switch (a) {
-      case CompressionAlgorithm::RANDOM_SAMPLING: return "sampling"; break;
-      case CompressionAlgorithm::ELEMENT_EXTRACTION: return "extraction"; break;
+      case CompressionAlgorithm::RANDOM_SAMPLING: return "sampling";
+      case CompressionAlgorithm::ELEMENT_EXTRACTION: return "extraction";
       default: return "unknown";
       }
     }

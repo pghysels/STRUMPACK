@@ -14,8 +14,8 @@ sparse solver (the default is to perform exact LU factorization), but
 BLR compression can be turned on/off via the command line:
 
 \code {.bash}
---sp_compression blr
---sp_compression none
+  --sp_compression blr
+  --sp_compression none
 \endcode
 
 or via the C++ API as follows
@@ -31,33 +31,6 @@ use the BLR enabled approximate LU factorization as a preconditioner
 within GMRES. This behavior can also be changed, see \link solve
 Solve\endlink.
 
-However, BLR compression has a considerable overhead and only pays off
-for sufficiently large matrices.  Therefore STRUMPACK has a tuning
-parameter to specify the minimum size a dense matrix needs to be to be
-considered a candidate for HSS compression. The minimum dense matrix
-size for BLR compression is set via the command line via
-
-\code {.bash}
---sp_compression_min_sep_size int
-\endcode
-
-or via the C++ API as follows
-
-\code {.cpp}
-void strumpack::SPOptions::set_compression_min_sep_size(int s);
-int strumpack::SPOptions::compression_min_sep_size() const;
-\endcode
-
-The routine \link
-strumpack::SPOptions::set_compression_min_sep_size(int s)
-set_compression_min_sep_size(int s)\endlink refers to the size of the
-top-left block of the front only. This top-left block is the part that
-corresponds to a separator, as given by the nested dissection
-reordering algorithm. This top-left block is also referred to as the
-block containing the fully-summed variable. Factorization is only
-applied to this top-left block. __Tuning the value for the minimum
-separator size can have a big impact on performance and memory
-usage!__
 
 The above options affect the use of BLR within the multifrontal
 solver. There are more, BLR specific, options which are stored in an
@@ -74,34 +47,90 @@ sp.options().set_compression(CompressionType::BLR);  // enable BLR compression i
 sp.options().BLR_options().set_leaf_size(256);       // set the BLR leaf size
 \endcode
 
- __The compression tolerances can greatly impact performance.__ They
+__The compression tolerances can greatly impact performance.__ They
 can be set using:
 
 \code
-> --blr_rel_tol real (default 0.01)
-> --blr_abs_tol real (default 1e-08)
+  --blr_rel_tol real (default 0.01)
+  --blr_abs_tol real (default 1e-08)
 \endcode
-
 or via the C++ API
-
 \code
-> void strumpack::BLR::BLROptions<scalar>::set_rel_tol(real rel_tol);
-> void strumpack::BLR::BLROptions<scalar>::set_abs_tol(real abs_tol);
-> real strumpack::BLR::BLROptions<scalar>::rel_tol() const;              // get the current value
-> real strumpack::BLR::BLROptions<scalar>::abs_tol() const;
+void strumpack::BLR::BLROptions<scalar>::set_rel_tol(real rel_tol);
+void strumpack::BLR::BLROptions<scalar>::set_abs_tol(real abs_tol);
+real strumpack::BLR::BLROptions<scalar>::rel_tol() const;              // get the current value
+real strumpack::BLR::BLROptions<scalar>::abs_tol() const;
 \endcode
+
+
+__The peak memory usage__ of the solver can be reduced by enabling
+columnwise construction (instead of DENSE):
+\code
+  --blr_cb_construction COLWISE
+  --blr_cb_construction DENSE
+\endcode
+or in C++
+\code {.cpp}
+void strumpack::BLR::BLROptions<scalar>::set_CB_construction(CBConstruction::COLWISE);
+void strumpack::BLR::BLROptions<scalar>::set_CB_construction(CBConstruction::DENSE);
+sp.options().BLR_options().set_CB_construction(CBConstruction::COLWISE);       // set this option through the sparse solver object sp
+sp.options().BLR_options().set_CB_construction(CBConstruction::DENSE);
+\endcode
+COLWISE will construct the BLR matrix one block column at a time, and
+will also compress the 22 part of a front. Hence, COLWISE uses less
+memory, but is slower and can be less accurate than DENSE.
+
+
+BLR compression has some overhead and only pays off for
+sufficiently large matrices.  Therefore STRUMPACK has tuning
+parameters to specify the minimum size a dense matrix needs to be to
+be considered a candidate for BLR compression. The following routines
+can be used to tune how many fronts are compressed, via the command
+line:
+
+\code {.bash}
+  --sp_compression_min_sep_size int
+  --sp_compression_min_front_size int
+\endcode
+
+or via the C++ API as follows
+
+\code {.cpp}
+void strumpack::SPOptions::set_compression_min_sep_size(int s);
+int strumpack::SPOptions::compression_min_sep_size() const;
+void strumpack::SPOptions::set_compression_min_front_size(int s);
+int strumpack::SPOptions::compression_min_front_size() const;
+\endcode
+
+The routine \link
+strumpack::SPOptions::set_compression_min_sep_size(int s)
+set_compression_min_sep_size(int s)\endlink refers to the size of the
+top-left sub-block of a front only. This top-left block is the part
+that corresponds to a separator, as given by the nested dissection
+reordering algorithm. This top-left block is also referred to as the
+block containing the fully-summed variable. Factorization is only
+applied to this top-left block. __Tuning the value for the minimum
+separator size can have a big impact on performance and memory
+usage!__
+
 
 Here is a list of all command line options:
 \code {.bash}
 # BLR Options:
 #   --blr_rel_tol real_t (default 0.0001)
 #   --blr_abs_tol real_t (default 1e-10)
-#   --blr_leaf_size int (default 128)
+#   --blr_leaf_size int (default 256)
 #   --blr_max_rank int (default 5000)
 #   --blr_low_rank_algorithm (default RRQR)
 #      should be [RRQR|ACA|BACA]
-#   --blr_admissibility (default strong)
+#   --blr_admissibility (default weak)
 #      should be one of [weak|strong]
+#   --blr_factor_algorithm (default Star)
+#      should be [RL|LL|Comb|Star]
+#   --blr_compression_kernel (default half)
+#      should be [full|half]
+#   --blr_cb (default DENSE)
+#      should be [COLWISE|DENSE]
 #   --blr_BACA_blocksize int (default 4)
 #   --blr_verbose or -v (default false)
 #   --blr_quiet or -q (default true)

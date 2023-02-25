@@ -927,7 +927,7 @@ namespace strumpack {
     }
     void plapiv
     (char direc, char rowcol, char pivroc, int m, int n,
-     std::complex<double>* a, int ia, int ja, int* desca,
+     std::complex<double>* a, int ia, int ja, const int* desca,
      const int* ipiv, int ip, int jp, const int* descip, int* iwork) {
       STRUMPACK_FC_GLOBAL(pzlapiv,PZLAPIV)
         (&direc, &rowcol, &pivroc, &m, &n,
@@ -1029,23 +1029,23 @@ namespace strumpack {
 
     void pgeadd
     (char trans, int m, int n, float alpha,
-     const float* a, int ia, int ja, int *desca, float beta,
-     float *c, int ic, int jc, const int *descc) {
+     const float* a, int ia, int ja, const int *desca,
+     float beta, float *c, int ic, int jc, const int *descc) {
       STRUMPACK_FC_GLOBAL(psgeadd,PSGEADD)
         (&trans, &m, &n, &alpha, a, &ia, &ja, desca,
          &beta, c, &ic, &jc, descc);
     }
     void pgeadd
     (char trans, int m, int n, double alpha,
-     const double* a, int ia, int ja, int *desca, double beta,
-     double *c, int ic, int jc, const int *descC) {
+     const double* a, int ia, int ja, const int *desca,
+     double beta, double *c, int ic, int jc, const int *descC) {
       STRUMPACK_FC_GLOBAL(pdgeadd,PDGEADD)
         (&trans, &m, &n, &alpha, a, &ia, &ja, desca,
          &beta, c, &ic, &jc, descC);
     }
     void pgeadd
     (char trans, int m, int n, std::complex<float> alpha,
-     const std::complex<float>* a, int ia, int ja, int *desca,
+     const std::complex<float>* a, int ia, int ja, const int *desca,
      std::complex<float> beta,
      std::complex<float> *c, int ic, int jc, const int *descC) {
       STRUMPACK_FC_GLOBAL(pcgeadd,PCGEADD)
@@ -1054,7 +1054,7 @@ namespace strumpack {
     }
     void pgeadd
     (char trans, int m, int n, std::complex<double> alpha,
-     const std::complex<double>* a, int ia, int ja, int *desca,
+     const std::complex<double>* a, int ia, int ja, const int *desca,
      std::complex<double> beta,
      std::complex<double> *c, int ic, int jc, const int *descC) {
       STRUMPACK_FC_GLOBAL(pzgeadd,PZGEADD)

@@ -1,3 +1,96 @@
+Version 7.0.1 Released Oct 2022
+===============================
+- Require C++14 instead of 17
+
+Version 7.0.0 Released Oct 2022
+===============================
+- Many bugfixes and general improvements.
+- Important fixes in the GPU code, and in the usage of SLATE
+  (GPU capable ScaLAPACK replacement).
+- The default ordering now uses METIS_NodeND, instead of the
+  (undocumented) METIS_NodeNDP routine. This can impact performance,
+  or for some problems lead to stack overflow, but for others it
+  drastically reduces memory usage. The old behavior can be restored
+  with --sp_enable_METIS_NodeNDP.
+- Improvements to error handling, mostly related to zero pivots.
+- Added new ordering options: AND, MMD, AMD
+- Require C++-17
+
+
+Version 6.3.1 Released March 2022
+=================================
+- Fix for setting CUDA/HIP device when there are multiple,
+  but MPI was not initialized
+- Memory leak fix in distributed memory GPU code
+- Fixed small memory leaks from MPI datatypes
+- Change in BLR algorithm selection options
+- Changed default blocksize for 2D block cyclic distribution
+  when using SLATE to 512
+- Add 64bit support in the matching (MC64)
+- Fix installation of Fortran modules
+
+
+Version 6.3.0 Released February 2022
+====================================
+- Change default sparsity reducing ordering to use METIS_NodeNDP
+  (from METIS_NodeND)
+- Significant performance improvements in the GPU code for the
+  direct solver, from the NERSC December 2021 Hackathon
+- Performance fix in symbolic phase
+  (affecting only some MPI implementations)
+- Bump minimum CMake version to 3.17
+- CMake fix for Perlmutter
+- Compilation fix for GCC 8
+- Add support for single precision HODLR/Butterfly
+  (now requiring ButterflyPACK >= 2.1.0)
+
+
+Version 6.2.1 Released November 2021
+====================================
+- HIP compilation fix
+- Change default minimum front size for compression to very large
+  values, use minimum separator size instead.
+
+
+Version 6.2.0 Released November 2021
+====================================
+Bugfix release, with some changes in the C interface.
+- Additions to the C interface for the sparse solver:
+  . Solve with multiple RHS
+  . Specify grid dimensions, stencil, for geometric ordering
+  . Fix typo in GPU enabling routine
+  . Set lossy precision
+- Bugfix in passing grid via options object
+- Bugfix in LOSSY/LOSSLESS compression using ZFP
+- Compilation fix for nvcc not finding MPI when the CXX/C
+  compilers are set to the MPI wrappers
+- Fix Fortran module case in CMake when using CCE
+- Disable GPU if CUDA/HIP are not enabled
+
+
+Version 6.1.0 Released October 2021
+===================================
+- Change default BLR blocksize, and in the BLR preconditioner use
+  right-looking algorithm as the default. This has higher peak
+  memory usage, but is much faster and more robust.
+- Fixes in printing of compression statistics.
+- Always build the test when doing 'make', you no longer have to
+  run 'make tests'.
+- Setup CI at github and gitlab, remove Travis testing.
+
+
+Version 6.0.0 Released September 2021
+=====================================
+- Block Low-Rank compression is now supported in the sparse
+  solver, resulting in an efficient, scalable and robust
+  precoditioner.
+- Improved GPU performance for the sparse direct solver
+- Add the StructuredMatrix class, for a general interface to
+  different rank structured formats. This also comes with a C and a
+  Fortran interface.
+- Several performance improvements
+
+
 Version 5.1.1 Released January 22, 2021
 =======================================
 - Small change in the build script for using HIP/ROCm. See

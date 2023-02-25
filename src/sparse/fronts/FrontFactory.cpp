@@ -46,8 +46,14 @@
 #include "FrontalMatrixHODLRMPI.hpp"
 #endif
 #endif
+#if defined(STRUMPACK_USE_MAGMA)
+#include "FrontalMatrixMAGMA.hpp"
+#endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
 #include "FrontalMatrixGPU.hpp"
+#endif
+#if defined(STRUMPACK_USE_SYCL)
+#include "FrontSYCL.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"
@@ -66,11 +72,20 @@ namespace strumpack {
     switch (opts.compression()) {
     case CompressionType::NONE: {
       if (is_GPU(opts)) {
+#if defined(STRUMPACK_USE_MAGMA)
+        front.reset
+          (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
+#else
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
         front.reset
           (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
-        if (root) fc.dense++;
 #endif
+#endif
+#if defined(STRUMPACK_USE_SYCL)
+        front.reset
+          (new FrontSYCL<scalar_t,integer_t>(s, sbegin, send, upd));
+#endif
+        if (root) fc.dense++;
       }
     } break;
     case CompressionType::HSS: {
@@ -128,6 +143,7 @@ namespace strumpack {
 #endif
       }
     } break;
+    case CompressionType::LOSSLESS:
     case CompressionType::LOSSY: {
       if (is_lossy(dsep, dupd, compressed_parent, opts)) {
 #if defined(STRUMPACK_USE_ZFP)
@@ -137,8 +153,6 @@ namespace strumpack {
 #endif
       }
     } break;
-    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
-      break;
     };
     if (!front) {
       // fallback in case support for cublas/zfp/hodlr is missing
@@ -280,7 +294,7 @@ namespace strumpack {
       }
     } break;
     case CompressionType::LOSSY: // handled in DenseMPI
-    case CompressionType::LOSSLESS: // not implemented yet, use DenseMPI
+    case CompressionType::LOSSLESS: // handled in DenseMPI
     case CompressionType::NONE: break;
     };
     // (NONE, LOSSLESS, LOSSY or not compiled with HODLR)

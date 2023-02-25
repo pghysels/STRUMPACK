@@ -45,9 +45,13 @@
 #include "kblas.h"
 #endif
 
-
 namespace strumpack {
   namespace gpu {
+
+    // this is valid for compute capability 3.5 -> 8.0 (and beyond?)
+    //const unsigned int MAX_BLOCKS_X = 4294967295; // 2^32-1
+    const unsigned int MAX_BLOCKS_Y = 65535;
+    const unsigned int MAX_BLOCKS_Z = 65535;
 
 #define gpu_check(err) {                                               \
       strumpack::gpu::cuda_assert((err), __FILE__, __LINE__);          \
@@ -78,10 +82,10 @@ namespace strumpack {
 
     class BLASHandle {
     public:
-      BLASHandle() { 
-        gpu_check(cublasCreate(&h_)); 
+      BLASHandle() {
+        gpu_check(cublasCreate(&h_));
 #if defined(STRUMPACK_USE_KBLAS)
-        create_kblas_handle(); 
+        create_kblas_handle();
 #endif
       }
       BLASHandle(Stream& s):BLASHandle() {
@@ -115,10 +119,7 @@ namespace strumpack {
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(cusolverDnCreate(&h_)); }
-      SOLVERHandle(Stream& s) { 
-        gpu_check(cusolverDnCreate(&h_)); 
-        set_stream(s);
-      }
+      SOLVERHandle(Stream& s) : SOLVERHandle() { set_stream(s); }
       ~SOLVERHandle() { gpu_check(cusolverDnDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(cusolverDnSetStream(h_, s)); }
       operator cusolverDnHandle_t&() { return h_; }
@@ -140,130 +141,123 @@ namespace strumpack {
       cudaEvent_t e_;
     };
 
-    template<typename T> void memset
-    (void* dptr, int value, std::size_t count) {
-      gpu_check(cudaMemset(dptr, value, count*sizeof(T)));
+    template<typename T> cudaError_t
+    memset(void* dptr, int value, std::size_t count) {
+      return cudaMemset(dptr, value, count*sizeof(T));
     }
 
-    template<typename T> void copy_device_to_host
-    (T* hptr, const T* dptr, std::size_t count) {
-      gpu_check(cudaMemcpy(hptr, dptr, count*sizeof(T),
-                           cudaMemcpyDeviceToHost));
+    template<typename T> cudaError_t
+    copy_device_to_host(T* hptr, const T* dptr, std::size_t count) {
+      return cudaMemcpy(hptr, dptr, count*sizeof(T),
+                        cudaMemcpyDeviceToHost);
     }
-    template<typename T> void copy_device_to_host_async
-    (T* hptr, const T* dptr, std::size_t count, const Stream& s) {
-      gpu_check(cudaMemcpyAsync(hptr, dptr, count*sizeof(T),
-                                cudaMemcpyDeviceToHost, s));
+    template<typename T> cudaError_t
+    copy_device_to_host_async(T* hptr, const T* dptr,
+                              std::size_t count, const Stream& s) {
+      return cudaMemcpyAsync(hptr, dptr, count*sizeof(T),
+                             cudaMemcpyDeviceToHost, s);
     }
-    template<typename T> void copy_host_to_device
-    (T* dptr, const T* hptr, std::size_t count) {
-      gpu_check(cudaMemcpy(dptr, hptr, count*sizeof(T),
-                           cudaMemcpyHostToDevice));
+    template<typename T> cudaError_t
+    copy_host_to_device(T* dptr, const T* hptr, std::size_t count) {
+      return cudaMemcpy(dptr, hptr, count*sizeof(T),
+                        cudaMemcpyHostToDevice);
     }
-    template<typename T> void copy_host_to_device_async
-    (T* dptr, const T* hptr, std::size_t count, const Stream& s) {
-      gpu_check(cudaMemcpyAsync(dptr, hptr, count*sizeof(T),
-                                cudaMemcpyHostToDevice, s));
+    template<typename T> cudaError_t
+    copy_host_to_device_async(T* dptr, const T* hptr,
+                              std::size_t count, const Stream& s) {
+      return cudaMemcpyAsync(dptr, hptr, count*sizeof(T),
+                             cudaMemcpyHostToDevice, s);
     }
-
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const DenseMatrix<T>& d) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> cudaError_t
+    copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
+      if (!h.rows() || !h.cols()) return cudaSuccess;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(cudaMemcpy2D
-                  (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), cudaMemcpyDeviceToHost));
-      } else
-        copy_device_to_host(h.data(), d.data(), d.rows()*d.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      return copy_device_to_host
+        (h.data(), d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_device_to_host_async
-    (DenseMatrix<T>& h, const DenseMatrix<T>& d, const Stream& s) {
-      if (!d.rows() || !d.cols()) return;
-      assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(cudaMemcpy2DAsync
-                  (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), cudaMemcpyDeviceToHost, s));
-      } else
-        copy_device_to_host_async(h.data(), d.data(), d.rows()*d.cols(), s);
-    }
-    template<typename T> void copy_device_to_host
-    (DenseMatrix<T>& h, const T* d) {
-      if (!h.rows() || !h.cols()) return;
+    template<typename T> cudaError_t
+    copy_device_to_host(DenseMatrix<T>& h, const T* d) {
+      if (!h.rows() || !h.cols()) return cudaSuccess;
       assert(h.rows() == h.ld());
-      copy_device_to_host(h.data(), d, h.rows()*h.cols());
+      return copy_device_to_host
+        (h.data(), d, std::size_t(h.rows())*h.cols());
     }
-    template<typename T> void copy_device_to_host
-    (T* h, const DenseMatrix<T>& d) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> cudaError_t
+    copy_device_to_host(T* h, const DenseMatrix<T>& d) {
+      if (!d.rows() || !d.cols()) return cudaSuccess;
       assert(d.rows() == d.ld());
-      copy_device_to_host(h, d.data(), d.rows()*d.cols());
+      return copy_device_to_host
+        (h, d.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const DenseMatrix<T>& h) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> cudaError_t
+    copy_device_to_host_async(DenseMatrix<T>& h,
+                              const DenseMatrix<T>& d, const Stream& s) {
+      if (!d.rows() || !d.cols()) return cudaSuccess;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(cudaMemcpy2D
-                  (d.data(), d.ld()*sizeof(T), h.data(), h.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), cudaMemcpyHostToDevice));
-      } else
-        copy_host_to_device(d.data(), h.data(), d.rows()*d.cols());
+      if (d.rows() != d.ld() || h.rows() != h.ld())
+        return cudaMemcpy2DAsync
+          (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
+           h.rows()*sizeof(T), h.cols(), cudaMemcpyDeviceToHost, s);
+      else
+        return copy_device_to_host_async
+          (h.data(), d.data(), d.rows()*d.cols(), s);
     }
-    template<typename T> void copy_host_to_device_async
-    (DenseMatrix<T>& d, const DenseMatrix<T>& h, const Stream& s) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> cudaError_t
+    copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
+      if (!d.rows() || !d.cols()) return cudaSuccess;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
-      if (d.rows() != d.ld() || h.rows() != h.ld()) {
-        gpu_check(cudaMemcpy2DAsync
-                  (d.data(), d.ld()*sizeof(T), h.data(), h.ld()*sizeof(T),
-                   h.rows()*sizeof(T), h.cols(), cudaMemcpyHostToDevice, s));
-      } else
-        copy_host_to_device_async(d.data(), h.data(), d.rows()*d.cols(), s);
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      return copy_host_to_device
+        (d.data(), h.data(), std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (DenseMatrix<T>& d, const T* h) {
-      if (!d.rows() || !d.cols()) return;
+    template<typename T> cudaError_t
+    copy_host_to_device(DenseMatrix<T>& d, const T* h) {
+      if (!d.rows() || !d.cols()) return cudaSuccess;
       assert(d.rows() == d.ld());
-      copy_host_to_device(d.data(), h, d.rows()*d.cols());
+      return copy_host_to_device
+        (d.data(), h, std::size_t(d.rows())*d.cols());
     }
-    template<typename T> void copy_host_to_device
-    (T* d, const DenseMatrix<T>& h) {
-      if (!h.rows() || !h.cols()) return;
+    template<typename T> cudaError_t
+    copy_host_to_device(T* d, const DenseMatrix<T>& h) {
+      if (!h.rows() || !h.cols()) return cudaSuccess;
       assert(h.rows() == h.ld());
-      copy_host_to_device(d, h.data(), h.rows()*h.cols());
+      return copy_host_to_device
+        (d, h.data(), std::size_t(h.rows())*h.cols());
     }
-    template<typename T> void copy_host_to_device_async
+    template<typename T> cudaError_t
+    copy_host_to_device_async
     (T* d, const DenseMatrix<T>& h, const Stream& s) {
-      if (!h.rows() || !h.cols()) return;
+      if (!h.rows() || !h.cols()) return cudaSuccess;
       assert(h.rows() == h.ld());
-      copy_host_to_device_async(d, h.data(), h.rows()*h.cols(), s);
+      return copy_host_to_device_async
+        (d, h.data(), h.rows()*h.cols(), s);
     }
-
-    template<typename T> void copy_device_to_device
-    (T* d1ptr, const T* d2ptr, std::size_t count) {
-      gpu_check(cudaMemcpy(d1ptr, d2ptr, count*sizeof(T),
-                           cudaMemcpyDeviceToDevice));
+    template<typename T> cudaError_t
+    copy_device_to_device(T* d1ptr, const T* d2ptr, std::size_t count) {
+      return cudaMemcpy(d1ptr, d2ptr, count*sizeof(T),
+                        cudaMemcpyDeviceToDevice);
     }
-
-    template<typename T> void copy_device_to_device
-    (DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
-      if (!d1.rows() || !d1.cols()) return;
+    template<typename T> cudaError_t
+    copy_device_to_device(DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
+      if (!d1.rows() || !d1.cols()) return cudaSuccess;
       assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
       if (d1.rows() != d1.ld() || d2.rows() != d2.ld()) {
-        gpu_check(cudaMemcpy2D
-                  (d1.data(), d1.ld()*sizeof(T), d2.data(), d2.ld()*sizeof(T),
-                   d2.rows()*sizeof(T), d2.cols(), cudaMemcpyDeviceToDevice));
+        return cudaMemcpy2D
+          (d1.data(), d1.ld()*sizeof(T), d2.data(), d2.ld()*sizeof(T),
+           d2.rows()*sizeof(T), d2.cols(), cudaMemcpyDeviceToDevice);
       } else
-        copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
+        return copy_device_to_device
+          (d1.data(), d2.data(), d1.rows()*d1.cols());
     }
-
-    template<typename scalar_t, typename real_t = typename RealType<scalar_t>::value_type>
-    void copy_real_to_scalar(scalar_t* dest, const real_t* src, std::size_t size) {
-      gpu_check(cudaMemset(dest, 0, size*sizeof(scalar_t)));
-      gpu_check(cudaMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t), 
-                sizeof(real_t), size, cudaMemcpyDeviceToDevice));
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type>
+    cudaError_t
+    copy_real_to_scalar(scalar_t* dest, const real_t* src,
+                        std::size_t size) {
+      cudaMemset(dest, 0, size*sizeof(scalar_t));
+      return cudaMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t),
+                          sizeof(real_t), size, cudaMemcpyDeviceToDevice);
     }
 
     inline std::size_t available_memory() {
@@ -321,11 +315,11 @@ namespace strumpack {
         return *this;
       }
       ~DeviceMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
-      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           if (is_managed_) {
@@ -382,11 +376,11 @@ namespace strumpack {
         return *this;
       }
       ~HostMemory() { release(); }
+      std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
       // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
-      std::size_t size() const { return size_; }
       void release() {
         if (data_) {
           STRUMPACK_SUB_MEMORY(size_*sizeof(T));
@@ -437,10 +431,11 @@ namespace strumpack {
 
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> int
-    gesvd(SOLVERHandle& handle, Jobz jobz, real_t* S, DenseMatrix<scalar_t>& A, 
-          DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, 
-          int* devInfo, char* svd_mem, const double tol);
-    
+    gesvd(SOLVERHandle& handle, Jobz jobz, real_t* S,
+          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U,
+          DenseMatrix<scalar_t>& V, int* devInfo,
+          char* svd_mem, const double tol);
+
     template<typename scalar_t> void
     geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
          const DenseMatrix<scalar_t>& A, const scalar_t beta,
@@ -463,8 +458,14 @@ namespace strumpack {
          DenseMatrix<scalar_t>& y);
 
     template<typename scalar_t> void
-    laswp(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
+    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
           int k1, int k2, int* ipiv, int inc);
+
+    // assume inc = 1
+    template<typename scalar_t> void
+    laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
+                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
+                       unsigned int batchCount);
 
   } // end namespace gpu
 } // end namespace strumpack

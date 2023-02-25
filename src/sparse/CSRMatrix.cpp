@@ -34,6 +34,7 @@
 #include <string>
 
 #include "CSRMatrix.hpp"
+#include "MC64ad.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "dense/DistributedMatrix.hpp"
 #endif
@@ -357,39 +358,39 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   CSRMatrix<scalar_t,integer_t>::strumpack_mc64
   (MatchingJob job, Match_t& M) {
-    int_t n = n_, nnz = nnz_, icntl[10], info[10], num,
+    integer_t n = n_, nnz = nnz_, icntl[10], info[10], num,
       ijob = static_cast<int>(job), liw = M.mc64_work_int(n_, nnz_),
       ldw = M.mc64_work_double(n_, nnz_);
-    std::unique_ptr<int_t[]> iw(new int_t[liw + n+1+nnz+n+n]);
+    std::unique_ptr<integer_t[]> iw(new integer_t[liw + n+1+nnz+n+n]);
     std::unique_ptr<double[]> dw(new double[ldw + nnz]);
-    strumpack_mc64id_(icntl);
+    mc64id(icntl);
     auto dval = dw.get() + ldw;
     auto cptr = iw.get() + liw;
     auto rind = cptr + n + 1;
     auto permutation = rind + nnz;
     auto rsums = permutation + n;
-    for (int_t i=0; i<n; i++) rsums[i] = 0;
-    for (int_t col=0; col<n; col++)
-      for (int_t i=ptr_[col]; i<ptr_[col+1]; i++)
+    for (integer_t i=0; i<n; i++) rsums[i] = 0;
+    for (integer_t col=0; col<n; col++)
+      for (integer_t i=ptr_[col]; i<ptr_[col+1]; i++)
         rsums[ind_[i]]++;
     cptr[0] = 1;  // start from 1, because mc64 is fortran!
-    for (int_t r=0; r<n; r++) {
+    for (integer_t r=0; r<n; r++) {
       cptr[r+1] = cptr[r] + rsums[r];
       rsums[r] = 0;
     }
-    for (int_t col=0; col<n; col++) {
-      for (int_t i=ptr_[col]; i<ptr_[col+1]; i++) {
-        int_t row = ind_[i], j = cptr[row] - 1 + rsums[row]++;
+    for (integer_t col=0; col<n; col++) {
+      for (integer_t i=ptr_[col]; i<ptr_[col+1]; i++) {
+        integer_t row = ind_[i], j = cptr[row] - 1 + rsums[row]++;
         if (is_complex<scalar_t>())
           dval[j] = static_cast<double>(std::abs(val_[i]));
         else dval[j] = static_cast<double>(std::real(val_[i]));
         rind[j] = col + 1;
       }
     }
-    strumpack_mc64ad_
-      (&ijob, &n, &nnz, cptr, rind, dval, &num,
-       permutation, &liw, iw.get(), &ldw, dw.get(), icntl, info);
-    for (int_t i=0; i<n; i++)
+    mc64ad(&ijob, &n, &nnz, cptr, rind, dval, &num,
+           permutation, &liw, iw.get(), &ldw, dw.get(),
+           icntl, info);
+    for (integer_t i=0; i<n; i++)
       M.Q[i] = permutation[i] - 1;
     if (job == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING) {
 #pragma omp parallel for
@@ -458,6 +459,43 @@ namespace strumpack {
         if (col >= slo) {
           if (col < shi)
             e21.emplace_back(i, col-slo, val_[j]);
+          else break;
+        }
+      }
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::set_front_elements
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   Triplet<scalar_t>* e11, Triplet<scalar_t>* e12,
+   Triplet<scalar_t>* e21) const {
+    integer_t ds = shi - slo, du = upd.size();
+    for (integer_t row=0; row<ds; row++) { // separator rows
+      integer_t upd_ptr = 0;
+      const auto hij = ptr_[row+slo+1];
+      for (integer_t j=ptr_[row+slo]; j<hij; j++) {
+        integer_t col = ind_[j];
+        if (col >= slo) {
+          if (col < shi)
+            *e11++ = Triplet<scalar_t>(row, col-slo, val_[j]);
+          else {
+            while (upd_ptr<du && upd[upd_ptr]<col) upd_ptr++;
+            if (upd_ptr == du) break;
+            if (upd[upd_ptr] == col)
+              *e12++ = Triplet<scalar_t>(row, upd_ptr, val_[j]);
+          }
+        }
+      }
+    }
+    for (integer_t i=0; i<du; i++) { // update rows
+      auto row = upd[i];
+      const auto hij = ptr_[row+1];
+      for (integer_t j=ptr_[row]; j<hij; j++) {
+        integer_t col = ind_[j];
+        if (col >= slo) {
+          if (col < shi)
+            *e21++ = Triplet<scalar_t>(i, col-slo, val_[j]);
           else break;
         }
       }
@@ -823,12 +861,18 @@ namespace strumpack {
     std::unique_ptr<integer_t[]> iperm(new integer_t[n_]);
     for (integer_t i=0; i<n_; i++) iperm[perm[i]] = i;
 #pragma omp parallel for
-    for (integer_t row=0; row<n_; row++) {
+    for (integer_t row=0; row<n_; row++)
       for (integer_t i=ptr_[row]; i<ptr_[row+1]; i++)
         ind_[i] = iperm[ind_[i]];
+    sort_rows();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::sort_rows() {
+#pragma omp parallel for
+    for (integer_t r=0; r<n_; r++)
       sort_indices_values<scalar_t>
-        (ind_.data(), val_.data(), ptr_[row], ptr_[row+1]);
-    }
+        (ind_.data(), val_.data(), ptr_[r], ptr_[r+1]);
   }
 
   template<typename scalar_t,typename integer_t> int
@@ -897,6 +941,38 @@ namespace strumpack {
     return max_scaled_residual(*X, *B);
   }
 
+  template<typename scalar_t,typename integer_t>
+  std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+  CSRMatrix<scalar_t,integer_t>::add_missing_diagonal
+  (const scalar_t& s) const {
+    integer_t diag_nnz = 0;
+    for (integer_t r=0; r<n_; r++)
+      for (integer_t k=ptr_[r]; k<ptr_[r+1]; k++)
+        if (ind_[k] == r) {
+          diag_nnz++;
+          break;
+        }
+    std::unique_ptr<CSRMatrix<scalar_t,integer_t>>
+      Anew(new CSRMatrix<scalar_t,integer_t>(n_, nnz_+n_-diag_nnz));
+    for (integer_t r=0, i=0; r<n_; r++) {
+      bool d = false;
+      for (integer_t k=ptr_[r]; k<ptr_[r+1]; k++) {
+        auto c = ind_[k];
+        if (c == r) d = true;
+        Anew->ind(i) = c;
+        Anew->val(i) = val_[k];
+        i++;
+      }
+      if (!d) {
+        Anew->ind(i) = r;
+        Anew->val(i) = s;
+        i++;
+      }
+      Anew->ptr(r+1) = i;
+    }
+    Anew->sort_rows();  // is this necessary?!
+    return Anew;
+  }
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
@@ -1192,6 +1268,22 @@ namespace strumpack {
     return CSRGraph<integer_t>(std::move(gptr), std::move(gind));
   }
 
+  // template<typename scalar_t,typename integer_t>
+  // ordering::Graph<integer_t>
+  // CSRMatrix<scalar_t,integer_t>::graph() const {
+  //   std::cout << "TODO remove self loops???" << std::endl;
+  //   std::copy(ptr_.begin(), ptr_.end(), g.ptr());
+  //   std::copy(ind_.begin(), ind_.end(), g.ind());
+  //   return g;
+  // }
+
+  template<typename scalar_t, typename integer_t, typename cast_t>
+  CSRMatrix<cast_t,integer_t>
+  cast_matrix(const CSRMatrix<scalar_t,integer_t>& mat) {
+    std::vector<cast_t> new_val(mat.val(), mat.val()+mat.nnz());
+    return CSRMatrix<cast_t,integer_t>
+      (mat.size(), mat.ptr(), mat.ind(), new_val.data(), mat.symm_sparse());
+  }
 
   // explicit template instantiations
   template class CSRMatrix<float,int>;
@@ -1209,50 +1301,31 @@ namespace strumpack {
   template class CSRMatrix<std::complex<float>,long long int>;
   template class CSRMatrix<std::complex<double>,long long int>;
 
-
-
-  template<typename scalar_t, typename integer_t, typename cast_t>
-  CSRMatrix<cast_t,integer_t>
-  cast_matrix(const CSRMatrix<scalar_t,integer_t>& mat) {
-    std::vector<cast_t> new_val(mat.val(), mat.val()+mat.nnz());
-    return CSRMatrix<cast_t,integer_t>
-      (mat.size(), mat.ptr(), mat.ind(), new_val.data(), mat.symm_sparse());
-  }
-
-  // explicit template instantiations
   template CSRMatrix<float,int>
   cast_matrix<double,int,float>(const CSRMatrix<double,int>& mat);
   template CSRMatrix<double,int>
   cast_matrix<float,int,double>(const CSRMatrix<float,int>& mat);
   template CSRMatrix<std::complex<float>,int>
-  cast_matrix<std::complex<double>,int,std::complex<float>>
-  (const CSRMatrix<std::complex<double>,int>& mat);
+  cast_matrix<std::complex<double>,int,std::complex<float>>(const CSRMatrix<std::complex<double>,int>& mat);
   template CSRMatrix<std::complex<double>,int>
-  cast_matrix<std::complex<float>,int,std::complex<double>>
-  (const CSRMatrix<std::complex<float>,int>& mat);
+  cast_matrix<std::complex<float>,int,std::complex<double>>(const CSRMatrix<std::complex<float>,int>& mat);
 
   template CSRMatrix<float,long int>
   cast_matrix<double,long int,float>(const CSRMatrix<double,long int>& mat);
   template CSRMatrix<double,long int>
   cast_matrix<float,long int,double>(const CSRMatrix<float,long int>& mat);
   template CSRMatrix<std::complex<float>,long int>
-  cast_matrix<std::complex<double>,long int,std::complex<float>>
-  (const CSRMatrix<std::complex<double>,long int>& mat);
+  cast_matrix<std::complex<double>,long int,std::complex<float>>(const CSRMatrix<std::complex<double>,long int>& mat);
   template CSRMatrix<std::complex<double>,long int>
-  cast_matrix<std::complex<float>,long int,std::complex<double>>
-  (const CSRMatrix<std::complex<float>,long int>& mat);
+  cast_matrix<std::complex<float>,long int,std::complex<double>>(const CSRMatrix<std::complex<float>,long int>& mat);
 
   template CSRMatrix<float,long long int>
-  cast_matrix<double,long long int,float>
-  (const CSRMatrix<double,long long int>& mat);
+  cast_matrix<double,long long int,float>(const CSRMatrix<double,long long int>& mat);
   template CSRMatrix<double,long long int>
-  cast_matrix<float,long long int,double>
-  (const CSRMatrix<float,long long int>& mat);
+  cast_matrix<float,long long int,double>(const CSRMatrix<float,long long int>& mat);
   template CSRMatrix<std::complex<float>,long long int>
-  cast_matrix<std::complex<double>,long long int,std::complex<float>>
-  (const CSRMatrix<std::complex<double>,long long int>& mat);
+  cast_matrix<std::complex<double>,long long int,std::complex<float>>(const CSRMatrix<std::complex<double>,long long int>& mat);
   template CSRMatrix<std::complex<double>,long long int>
-  cast_matrix<std::complex<float>,long long int,std::complex<double>>
-  (const CSRMatrix<std::complex<float>,long long int>& mat);
+  cast_matrix<std::complex<float>,long long int,std::complex<double>>(const CSRMatrix<std::complex<float>,long long int>& mat);
 
 } // end namespace strumpack

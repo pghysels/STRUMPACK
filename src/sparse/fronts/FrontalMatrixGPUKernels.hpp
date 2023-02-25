@@ -38,7 +38,6 @@
 #endif
 
 namespace strumpack {
-
   namespace gpu {
 
     template<typename T> struct AssembleData {
@@ -91,21 +90,36 @@ namespace strumpack {
 
     template<typename T, int NT=32,
              typename real_t = typename RealType<T>::value_type>
-    void factor_block_batch(unsigned int, FrontData<T>*, bool, real_t);
+    void factor_block_batch(unsigned int, FrontData<T>*, bool, real_t, int*);
 
     template<typename T,
              typename real_t = typename RealType<T>::value_type>
-    void replace_pivots(int, T*, real_t, gpu::Stream&);
+    void replace_pivots(int, T*, real_t, gpu::Stream* = nullptr);
 
     template<typename T> void
-    extend_add_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);
-    template<typename T, int NT=32> void
-    fwd_block_batch(int, unsigned int, FrontData<T>*);
+    extend_add_rhs(int, int, unsigned int, AssembleData<T>*, AssembleData<T>*);
 
     template<typename T> void
-    extract_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);
-    template<typename T, int NT=32> void
-    bwd_block_batch(int, unsigned int, FrontData<T>*);
+    extract_rhs(int, int, unsigned int, AssembleData<T>*, AssembleData<T>*);
+
+    // constexpr
+    inline int align_max_struct() {
+      auto m = sizeof(std::complex<double>);
+      m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
+      m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
+      m = std::max(m, sizeof(Triplet<std::complex<double>>));
+      int k = 16;
+      while (k < int(m)) k *= 2;
+      return k;
+    }
+
+    inline std::size_t round_up(std::size_t n) {
+      int k = align_max_struct();
+      return std::size_t((n + k - 1) / k) * k;
+    }
+    template<typename T> T* aligned_ptr(void* p) {
+      return (T*)(round_up(uintptr_t(p)));
+    }
 
   } // end namespace gpu
 } // end namespace strumpack

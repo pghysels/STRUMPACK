@@ -1,15 +1,13 @@
 # STRUMPACK
-STRUMPACK -- STRUctured Matrix PACKage, Copyright (c) 2014-2020, The
+STRUMPACK -- STRUctured Matrix PACKage, Copyright (c) 2014-2021, The
 Regents of the University of California, through Lawrence Berkeley
 National Laboratory (subject to receipt of any required approvals from
 the U.S. Dept. of Energy).  All rights reserved.
 
-[![Build Status](https://www.travis-ci.com/pghysels/STRUMPACK.svg?branch=master)](https://www.travis-ci.com/pghysels/STRUMPACK)
-
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)
 
-   [http://portal.nersc.gov/project/sparse/strumpack/v5.1.0/](http://portal.nersc.gov/project/sparse/strumpack/v5.1.0/)
+   [http://portal.nersc.gov/project/sparse/strumpack/v6.3.1/](http://portal.nersc.gov/project/sparse/strumpack/v6.3.1/)
 
 
 ## Website
@@ -21,8 +19,11 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
+ - Wajih Boukaram - wajih.boukaram@lbl.gov
+ - Yotam Yaniv - yotamya@math.ucla.edu (UCLA)
 
 ## Past contributors
+ - Ryan Synk
  - Lucy Guo
  - Gustavo Chávez
  - Liza Rebrova - UCLA, University of Michigan

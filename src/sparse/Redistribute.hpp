@@ -74,6 +74,7 @@ namespace strumpack {
 #pragma omp parallel for
     for (integer_t i=0; i<m; i++)
       x[rbuf[i].i-lo] = rbuf[i].v;
+    IdxVal::free_mpi_type();
   }
 
   /**
@@ -149,32 +150,37 @@ namespace strumpack {
 
     // send the symbolic info of the entire tree belonging to dist_sep
     // owned by owner to [P0,P0+P) send only the root of the sub tree
-    // to [P0_brother,P0_brother+P_brother)
-    RedistSubTree(const SeparatorTree<integer_t>& tree, integer_t sub_begin,
+    // to [P0_sib,P0_sib+P_sib)
+    RedistSubTree(const SeparatorTree<integer_t>& tree,
+                  integer_t dsep, integer_t sub_begin,
                   const std::vector<std::vector<integer_t>>& _upd,
                   const std::vector<float>& _work,
-                  integer_t P0, integer_t P, integer_t P0_sibling,
-                  integer_t P_sibling, integer_t owner, const MPIComm& comm) {
-
+                  integer_t P0, integer_t P,
+                  integer_t P0_sib, integer_t P_sib,
+                  integer_t owner, const MPIComm& comm) {
       auto rank = comm.rank();
-      int dest0 = std::min(P0, P0_sibling);
-      int dest1 = std::max(P0+P, P0_sibling+P_sibling);
+      int dest0 = std::min(P0, P0_sib);
+      int dest1 = std::max(P0+P, P0_sib+P_sib);
       std::vector<integer_t> sbufi;
       std::vector<float> sbuff;
       std::vector<MPIRequest> sreq;
       if (rank == owner) {
         auto nbsep = tree.separators();
+        std::size_t sbufi_size = 3 + 4*nbsep;
+        for (integer_t i=0; i<nbsep; i++)
+          sbufi_size += _upd[i].size();
+        sbufi.reserve(sbufi_size);
         sbufi.push_back(nbsep);
-        sbufi.insert(sbufi.end(), tree.lch(), tree.lch()+nbsep);
-        sbufi.insert(sbufi.end(), tree.rch(), tree.rch()+nbsep);
+        sbufi.insert(sbufi.end(), tree.lch, tree.lch+nbsep);
+        sbufi.insert(sbufi.end(), tree.rch, tree.rch+nbsep);
         sbufi.push_back(tree.root());
         for (integer_t s=0; s<nbsep+1; s++)
-          sbufi.push_back(tree.sizes(s) + sub_begin);
+          sbufi.push_back(tree.sizes[s] + sub_begin);
         for (integer_t i=0; i<nbsep; i++)
           sbufi.push_back(_upd[i].size());
         for (integer_t i=0; i<nbsep; i++)
           sbufi.insert(sbufi.end(), _upd[i].begin(), _upd[i].end());
-        sbuff.reserve(nbsep);
+        sbuff.reserve(_work.size());
         sbuff.insert(sbuff.end(), _work.begin(), _work.end());
         if (sbufi.size() >=
             static_cast<std::size_t>(std::numeric_limits<int>::max()))
@@ -188,19 +194,26 @@ namespace strumpack {
         sreq.reserve(2*(dest1-dest0));
         // TODO the sibling only needs the root of the tree!!
         for (int dest=dest0; dest<dest1; dest++) {
-          sreq.emplace_back(comm.isend(sbufi, dest, 0));
-          sreq.emplace_back(comm.isend(sbuff, dest, 1));
+          if (dest != owner) {
+            sreq.emplace_back(comm.isend(sbufi, dest, dsep));
+            sreq.emplace_back(comm.isend(sbuff, dest, 2*dsep));
+          }
         }
       }
-      bool receiver = (rank >= dest0 && rank < dest1);
-      if (receiver) {
-        rbufi = comm.template recv<integer_t>(owner, 0);
-        rbuff = comm.template recv<float>(owner, 1);
+      bool receiver = rank >= dest0 && rank < dest1;
+      if (receiver && rank != owner) {
+        rbufi = comm.template recv<integer_t>(owner, dsep);
+        rbuff = comm.template recv<float>(owner, 2*dsep);
       }
       if (rank == owner) {
         wait_all(sreq);
-        sbuff.clear(); sbuff.shrink_to_fit();
-        sbufi.clear(); sbufi.shrink_to_fit();
+        if (receiver) {
+          rbufi = std::move(sbufi);
+          rbuff = std::move(sbuff);
+        } else {
+          sbuff.clear(); sbuff.shrink_to_fit();
+          sbufi.clear(); sbufi.shrink_to_fit();
+        }
       }
       if (receiver) {
         auto pi = rbufi.data();

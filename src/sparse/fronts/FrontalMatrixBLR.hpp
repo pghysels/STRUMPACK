@@ -54,7 +54,6 @@ namespace strumpack {
                      std::vector<integer_t>& upd);
     ~FrontalMatrixBLR() {}
 
-    // void release_work_memory() override;
     void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
     void build_front(const SpMat_t& A);
@@ -66,10 +65,9 @@ namespace strumpack {
                           const std::vector<Triplet<scalar_t>>& e21,
                           int task_depth, const Opts_t& opts);
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    scalar_t* getF22(gpu::DeviceMemory<scalar_t>&) override;
-#endif
-    
+    std::size_t get_device_F22_worksize() { return 0; };
+    scalar_t* get_device_F22(scalar_t*) override;
+
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
@@ -88,26 +86,21 @@ namespace strumpack {
     void sample_CB(const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
                    DenseM_t& Sc, F_t* pa, int task_depth) override;
 
-    void multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                    int etree_level=0, int task_depth=0)
+    ReturnCode
+    multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
+                               int etree_level=0, int task_depth=0)
       override {
       VectorPool<scalar_t> workspace;
-      factor(A, opts, workspace, etree_level, task_depth);
+      return factor(A, opts, workspace, etree_level, task_depth);
     }
-    void factor(const SpMat_t& A, const Opts_t& opts,
-                VectorPool<scalar_t>& workspace,
-                int etree_level=0, int task_depth=0) override;
+    ReturnCode
+    factor(const SpMat_t& A, const Opts_t& opts,
+           VectorPool<scalar_t>& workspace,
+           int etree_level=0, int task_depth=0) override;
 
-    void factor_node(const SpMat_t& A, const Opts_t& opts,
-                     VectorPool<scalar_t>& workspace,
-                     int etree_level=0, int task_depth=0);
-
-    void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
-                                    int etree_level=0, int task_depth=0)
-      const override;
-    void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int
-                                     etree_level=0, int task_depth=0)
-      const override;
+    ReturnCode factor_node(const SpMat_t& A, const Opts_t& opts,
+                           VectorPool<scalar_t>& workspace,
+                           int etree_level=0, int task_depth=0);
 
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,
@@ -116,14 +109,17 @@ namespace strumpack {
     std::string type() const override { return "FrontalMatrixBLR"; }
 
 #if defined(STRUMPACK_USE_MPI)
-    void extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                                    const FMPI_t* pa) const override;
-    void extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                                    const FBLRMPI_t* pa) const override;
-    void extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
-                                        const FBLRMPI_t* pa,
-                                        integer_t begin_col, integer_t end_col,
-                                        const Opts_t& opts) const override;
+    void
+    extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FMPI_t* pa) const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FBLRMPI_t* pa) const override;
+    void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FBLRMPI_t* pa,
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts) const override;
 #endif
 
     void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,

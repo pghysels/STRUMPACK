@@ -102,7 +102,8 @@ int main(int argc, char* argv[]) {
   }
 
   STRUMPACK_set_csr_matrix(S, &N, row_ptr, col_ind, val, 1);
-  STRUMPACK_reorder_regular(S, n, n, 1);
+  /* n x n x 1 mesh, 1 component per grid-point, separator of width 1 */
+  STRUMPACK_reorder_regular(S, n, n, 1, 1, 1);
 
   /*
     Solve will internally call factor (and reorder if necessary).

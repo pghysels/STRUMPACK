@@ -36,72 +36,316 @@
 #include <memory>
 
 #include "DenseMatrix.hpp"
-#include "CUDAWrapper.hpp"
+#if defined(STRUMPACK_USE_CUDA)
+#include "dense/CUDAWrapper.hpp"
+#endif
+#if defined(STRUMPACK_USE_HIP)
+#include "dense/HIPWrapper.hpp"
+#endif
 
 #include <magma_v2.h>
+#include <magma_auxiliary.h>
+#include <magma_svbatched.h>
+#include <magma_dvbatched.h>
+#include <magma_cvbatched.h>
+#include <magma_zvbatched.h>
+
 
 namespace strumpack {
   namespace gpu {
     namespace magma {
+
+      class MAGMAQueue {
+      public:
+        MAGMAQueue() { magma_queue_create(0, &q_); }
+        MAGMAQueue(Stream& s, BLASHandle& h) {
+          magma_init();
+#if defined(STRUMPACK_USE_CUDA)
+          magma_queue_create_from_cuda(0, s, h, NULL, &q_);
+#elif defined(STRUMPACK_USE_HIP)
+          magma_queue_create_from_hip(0, s, h, NULL, &q_);
+#endif
+        }
+        ~MAGMAQueue() {
+          magma_queue_destroy(q_);
+          magma_finalize();
+        }
+        operator magma_queue_t&() { return q_; }
+        operator const magma_queue_t&() const { return q_; }
+      private:
+        magma_queue_t q_;
+      };
 
       int getrf(DenseMatrix<float>& A, int* dpiv);
       int getrf(DenseMatrix<double>& A, int* dpiv);
       int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv);
       int getrf(DenseMatrix<std::complex<double>>& A, int* dpiv);
 
-      void laswpx(DenseMatrix<float>& A, const int* dpiv, 
+      void laswpx(DenseMatrix<float>& A, const int* dpiv,
                   magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<double>& A, const int* dpiv, 
+      void laswpx(DenseMatrix<double>& A, const int* dpiv,
                   magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<std::complex<float>>& A, const int* dpiv, 
+      void laswpx(DenseMatrix<std::complex<float>>& A, const int* dpiv,
                   magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv, 
+      void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv,
                   magma_queue_t queue, bool fwd);
-      
-      template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type> void
-      gesvd_magma(magma_vec_t jobu, magma_vec_t jobvt, real_t* S, 
-            DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U, 
-            DenseMatrix<scalar_t>& V);
 
-      void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
-                         magma_int_t * m, magma_int_t * n, magma_int_t * k,
-                         float alpha,
-                         float const *const * dA_array, magma_int_t * ldda,
-                         float const *const * dB_array, magma_int_t * lddb,
-                         float beta, float ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount,
-                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
-                         magma_queue_t queue);
-      void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
-                         magma_int_t * m, magma_int_t * n, magma_int_t * k,
-                         double alpha,
-                         double const *const * dA_array, magma_int_t * ldda,
-                         double const *const * dB_array, magma_int_t * lddb,
-                         double beta, double ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount,
-                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
-                         magma_queue_t queue);
-      void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
-                         magma_int_t * m, magma_int_t * n, magma_int_t * k,
-                         std::complex<float> alpha,
-                         std::complex<float> const *const * dA_array, magma_int_t * ldda,
-                         std::complex<float> const *const * dB_array, magma_int_t * lddb,
-                         std::complex<float> beta,
-                         std::complex<float> ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount,
-                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
-                         magma_queue_t queue);
-      void gemm_vbatched(magma_trans_t transA, magma_trans_t transB,
-                         magma_int_t * m, magma_int_t * n, magma_int_t * k,
-                         std::complex<double> alpha,
-                         std::complex<double> const *const * dA_array, magma_int_t * ldda,
-                         std::complex<double> const *const * dB_array, magma_int_t * lddb,
-                         std::complex<double> beta,
-                         std::complex<double> ** dC_array, magma_int_t * lddc,
-                         magma_int_t batchCount,
-                         magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
-                         magma_queue_t queue);
+      template<typename scalar_t,
+               typename real_t=typename RealType<scalar_t>::value_type> void
+      gesvd_magma(magma_vec_t jobu, magma_vec_t jobvt, real_t* S,
+                  DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U,
+                  DenseMatrix<scalar_t>& V);
+
+      inline magma_int_t getrf_vbatched_max_nocheck_work
+      (magma_int_t* m, magma_int_t* n,
+       magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
+       float **dA_array, magma_int_t *ldda,
+       magma_int_t **dipiv_array, magma_int_t *info_array,
+       void* work, magma_int_t* lwork,
+       magma_int_t batchCount, magma_queue_t queue) {
+        if (!batchCount) return 0;
+        return magma_sgetrf_vbatched_max_nocheck_work
+          (m, n, max_m, max_n, max_minmn, max_mxn,
+           dA_array, ldda, dipiv_array, info_array,
+           work, lwork, batchCount, queue);
+      }
+      inline magma_int_t getrf_vbatched_max_nocheck_work
+      (magma_int_t* m, magma_int_t* n,
+       magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
+       double **dA_array, magma_int_t *ldda,
+       magma_int_t **dipiv_array, magma_int_t *info_array,
+       void* work, magma_int_t* lwork,
+       magma_int_t batchCount, magma_queue_t queue) {
+        if (!batchCount) return 0;
+        return magma_dgetrf_vbatched_max_nocheck_work
+          (m, n, max_m, max_n, max_minmn, max_mxn,
+           dA_array, ldda, dipiv_array, info_array,
+           work, lwork, batchCount, queue);
+      }
+      inline magma_int_t getrf_vbatched_max_nocheck_work
+      (magma_int_t* m, magma_int_t* n,
+       magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
+       std::complex<float>** dA_array, magma_int_t *ldda,
+       magma_int_t **dipiv_array, magma_int_t *info_array,
+       void* work, magma_int_t* lwork,
+       magma_int_t batchCount, magma_queue_t queue) {
+        if (!batchCount) return 0;
+        return magma_cgetrf_vbatched_max_nocheck_work
+          (m, n, max_m, max_n, max_minmn, max_mxn,
+           (magmaFloatComplex**)dA_array, ldda,
+           dipiv_array, info_array, work, lwork, batchCount, queue);
+      }
+      inline magma_int_t getrf_vbatched_max_nocheck_work
+      (magma_int_t* m, magma_int_t* n,
+       magma_int_t max_m, magma_int_t max_n,
+       magma_int_t max_minmn, magma_int_t max_mxn,
+       std::complex<double>** dA_array, magma_int_t *ldda,
+       magma_int_t **dipiv_array, magma_int_t *info_array,
+       void* work, magma_int_t* lwork,
+       magma_int_t batchCount, magma_queue_t queue) {
+        if (!batchCount) return 0;
+        return magma_zgetrf_vbatched_max_nocheck_work
+          (m, n, max_m, max_n, max_minmn, max_mxn,
+           (magmaDoubleComplex**)dA_array, ldda,
+           dipiv_array, info_array, work, lwork, batchCount, queue);
+      }
+
+      inline void trsm_vbatched_max_nocheck
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t *m, magma_int_t *n,
+       float alpha, float **dA_array, magma_int_t *ldda,
+       float **dB_array, magma_int_t *lddb, magma_int_t batchCount,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmablas_strsm_vbatched_max_nocheck
+          (side, uplo, transA, diag, max_m, max_n, m, n, alpha, dA_array,
+           ldda, dB_array, lddb, batchCount, queue);
+      }
+      inline void trsm_vbatched_max_nocheck
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t *m, magma_int_t *n,
+       double alpha, double **dA_array, magma_int_t *ldda,
+       double **dB_array, magma_int_t *lddb, magma_int_t batchCount,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmablas_dtrsm_vbatched_max_nocheck
+          (side, uplo, transA, diag, max_m, max_n, m, n, alpha, dA_array,
+           ldda, dB_array, lddb, batchCount, queue);
+      }
+      inline void trsm_vbatched_max_nocheck
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t *m, magma_int_t *n,
+       std::complex<float> alpha,
+       std::complex<float> **dA_array, magma_int_t *ldda,
+       std::complex<float> **dB_array, magma_int_t *lddb,
+       magma_int_t batchCount, magma_queue_t queue) {
+        if (!batchCount) return;
+        magmaFloatComplex alpha_ = {alpha.real(), alpha.imag()};
+        magmablas_ctrsm_vbatched_max_nocheck
+          (side, uplo, transA, diag, max_m, max_n, m, n, alpha_,
+           (magmaFloatComplex**)dA_array, ldda,
+           (magmaFloatComplex**)dB_array, lddb, batchCount, queue);
+      }
+      inline void trsm_vbatched_max_nocheck
+      (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
+       magma_diag_t diag, magma_int_t max_m, magma_int_t max_n,
+       magma_int_t *m, magma_int_t *n,
+       std::complex<double> alpha,
+       std::complex<double> **dA_array, magma_int_t *ldda,
+       std::complex<double> **dB_array, magma_int_t *lddb,
+       magma_int_t batchCount, magma_queue_t queue) {
+        if (!batchCount) return;
+        magmaDoubleComplex alpha_ = {alpha.real(), alpha.imag()};
+        magmablas_ztrsm_vbatched_max_nocheck
+          (side, uplo, transA, diag, max_m, max_n, m, n, alpha_,
+           (magmaDoubleComplex**)dA_array, ldda,
+           (magmaDoubleComplex**)dB_array, lddb, batchCount, queue);
+      }
+
+      inline void gemm_vbatched_max_nocheck
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k, float alpha,
+       float const *const *dA_array, magma_int_t *ldda,
+       float const *const *dB_array, magma_int_t *lddb,
+       float beta, float **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount,
+       magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmablas_sgemm_vbatched_max_nocheck
+          (transA, transB, m, n, k, alpha, dA_array, ldda,
+           dB_array, lddb, beta, dC_array, lddc, batchCount,
+           max_m, max_n, max_k, queue);
+      }
+      inline void gemm_vbatched_max_nocheck
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k, double alpha,
+       double const *const *dA_array, magma_int_t *ldda,
+       double const *const *dB_array, magma_int_t *lddb,
+       double beta, double **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount,
+       magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmablas_dgemm_vbatched_max_nocheck
+          (transA, transB, m, n, k, alpha, dA_array, ldda,
+           dB_array, lddb, beta, dC_array, lddc, batchCount,
+           max_m, max_n, max_k, queue);
+      }
+      inline void gemm_vbatched_max_nocheck
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k,
+       std::complex<float> alpha,
+       std::complex<float> const *const *dA_array, magma_int_t *ldda,
+       std::complex<float> const *const *dB_array, magma_int_t *lddb,
+       std::complex<float> beta,
+       std::complex<float> **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount,
+       magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmaFloatComplex alpha_ = {alpha.real(), alpha.imag()},
+          beta_ = {beta.real(), beta.imag()};
+        magmablas_cgemm_vbatched_max_nocheck
+          (transA, transB, m, n, k, alpha_,
+           (magmaFloatComplex**)dA_array, ldda,
+           (magmaFloatComplex**)dB_array, lddb, beta_,
+           (magmaFloatComplex**)dC_array, lddc, batchCount,
+           max_m, max_n, max_k, queue);
+      }
+      inline void gemm_vbatched_max_nocheck
+      (magma_trans_t transA, magma_trans_t transB,
+       magma_int_t *m, magma_int_t *n, magma_int_t *k,
+       std::complex<double> alpha,
+       std::complex<double> const *const *dA_array, magma_int_t *ldda,
+       std::complex<double> const *const *dB_array, magma_int_t *lddb,
+       std::complex<double> beta,
+       std::complex<double> **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount,
+       magma_int_t max_m, magma_int_t max_n, magma_int_t max_k,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmaDoubleComplex alpha_ = {alpha.real(), alpha.imag()},
+          beta_ = {beta.real(), beta.imag()};
+        magmablas_zgemm_vbatched_max_nocheck
+          (transA, transB, m, n, k, alpha_,
+           (magmaDoubleComplex**)dA_array, ldda,
+           (magmaDoubleComplex**)dB_array, lddb, beta_,
+           (magmaDoubleComplex**)dC_array, lddc, batchCount,
+           max_m, max_n, max_k, queue);
+      }
+
+      inline void gemv_vbatched_max_nocheck
+      (magma_trans_t trans, magma_int_t *m, magma_int_t *n, float alpha,
+       float const *const *dA_array, magma_int_t *ldda,
+       float const *const *dB_array, magma_int_t *lddb,
+       float beta, float **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_int_t max_m, magma_int_t max_n,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmablas_sgemv_vbatched_max_nocheck
+          (trans, m, n, alpha,
+           const_cast<float**>(dA_array), ldda,
+           const_cast<float**>(dB_array), lddb, beta,
+           dC_array, lddc, batchCount, max_m, max_n, queue);
+      }
+      inline void gemv_vbatched_max_nocheck
+      (magma_trans_t trans, magma_int_t *m, magma_int_t *n, double alpha,
+       double const *const *dA_array, magma_int_t *ldda,
+       double const *const *dB_array, magma_int_t *lddb,
+       double beta, double **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_int_t max_m, magma_int_t max_n,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmablas_dgemv_vbatched_max_nocheck
+          (trans, m, n, alpha,
+           const_cast<double**>(dA_array), ldda,
+           const_cast<double**>(dB_array), lddb, beta,
+           dC_array, lddc, batchCount, max_m, max_n, queue);
+      }
+      inline void gemv_vbatched_max_nocheck
+      (magma_trans_t trans, magma_int_t *m, magma_int_t *n, std::complex<float> alpha,
+       std::complex<float> const *const *dA_array, magma_int_t *ldda,
+       std::complex<float> const *const *dB_array, magma_int_t *lddb,
+       std::complex<float> beta,
+       std::complex<float> **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_int_t max_m, magma_int_t max_n,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmaFloatComplex alpha_ = {alpha.real(), alpha.imag()},
+          beta_ = {beta.real(), beta.imag()};
+        magmablas_cgemv_vbatched_max_nocheck
+          (trans, m, n, alpha_,
+           (magmaFloatComplex**)(const_cast<std::complex<float>**>(dA_array)), ldda,
+           (magmaFloatComplex**)(const_cast<std::complex<float>**>(dB_array)), lddb, beta_,
+           (magmaFloatComplex**)dC_array, lddc, batchCount,
+           max_m, max_n, queue);
+      }
+      inline void gemv_vbatched_max_nocheck
+      (magma_trans_t trans, magma_int_t *m, magma_int_t *n,
+       std::complex<double> alpha,
+       std::complex<double> const *const *dA_array, magma_int_t *ldda,
+       std::complex<double> const *const *dB_array, magma_int_t *lddb,
+       std::complex<double> beta,
+       std::complex<double> **dC_array, magma_int_t *lddc,
+       magma_int_t batchCount, magma_int_t max_m, magma_int_t max_n,
+       magma_queue_t queue) {
+        if (!batchCount) return;
+        magmaDoubleComplex alpha_ = {alpha.real(), alpha.imag()},
+          beta_ = {beta.real(), beta.imag()};
+        magmablas_zgemv_vbatched_max_nocheck
+          (trans, m, n, alpha_,
+           (magmaDoubleComplex**)(const_cast<std::complex<double>**>(dA_array)), ldda,
+           (magmaDoubleComplex**)(const_cast<std::complex<double>**>(dB_array)), lddb, beta_,
+           (magmaDoubleComplex**)dC_array, lddc, batchCount,
+           max_m, max_n, queue);
+      }
 
     } // end namespace magma
   } // end namespace gpu

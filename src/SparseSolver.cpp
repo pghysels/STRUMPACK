@@ -166,6 +166,8 @@ namespace strumpack {
         (opts_.Krylov_solver() != KrylovSolver::GMRES) &&
         (opts_.Krylov_solver() != KrylovSolver::BICGSTAB)) {
       ReturnCode ierr = this->factor();
+      // TODO there could be zero pivots, but replaced, and this
+      // should still continue!!
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
 
@@ -275,7 +277,7 @@ namespace strumpack {
          opts_.rel_tol(), opts_.abs_tol(), Krylov_its_, opts_.maxit(),
          opts_.gmres_restart(), opts_.GramSchmidt_type(),
          use_initial_guess, opts_.verbose() && is_root_);
-    }
+    }; break;
     case KrylovSolver::BICGSTAB: {
       assert(x.cols() == 1);
       iterative::BiCGStab<scalar_t>

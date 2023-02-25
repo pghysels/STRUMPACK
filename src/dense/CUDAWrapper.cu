@@ -50,23 +50,79 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    laswp(SOLVERHandle& handle, DenseMatrix<scalar_t>& dA,
+    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& dA,
           int k1, int k2, int* dipiv, int inci) {
-      int n = dA.cols();
-      int nt = 256;
+      if (!dA.rows() || !dA.cols()) return;
+      int n = dA.cols(), nt = 256;
       int grid = (n + nt - 1) / nt;
-      // TODO use the Handle's stream?
       cudaStream_t streamId;
-      cusolverDnGetStream(handle, &streamId);
+      cublasGetStream(handle, &streamId);
       laswp_kernel<scalar_t><<<grid, nt, 0, streamId>>>
         (n, dA.data(), dA.ld(), k2-k1+1, dipiv+k1-1, inci);
+      gpu_check(cudaPeekAtLastError());
+    }
+
+    template<typename T>  __global__ void
+    laswp_vbatch_kernel(int* dn, T** dA, int* lddA, int** dipiv,
+                        int* npivots, unsigned int batchCount) {
+      // assume dn = cols, inc = 1
+      int x = blockIdx.x * blockDim.x + threadIdx.x,
+        f = blockIdx.y * blockDim.y + threadIdx.y;
+      if (f >= batchCount) return;
+      if (x >= dn[f]) return;
+      auto A = dA[f];
+      auto P = dipiv[f];
+      auto ldA = lddA[f];
+      auto npiv = npivots[f];
+      A += x * ldA;
+      auto A1 = A;
+      for (int i=0; i<npiv; i++) {
+        auto p = P[i] - 1;
+        if (p != i) {
+          auto A2 = A + p;
+          auto temp = *A1;
+          *A1 = *A2;
+          *A2 = temp;
+        }
+        A1++;
+      }
+    }
+
+    template<typename scalar_t> void
+    laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
+                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
+                       unsigned int batchCount) {
+      if (max_n <= 0 || !batchCount) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > max_n) {
+        nt /= 2;
+        ops *= 2;
+      }
+      ops = std::min(ops, batchCount);
+      unsigned int nbx = (max_n + nt - 1) / nt,
+        nbf = (batchCount + ops - 1) / ops;
+      dim3 block(nt, ops);
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+        dim3 grid(nbx, std::min(nbf-f, MAX_BLOCKS_Y));
+        cudaStream_t streamId;
+        cublasGetStream(handle, &streamId);
+        auto f0 = f * ops;
+        laswp_vbatch_kernel<<<grid, block, 0, streamId>>>
+          (dn+f0, dA+f0, lddA+f0, dipiv+f0, npivots+f0, batchCount-f0);
+        gpu_check(cudaPeekAtLastError());
+      }
     }
 
     // explicit template instantiations
-    template void laswp(SOLVERHandle& handle, DenseMatrix<float>& dA, int k1, int k2, int* dipiv, int inci);
-    template void laswp(SOLVERHandle& handle, DenseMatrix<double>& dA, int k1, int k2, int* dipiv, int inci);
-    template void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<float>>& dA, int k1, int k2, int* dipiv, int inci);
-    template void laswp(SOLVERHandle& handle, DenseMatrix<std::complex<double>>& dA, int k1, int k2, int* dipiv, int inci);
+    template void laswp(BLASHandle&, DenseMatrix<float>&, int, int, int*, int);
+    template void laswp(BLASHandle&, DenseMatrix<double>&, int, int, int*, int);
+    template void laswp(BLASHandle&, DenseMatrix<std::complex<float>>&, int, int, int*, int);
+    template void laswp(BLASHandle&, DenseMatrix<std::complex<double>>&, int, int, int*, int);
+
+    template void laswp_fwd_vbatched(BLASHandle&, int*, int, float**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(BLASHandle&, int*, int, double**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(BLASHandle&, int*, int, std::complex<float>**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(BLASHandle&, int*, int, std::complex<double>**, int*, int**, int*, unsigned int);
 
   } // end namespace gpu
 } // end namespace strumpack

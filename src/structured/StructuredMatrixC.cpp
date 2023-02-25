@@ -330,8 +330,9 @@ extern "C" {
     try {
       auto s = create_mat<float>();
       s->comm = MPIComm(comm);
+      s->grid = BLACSGrid(s->comm);
       s->S = construct_from_elements<float>
-        (s->comm, rows, cols,
+        (s->comm, &s->grid, rows, cols,
          [&A](int i, int j) { return A(i,j); },
          get_options<float>(opts));
       *S = s;
@@ -349,8 +350,9 @@ extern "C" {
     try {
       auto s = create_mat<double>();
       s->comm = MPIComm(comm);
+      s->grid = BLACSGrid(s->comm);
       s->S = construct_from_elements<double>
-        (s->comm, rows, cols,
+        (s->comm, &s->grid, rows, cols,
          [&A](int i, int j) { return A(i,j); },
          get_options<double>(opts));
       *S = s;
@@ -368,8 +370,9 @@ extern "C" {
     try {
       auto s = create_mat<std::complex<float>>();
       s->comm = MPIComm(comm);
+      s->grid = BLACSGrid(s->comm);
       s->S = construct_from_elements<std::complex<float>>
-        (s->comm, rows, cols,
+        (s->comm, &s->grid, rows, cols,
          [&A](int i, int j) -> std::complex<float> {
           auto aij = A(i, j);
           return reinterpret_cast<std::complex<float>&>(aij); },
@@ -389,8 +392,9 @@ extern "C" {
     try {
       auto s = create_mat<std::complex<double>>();
       s->comm = MPIComm(comm);
+      s->grid = BLACSGrid(s->comm);
       s->S = construct_from_elements<std::complex<double>>
-        (s->comm, rows, cols,
+        (s->comm, &s->grid, rows, cols,
          [&A](int i, int j) -> std::complex<double> {
           auto aij = A(i, j);
           return reinterpret_cast<std::complex<double>&>(aij); },

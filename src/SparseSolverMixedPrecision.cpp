@@ -138,6 +138,15 @@ namespace strumpack {
     return solve(*B, X, use_initial_guess);
   }
 
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  solve(int nrhs, const refine_t* b, int ldb, refine_t* x, int ldx,
+        bool use_initial_guess) {
+    auto N = mat_.size();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMatrixWrapper<refine_t> X(N, nrhs, x, ldx);
+    return solve(*B, X, use_initial_guess);
+  }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
@@ -161,6 +170,15 @@ namespace strumpack {
     return solve(*B, X, use_initial_guess);
   }
 
+  template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  solve(int nrhs, const factor_t* b, int ldb, factor_t* x, int ldx,
+        bool use_initial_guess) {
+    auto N = mat_.size();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMatrixWrapper<factor_t> X(N, nrhs, x, ldx);
+    return solve(*B, X, use_initial_guess);
+  }
 
   template<typename factor_t,typename refine_t,typename integer_t> ReturnCode
   SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
@@ -188,8 +206,28 @@ namespace strumpack {
     solver_.set_matrix(A);
   }
 
+  template<typename factor_t,typename refine_t,typename integer_t> void
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  update_matrix_values(const CSRMatrix<refine_t,integer_t>& A) {
+    mat_ = A;
+    solver_.update_matrix_values(cast_matrix<refine_t,integer_t,factor_t>(A));
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> void
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  update_matrix_values(const CSRMatrix<factor_t,integer_t>& A) {
+    mat_ = cast_matrix<factor_t,integer_t,refine_t>(A);
+    solver_.update_matrix_values(A);
+  }
+
   // explicit template instantiations
   template class SparseSolverMixedPrecision<float,double,int>;
   template class SparseSolverMixedPrecision<std::complex<float>,std::complex<double>,int>;
+
+  template class SparseSolverMixedPrecision<float,double,long int>;
+  template class SparseSolverMixedPrecision<std::complex<float>,std::complex<double>,long int>;
+
+  template class SparseSolverMixedPrecision<float,double,long long int>;
+  template class SparseSolverMixedPrecision<std::complex<float>,std::complex<double>,long long int>;
 
 } //end namespace strumpack

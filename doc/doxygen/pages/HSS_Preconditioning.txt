@@ -8,10 +8,10 @@ HSS matrix, but this will only be beneficial (compared to storing the
 frontal as a standard dense matrix and operating on it with
 BLAS/LAPACK routines) if the frontal matrix is large enough.
 
-\image html SPOptions_Interface.png width=23%
+\image html SPOptions_Interface.png width=18%
 
 __Figure 3__ illustrates the HSS matrix format. The matrix is
-partitioned as a 2 × 2 block matrix, with the partitioning recursively
+partitioned as a 2x2 block matrix, with the partitioning recursively
 applied on the diagonal blocks, until diagonal blocks are smaller than
 a specified leaf size. The off-diagonal block on each level of the
 hierarchy are approximated by a low-rank product. This low-rank
@@ -22,8 +22,8 @@ perform exact LU factorization), but can be turned on/off via the
 command line:
 
 \code {.bash}
---sp_compression hss
---sp_compression none    (disable HSS)
+  --sp_compression hss
+  --sp_compression none    (disable HSS)
 \endcode
 
 or via the C++ API as follows
@@ -46,7 +46,7 @@ considered a candidate for HSS compression. The minimum dense matrix
 size for HSS compression is set via the command line via
 
 \code {.bash}
---sp_compression_min_sep_size int
+  --sp_compression_min_sep_size int
 \endcode
 
 or via the C++ API as follows
@@ -83,41 +83,40 @@ sp.options().HSS_options().set_leaf_size(256);      // set the HSS leaf size
 \endcode
 
 In STRUMPACK, HSS matrices are constructed using a randomized sampling
-algorithm [6]. To construct an HSS approximation for a matrix \f$A\f$,
-sampling of the rows and columns of \f$A\f$ is computed by
-multiplication with a tall and skinny random matrix \f$R\f$ as
-follows: \f$S^r = AR\f$ and \f$S^c = A∗R\f$. Ideally, the number of
-columns in the matrix \f$R\f$ is \f$d = r + p\f$, with \f$r\f$ the
-maximum off-diagonal block rank in the HSS matrix and p a small
-oversampling parameter. Unfortunately, the HSS rank is not known
+algorithm [6]. To construct an HSS approximation for a matrix A,
+sampling of the rows and columns of A is computed by multiplication
+with a tall and skinny random matrix R as follows: S^r = AR and S^c =
+A^*R. Ideally, the number of columns in the matrix R is d = r + p,
+with r the maximum off-diagonal block rank in the HSS matrix and p a
+small oversampling parameter. Unfortunately, the HSS rank is not known
 a-priori, so it needs to determined adaptively. The adaptive sampling
 scheme used in STRUMPACK starts with an initial number of random
-vector \f$d_0\f$, and increases this in steps of \f$\Delta d\f$, until
-the compression quality reaches the desired user specified tolerance,
-or until the maximum rank is reached. __The compression tolerances can
+vector d_0, and increases this in steps of \Delta d, until the
+compression quality reaches the desired user specified tolerance, or
+until the maximum rank is reached. __The compression tolerances can
 greatly impact performance.__ They can be set using:
 
 \code
-> --hss_rel_tol real (default 0.01)
-> --hss_abs_tol real (default 1e-08)
+  --hss_rel_tol real (default 0.01)
+  --hss_abs_tol real (default 1e-08)
 \endcode
 
 or via the C++ API
 
 \code
-> void strumpack::HSS::HSSOptions<scalar>::set_rel_tol(real rel_tol);
-> void strumpack::HSS::HSSOptions<scalar>::set_abs_tol(real abs_tol);
-> real strumpack::HSS::HSSOptions<scalar>::rel_tol() const;              // get the current value
-> real strumpack::HSS::HSSOptions<scalar>::abs_tol() const;
+void strumpack::HSS::HSSOptions<scalar>::set_rel_tol(real rel_tol);
+void strumpack::HSS::HSSOptions<scalar>::set_abs_tol(real abs_tol);
+real strumpack::HSS::HSSOptions<scalar>::rel_tol() const;              // get the current value
+real strumpack::HSS::HSSOptions<scalar>::abs_tol() const;
 \endcode
 ____
 
 Other options are available to tune for instance the initial number of
-random vectors \f$d_0\f$, the increment \f$\Delta d\f$, the random
-number generator or the random number distribution. See the
-documentation of \link strumpack::HSS::HSSOptions
-HSSOptions<scalar>\endlink for more detailed information.
-The corresponding HSS specific command line options are:
+random vectors d_0, the increment \Delta d, the random number
+generator or the random number distribution. See the documentation of
+\link strumpack::HSS::HSSOptions HSSOptions<scalar>\endlink for more
+detailed information.  The corresponding HSS specific command line
+options are:
 
 \code {.bash}
 # HSS Options:

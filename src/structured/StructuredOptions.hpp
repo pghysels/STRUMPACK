@@ -82,14 +82,14 @@ namespace strumpack {
 
     inline std::string get_name(Type a) {
       switch (a) {
-      case Type::HSS: return "HSS"; break;
-      case Type::BLR: return "BLR"; break;
-      case Type::HODLR: return "HODLR"; break;
-      case Type::HODBF: return "HODBF"; break;
-      case Type::BUTTERFLY: return "BUTTERFLY"; break;
-      case Type::LR: return "LR"; break;
-      case Type::LOSSY: return "LOSSY"; break;
-      case Type::LOSSLESS: return "LOSSLESS"; break;
+      case Type::HSS: return "HSS";
+      case Type::BLR: return "BLR";
+      case Type::HODLR: return "HODLR";
+      case Type::HODBF: return "HODBF";
+      case Type::BUTTERFLY: return "BUTTERFLY";
+      case Type::LR: return "LR";
+      case Type::LOSSY: return "LOSSY";
+      case Type::LOSSLESS: return "LOSSLESS";
       default: return "unknown";
       }
     }

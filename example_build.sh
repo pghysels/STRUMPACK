@@ -176,16 +176,18 @@ if [[ $(hostname -s) = "cs-it-7098760" ]]; then
           -DCMAKE_Fortran_COMPILER=gfortran-11 \
           -DCMAKE_CUDA_HOST_COMPILER=g++-11 \
           -DCMAKE_CUDA_COMPILER=/usr/local/cuda-11.7/bin/nvcc \
-          -DSTRUMPACK_USE_MPI=OFF \
+          -DSTRUMPACK_USE_MPI=ON \
           -DSTRUMPACK_USE_OPENMP=ON \
+          -DBLA_VENDOR=OpenBLAS \
           -DBUILD_SHARED_LIBS=OFF \
           -DCMAKE_INSTALL_PREFIX=../install \
           -DSTRUMPACK_COUNT_FLOPS=ON \
           -DSTRUMPACK_USE_CUDA=ON \
           -DCMAKE_CUDA_ARCHITECTURES="75" \
           -DSTRUMPACK_USE_HIP=OFF \
-          -DTPL_ENABLE_MAGMA=ON \
+          -DTPL_ENABLE_MAGMA=OFF \
           -DTPL_ENABLE_SLATE=OFF \
+          -DTPL_ENABLE_COMBBLAS=OFF \
           -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 
 fi
@@ -201,7 +203,8 @@ if ! $found_host; then
 
     cmake ../ \
           -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_INSTALL_PREFIX=../install
+          -DCMAKE_INSTALL_PREFIX=../install \
+          -DTPL_SCALAPACK_LIBRARIES="/usr/lib64/openmpi/lib/libscalapack.so"
 
     ## if not found automatically, you can specify BLAS/LAPACK/SCALAPACK as:
     #  -DTPL_BLAS_LIBRARIES="/usr/lib/x86_64-linux-gnu/libopenblas.a"
@@ -209,7 +212,7 @@ if ! $found_host; then
     #  -DTPL_SCALAPACK_LIBRARIES="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
 fi
 
+make -j8 # VERBOSE=1
 make install -j8
 make examples -j8
-make tests -j8
 # make test

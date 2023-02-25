@@ -223,15 +223,17 @@ namespace strumpack {
     STRUMPACK_CB_SAMPLE_FLOPS(cSr.rows()*cSr.cols()*2);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
+    ReturnCode e = ReturnCode::SUCCESS;
     if (task_depth == 0)
-#pragma omp parallel if(!omp_in_parallel())
+#pragma omp parallel if(!omp_in_parallel()) default(shared)
 #pragma omp single
-      multifrontal_factorization_node(A, opts, etree_level, task_depth);
-    else multifrontal_factorization_node(A, opts, etree_level, task_depth);
+      e = multifrontal_factorization_node(A, opts, etree_level, task_depth);
+    else e = multifrontal_factorization_node(A, opts, etree_level, task_depth);
+    return e;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -328,31 +330,35 @@ namespace strumpack {
       rchild_->extract_CB_sub_matrix(gI, gJ, B, task_depth);
   }
 
-  template<typename scalar_t,typename integer_t> void
+  template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization_node
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
     bool tasked = task_depth < params::task_recursion_cutoff_level;
     if (tasked) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        lchild_->multifrontal_factorization
+        el = lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
       if (rchild_)
 #pragma omp task default(shared)                                        \
   final(task_depth >= params::task_recursion_cutoff_level-1) mergeable
-        rchild_->multifrontal_factorization
+        er = rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
       if (lchild_)
-        lchild_->multifrontal_factorization
+        el = lchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
       if (rchild_)
-        rchild_->multifrontal_factorization
+        er = rchild_->multifrontal_factorization
           (A, opts, etree_level+1, task_depth);
     }
+    ReturnCode err_code = ReturnCode::SUCCESS;
+    if (el != ReturnCode::SUCCESS) err_code = el;
+    if (er != ReturnCode::SUCCESS) err_code = er;
     TaskTimer t("FrontalMatrixHSS_factor");
     if (opts.print_compressed_front_stats()) t.start();
     H_.set_openmp_task_depth(task_depth);
@@ -423,6 +429,7 @@ namespace strumpack {
                 << " %compression, time= " << time
                 << " sec" << std::endl;
     }
+    return err_code;
   }
 
   template<typename scalar_t,typename integer_t> void

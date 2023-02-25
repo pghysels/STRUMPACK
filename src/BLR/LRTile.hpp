@@ -148,7 +148,7 @@ namespace strumpack {
       void laswpx(const int* dpiv, magma_queue_t q, bool fwd) override;
 #endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void laswp(gpu::SOLVERHandle& handle, int* dpiv, bool fwd) override;
+      void laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) override;
 #endif
 
       void move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned = NULL) override;
@@ -156,7 +156,7 @@ namespace strumpack {
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
+      void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul,
                   Trans ta, Diag d, scalar_t alpha,
                   DenseM_t& a) override;
 #endif

@@ -54,17 +54,16 @@ namespace strumpack {
   public:
     EliminationTreeMPI(const MPIComm& comm);
 
-    EliminationTreeMPI
-    (const SPOptions<scalar_t>& opts, const SpMat_t& A,
-     Reord_t& nd, const MPIComm& comm);
-
     virtual ~EliminationTreeMPI();
 
-    void multifrontal_solve(DenseM_t& x) const override;
     integer_t maximum_rank() const override;
     long long factor_nonzeros() const override;
     long long dense_factor_nonzeros() const override;
     const MPIComm& Comm() const { return comm_; }
+
+    ReturnCode inertia(integer_t& neg,
+                       integer_t& zero,
+                       integer_t& pos) const override;
 
   protected:
     const MPIComm& comm_;
@@ -75,36 +74,6 @@ namespace strumpack {
 
     virtual FrontCounter front_counter() const override;
     void update_local_ranges(integer_t lo, integer_t hi);
-
-  private:
-    struct ParFront {
-      // TODO store a pointer to the actual front??
-      ParFront(integer_t _sep_begin, integer_t _dim_sep,
-               int _P0, int _P, BLACSGrid* g)
-        : sep_begin(_sep_begin), dim_sep(_dim_sep),
-          P0(_P0), P(_P), grid(g) {}
-      integer_t sep_begin, dim_sep;
-      int P0, P;
-      const BLACSGrid* grid;
-    };
-
-    std::vector<ParFront> parallel_fronts_;
-    integer_t active_pfronts_;
-
-    void symbolic_factorization
-    (const SpMat_t& A, const Tree_t& tree, integer_t sep,
-     std::vector<std::vector<integer_t>>& upd,
-     std::vector<float>& subtree_work, int depth=0) const;
-
-    std::unique_ptr<F_t> proportional_mapping
-    (Tree_t& tree, const SPOptions<scalar_t>& opts,
-     std::vector<std::vector<integer_t>>& upd,
-     std::vector<float>& subtree_work,
-     integer_t sep, int P0, int P, const MPIComm& fcomm,
-     bool keep, bool is_hss, int level=0);
-
-    std::unique_ptr<DistM_t[]> sequential_to_block_cyclic(DenseM_t& x) const;
-    void block_cyclic_to_sequential(DenseM_t& x, const DistM_t* x_dist) const;
   };
 
 } // end namespace strumpack

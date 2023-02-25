@@ -403,17 +403,21 @@ namespace strumpack {
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::decompress_local_columns(int c_min, int c_max) {
-      for (std::size_t c=cg2t(c_min); c<=cg2t(c_max-1); c++)
+      if (!c_max) return;
+      for (std::size_t c=cg2t(c_min);
+           c<=std::min(cg2t(c_max-1), nbcols_-1); c++) {
         for (std::size_t r=0; r<nbrows_; r++) {
           auto& b = block(r, c);
           if (b && b->is_low_rank())
             b.reset(new DenseTile<scalar_t>(b->dense()));
         }
+      }
     }
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::remove_tiles_before_local_column
     (int c_min, int c_max) {
+      if (!c_max) return;
       for (std::size_t c=cg2t(c_min); c<cg2t(c_max-1); c++)
         for (std::size_t r=0; r<nbrows_; r++)
           block(r, c) = nullptr;
@@ -609,9 +613,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::fill_col
-    (scalar_t v, std::size_t k, bool part, std::size_t CP) {
+    (scalar_t v, std::size_t k, std::size_t CP) {
       std::size_t j_end = std::min(k + CP, colblocks());
-      // (part ? (k + CP) : k + colblocks(), colblocks());
       for (std::size_t i=0; i<nbrows_; i++)
         for (std::size_t j=k; j<j_end; j++) {
           block(i, j).reset
@@ -1258,18 +1261,16 @@ namespace strumpack {
               }
             }
           }
-          if (opts.BLRseq_CB_Compression()) {
-            for (std::size_t j=0; j<rb2; j++) {
-              for (std::size_t k=0; k<rb2; k++) {
-                if(j!=k){
+          for (std::size_t j=0; j<rb2; j++) {
+            for (std::size_t k=0; k<rb2; k++) {
+              if(j!=k){
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+                std::size_t k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(j,k,k2j2) \
   depend(inout:B[k2j2])
 #endif
-                  {
-                    B22.compress_tile(k, j, opts);
-                  }
+                {
+                  B22.compress_tile(k, j, opts);
                 }
               }
             }
@@ -1312,6 +1313,8 @@ namespace strumpack {
   depend(out:B[ifirst:lrb])
 #endif
             {
+              B11.fill_col(0., i, CP);
+              B21.fill_col(0., i, CP);
               blockcol(i, true, CP);
             }
             for (std::size_t k=0; k<i; k++) {
@@ -1452,6 +1455,8 @@ namespace strumpack {
   depend(out:B[ifirst:lrb])
 #endif
             {
+              B12.fill_col(0., i, CP);
+              B22.fill_col(0., i, CP);
               blockcol(i, false, CP);
             }
             for (std::size_t k=0; k<rb; k++) {
@@ -1502,18 +1507,16 @@ namespace strumpack {
                 }
               }
             }
-            if (opts.BLRseq_CB_Compression()) {
-              for (std::size_t k=0; k<rb2; k++) {
-                for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
-                  if (j != k) {
+            for (std::size_t k=0; k<rb2; k++) {
+              for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
+                if (j != k) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                    std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+                  std::size_t k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,k,j,k2j2)       \
   depend(inout:B[k2j2])
 #endif
-                    {
-                      B22.compress_tile(k, j, opts);
-                    }
+                  {
+                    B22.compress_tile(k, j, opts);
                   }
                 }
               }
