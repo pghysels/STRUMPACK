@@ -496,9 +496,9 @@ namespace strumpack {
                scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
         }
 
-        // Schur updates
-        int batchcount = (rb-i-1+rb2)*(rb-i-1+rb2);
+        // Schur complement update
         std::size_t sVU = 0, sUVU = 0;
+        int batchcount = std::pow(rb-(i+1)+rb2, 2);
         for (std::size_t j=i+1; j<rb; j++) {
           for (std::size_t k=i+1; k<rb; k++)
             multiply_inc_work_size
@@ -545,8 +545,10 @@ namespace strumpack {
         b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
         b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
         b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
-        gpu::synchronize();
+        comp_stream.synchronize();
       }
+      gpu::synchronize();
+      gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), dsep);
       for (std::size_t i=0; i<rb; i++) {
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
