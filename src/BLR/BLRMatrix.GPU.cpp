@@ -72,11 +72,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     add_tile_mult(BLRTile<scalar_t>& A, BLRTile<scalar_t>& B,
-                  // BLRTile<scalar_t>& C,
-                  scalar_t* C,
-                  VBatchedGEMM<scalar_t>& b1,
-                  VBatchedGEMM<scalar_t>& b2,
-                  VBatchedGEMM<scalar_t>& b3,
+                  DenseMatrix<scalar_t>& C, VBatchedGEMM<scalar_t>& b1,
+                  VBatchedGEMM<scalar_t>& b2, VBatchedGEMM<scalar_t>& b3,
                   scalar_t*& d1, scalar_t*& d2) {
       if (A.is_low_rank()) {
         if (B.is_low_rank()) {
@@ -86,13 +83,13 @@ namespace strumpack {
             b2.add(A.rows(), B.rank(), A.rank(),
                    A.U().data(), d1, d2);
             b3.add(A.rows(), B.cols(), B.rank(),
-                   d2, B.V().data(), C);//C.D().data());
+                   d2, B.V().data(), C.data(), C.ld());
             d2 += A.rows() * B.rank();
           } else {
             b2.add(A.rank(), B.cols(), B.rank(),
                    d1, B.V().data(), d2);
             b3.add(A.rows(), B.cols(), A.rank(),
-                   A.U().data(), d2, C); //.D().data());
+                   A.U().data(), d2, C.data(), C.ld());
             d2 += A.rank() * B.cols();
           }
           d1 += A.rank() * B.rank();
@@ -100,7 +97,7 @@ namespace strumpack {
           b1.add(A.rank(), B.cols(), A.cols(),
                  A.V().data(), B.D().data(), d1);
           b3.add(A.rows(), B.cols(), A.rank(),
-                 A.U().data(), d1, C); //.D().data());
+                 A.U().data(), d1, C.data(), C.ld());
           d1 += A.rank() * B.cols();
         }
       } else {
@@ -108,11 +105,11 @@ namespace strumpack {
           b1.add(A.rows(), B.rank(), A.cols(),
                  A.D().data(), B.U().data(), d1);
           b3.add(A.rows(), B.cols(), B.rank(),
-                 d1, B.V().data(), C); //.D().data());
+                 d1, B.V().data(), C.data(), C.ld());
           d1 += A.rows() * B.rank();
         } else
           b3.add(A.rows(), B.cols(), A.cols(),
-                 A.D().data(), B.D().data(), C); //.D().data());
+                 A.D().data(), B.D().data(), C.data(), C.ld());
       }
     }
 
@@ -175,7 +172,7 @@ namespace strumpack {
           (handle, Jobz::V, dS, A, dU, dV, dpiv, svd_mem, tol);
         gpu_check(gpu::copy_device_to_host(S_tmp.data(), dS, minmn));
         while (S_tmp[rank] >= tol) rank++;
-        if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
+        if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()) {
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
           auto d_V = gpu::aligned_ptr<scalar_t>(svd_mem);
           d_V += minmn + (A.rows() * A.cols()) + gesvd_work_size;
@@ -286,7 +283,7 @@ namespace strumpack {
                         minmn, 32, 10, blashandle.kblas_rand_state(), 1, 1);
         gpu_check(gpu::copy_device_to_host(&rank, drank, 1));
         STRUMPACK_FLOPS(blas::ara_flops(rows, cols, rank, 10));
-        if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()){
+        if (rank*(dU.rows() + dV.rows()) < dU.rows()*dV.rows()) {
           DenseMW_t dU_tmp(dU.rows(), rank, dU, 0, 0);
           auto d_V = reinterpret_cast<scalar_t*>(svd_mem);
           d_V += A.rows()*A.cols() + 6;
@@ -447,21 +444,21 @@ namespace strumpack {
       gpu::DeviceMemory<scalar_t> dmemA22(2*max_m21*max_n12);
 
       for (std::size_t i=0; i<rb; i++)
-        for (std::size_t j=0; j<rb; j++){
+        for (std::size_t j=0; j<rb; j++) {
           DenseMW_t dAij(B11.tilerows(i), B11.tilecols(j),
                          dA11, B11.tilerows(i));
           B11.create_dense_gpu_tile(i, j, A11, dAij);
           dA11 += B11.tilerows(i) * B11.tilecols(j);
         }
       for (std::size_t i=0; i<rb; i++)
-        for (std::size_t j=0; j<rb2; j++){
+        for (std::size_t j=0; j<rb2; j++) {
           DenseMW_t dAij(B12.tilerows(i), B12.tilecols(j),
                          dA12, B12.tilerows(i));
           B12.create_dense_gpu_tile(i, j, A12, dAij);
           dA12 += B12.tilerows(i) * B12.tilecols(j);
         }
       for (std::size_t i=0; i<rb2; i++)
-        for (std::size_t j=0; j<rb; j++){
+        for (std::size_t j=0; j<rb; j++) {
           DenseMW_t dAij(B21.tilerows(i), B21.tilecols(j),
                          dA21, B21.tilerows(i));
           B21.create_dense_gpu_tile(i, j, A21, dAij);
@@ -537,15 +534,12 @@ namespace strumpack {
 
         for (std::size_t j=i+1; j<rb; j++) {
           for (std::size_t k=i+1; k<rb; k++)
-            add_tile_mult(B11.tile(k, i), B11.tile(i, j),
-                          B11.tile(k, j).D().data(),
+            add_tile_mult(B11.tile(k, i), B11.tile(i, j), B11.tile(k, j).D(),
                           b1, b2, b3, dVU, dUVU);
           for (std::size_t k=0; k<rb2; k++) {
-            add_tile_mult(B11.tile(j, i), B12.tile(i, k),
-                          B12.tile(j, k).D().data(),
+            add_tile_mult(B11.tile(j, i), B12.tile(i, k), B12.tile(j, k).D(),
                           b1, b2, b3, dVU, dUVU);
-            add_tile_mult(B21.tile(k, i), B11.tile(i, j),
-                          B21.tile(k, j).D().data(),
+            add_tile_mult(B21.tile(k, i), B11.tile(i, j), B21.tile(k, j).D(),
                           b1, b2, b3, dVU, dUVU);
           }
         }
@@ -594,70 +588,23 @@ namespace strumpack {
         auto dUVU = dVU + sVU;
         VBatchedGEMM<scalar_t> b1(rb2*rb2, bdmem),
           b2(rb2*rb2, bdmem+bdwork), b3(rb2*rb2, bdmem+2*bdwork);
-        for (std::size_t j=0; j<rb2; j++) {
-          auto& Tij = B12.tile(i, j);
+
+        for (std::size_t j=0; j<rb2; j++)
           for (std::size_t k=0; k<rb2; k++) {
-            auto& Tki = B21.tile(k, i);
-            auto dAkj = A22.ptr(B21.tileroff(k), B12.tilecoff(j));
-
-            // // TODO ld for C tile!!!
-            // add_tile_mult(B21.tile(k, i), B12.tile(i, j), dAkj,
-            //               b1, b2, b3, dVU, dUVU);
-
-
-            if (Tki.is_low_rank()) {
-              if (Tij.is_low_rank()) {
-                b1.add(Tki.rank(), Tij.rank(), Tki.cols(),
-                       Tki.V().data(), Tij.U().data(), dVU);
-                if (Tij.rank() < Tki.rank()) {
-                  b2.add(Tki.rows(), Tij.rank(), Tki.rank(),
-                         Tki.U().data(), dVU, dUVU);
-                  b3.add(Tki.rows(), Tij.cols(), Tij.rank(),
-                         dUVU, Tki.rows(), Tij.V().data(), Tij.rank(),
-                         dAkj, d2);
-                  dUVU += Tki.rows() * Tij.rank();
-                } else {
-                  b2.add(Tki.rank(), Tij.cols(), Tij.rank(),
-                         dVU, Tij.V().data(), dUVU);
-                  b3.add(Tki.rows(), Tij.cols(), Tki.rank(),
-                         Tki.U().data(), Tki.rows(),
-                         dUVU, Tki.rank(), dAkj, d2);
-                  dUVU += Tki.rank() * Tij.cols();
-                }
-                dVU += Tki.rank() * Tij.rank();
-              } else {
-                b1.add(Tki.rank(), Tij.cols(), Tki.cols(),
-                       Tki.V().data(), Tij.D().data(), dVU);
-                b3.add(Tki.rows(), Tij.cols(), Tki.rank(),
-                       Tki.U().data(), Tki.rows(),
-                       dVU, Tki.rank(), dAkj, d2);
-                dVU += Tki.rank() * Tij.cols();
-              }
-            } else {
-              if (Tij.is_low_rank()) {
-                b1.add(Tki.rows(), Tij.rank(), Tki.cols(),
-                       Tki.D().data(), Tij.U().data(), dVU);
-                b3.add(Tki.rows(), Tij.cols(), Tij.rank(), dVU, Tki.rows(),
-                       Tij.V().data(), Tij.rank(), dAkj, d2);
-                dVU += Tki.rows() * Tij.rank();
-              } else
-                b3.add(Tki.rows(), Tij.cols(), Tki.cols(),
-                       Tki.D().data(), Tki.rows(),
-                       Tij.D().data(), Tki.cols(), dAkj, d2);
-            }
+            DenseMW_t dAkj(B21.tilerows(k), B12.tilecols(j), A22,
+                           B21.tileroff(k), B12.tilecoff(j));
+            add_tile_mult(B21.tile(k, i), B12.tile(i, j), dAkj,
+                          b1, b2, b3, dVU, dUVU);
           }
-        }
         if (i == 0) {
 #pragma omp parallel
 #pragma omp single
           {
 #pragma omp task
             {
-              for (std::size_t r=0; r<rb; r++) {
-                for (std::size_t c=0; c<rb; c++){
+              for (std::size_t r=0; r<rb; r++)
+                for (std::size_t c=0; c<rb; c++)
                   B11.tile(r, c).move_gpu_tile_to_cpu(copy_stream, pinned);
-                }
-              }
             }
 #pragma omp task
             {

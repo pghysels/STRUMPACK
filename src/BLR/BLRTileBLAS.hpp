@@ -120,6 +120,10 @@ namespace strumpack {
                scalar_t* A, scalar_t* B, scalar_t* C) {
         add(m, n, k, A, m, B, k, C, m);
       }
+      void add(int m, int n, int k,
+               scalar_t* A, scalar_t* B, scalar_t* C, int ldC) {
+        add(m, n, k, A, m, B, k, C, ldC);
+      }
       void add(int m, int n, int k, scalar_t* A, int ldA,
                scalar_t* B, int ldB, scalar_t* C, int ldC) {
         assert(ldA >= m && ldB >= k && ldC >= m);
