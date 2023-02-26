@@ -123,29 +123,11 @@ namespace strumpack {
       std::vector<int> LU() override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
-#if defined(STRUMPACK_USE_MAGMA)
-      void laswpx(const int* dpiv, magma_queue_t q, bool fwd) override;
-#endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) override;
+      void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) override;
 
       void move_gpu_tile_to_cpu(gpu::Stream& s,
-                                scalar_t* pinned=nullptr) override {
-        gpu::Event event;
-        DenseM_t hD(D().rows(), D().cols());
-        if (pinned == NULL){
-          gpu_check(gpu::copy_device_to_host_async(hD, D(), s));
-        } else {
-          gpu_check(gpu::copy_device_to_host_async
-                    (pinned, D().data(), D().rows()*D().cols(), s));
-          event.record(s);
-          event.synchronize();
-          for (std::size_t i=0; i<D().rows(); i++)
-            for (std::size_t j=0; j<D().cols(); j++)
-              hD(i, j) = pinned[i+D().ld()*j];
-        }
-        D_.reset(new DenseM_t(hD));
-      }
+                                scalar_t* pinned=nullptr) override;
 #endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,

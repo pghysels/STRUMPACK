@@ -123,10 +123,8 @@ namespace strumpack {
 
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      virtual void laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) = 0;
-#if defined(STRUMPACK_USE_MAGMA)
-      virtual void laswpx(const int* dpiv, magma_queue_t q, bool fwd) = 0;
-#endif
+      virtual void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) = 0;
+
       virtual void move_gpu_tile_to_cpu(gpu::Stream& s,
                                         scalar_t* pinned=nullptr) = 0;
 #endif

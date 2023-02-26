@@ -243,16 +243,14 @@ namespace strumpack {
     LRTile<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
       U().laswp(piv, fwd);
     }
-#if defined(STRUMPACK_USE_MAGMA)
-    template<typename scalar_t> void
-    LRTile<scalar_t>::laswpx(const int* dpiv, magma_queue_t q, bool fwd) {
-      gpu::magma::laswpx(U(), dpiv, q, fwd);
-    }
-#endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> void
-    LRTile<scalar_t>::laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) {
-      gpu::laswp(handle, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
+    LRTile<scalar_t>::laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) {
+#if defined(STRUMPACK_USE_MAGMA)
+      gpu::magma::laswpx(U(), dpiv, h, fwd);
+#else
+      gpu::laswp(h, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
+#endif
     }
 #endif
 
@@ -262,7 +260,7 @@ namespace strumpack {
       gpu::Event event;
       DenseM_t hU(U().rows(), U().cols()),
         hV(V().rows(), V().cols());
-      if (pinned == NULL){
+      if (!pinned) {
         gpu_check(gpu::copy_device_to_host_async(hU, U(), s));
         gpu_check(gpu::copy_device_to_host_async(hV, V(), s));
       } else {

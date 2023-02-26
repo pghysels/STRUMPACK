@@ -149,11 +149,11 @@ namespace strumpack {
                    DenseM_t& B) const override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
-#if defined(STRUMPACK_USE_MAGMA)
-      void laswpx(const int* dpiv, magma_queue_t q, bool fwd) override;
-#endif
+// #if defined(STRUMPACK_USE_MAGMA)
+//       void laswpx(const int* dpiv, magma_queue_t q, bool fwd) override;
+// #endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) override;
+      void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) override;
 #endif
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)

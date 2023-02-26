@@ -394,15 +394,11 @@ namespace strumpack {
       gpu::BLASHandle handle(comp_stream);
       gpu::SOLVERHandle solvehandle(comp_stream);
 
-#if defined(STRUMPACK_USE_MAGMA)
-      // TODO store magma queue in the BLASHandle??
-      gpu::magma::MAGMAQueue q(comp_stream, handle);
 #if defined(STRUMPACK_USE_KBLAS)
       const int BLOCK_SIZE = 32;
       kblas_ara_batch_wsquery<real_t>
         (handle.kblas_handle(), BLOCK_SIZE, 1);
       kblasAllocateWorkspace(handle.kblas_handle());
-#endif
 #endif
 
       gpu::DeviceMemory<scalar_t>
@@ -473,11 +469,7 @@ namespace strumpack {
             B11.compress_tile_gpu
               (solvehandle, handle, i, j, B11.tile(i, j).D(),
                d_U, d_V, dpiv+dsep, cmprs_mem, opts);
-#if defined(STRUMPACK_USE_MAGMA)
-          B11.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
-#else
           B11.tile(i, j).laswp(handle, dpiv+B11.tileroff(i), true);
-#endif
           trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U,
                scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
         }
@@ -494,11 +486,7 @@ namespace strumpack {
           B12.compress_tile_gpu
             (solvehandle, handle, i, j, B12.tile(i, j).D(),
              d_U, d_V, dpiv+dsep, cmprs_mem, opts);
-#if defined(STRUMPACK_USE_MAGMA)
-          B12.tile(i, j).laswpx(dpiv+B11.tileroff(i), q, true);
-#else
           B12.tile(i, j).laswp(handle, dpiv+B11.tileroff(i), true);
-#endif
           trsm(handle, Side::L, UpLo::L, Trans::N, Diag::U,
                scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
           B21.compress_tile_gpu
@@ -508,10 +496,9 @@ namespace strumpack {
                scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
         }
 
-        // GEMM B11
+        // Schur updates
+        int batchcount = (rb-i-1+rb2)*(rb-i-1+rb2);
         std::size_t sVU = 0, sUVU = 0;
-        int batchcount = (rb-i-1)*((rb-i-1) + rb2);
-
         for (std::size_t j=i+1; j<rb; j++) {
           for (std::size_t k=i+1; k<rb; k++)
             multiply_inc_work_size
@@ -523,7 +510,12 @@ namespace strumpack {
               (B21.tile(k, i), B11.tile(i, j), sVU, sUVU);
           }
         }
+        for (std::size_t j=0; j<rb2; j++)
+          for (std::size_t k=0; k<rb2; k++)
+            multiply_inc_work_size
+              (B21.tile(k, i), B12.tile(i, j), sVU, sUVU);
 
+        // TODO move allocation out of the loop
         std::size_t lwork = sVU + sUVU;
         auto bdwork = VBatchedGEMM<scalar_t>::dwork_bytes(batchcount);
         gpu::DeviceMemory<char> bdmem(bdwork*3 + 2*lwork*sizeof(scalar_t));
@@ -543,45 +535,6 @@ namespace strumpack {
                           b1, b2, b3, dVU, dUVU);
           }
         }
-        b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-        b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-        b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
-      }
-      std::size_t max_pinned = 0;
-      for (std::size_t i=0; i<rb; i++)
-        for (std::size_t j=0; j<rb; j++) {
-          std::size_t ts = B11.tile(i, j).rows()* B11.tile(i, j).cols();
-          max_pinned = std::max(max_pinned, ts);
-        }
-
-      gpu::synchronize();
-      gpu::copy_device_to_host(piv.data(), dpiv.as<int>(), dsep);
-      gpu::HostMemory<scalar_t> pinned(max_pinned);
-
-      // GEMM B22
-      std::size_t sVU = 0, sUVU = 0;
-      for (std::size_t i=0; i<rb; i++) {
-        std::size_t sVUi = 0, sUVUi = 0;
-        for (std::size_t j=0; j<rb2; j++)
-          for (std::size_t k=0; k<rb2; k++)
-            multiply_inc_work_size
-              (B21.tile(k, i), B12.tile(i, j), sVUi, sUVUi);
-        sVU = std::max(sVU, sVUi);
-        sUVU = std::max(sUVU, sUVUi);
-      }
-
-      std::size_t lwork = sVU + sUVU;
-      auto bdwork = VBatchedGEMM<scalar_t>::dwork_bytes(rb2*rb2);
-      gpu::DeviceMemory<char> bdmem
-        (gpu::round_up(bdwork*3) +
-         gpu::round_up(2*lwork*sizeof(scalar_t)));
-
-      for (std::size_t i=0; i<rb; i++) {
-        auto dVU = gpu::aligned_ptr<scalar_t>(bdmem + bdwork*3);
-        auto dUVU = dVU + sVU;
-        VBatchedGEMM<scalar_t> b1(rb2*rb2, bdmem),
-          b2(rb2*rb2, bdmem+bdwork), b3(rb2*rb2, bdmem+2*bdwork);
-
         for (std::size_t j=0; j<rb2; j++)
           for (std::size_t k=0; k<rb2; k++) {
             DenseMW_t dAkj(B21.tilerows(k), B12.tilecols(j), A22,
@@ -589,38 +542,20 @@ namespace strumpack {
             add_tile_mult(B21.tile(k, i), B12.tile(i, j), dAkj,
                           b1, b2, b3, dVU, dUVU);
           }
-        if (i == 0) {
-#pragma omp parallel
-#pragma omp single //nowait
-          {
-#pragma omp task
-            {
-              for (std::size_t r=0; r<rb; r++)
-                for (std::size_t c=0; c<rb; c++)
-                  B11.tile(r, c).move_gpu_tile_to_cpu(copy_stream, pinned);
-            }
-#pragma omp task
-            {
-              b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-              b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-              b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
-            }
-          }
-        } else {
-          b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-          b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-          b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
-        }
-        comp_stream.synchronize();
+        b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+        b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+        b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
+        gpu::synchronize();
       }
-      gpu::synchronize();
       for (std::size_t i=0; i<rb; i++) {
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
-        for (std::size_t j=0; j<rb2; j++)
+        for (std::size_t j=0; j<rb; j++)
+          B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
+        for (std::size_t j=0; j<rb2; j++) {
           B12.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
-        for (std::size_t j=0; j<rb2; j++)
           B21.tile(j, i).move_gpu_tile_to_cpu(copy_stream);
+        }
       }
       gpu::synchronize();
       A11.clear();
