@@ -300,9 +300,6 @@ namespace strumpack {
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile(std::size_t i, std::size_t j,
                              const extract_t<scalar_t>& Aelem);
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void create_dense_gpu_tile(std::size_t i, std::size_t j, DenseM_t& A, DenseMW_t& dB);
-#endif
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
                                           const extract_t<scalar_t>& Aelem);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
@@ -312,12 +309,18 @@ namespace strumpack {
                                           const BLRMatrix<scalar_t>& B12);
       void create_LR_tile(std::size_t i, std::size_t j,
                           DenseM_t& A, const Opts_t& opts);
+
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void create_LR_gpu_tile(gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle, 
-                              std::size_t i, std::size_t j, DenseM_t& A, 
-                              DenseM_t& dU, DenseM_t& dV, scalar_t*& dA, int* dpiv,
+      void create_dense_gpu_tile(std::size_t i, std::size_t j,
+                                 DenseM_t& A, DenseMW_t& dB);
+      void create_LR_gpu_tile(gpu::SOLVERHandle& handle,
+                              gpu::BLASHandle& blashandle,
+                              std::size_t i, std::size_t j, DenseM_t& A,
+                              DenseM_t& dU, DenseM_t& dV,
+                              scalar_t*& dA, int* dpiv,
                               const Opts_t& opts);
 #endif
+
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        const extract_t<scalar_t>& Aelem,
                                        const Opts_t& opts);
@@ -342,9 +345,11 @@ namespace strumpack {
       template<typename T,typename I> friend class BLRExtendAdd;
     };
 
-    template<typename scalar_t> int 
-    compress_mem(gpu::SOLVERHandle& solvehandle,
-                 std::size_t maxm_all, std::size_t maxmn_all);
+// #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+//     template<typename scalar_t> int
+//     compress_mem(gpu::SOLVERHandle& solvehandle,
+//                  std::size_t maxm_all, std::size_t maxmn_all);
+// #endif
 
     template<typename scalar_t> void
     LUAR(const std::vector<BLRTile<scalar_t>*>& Ti,

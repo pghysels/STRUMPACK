@@ -256,35 +256,35 @@ namespace strumpack {
     }
 #endif
 
-    template<typename scalar_t> void LRTile<scalar_t>::move_gpu_tile_to_cpu
-     (gpu::Stream& s, scalar_t* pinned) {
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+    template<typename scalar_t> void
+    LRTile<scalar_t>::move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned) {
       gpu::Event event;
-      DenseM_t hU(U().rows(), U().cols());
-      DenseM_t hV(V().rows(), V().cols());
+      DenseM_t hU(U().rows(), U().cols()),
+        hV(V().rows(), V().cols());
       if (pinned == NULL){
-        gpu::copy_device_to_host_async(hU, U(), s);
-        gpu::copy_device_to_host_async(hV, V(), s);
+        gpu_check(gpu::copy_device_to_host_async(hU, U(), s));
+        gpu_check(gpu::copy_device_to_host_async(hV, V(), s));
       } else {
-        gpu::copy_device_to_host_async(pinned, U().data(), U().rows()*U().cols(), s);
+        gpu_check(gpu::copy_device_to_host_async
+                  (pinned, U().data(), U().rows()*U().cols(), s));
         event.record(s);
         event.synchronize();
-        for (std::size_t i=0; i<U().rows(); i++) {
-          for (std::size_t j=0; j<U().cols(); j++) {
+        for (std::size_t i=0; i<U().rows(); i++)
+          for (std::size_t j=0; j<U().cols(); j++)
             hU(i, j) = pinned[i+U().ld()*j];
-          }
-        }
-        gpu::copy_device_to_host_async(pinned, V().data(), V().rows()*V().cols(), s);
+        gpu_check(gpu::copy_device_to_host_async
+                  (pinned, V().data(), V().rows()*V().cols(), s));
         event.record(s);
         event.synchronize();
-        for (std::size_t i=0; i<V().rows(); i++) {
-          for (std::size_t j=0; j<V().cols(); j++) {
+        for (std::size_t i=0; i<V().rows(); i++)
+          for (std::size_t j=0; j<V().cols(); j++)
             hV(i, j) = pinned[i+V().ld()*j];
-          }
-        }
       }
       U_.reset(new DenseM_t(hU));
       V_.reset(new DenseM_t(hV));
     }
+#endif
 
     template<typename scalar_t> void
     LRTile<scalar_t>::trsm_b(Side s, UpLo ul, Trans ta, Diag d,
@@ -302,6 +302,7 @@ namespace strumpack {
         (handle, s, ul, ta, d, alpha, a, (s == Side::L) ? U() : V());
     }
 #endif
+
     template<typename scalar_t> void
     LRTile<scalar_t>::gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
                              scalar_t beta, DenseM_t& y) const {

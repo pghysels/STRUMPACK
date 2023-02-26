@@ -55,6 +55,7 @@ namespace strumpack {
   namespace gpu {
     namespace magma {
 
+      // TODO remove, now part of BLASHandle?
       class MAGMAQueue {
       public:
         MAGMAQueue() { magma_queue_create(0, &q_); }

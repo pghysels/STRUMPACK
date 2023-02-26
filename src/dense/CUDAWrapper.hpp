@@ -41,6 +41,11 @@
 
 #include "DenseMatrix.hpp"
 
+#if defined(STRUMPACK_USE_MAGMA)
+#include <magma_v2.h>
+#include <magma_auxiliary.h>
+#endif
+
 #if defined(STRUMPACK_USE_KBLAS)
 #include "kblas.h"
 #endif
@@ -84,22 +89,41 @@ namespace strumpack {
     public:
       BLASHandle() {
         gpu_check(cublasCreate(&h_));
+#if defined(STRUMPACK_USE_MAGMA)
+        // magma_init();
+        magma_queue_create_from_cuda(0, NULL, h_, NULL, &q_);
+#endif
 #if defined(STRUMPACK_USE_KBLAS)
         create_kblas_handle();
 #endif
       }
-      BLASHandle(Stream& s):BLASHandle() {
+      BLASHandle(Stream& s) : BLASHandle() {
         set_stream(s);
+#if defined(STRUMPACK_USE_MAGMA)
+        magma_init();
+        magma_queue_create_from_cuda(0, s, h_, NULL, &q_);
+#endif
 #if defined(STRUMPACK_USE_KBLAS)
         set_kblas_stream(s);
         kblasInitRandState(kh_, &rs_, 16384*2, 0);
         kblasEnableMagma(kh_);
 #endif
       }
-      ~BLASHandle() { gpu_check(cublasDestroy(h_)); }
+      ~BLASHandle() {
+        // TODO KBLAS destroy
+#if defined(STRUMPACK_USE_MAGMA)
+        magma_queue_destroy(q_);
+        // magma_finalize();
+#endif
+        gpu_check(cublasDestroy(h_));
+      }
       void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
       operator cublasHandle_t&() { return h_; }
       operator const cublasHandle_t&() const { return h_; }
+#if defined(STRUMPACK_USE_MAGMA)
+      operator magma_queue_t&() { return q_; }
+      operator const magma_queue_t&() const { return q_; }
+#endif
 #if defined(STRUMPACK_USE_KBLAS)
       void create_kblas_handle() { kblasCreate(&kh_); }
       kblasHandle_t & kblas_handle() { return kh_; }
@@ -110,6 +134,9 @@ namespace strumpack {
 #endif
     private:
       cublasHandle_t h_;
+#if defined(STRUMPACK_USE_MAGMA)
+      magma_queue_t q_;
+#endif
 #if defined(STRUMPACK_USE_KBLAS)
       kblasHandle_t kh_; // TODO need to free this handle!!
       kblasRandState_t rs_;

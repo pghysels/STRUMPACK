@@ -36,8 +36,11 @@
 
 #include "LRTile.hpp"
 #include "DenseTile.hpp"
+
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
 // for gpu::round_up
 #include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
+#endif
 
 namespace strumpack {
   namespace BLR {
@@ -107,7 +110,7 @@ namespace strumpack {
       a.Schur_update_rows_a(rows, b, c, work);
     }
 
-
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> class VBatchedGEMM {
     public:
       VBatchedGEMM(std::size_t B, char* dmem) : dmem_(dmem) { reserve(B); }
@@ -144,9 +147,11 @@ namespace strumpack {
 #endif
       }
 
-#if defined(STRUMPACK_USE_MAGMA)
       void run(scalar_t alpha, scalar_t beta,
-               magma_queue_t& q, gpu::Stream& s) {
+               // magma_queue_t& q,
+               gpu::Stream& s,
+               gpu::BLASHandle& h) {
+#if defined(STRUMPACK_USE_MAGMA)
         magma_int_t batchcount = m_.size();
         if (!batchcount) return;
         auto dimem = reinterpret_cast<magma_int_t*>(dmem_);
@@ -188,10 +193,8 @@ namespace strumpack {
            alpha, dsmem, dimem+3*(batchcount+1),
            dsmem+batchcount, dimem+4*(batchcount+1),
            beta, dsmem+2*batchcount, dimem+5*(batchcount+1),
-           batchcount, max_m, max_n, max_k, q);
-      }
-#endif
-      void run(scalar_t alpha, scalar_t beta, gpu::BLASHandle& h) {
+           batchcount, max_m, max_n, max_k, h);
+#else
         std::size_t batchcount = m_.size();
         if (!batchcount) return;
         // gpu::synchronize();
@@ -206,7 +209,9 @@ namespace strumpack {
             C(m_[i], n_[i], C_[i], ldC_[i]);
           gpu::gemm(h, Trans::N, Trans::N, alpha, A, B, beta, C);
         }
+#endif
       }
+
     private:
 #if defined(STRUMPACK_USE_MAGMA)
       std::vector<magma_int_t> m_, n_, k_, ldA_, ldB_, ldC_;
@@ -216,6 +221,7 @@ namespace strumpack {
       std::vector<scalar_t*> A_, B_, C_;
       char* dmem_ = nullptr; // only needed for MAGMA
     };
+#endif
 
   } // end namespace BLR
 } // end namespace strumpack

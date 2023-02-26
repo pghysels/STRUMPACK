@@ -128,30 +128,30 @@ namespace strumpack {
 #endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) override;
-#endif
 
-      void move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned = NULL) override {
+      void move_gpu_tile_to_cpu(gpu::Stream& s,
+                                scalar_t* pinned=nullptr) override {
         gpu::Event event;
         DenseM_t hD(D().rows(), D().cols());
         if (pinned == NULL){
-          gpu::copy_device_to_host_async(hD, D(), s);
+          gpu_check(gpu::copy_device_to_host_async(hD, D(), s));
         } else {
-          gpu::copy_device_to_host_async(pinned, D().data(), D().rows()*D().cols(), s);
+          gpu_check(gpu::copy_device_to_host_async
+                    (pinned, D().data(), D().rows()*D().cols(), s));
           event.record(s);
           event.synchronize();
-          for (std::size_t i=0; i<D().rows(); i++) {
-            for (std::size_t j=0; j<D().cols(); j++) {             
+          for (std::size_t i=0; i<D().rows(); i++)
+            for (std::size_t j=0; j<D().cols(); j++)
               hD(i, j) = pinned[i+D().ld()*j];
-            }
-          }
         }
         D_.reset(new DenseM_t(hD));
       }
+#endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul, 
+      void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul,
                   Trans ta, Diag d, scalar_t alpha,
                   DenseM_t& a) override;
 #endif
@@ -177,58 +177,58 @@ namespace strumpack {
                   const DenseM_t& a, scalar_t beta,
                   DenseM_t& c, int task_depth) const override;
 
-      void Schur_update_col_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c,
-       scalar_t* work) const override;
+      void Schur_update_col_a(std::size_t i, const BLRTile<scalar_t>& b,
+                              scalar_t* c, scalar_t* work) const override;
 
-      void Schur_update_row_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c,
-       scalar_t* work) const override;
+      void Schur_update_row_a(std::size_t i, const BLRTile<scalar_t>& b,
+                              scalar_t* c, scalar_t* work) const override;
 
       /* work should be at least rank(a) */
-      void Schur_update_col_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const override;
+      void Schur_update_col_b(std::size_t i, const LRTile<scalar_t>& a,
+                              scalar_t* c, scalar_t* work) const override;
 
       /* work not used */
-      void Schur_update_col_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const override;
+      void Schur_update_col_b(std::size_t i, const DenseTile<scalar_t>& a,
+                              scalar_t* c, scalar_t* work) const override;
 
       /* work should be at least cols(a) */
-      void Schur_update_row_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const override;
+      void Schur_update_row_b(std::size_t i, const LRTile<scalar_t>& a,
+                              scalar_t* c, scalar_t* work) const override;
 
       /* work not used */
-      void Schur_update_row_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const override;
+      void Schur_update_row_b(std::size_t i, const DenseTile<scalar_t>& a,
+                              scalar_t* c, scalar_t* work) const override;
 
 
-      void Schur_update_cols_a
-      (const std::vector<std::size_t>& cols, const BLRTile<scalar_t>& b,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const override;
+      void Schur_update_cols_a(const std::vector<std::size_t>& cols,
+                               const BLRTile<scalar_t>& b,
+                               DenseMatrix<scalar_t>& c,
+                               scalar_t* work) const override;
 
-      void Schur_update_rows_a
-      (const std::vector<std::size_t>& rows, const BLRTile<scalar_t>& b,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const override;
+      void Schur_update_rows_a(const std::vector<std::size_t>& rows,
+                               const BLRTile<scalar_t>& b,
+                               DenseMatrix<scalar_t>& c,
+                               scalar_t* work) const override;
 
-      void Schur_update_cols_b
-      (const std::vector<std::size_t>& cols, const LRTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const override;
+      void Schur_update_cols_b(const std::vector<std::size_t>& cols,
+                               const LRTile<scalar_t>& a,
+                               DenseMatrix<scalar_t>& c,
+                               scalar_t* work) const override;
 
-      void Schur_update_cols_b
-      (const std::vector<std::size_t>& cols, const DenseTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const override;
+      void Schur_update_cols_b(const std::vector<std::size_t>& cols,
+                               const DenseTile<scalar_t>& a,
+                               DenseMatrix<scalar_t>& c,
+                               scalar_t* work) const override;
 
-      void Schur_update_rows_b
-      (const std::vector<std::size_t>& rows, const LRTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const override;
+      void Schur_update_rows_b(const std::vector<std::size_t>& rows,
+                               const LRTile<scalar_t>& a,
+                               DenseMatrix<scalar_t>& c, scalar_t* work)
+        const override;
 
-      void Schur_update_rows_b
-      (const std::vector<std::size_t>& rows, const DenseTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const override;
+      void Schur_update_rows_b(const std::vector<std::size_t>& rows,
+                               const DenseTile<scalar_t>& a,
+                               DenseMatrix<scalar_t>& c,
+                               scalar_t* work) const override;
 
     private:
       std::unique_ptr<DenseM_t> D_;

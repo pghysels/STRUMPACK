@@ -180,7 +180,8 @@ namespace strumpack {
       gpu::BLASHandle hb;
       gpu::SOLVERHandle hs;
 #if defined(STRUMPACK_USE_MAGMA)
-      gpu::magma::MAGMAQueue mq;
+      magma_init();
+      // gpu::magma::MAGMAQueue mq;
 #endif
     }
 

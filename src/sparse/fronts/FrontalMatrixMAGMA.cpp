@@ -118,8 +118,8 @@ namespace strumpack {
       }
 
       if (A) { // not needed for the solve
-        int getrf_work_cusolver =
-          sizeof(scalar_t) * gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
+        int getrf_work_cusolver = sizeof(scalar_t) *
+          gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
         getrf_work_bytes = -1;
         magma_queue_t magma_q = nullptr;
         gpu::magma::getrf_vbatched_max_nocheck_work
@@ -373,7 +373,6 @@ namespace strumpack {
     gpu::Stream comp_stream, copy_stream;
     gpu::BLASHandle blas_handle(comp_stream);
     gpu::SOLVERHandle solver_handle(comp_stream);
-    gpu::magma::MAGMAQueue magma_q(comp_stream, blas_handle);
     std::size_t peak_ea_hmem = 0, total_factor_dmem = 0,
       peak_work_dmem = 0;
     for (int l=0; l<lvls; l++) {
@@ -421,7 +420,7 @@ namespace strumpack {
           (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
            L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dev_getrf_err, L.dev_getrf_work, &L.getrf_work_bytes,
-           Nsmall, magma_q);
+           Nsmall, blas_handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
@@ -440,11 +439,11 @@ namespace strumpack {
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, blas_handle);
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, blas_handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrs
             (solver_handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
@@ -452,7 +451,7 @@ namespace strumpack {
         gpu::magma::gemm_vbatched_max_nocheck
           (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
            F21, ld2, F12, ld1, scalar_t(1.), F22, ld2, Nsmall,
-           L.max_d2_small, L.max_d2_small, L.max_d1_small, magma_q);
+           L.max_d2_small, L.max_d2_small, L.max_d1_small, blas_handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::gemm
             (blas_handle, Trans::N, Trans::N, scalar_t(-1.),
@@ -649,7 +648,6 @@ namespace strumpack {
       return split_smaller(A, opts, etree_level, task_depth);
 
     gpu::BLASHandle blas_handle(comp_stream);
-    gpu::magma::MAGMAQueue magma_q(comp_stream, blas_handle);
 
     std::size_t pinned_size = 0;
     for (int l=lvls-1; l>=0; l--)
@@ -699,7 +697,7 @@ namespace strumpack {
           (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
            L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dev_getrf_err, L.dev_getrf_work, &L.getrf_work_bytes,
-           Nsmall, magma_q);
+           Nsmall, blas_handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
@@ -718,11 +716,11 @@ namespace strumpack {
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, blas_handle);
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, blas_handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrs
             (solver_handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
@@ -740,7 +738,7 @@ namespace strumpack {
         gpu::magma::gemm_vbatched_max_nocheck
           (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
            F21, ld2, F12, ld1, scalar_t(1.), F22, ld2, Nsmall,
-           L.max_d2_small, L.max_d2_small, L.max_d1_small, magma_q);
+           L.max_d2_small, L.max_d2_small, L.max_d1_small, blas_handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::gemm
             (blas_handle, Trans::N, Trans::N, scalar_t(-1.),
@@ -831,7 +829,6 @@ namespace strumpack {
     gpu::Stream comp_stream;
     gpu::SOLVERHandle solver_handle(comp_stream);
     gpu::BLASHandle blas_handle(comp_stream);
-    gpu::magma::MAGMAQueue magma_q(comp_stream, blas_handle);
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
     for (int l=lvls-1; l>=0; l--) {
@@ -963,11 +960,13 @@ namespace strumpack {
       gpu::magma::trsm_vbatched_max_nocheck
         (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
          L.max_d1_small, nrhs, d1, nrhs_batch+Nmax-Nsmall, scalar_t(1.),
-         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall, Nsmall, magma_q);
+         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-
+         Nsmall, Nsmall, blas_handle);
       gpu::magma::trsm_vbatched_max_nocheck
         (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
          L.max_d1_small, nrhs, d1, nrhs_batch+Nmax-Nsmall, scalar_t(1.),
-         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall, Nsmall, magma_q);
+         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall,
+         Nsmall, blas_handle);
       for (std::size_t i=Nsmall; i<N; i++) {
         DenseMW_t fb(L.f[i]->dim_sep(), nrhs, h_rhs_batch[l][i], b.rows());
         gpu::getrs(solver_handle, Trans::N, L.f[i]->F11_,
@@ -979,13 +978,13 @@ namespace strumpack {
           (MagmaNoTrans, d2, d1, scalar_t(-1.),
            F21, ld2, d_rhs_batch[l], inc_batch+Nmax-Nsmall, scalar_t(1.),
            d_bupd_batch[l], inc_batch+Nmax-Nsmall, Nsmall,
-           L.max_d2_small, L.max_d1_small, magma_q);
+           L.max_d2_small, L.max_d1_small, blas_handle);
       else
         gpu::magma::gemm_vbatched_max_nocheck
           (MagmaNoTrans, MagmaNoTrans, d2, nrhs_batch+Nmax-Nsmall, d1,
            scalar_t(-1.), F21, ld2, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall,
            scalar_t(1.), d_bupd_batch[l], ld2, Nsmall,
-           L.max_d2_small, nrhs, L.max_d1_small, magma_q);
+           L.max_d2_small, nrhs, L.max_d1_small, blas_handle);
       for (std::size_t i=Nsmall; i<N; i++) {
         DenseMW_t fb(L.f[i]->dim_sep(), nrhs, h_rhs_batch[l][i], b.rows()),
           fbu(L.f[i]->dim_upd(), nrhs, h_bupd_batch[l][i], L.f[i]->dim_upd());
@@ -1014,13 +1013,13 @@ namespace strumpack {
             (MagmaNoTrans, d1, d2, scalar_t(-1.), F12, ld1,
              d_bupd_batch[l], inc_batch+Nmax-Nsmall, scalar_t(1.),
              d_rhs_batch[l], inc_batch+Nmax-Nsmall, Nsmall,
-             L.max_d1_small, L.max_d2_small, magma_q);
+             L.max_d1_small, L.max_d2_small, blas_handle);
         else
           gpu::magma::gemm_vbatched_max_nocheck
             (MagmaNoTrans, MagmaNoTrans, d1, nrhs_batch+Nmax-Nsmall, d2,
              scalar_t(-1.), F12, ld1, d_bupd_batch[l], ld2, scalar_t(1.),
              d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall, Nsmall,
-             L.max_d1_small, nrhs, L.max_d2_small, magma_q);
+             L.max_d1_small, nrhs, L.max_d2_small, blas_handle);
         for (std::size_t i=Nsmall; i<N; i++) {
           DenseMW_t fb(L.f[i]->dim_sep(), nrhs, h_rhs_batch[l][i], b.rows()),
             fbu(L.f[i]->dim_upd(), nrhs, h_bupd_batch[l][i], L.f[i]->dim_upd());

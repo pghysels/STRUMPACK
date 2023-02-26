@@ -62,8 +62,9 @@ namespace strumpack {
       using Opts_t = BLROptions<scalar_t>;
 
     public:
+      // TODO where is this used?
       LRTile();
-      
+
       LRTile(std::size_t m, std::size_t n, std::size_t r);
 
       LRTile(const DenseM_t& T, const Opts_t& opts);
@@ -93,7 +94,8 @@ namespace strumpack {
              const Opts_t& opts);
 
       LRTile(const DenseM_t& U, const DenseM_t& V);
-      
+
+      // TODO where is this used??
       LRTile(DMW_t& dU, DMW_t& dV);
 
       std::size_t rows() const override { return U_->rows(); }
@@ -126,9 +128,12 @@ namespace strumpack {
       const DenseM_t& U() const override { return *U_; }
       const DenseM_t& V() const override { return *V_; }
 
-      LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
-      LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
-      LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      multiply(const BLRTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      left_multiply(const LRTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      left_multiply(const DenseTile<scalar_t>& a) const override;
 
       void multiply(const BLRTile<scalar_t>& a,
                     DenseM_t& b, DenseM_t& c) const override;
@@ -151,7 +156,10 @@ namespace strumpack {
       void laswp(gpu::BLASHandle& handle, int* dpiv, bool fwd) override;
 #endif
 
-      void move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned = NULL) override;
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      void move_gpu_tile_to_cpu(gpu::Stream& s,
+                                scalar_t* pinned=nullptr) override;
+#endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;

@@ -543,16 +543,9 @@ namespace strumpack {
                           b1, b2, b3, dVU, dUVU);
           }
         }
-
-#if defined(STRUMPACK_USE_MAGMA)
-        b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-        b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-        b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
-#else
-        b1.run(scalar_t(1.), scalar_t(0.), handle);
-        b2.run(scalar_t(1.), scalar_t(0.), handle);
-        b3.run(scalar_t(-1.), scalar_t(1.), handle);
-#endif
+        b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+        b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+        b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
       }
       std::size_t max_pinned = 0;
       for (std::size_t i=0; i<rb; i++)
@@ -598,7 +591,7 @@ namespace strumpack {
           }
         if (i == 0) {
 #pragma omp parallel
-#pragma omp single
+#pragma omp single //nowait
           {
 #pragma omp task
             {
@@ -608,27 +601,15 @@ namespace strumpack {
             }
 #pragma omp task
             {
-#if defined(STRUMPACK_USE_MAGMA)
-              b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-              b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-              b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
-#else
-              b1.run(scalar_t(1.), scalar_t(0.), handle);
-              b2.run(scalar_t(1.), scalar_t(0.), handle);
-              b3.run(scalar_t(-1.), scalar_t(1.), handle);
-#endif
+              b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+              b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+              b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
             }
           }
         } else {
-#if defined(STRUMPACK_USE_MAGMA)
-          b1.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-          b2.run(scalar_t(1.), scalar_t(0.), q, comp_stream);
-          b3.run(scalar_t(-1.), scalar_t(1.), q, comp_stream);
-#else
-          b1.run(scalar_t(1.), scalar_t(0.), handle);
-          b2.run(scalar_t(1.), scalar_t(0.), handle);
-          b3.run(scalar_t(-1.), scalar_t(1.), handle);
-#endif
+          b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+          b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+          b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
         }
         comp_stream.synchronize();
       }
