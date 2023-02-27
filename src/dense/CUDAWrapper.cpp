@@ -633,20 +633,11 @@ namespace strumpack {
            DenseMatrix<scalar_t>& A, real_t* S, DenseMatrix<scalar_t>& U,
            DenseMatrix<scalar_t>& V, int* devInfo,
            scalar_t* work, int lwork, const double tol) {
-      // std::size_t minmn = std::min(U.rows(), V.rows());
       gesvdjInfo_t params;
       gesvdj_info_create(&params);
       cusolverDnXgesvdjSetTolerance(params, tol);
-      // int gesvd_work_size = gesvdj_buffersize<scalar_t>
-      //   (handle, jobz, U.rows(), V.rows(), params);
-      //auto svd_ptr = reinterpret_cast<scalar_t*>(svd_mem);
-      //svd_ptr += minmn;
-      //DenseMatrixWrapper<scalar_t> d_A(A.rows(), A.cols(), svd_ptr, A.rows());
-      //copy_device_to_device(d_A, A);
-      //svd_ptr += A.rows() * A.cols();
       gesvdj<scalar_t>(handle, jobz, A, S, U, V, work, lwork, devInfo, params);
       gesvdj_info_destroy(params);
-      // return gesvd_work_size;
     }
     template void gesvdj(SOLVERHandle&, Jobz, DenseMatrix<float>&, float*,
                          DenseMatrix<float>&, DenseMatrix<float>&,

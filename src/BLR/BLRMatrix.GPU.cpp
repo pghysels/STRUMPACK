@@ -137,17 +137,13 @@ namespace strumpack {
             (new LRTile<scalar_t>(tU, tV));
           DenseMW_t dU_tmp(m, rank, dU, 0, 0);
           gpu_check(gpu::copy_device_to_device(tU, dU_tmp));
-
           gpu::geam<scalar_t>
             (blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, dV, tV);
           gpu_check(gpu::copy_real_to_scalar<scalar_t>
                     (d_sval_scalar, d_sval_real, rank));
           gpu::dgmm<scalar_t>(blashandle, Side::L, tV, d_sval_scalar, tV);
-        } else {
-          // create_dense_tile_gpu(i, j, A, opts);
         }
       }
-
     }
 
     template<typename scalar_t> void
@@ -226,6 +222,7 @@ namespace strumpack {
           B21.create_dense_tile_gpu(i, j, A21, dAij);
           dA21 += B21.tilerows(i) * B21.tilecols(j);
         }
+
       for (std::size_t i=0; i<rb; i++) {
         gpu::getrf(solvehandle, B11.tile(i, i).D(),
                    d_work_mem, dpiv+B11.tileroff(i), dinfo);
@@ -266,7 +263,7 @@ namespace strumpack {
         VBatchedGEMM<scalar_t> b1(batchcount, d_batch_mem),
           b2(batchcount, d_batch_mem+gpu::round_up(d_batch_meta)),
           b3(batchcount, d_batch_mem+2*gpu::round_up(d_batch_meta));
-        auto dVU = d_work_mem; //gpu::aligned_ptr<scalar_t>(d_batch_mem + 3*d_batch_meta);
+        auto dVU = d_work_mem;
         auto dUVU = dVU + max_batch_temp;
         for (std::size_t j=i+1; j<rb; j++) {
           for (std::size_t k=i+1; k<rb; k++)
