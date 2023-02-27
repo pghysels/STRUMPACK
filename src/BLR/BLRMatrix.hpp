@@ -273,13 +273,12 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void create_dense_tile_gpu(std::size_t i, std::size_t j,
-                                 DenseM_t& A, DenseMW_t& dB);
+                                 DenseM_t& A, scalar_t*& dA);
       void compress_tile_gpu(gpu::SOLVERHandle& handle,
                              gpu::BLASHandle& blashandle,
                              std::size_t i, std::size_t j, DenseM_t& A,
                              int* dinfo, scalar_t* work,
                              const Opts_t& opts);
-
 #endif
 
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,

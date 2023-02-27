@@ -538,7 +538,7 @@ namespace strumpack {
       gesvdjInfo_t params = nullptr;
       int Lwork;
       gesvdj_buffersize
-        (handle, E2cuOp(jobz), 1, m, n, static_cast<scalar_t*>(nullptr), n,
+        (handle, E2cuOp(jobz), 1, m, n, static_cast<scalar_t*>(nullptr), m,
          static_cast<real_t*>(nullptr), static_cast<scalar_t*>(nullptr), m,
          static_cast<scalar_t*>(nullptr), n, &Lwork, params);
       return Lwork;
