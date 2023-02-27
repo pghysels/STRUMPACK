@@ -257,7 +257,6 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> void
     LRTile<scalar_t>::move_gpu_tile_to_cpu(gpu::Stream& s, scalar_t* pinned) {
-      gpu::Event event;
       DenseM_t hU(U().rows(), U().cols()),
         hV(V().rows(), V().cols());
       if (!pinned) {
@@ -266,21 +265,22 @@ namespace strumpack {
       } else {
         gpu_check(gpu::copy_device_to_host_async
                   (pinned, U().data(), U().rows()*U().cols(), s));
-        event.record(s);
-        event.synchronize();
-        for (std::size_t i=0; i<U().rows(); i++)
-          for (std::size_t j=0; j<U().cols(); j++)
+        gpu::Event e;
+        e.record(s);
+        e.synchronize();
+        for (std::size_t j=0; j<U().cols(); j++)
+          for (std::size_t i=0; i<U().rows(); i++)
             hU(i, j) = pinned[i+U().ld()*j];
         gpu_check(gpu::copy_device_to_host_async
                   (pinned, V().data(), V().rows()*V().cols(), s));
-        event.record(s);
-        event.synchronize();
-        for (std::size_t i=0; i<V().rows(); i++)
-          for (std::size_t j=0; j<V().cols(); j++)
+        e.record(s);
+        e.synchronize();
+        for (std::size_t j=0; j<V().cols(); j++)
+          for (std::size_t i=0; i<V().rows(); i++)
             hV(i, j) = pinned[i+V().ld()*j];
       }
-      U_.reset(new DenseM_t(hU));
-      V_.reset(new DenseM_t(hV));
+      U_.reset(new DenseM_t(std::move(hU)));
+      V_.reset(new DenseM_t(std::move(hV)));
     }
 #endif
 

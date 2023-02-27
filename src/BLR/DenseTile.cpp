@@ -104,30 +104,27 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> void
     DenseTile<scalar_t>::laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) {
-// #if defined(STRUMPACK_USE_MAGMA)
-//       gpu::magma::laswpx(D(), dpiv, h, fwd);
-// #else
       gpu::laswp(h, D(), 1, D().rows(), dpiv, fwd ? 1 : -1);
-// #endif
     }
 
     template<typename scalar_t> void
     DenseTile<scalar_t>::move_gpu_tile_to_cpu
     (gpu::Stream& s, scalar_t* pinned) {
-      gpu::Event event;
-      DenseM_t hD(D().rows(), D().cols());
+      DenseM_t hD(rows(), cols());
       if (!pinned) {
         gpu_check(gpu::copy_device_to_host_async(hD, D(), s));
       } else {
+        assert(rows() == 0 || D_->ld() == rows());
         gpu_check(gpu::copy_device_to_host_async
-                  (pinned, D().data(), D().rows()*D().cols(), s));
+                  (pinned, D().data(), rows()*cols(), s));
+        gpu::Event event;
         event.record(s);
         event.synchronize();
-        for (std::size_t i=0; i<D().rows(); i++)
-          for (std::size_t j=0; j<D().cols(); j++)
+        for (std::size_t j=0; j<cols(); j++)
+          for (std::size_t i=0; i<rows(); i++)
             hD(i, j) = pinned[i+D().ld()*j];
       }
-      D_.reset(new DenseM_t(hD));
+      D_.reset(new DenseM_t(std::move(hD)));
     }
 #endif
 

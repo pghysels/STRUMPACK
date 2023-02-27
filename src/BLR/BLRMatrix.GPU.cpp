@@ -190,6 +190,8 @@ namespace strumpack {
         max_m = std::max(max_m, B21.tilerows(k));
       auto max_mn = max_m*max_m;
 
+      gpu::HostMemory<scalar_t> pinned(max_mn);
+
       int getrf_work_size =
         gpu::getrf_buffersize<scalar_t>(solvehandle, max_m1);
       // max buffersize is not the buffersize of the largest matrix,
@@ -324,26 +326,32 @@ namespace strumpack {
             add_tile_mult(B21.tile(k, i), B12.tile(i, j), dAkj,
                           b1, b2, b3, dVU, dUVU);
           }
-
-        // TODO overlap this with copy back of the computed F11, F12, F21
-        b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-        b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-        b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
+#pragma omp parallel
+#pragma omp single nowait
+        {
+#pragma omp task
+          {
+            b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+            b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+            b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
+          }
+#pragma omp task
+          {
+            for (std::size_t j=0; j<rb; j++)
+              B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream, pinned);
+            for (std::size_t j=0; j<rb2; j++) {
+              B12.tile(i, j).move_gpu_tile_to_cpu(copy_stream, pinned);
+              B21.tile(j, i).move_gpu_tile_to_cpu(copy_stream, pinned);
+            }
+          }
+        }
         comp_stream.synchronize();
+        copy_stream.synchronize();
       }
-      gpu::synchronize();
       gpu::copy_device_to_host(piv.data(), dpiv, dsep);
-      for (std::size_t i=0; i<rb; i++) {
+      for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
-        for (std::size_t j=0; j<rb; j++)
-          B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
-        for (std::size_t j=0; j<rb2; j++) {
-          B12.tile(i, j).move_gpu_tile_to_cpu(copy_stream);
-          B21.tile(j, i).move_gpu_tile_to_cpu(copy_stream);
-        }
-      }
-      gpu::synchronize();
     }
 
     // explicit template instantiations
