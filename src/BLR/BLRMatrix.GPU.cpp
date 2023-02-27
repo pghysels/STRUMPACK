@@ -335,14 +335,17 @@ namespace strumpack {
             b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
             b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
           }
+          if (i > 0) {
 #pragma omp task
-          {
-            for (std::size_t j=0; j<rb; j++)
-              B11.tile(i, j).move_gpu_tile_to_cpu(copy_stream, pinned);
-            for (std::size_t j=0; j<rb2; j++) {
-              B12.tile(i, j).move_gpu_tile_to_cpu(copy_stream, pinned);
-              B21.tile(j, i).move_gpu_tile_to_cpu(copy_stream, pinned);
+            {
+              for (std::size_t j=0; j<rb; j++)
+                B11.tile(i-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
+              for (std::size_t j=0; j<rb2; j++) {
+                B12.tile(i-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
+                B21.tile(j, i-1).move_gpu_tile_to_cpu(copy_stream, pinned);
+              }
             }
+#pragma omp taskwait
           }
         }
         comp_stream.synchronize();
@@ -352,6 +355,14 @@ namespace strumpack {
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
+      if (rb > 0) {
+        for (std::size_t j=0; j<rb; j++)
+          B11.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream);
+        for (std::size_t j=0; j<rb2; j++) {
+          B12.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream);
+          B21.tile(j, rb-1).move_gpu_tile_to_cpu(copy_stream);
+        }
+      }
     }
 
     // explicit template instantiations

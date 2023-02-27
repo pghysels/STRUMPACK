@@ -153,14 +153,6 @@ namespace strumpack {
                        integer_t& zero,
                        integer_t& pos) const;
 
-    // #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    // virtual scalar_t*
-    // get_device_F22(gpu::DeviceMemory<scalar_t>& dmemF22) {
-    //   std::cerr << "ERROR copy_F22_to_gpu not implemented for this front type"
-    //             << std::endl;;
-    //   assert(false);
-    //   return nullptr;
-    // }
     virtual std::size_t get_device_F22_worksize() {
       return dim_upd()*dim_upd();
     };
@@ -168,8 +160,8 @@ namespace strumpack {
       std::cerr << "ERROR get_device_F22 not implemented for this front type"
                 << std::endl;;
       assert(false);
+      return nullptr;
     }
-    // #endif
 
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
