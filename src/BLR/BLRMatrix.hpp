@@ -190,45 +190,6 @@ namespace strumpack {
                                    const Opts_t& opts);
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void compress_tile_gpu(gpu::SOLVERHandle& handle,
-                             gpu::BLASHandle& blashandle,
-                             std::size_t i, std::size_t j,
-                             DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
-                             int* dpiv, char* gesvd_mem,
-                             const Opts_t& opts);
-#if defined(STRUMPACK_USE_CUDA)
-      void compress_tile_CUDA(gpu::SOLVERHandle& handle,
-                              gpu::BLASHandle& blashandle,
-                              std::size_t i, std::size_t j,
-                              DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
-                              int* dpiv, char* gesvd_mem,
-                              const Opts_t& opts);
-#endif
-#if defined(STRUMPACK_USE_MAGMA)
-      void compress_tile_MAGMA(gpu::SOLVERHandle& handle,
-                               gpu::BLASHandle& blashandle,
-                               std::size_t i, std::size_t j,
-                               DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
-                               int* dpiv, char* gesvd_mem,
-                               const Opts_t& opts);
-#endif
-#if defined(STRUMPACK_USE_KBLAS)
-      void compress_tile_KBLAS(gpu::SOLVERHandle& handle,
-                               gpu::BLASHandle& blashandle,
-                               std::size_t i, std::size_t j,
-                               DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
-                               int* dpiv, char* gesvd_mem,
-                               const Opts_t& opts);
-#endif
-#if defined(STRUMPACK_USE_HIP)
-      void compress_tile_HIP(gpu::SOLVERHandle& handle,
-                             gpu::BLASHandle& blashandle,
-                             std::size_t i, std::size_t j,
-                             DenseM_t& A, scalar_t* d_U, scalar_t* d_V,
-                             int* dpiv, char* gesvd_mem,
-                             const Opts_t& opts);
-#endif
-
       static void
       construct_and_partial_factor_gpu(DenseM_t& A11, DenseM_t& A12,
                                        DenseM_t& A21, DenseM_t& A22,
@@ -311,14 +272,14 @@ namespace strumpack {
                           DenseM_t& A, const Opts_t& opts);
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void create_dense_gpu_tile(std::size_t i, std::size_t j,
+      void create_dense_tile_gpu(std::size_t i, std::size_t j,
                                  DenseM_t& A, DenseMW_t& dB);
-      void create_LR_gpu_tile(gpu::SOLVERHandle& handle,
-                              gpu::BLASHandle& blashandle,
-                              std::size_t i, std::size_t j, DenseM_t& A,
-                              DenseM_t& dU, DenseM_t& dV,
-                              scalar_t*& dA, int* dpiv,
-                              const Opts_t& opts);
+      void compress_tile_gpu(gpu::SOLVERHandle& handle,
+                             gpu::BLASHandle& blashandle,
+                             std::size_t i, std::size_t j, DenseM_t& A,
+                             int* dinfo, scalar_t* work,
+                             const Opts_t& opts);
+
 #endif
 
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
@@ -344,12 +305,6 @@ namespace strumpack {
       void draw(const BLRMatrix<T>& H, const std::string& name);
       template<typename T,typename I> friend class BLRExtendAdd;
     };
-
-// #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-//     template<typename scalar_t> int
-//     compress_mem(gpu::SOLVERHandle& solvehandle,
-//                  std::size_t maxm_all, std::size_t maxmn_all);
-// #endif
 
     template<typename scalar_t> void
     LUAR(const std::vector<BLRTile<scalar_t>*>& Ti,

@@ -246,11 +246,11 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> void
     LRTile<scalar_t>::laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) {
-#if defined(STRUMPACK_USE_MAGMA)
-      gpu::magma::laswpx(U(), dpiv, h, fwd);
-#else
+// #if defined(STRUMPACK_USE_MAGMA)
+//       gpu::magma::laswpx(U(), dpiv, h, fwd);
+// #else
       gpu::laswp(h, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
-#endif
+// #endif
     }
 #endif
 

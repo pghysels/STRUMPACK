@@ -51,7 +51,7 @@ namespace strumpack {
     template<typename scalar_t> class DenseTile
       : public BLRTile<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
-      using DMW_t = DenseMatrixWrapper<scalar_t>;
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using BLRT_t = BLRTile<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
 
@@ -63,13 +63,9 @@ namespace strumpack {
       DenseTile(const DenseM_t& D) {
         D_.reset(new DenseM_t(D));
       }
-      DenseTile(DMW_t& D) {
-        D_.reset(new DMW_t(D));
+      DenseTile(DenseMW_t& D) {
+        D_.reset(new DenseMW_t(D));
       }
-      // DenseTile(std::size_t m, std::size_t n,
-      //           scalar_t* dB, std::size_t ldB) {
-      //   D_.reset(new DMW_t(m, n, dB, ldB));
-      // }
 
       std::size_t rows() const override { return D_->rows(); }
       std::size_t cols() const override { return D_->cols(); }

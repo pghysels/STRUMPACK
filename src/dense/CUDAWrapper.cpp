@@ -534,7 +534,8 @@ namespace strumpack {
     }
     template<typename scalar_t, typename real_t>
     int gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz,
-                          int m, int n, gesvdjInfo_t& params) {
+                          int m, int n) {
+      gesvdjInfo_t params = nullptr;
       int Lwork;
       gesvdj_buffersize
         (handle, E2cuOp(jobz), 1, m, n, static_cast<scalar_t*>(nullptr), n,
@@ -543,18 +544,16 @@ namespace strumpack {
       return Lwork;
     }
     template
-    int gesvdj_buffersize<float,float>(SOLVERHandle&, Jobz,
-                                       int, int, gesvdjInfo_t&);
+    int gesvdj_buffersize<float,float>(SOLVERHandle&, Jobz, int, int);
     template
     int gesvdj_buffersize<double,double>(SOLVERHandle&, Jobz,
-                                         int, int, gesvdjInfo_t&);
+                                         int, int);
     template
     int gesvdj_buffersize<std::complex<float>,float>(SOLVERHandle&, Jobz,
-                                                     int, int, gesvdjInfo_t&);
+                                                     int, int);
     template
     int gesvdj_buffersize<std::complex<double>,double>(SOLVERHandle&, Jobz,
-                                                       int, int,
-                                                       gesvdjInfo_t&);
+                                                       int, int);
 
     void gesvdj(SOLVERHandle& handle, cusolverEigMode_t jobz, int econ,
                 int m, int n, float* A, int lda, float* S, float* U, int ldu,
@@ -629,44 +628,42 @@ namespace strumpack {
                          DenseMatrix<std::complex<double>>&,
                          std::complex<double>*, int, int*, gesvdjInfo_t&);
 
-    template<typename scalar_t, typename real_t> int
-    gesvd(SOLVERHandle& handle, Jobz jobz, real_t* S,
-          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U,
-          DenseMatrix<scalar_t>& V, int* devInfo,
-          char* svd_mem, const double tol) {
-      std::size_t minmn = std::min(U.rows(), V.rows());
+    template<typename scalar_t, typename real_t> void
+    gesvdj(SOLVERHandle& handle, Jobz jobz,
+           DenseMatrix<scalar_t>& A, real_t* S, DenseMatrix<scalar_t>& U,
+           DenseMatrix<scalar_t>& V, int* devInfo,
+           scalar_t* work, int lwork, const double tol) {
+      // std::size_t minmn = std::min(U.rows(), V.rows());
       gesvdjInfo_t params;
       gesvdj_info_create(&params);
       cusolverDnXgesvdjSetTolerance(params, tol);
-      int gesvd_work_size = gesvdj_buffersize<scalar_t>
-        (handle, jobz, U.rows(), V.rows(), params);
-      auto svd_ptr = reinterpret_cast<scalar_t*>(svd_mem);
-      svd_ptr += minmn;
-      DenseMatrixWrapper<scalar_t> d_A(A.rows(), A.cols(), svd_ptr, A.rows());
-      copy_device_to_device(d_A, A);
-      svd_ptr += A.rows() * A.cols();
-      gesvdj<scalar_t>(handle, jobz, d_A, S, U, V, svd_ptr,
-                       gesvd_work_size, devInfo, params);
+      // int gesvd_work_size = gesvdj_buffersize<scalar_t>
+      //   (handle, jobz, U.rows(), V.rows(), params);
+      //auto svd_ptr = reinterpret_cast<scalar_t*>(svd_mem);
+      //svd_ptr += minmn;
+      //DenseMatrixWrapper<scalar_t> d_A(A.rows(), A.cols(), svd_ptr, A.rows());
+      //copy_device_to_device(d_A, A);
+      //svd_ptr += A.rows() * A.cols();
+      gesvdj<scalar_t>(handle, jobz, A, S, U, V, work, lwork, devInfo, params);
       gesvdj_info_destroy(params);
-      return gesvd_work_size;
+      // return gesvd_work_size;
     }
-
-    template int gesvd(SOLVERHandle&, Jobz, float*, DenseMatrix<float>&,
-                       DenseMatrix<float>&, DenseMatrix<float>&,
-                       int*, char*, const double);
-    template int gesvd(SOLVERHandle&, Jobz, double*, DenseMatrix<double>&,
-                        DenseMatrix<double>&, DenseMatrix<double>&,
-                        int*, char*, const double);
-    template int gesvd(SOLVERHandle&, Jobz, float*,
-                       DenseMatrix<std::complex<float>>&,
-                       DenseMatrix<std::complex<float>>&,
-                       DenseMatrix<std::complex<float>>&,
-                       int*, char*, const double);
-    template int gesvd(SOLVERHandle&, Jobz, double*,
-                       DenseMatrix<std::complex<double>>&,
-                       DenseMatrix<std::complex<double>>&,
-                       DenseMatrix<std::complex<double>>&,
-                       int*, char*, const double);
+    template void gesvdj(SOLVERHandle&, Jobz, DenseMatrix<float>&, float*,
+                         DenseMatrix<float>&, DenseMatrix<float>&,
+                         int*, float*, int, const double);
+    template void gesvdj(SOLVERHandle&, Jobz, DenseMatrix<double>&, double*,
+                         DenseMatrix<double>&, DenseMatrix<double>&,
+                         int*, double*, int, const double);
+    template void gesvdj(SOLVERHandle&, Jobz,
+                         DenseMatrix<std::complex<float>>&, float*,
+                         DenseMatrix<std::complex<float>>&,
+                         DenseMatrix<std::complex<float>>&,
+                         int*, std::complex<float>*, int, const double);
+    template void gesvdj(SOLVERHandle&, Jobz,
+                         DenseMatrix<std::complex<double>>&, double*,
+                         DenseMatrix<std::complex<double>>&,
+                         DenseMatrix<std::complex<double>>&,
+                         int*, std::complex<double>*, int, const double);
 
     void geam(BLASHandle& handle, cublasOperation_t transa,
               cublasOperation_t transb, int m, int n, const float* alpha,

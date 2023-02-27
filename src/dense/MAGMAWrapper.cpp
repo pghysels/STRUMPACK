@@ -76,66 +76,62 @@ namespace strumpack {
         return info;
       }
 
-      void laswpx(DenseMatrix<float>& A, const int* dpiv,
-                  magma_queue_t queue, bool fwd) {
-        std::vector<int> tpiv(A.rows());
-        gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
-        STRUMPACK_BYTES(4*blas::laswp_moves(A.cols(), 1, A.rows()));
-        magmablas_slaswpx(A.cols(), A.data(), 1, A.ld(), 1,
-                          A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
-      }
-      void laswpx(DenseMatrix<double>& A, const int* dpiv,
-                  magma_queue_t queue, bool fwd) {
-        std::vector<int> tpiv(A.rows());
-        gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
-        STRUMPACK_BYTES(8*blas::laswp_moves(A.cols(), 1, A.rows()));
-        magmablas_dlaswpx(A.cols(), A.data(), 1, A.ld(), 1,
-                          A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
-      }
-      void laswpx(DenseMatrix<std::complex<float>>& A,
-                  const int* dpiv, magma_queue_t queue, bool fwd) {
-        std::vector<int> tpiv(A.rows());
-        gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
-        STRUMPACK_BYTES(2*4*blas::laswp_moves(A.cols(), 1, A.rows()));
-        magmablas_claswpx(A.cols(),
-                          reinterpret_cast<magmaFloatComplex*>(A.data()),
-                          1, A.ld(), 1, A.rows(), tpiv.data(),
-                          fwd ? 1 : -1, queue);
-      }
-      void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv,
-                  magma_queue_t queue, bool fwd) {
-        std::vector<int> tpiv(A.rows());
-        gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
-        STRUMPACK_BYTES(2*8*blas::laswp_moves(A.cols(), 1, A.rows()));
-        magmablas_zlaswpx(A.cols(),
-                          reinterpret_cast<magmaDoubleComplex*>(A.data()),
-                          1, A.ld(), 1, A.rows(), tpiv.data(),
-                          fwd ? 1 : -1, queue);
-      }
+      // void laswpx(DenseMatrix<float>& A, const int* dpiv,
+      //             magma_queue_t queue, bool fwd) {
+      //   std::vector<int> tpiv(A.rows());
+      //   gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
+      //   STRUMPACK_BYTES(4*blas::laswp_moves(A.cols(), 1, A.rows()));
+      //   magmablas_slaswpx(A.cols(), A.data(), 1, A.ld(), 1,
+      //                     A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
+      // }
+      // void laswpx(DenseMatrix<double>& A, const int* dpiv,
+      //             magma_queue_t queue, bool fwd) {
+      //   std::vector<int> tpiv(A.rows());
+      //   gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
+      //   STRUMPACK_BYTES(8*blas::laswp_moves(A.cols(), 1, A.rows()));
+      //   magmablas_dlaswpx(A.cols(), A.data(), 1, A.ld(), 1,
+      //                     A.rows(), tpiv.data(), fwd ? 1 : -1, queue);
+      // }
+      // void laswpx(DenseMatrix<std::complex<float>>& A,
+      //             const int* dpiv, magma_queue_t queue, bool fwd) {
+      //   std::vector<int> tpiv(A.rows());
+      //   gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
+      //   STRUMPACK_BYTES(2*4*blas::laswp_moves(A.cols(), 1, A.rows()));
+      //   magmablas_claswpx(A.cols(),
+      //                     reinterpret_cast<magmaFloatComplex*>(A.data()),
+      //                     1, A.ld(), 1, A.rows(), tpiv.data(),
+      //                     fwd ? 1 : -1, queue);
+      // }
+      // void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv,
+      //             magma_queue_t queue, bool fwd) {
+      //   std::vector<int> tpiv(A.rows());
+      //   gpu_check(gpu::copy_device_to_host(tpiv.data(), dpiv, A.rows()));
+      //   STRUMPACK_BYTES(2*8*blas::laswp_moves(A.cols(), 1, A.rows()));
+      //   magmablas_zlaswpx(A.cols(),
+      //                     reinterpret_cast<magmaDoubleComplex*>(A.data()),
+      //                     1, A.ld(), 1, A.rows(), tpiv.data(),
+      //                     fwd ? 1 : -1, queue);
+      // }
 
       int gesvd_nb(DenseMatrix<float>& A) {
         int nb = magma_get_sgesvd_nb(A.rows(), A.cols());
         std::size_t minmn = std::min(A.rows(), A.cols());
-        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
-        return lwork;
+        return 2*minmn*minmn + 3*minmn + 2*minmn*nb;
       }
       int gesvd_nb(DenseMatrix<double>& A) {
         int nb = magma_get_dgesvd_nb(A.rows(), A.cols());
         std::size_t minmn = std::min(A.rows(), A.cols());
-        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
-        return lwork;
+        return 2*minmn*minmn + 3*minmn + 2*minmn*nb;
       }
       int gesvd_nb(DenseMatrix<std::complex<float>>& A) {
         int nb = magma_get_dgesvd_nb(A.rows(), A.cols());
         std::size_t minmn = std::min(A.rows(), A.cols());
-        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
-        return lwork;
+        return 2*minmn*minmn + 3*minmn + 2*minmn*nb;
       }
       int gesvd_nb(DenseMatrix<std::complex<double>>& A) {
         int nb = magma_get_dgesvd_nb(A.rows(), A.cols());
         std::size_t minmn = std::min(A.rows(), A.cols());
-        int lwork = 2* minmn * minmn +3* minmn +2* minmn *nb;
-        return lwork;
+        return 2*minmn*minmn + 3*minmn + 2*minmn*nb;
       }
 
       void gesvd(magma_vec_t jobu, magma_vec_t jobvt,

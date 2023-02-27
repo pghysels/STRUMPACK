@@ -55,41 +55,41 @@ namespace strumpack {
   namespace gpu {
     namespace magma {
 
-      // TODO remove, now part of BLASHandle?
-      class MAGMAQueue {
-      public:
-        MAGMAQueue() { magma_queue_create(0, &q_); }
-        MAGMAQueue(Stream& s, BLASHandle& h) {
-          magma_init();
-#if defined(STRUMPACK_USE_CUDA)
-          magma_queue_create_from_cuda(0, s, h, NULL, &q_);
-#elif defined(STRUMPACK_USE_HIP)
-          magma_queue_create_from_hip(0, s, h, NULL, &q_);
-#endif
-        }
-        ~MAGMAQueue() {
-          magma_queue_destroy(q_);
-          magma_finalize();
-        }
-        operator magma_queue_t&() { return q_; }
-        operator const magma_queue_t&() const { return q_; }
-      private:
-        magma_queue_t q_;
-      };
+//       // TODO remove, now part of BLASHandle?
+//       class MAGMAQueue {
+//       public:
+//         MAGMAQueue() { magma_queue_create(0, &q_); }
+//         MAGMAQueue(Stream& s, BLASHandle& h) {
+//           magma_init();
+// #if defined(STRUMPACK_USE_CUDA)
+//           magma_queue_create_from_cuda(0, s, h, NULL, &q_);
+// #elif defined(STRUMPACK_USE_HIP)
+//           magma_queue_create_from_hip(0, s, h, NULL, &q_);
+// #endif
+//         }
+//         ~MAGMAQueue() {
+//           magma_queue_destroy(q_);
+//           magma_finalize();
+//         }
+//         operator magma_queue_t&() { return q_; }
+//         operator const magma_queue_t&() const { return q_; }
+//       private:
+//         magma_queue_t q_;
+//       };
 
       int getrf(DenseMatrix<float>& A, int* dpiv);
       int getrf(DenseMatrix<double>& A, int* dpiv);
       int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv);
       int getrf(DenseMatrix<std::complex<double>>& A, int* dpiv);
 
-      void laswpx(DenseMatrix<float>& A, const int* dpiv,
-                  magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<double>& A, const int* dpiv,
-                  magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<std::complex<float>>& A, const int* dpiv,
-                  magma_queue_t queue, bool fwd);
-      void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv,
-                  magma_queue_t queue, bool fwd);
+      // void laswpx(DenseMatrix<float>& A, const int* dpiv,
+      //             magma_queue_t queue, bool fwd);
+      // void laswpx(DenseMatrix<double>& A, const int* dpiv,
+      //             magma_queue_t queue, bool fwd);
+      // void laswpx(DenseMatrix<std::complex<float>>& A, const int* dpiv,
+      //             magma_queue_t queue, bool fwd);
+      // void laswpx(DenseMatrix<std::complex<double>>& A, const int* dpiv,
+      //             magma_queue_t queue, bool fwd);
 
       template<typename scalar_t,
                typename real_t=typename RealType<scalar_t>::value_type> void
