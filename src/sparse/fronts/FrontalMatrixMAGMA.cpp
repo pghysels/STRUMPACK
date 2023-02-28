@@ -672,7 +672,7 @@ namespace strumpack {
       TaskTimer tl("");
       tl.start();
       auto& L = ldata[l];
-      if (opts.verbose()) L.print_info(l, lvls);
+      if (etree_level == 0 && opts.verbose()) L.print_info(l, lvls);
       try {
         char *work_mem = nullptr, *dea_mem = nullptr;
         scalar_t* dev_factors = nullptr;
@@ -769,7 +769,7 @@ namespace strumpack {
       L.flops(level_flops, small_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
-      if (opts.verbose()) {
+      if (etree_level == 0 && opts.verbose()) {
         auto level_time = tl.elapsed();
         std::cout << "#   GPU Factorization complete, took: "
                   << level_time << " seconds, "
