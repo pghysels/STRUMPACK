@@ -81,6 +81,8 @@ namespace strumpack {
       const override;
 #endif
 
+    scalar_t* get_device_F22(scalar_t* dF22) override;
+
   private:
     std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
     DenseMW_t F11_, F12_, F21_, F22_;

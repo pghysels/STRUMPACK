@@ -47,8 +47,6 @@
 #include "dense/MAGMAWrapper.hpp"
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
-#include "kblas_operators.h"
-#include "kblas.h"
 #include "dense/KBLASWrapper.hpp"
 #endif
 
@@ -65,8 +63,7 @@ namespace strumpack {
           temp1 += A.rank() * B.rank();
           temp2 += (B.rank() < A.rank()) ?
             A.rows() * B.rank() : A.rank() * B.cols();
-        } else
-          temp1 += A.rank() * B.cols();
+        } else temp1 += A.rank() * B.cols();
       } else if (B.is_low_rank())
         temp1 += A.rows() * B.rank();
     }
@@ -116,6 +113,61 @@ namespace strumpack {
       gpu_check(gpu::copy_device_to_device(tile(i, j).D(), tile(A, i, j)));
     }
 
+#if defined(STRUMPACK_USE_KBLAS)
+    /*
+     * work should be:
+     *   scalar_t:  3*m*n
+     *   int:       3
+     *   scalar_t*: 3
+     * this should always be less than the CUDA version???
+     */
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress_tile_gpu
+    (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
+     std::size_t i, std::size_t j, DenseM_t& A,
+     int* info, scalar_t* work, const Opts_t& opts) {
+      int m = tilerows(i), n = tilecols(j);
+      if (m > 15 && n > 15) {
+        std::size_t minmn = std::min(m, n);
+        DenseMW_t dU(m, minmn, work, m);  work += m*minmn;
+        DenseMW_t dV(n, minmn, work, n);  work += n*minmn;
+        DenseMW_t dA(m, n,     work, m);  work += m*n;
+        gpu_check(gpu::copy_device_to_device(dA, A));
+        auto diwork = gpu::aligned_ptr<int>(work);
+        auto d_m = diwork;  diwork += 1;
+        auto d_n = diwork;  diwork += 1;
+        auto d_r = diwork;  diwork += 1;
+        gpu_check(gpu::copy_host_to_device(d_m, &m, 1));
+        gpu_check(gpu::copy_host_to_device(d_n, &n, 1));
+        auto spwork = gpu::aligned_ptr<scalar_t*>(diwork);
+        auto dAptr = spwork;  spwork += 1;  auto hdAptr = dA.data();
+        auto dUptr = spwork;  spwork += 1;  auto hdUptr = dU.data();
+        auto dVptr = spwork;  spwork += 1;  auto hdVptr = dV.data();
+        gpu_check(gpu::copy_host_to_device(dAptr, &hdAptr, 1));
+        gpu_check(gpu::copy_host_to_device(dUptr, &hdUptr, 1));
+        gpu_check(gpu::copy_host_to_device(dVptr, &hdVptr, 1));
+        int rank = 0;
+        gpu::kblas::ara
+          (blashandle, d_m, d_n, dAptr, d_m, dUptr, d_m, dVptr, d_n,
+           d_r, opts.rel_tol(), m, n, minmn, 32, 10, 1, 1);
+        gpu_check(gpu::copy_device_to_host(&rank, d_r, 1));
+        STRUMPACK_FLOPS(blas::ara_flops(m, n, rank, 10));
+        if (rank*(m+n) < m*n) {
+          auto dA = tile(i, j).D().data();
+          DenseMW_t tU(m, rank, dA, m), tV(rank, n, dA+m*rank, rank);
+          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+            (new LRTile<scalar_t>(tU, tV));
+          DenseMW_t dUtmp(m, rank, dU, 0, 0), dVtmp(n, rank, dV, 0, 0);
+          gpu_check(gpu::copy_device_to_device(tU, dUtmp));
+          gpu::geam<scalar_t>
+            (blashandle, Trans::C, Trans::N, 1., dVtmp, 0., dVtmp, tV);
+        }
+      }
+    }
+#else
+    /*
+     * work should be: 2*minmn + 3*m*n + gesdj_buffersize(m, n)
+     */
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::compress_tile_gpu
     (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
@@ -149,16 +201,17 @@ namespace strumpack {
           DenseMW_t tU(m, rank, dA, m), tV(rank, n, dA+m*rank, rank);
           block(i, j) = std::unique_ptr<LRTile<scalar_t>>
             (new LRTile<scalar_t>(tU, tV));
-          DenseMW_t dU_tmp(m, rank, dU, 0, 0);
+          DenseMW_t dU_tmp(m, rank, dU, 0, 0), dV_tmp(n, rank, dV, 0, 0);
           gpu_check(gpu::copy_device_to_device(tU, dU_tmp));
           gpu::geam<scalar_t>
-            (blashandle, Trans::C, Trans::N, 1.0, dV, 0.0, dV, tV);
+            (blashandle, Trans::C, Trans::N, 1., dV_tmp, 0., dV_tmp, tV);
           gpu_check(gpu::copy_real_to_scalar<scalar_t>
                     (d_sval_scalar, d_sval_real, rank));
-          gpu::dgmm<scalar_t>(blashandle, Side::L, tV, d_sval_scalar, tV);
+          gpu::dgmm(blashandle, Side::L, tV, d_sval_scalar, tV);
         }
       }
     }
+#endif
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor_gpu
@@ -192,10 +245,17 @@ namespace strumpack {
 
       gpu::HostMemory<scalar_t> pinned(max_mn);
 
+#if defined(STRUMPACK_USE_KBLAS)
+      const int BLOCK_SIZE = 32;
+      kblas_ara_batch_wsquery<real_t>(handle, BLOCK_SIZE, 1);
+      kblasAllocateWorkspace(handle);
+#endif
+
       int getrf_work_size =
         gpu::getrf_buffersize<scalar_t>(solvehandle, max_m1);
-      // max buffersize is not the buffersize of the largest matrix,
-      // rectangular matrix seems to need more workspace than square
+      // max buffersize for gesvd is not the buffersize of the largest
+      // matrix, a rectangular matrix seems to need more workspace
+      // than a square one
       int compress_lwork = 0;
       for (std::size_t i=0; i<rb; i++) {
         for (std::size_t j=0; j<rb; j++)
@@ -216,6 +276,8 @@ namespace strumpack {
 
       int max_batchcount = std::pow(rb-1+rb2, 2);
       auto d_batch_meta = VBatchedGEMM<scalar_t>::dwork_bytes(max_batchcount);
+
+      // TODO KBLAS
       std::size_t max_work = std::max(getrf_work_size, compress_lwork);
       std::size_t d_mem_size =
         gpu::round_up(sizeof(scalar_t)*

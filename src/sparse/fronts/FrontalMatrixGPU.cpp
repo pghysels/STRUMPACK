@@ -229,6 +229,12 @@ namespace strumpack {
 #endif
   }
 
+  template<typename scalar_t,typename integer_t> scalar_t*
+  FrontalMatrixGPU<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+    gpu_check(gpu::copy_host_to_device(dF22, F22_));
+    return dF22;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixGPU<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();

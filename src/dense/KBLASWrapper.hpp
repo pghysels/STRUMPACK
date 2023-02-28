@@ -47,113 +47,150 @@
 namespace strumpack {
   namespace gpu {
     namespace kblas {
-      void geqp2(kblasHandle_t kblas_handle, int m, int n, float** A, int lda, 
-                 float** tau, int** piv, int* ranks, float tol, int num_ops) {
-        kblasSgeqp2_batch(kblas_handle, m, n, A, lda, tau, piv, ranks,
-                          tol, num_ops);
+
+      // void geqp2(kblasHandle_t kblas_handle, int m, int n,
+      //            float** A, int lda, float** tau, int** piv,
+      //            int* ranks, float tol, int num_ops) {
+      //   kblasSgeqp2_batch(kblas_handle, m, n, A, lda, tau, piv, ranks,
+      //                     tol, num_ops);
+      // }
+      // void geqp2(kblasHandle_t kblas_handle, int m, int n,
+      //            double** A, int lda, double** tau, int** piv,
+      //            int* ranks, double tol, int num_ops) {
+      //   kblasDgeqp2_batch(kblas_handle, m, n, A, lda, tau, piv, ranks,
+      //                     tol, num_ops);
+      // }
+      // void geqp2(kblasHandle_t kblas_handle, int m, int n,
+      //            std::complex<float>** A, int lda, std::complex<float>** tau,
+      //            int** piv, int* ranks, std::complex<float> tol, int num_ops) {
+      //   assert(false);
+      // }
+      // void geqp2(kblasHandle_t kblas_handle, int m, int n,
+      //            std::complex<double>** A, int lda, std::complex<double>** tau,
+      //            int** piv, int* ranks, std::complex<double> tol, int num_ops) {
+      //   assert(false);
+      // }
+
+      // void geqp2_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    float* A, int lda, int stride_a,
+      //                    float* tau, int stride_tau, int* piv, int stride_piv,
+      //                    int* ranks, float tol, int num_ops) {
+      //   kblasSgeqp2_batch_strided
+      //     (kblas_handle, m, n, A, lda, stride_a, tau, stride_tau,
+      //      piv, stride_piv, ranks, tol, num_ops);
+      // }
+      // void geqp2_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    double* A, int lda, int stride_a,
+      //                    double* tau, int stride_tau, int* piv, int stride_piv,
+      //                    int* ranks, double tol, int num_ops) {
+      //   kblasDgeqp2_batch_strided
+      //     (kblas_handle, m, n, A, lda, stride_a, tau, stride_tau,
+      //      piv, stride_piv, ranks, tol, num_ops);
+      // }
+      // void geqp2_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    std::complex<float>* A, int lda, int stride_a,
+      //                    std::complex<float>* tau, int stride_tau,
+      //                    int* piv, int stride_piv, int* ranks,
+      //                    std::complex<float> tol, int num_ops) {
+      //   assert(false);
+      // }
+      // void geqp2_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    std::complex<double>* A, int lda, int stride_a,
+      //                    std::complex<double>* tau, int stride_tau,
+      //                    int* piv, int stride_piv, int* ranks,
+      //                    std::complex<double> tol, int num_ops) {
+      //   assert(false);
+      // }
+
+      // void orgqr(kblasHandle_t kblas_handle, int m, int n,
+      //            float** A, int lda, float** tau, int num_ops) {
+      //   kblasSorgqr_batch(kblas_handle, m, n, A, lda, tau, num_ops);
+      // }
+      // void orgqr(kblasHandle_t kblas_handle, int m, int n,
+      //            double** A, int lda, double** tau, int num_ops) {
+      //   kblasDorgqr_batch(kblas_handle, m, n, A, lda, tau, num_ops);
+      // }
+      // void orgqr(kblasHandle_t kblas_handle, int m, int n,
+      //            std::complex<float>** A, int lda,
+      //            std::complex<float>** tau, int num_ops) {
+      //   assert(false);
+      // }
+      // void orgqr(kblasHandle_t kblas_handle, int m, int n,
+      //            std::complex<double>** A, int lda,
+      //            std::complex<double>** tau, int num_ops) {
+      //   assert(false);
+      // }
+
+      // void orgqr_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    float* A, int lda, int stride_a,
+      //                    float* tau, int stride_tau, int num_ops) {
+      //   kblasSorgqr_batch_strided(kblas_handle, m, n, A, lda, stride_a, tau,
+      //                             stride_tau, num_ops);
+      // }
+      // void orgqr_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    double* A, int lda, int stride_a,
+      //                    double* tau, int stride_tau, int num_ops) {
+      //   kblasDorgqr_batch_strided(kblas_handle, m, n, A, lda, stride_a, tau,
+      //                             stride_tau, num_ops);
+      // }
+      // void orgqr_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    std::complex<float>* A, int lda, int stride_a,
+      //                    std::complex<float>* tau, int stride_tau,
+      //                    int num_ops) {
+      //   assert(false);
+      // }
+      // void orgqr_strided(kblasHandle_t kblas_handle, int m, int n,
+      //                    std::complex<double>* A, int lda, int stride_a,
+      //                    std::complex<double>* tau, int stride_tau,
+      //                    int num_ops) {
+      //   assert(false);
+      // }
+
+      void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
+               float** M_batch, int* ldm_batch,
+               float** A_batch, int* lda_batch,
+               float** B_batch, int* ldb_batch, int* ranks_batch,
+               float tol, int max_rows, int max_cols, int max_rank,
+               int bs, int r, int relative, int num_ops) {
+        kblas_sara_batch
+          (handle, rows_batch, cols_batch, M_batch, ldm_batch,
+           A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
+           tol, max_rows, max_cols, max_rank, bs, r,
+           handle.kblas_rand_state(), relative, num_ops);
       }
-      void geqp2(kblasHandle_t kblas_handle, int m, int n, double** A, int lda, 
-                 double** tau, int** piv, int* ranks, double tol, int num_ops) {
-        kblasDgeqp2_batch(kblas_handle, m, n, A, lda, tau, piv, ranks, 
-                         tol, num_ops);
+      void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
+               double** M_batch, int* ldm_batch,
+               double** A_batch, int* lda_batch,
+               double** B_batch, int* ldb_batch, int* ranks_batch,
+               double tol, int max_rows, int max_cols, int max_rank,
+               int bs, int r, int relative, int num_ops) {
+        kblas_dara_batch
+          (handle, rows_batch, cols_batch, M_batch, ldm_batch,
+           A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
+           tol, max_rows, max_cols, max_rank, bs, r,
+           handle.kblas_rand_state(), relative, num_ops);
       }
-      void geqp2(kblasHandle_t kblas_handle, int m, int n, std::complex<float>** A, 
-                 int lda, std::complex<float>** tau, int** piv, int* ranks, 
-                 std::complex<float> tol, int num_ops) {
+      void ara(kblasHandle_t handle, int* rows_batch, int* cols_batch,
+               std::complex<float>** M_batch, int* ldm_batch,
+               std::complex<float>** A_batch, int* lda_batch,
+               std::complex<float>** B_batch, int* ldb_batch,
+               int* ranks_batch, std::complex<float> tol,
+               int max_rows, int max_cols, int max_rank,
+               int bs, int r, int relative, int num_ops) {
+        assert(false);
       }
-      void geqp2(kblasHandle_t kblas_handle, int m, int n, std::complex<double>** A, 
-                 int lda, std::complex<double>** tau, int** piv, int* ranks, 
-                 std::complex<double> tol, int num_ops) {
+      void ara(kblasHandle_t handle, int* rows_batch, int* cols_batch,
+               std::complex<double>** M_batch, int* ldm_batch,
+               std::complex<double>** A_batch, int* lda_batch,
+               std::complex<double>** B_batch, int* ldb_batch,
+               int* ranks_batch, std::complex<double> tol,
+               int max_rows, int max_cols, int max_rank, int bs, int r,
+               int relative, int num_ops) {
+        assert(false);
       }
 
-      void geqp2_strided(kblasHandle_t kblas_handle, int m, int n, float* A, 
-                         int lda, int stride_a, float* tau, int stride_tau, 
-                         int* piv, int stride_piv, int* ranks, float tol, 
-                         int num_ops){
-        kblasSgeqp2_batch_strided(kblas_handle, m, n, A, lda, stride_a, 
-	                                tau, stride_tau, piv, stride_piv, 
-	                                ranks, tol, num_ops);
-      }
-      void geqp2_strided(kblasHandle_t kblas_handle, int m, int n, double* A, 
-                         int lda, int stride_a, double* tau, int stride_tau, 
-                         int* piv, int stride_piv, int* ranks, double tol, 
-                         int num_ops){ 
-        kblasDgeqp2_batch_strided(kblas_handle, m, n, A, lda, stride_a, 
-	                                tau, stride_tau, piv, stride_piv, 
-	                                ranks, tol, num_ops);
-      }
-      void geqp2_strided(kblasHandle_t kblas_handle, int m, int n, std::complex<float>* A, 
-                         int lda, int stride_a, std::complex<float>* tau, int stride_tau,
-                         int* piv, int stride_piv, int* ranks, std::complex<float> tol, 
-                         int num_ops) {
-      }
-      void geqp2_strided(kblasHandle_t kblas_handle, int m, int n, std::complex<double>* A, 
-                         int lda, int stride_a, std::complex<double>* tau, int stride_tau,
-                         int* piv, int stride_piv, int* ranks, std::complex<double> tol, 
-                         int num_ops) {
-      }
-
-      void orgqr(kblasHandle_t kblas_handle, int m, int n, float** A, int lda, 
-                 float** tau, int num_ops) {
-        kblasSorgqr_batch(kblas_handle, m, n, A, lda, tau, num_ops);
-      }
-      void orgqr(kblasHandle_t kblas_handle, int m, int n, double** A, int lda, 
-                 double** tau, int num_ops) {
-        kblasDorgqr_batch(kblas_handle, m, n, A, lda, tau, num_ops);
-      }
-      void orgqr(kblasHandle_t kblas_handle, int m, int n, std::complex<float>** A, 
-                 int lda, std::complex<float>** tau, int num_ops) {
-      }
-      void orgqr(kblasHandle_t kblas_handle, int m, int n, std::complex<double>** A, 
-                 int lda, std::complex<double>** tau, int num_ops) {
-      }
-
-      void orgqr_strided(kblasHandle_t kblas_handle, int m, int n, float* A, int lda, 
-                         int stride_a, float* tau, int stride_tau, int num_ops){
-        kblasSorgqr_batch_strided(kblas_handle, m, n, A, lda, stride_a, tau, 
-                                  stride_tau, num_ops);
-      }
-      void orgqr_strided(kblasHandle_t kblas_handle, int m, int n, double* A, int lda, 
-                         int stride_a, double* tau, int stride_tau, int num_ops){
-        kblasDorgqr_batch_strided(kblas_handle, m, n, A, lda, stride_a, tau, 
-                                  stride_tau, num_ops);
-      }
-      void orgqr_strided(kblasHandle_t kblas_handle, int m, int n, std::complex<float>* A, 
-                         int lda, int stride_a, std::complex<float>* tau, int stride_tau, 
-                         int num_ops) {
-      }
-      void orgqr_strided(kblasHandle_t kblas_handle, int m, int n, std::complex<double>* A, 
-                         int lda, int stride_a, std::complex<double>* tau, int stride_tau,
-                         int num_ops) {
-      }
-
-      void ara(kblasHandle_t handle, int* rows_batch, int* cols_batch, float** M_batch, int* ldm_batch, 
-               float** A_batch, int* lda_batch, float** B_batch, int* ldb_batch, int* ranks_batch, 
-               float tol, int max_rows, int max_cols, int max_rank, int bs, int r, 
-               kblasRandState_t rand_state, int relative, int num_ops){
-        kblas_sara_batch(handle, rows_batch, cols_batch, M_batch, ldm_batch, A_batch, lda_batch, B_batch, 
-                         ldb_batch, ranks_batch, tol, max_rows, max_cols, max_rank, bs, r, rand_state, 
-                         relative, num_ops);
-      }
-      void ara(kblasHandle_t handle, int* rows_batch, int* cols_batch, double** M_batch, int* ldm_batch, 
-	             double** A_batch, int* lda_batch, double** B_batch, int* ldb_batch, int* ranks_batch, 
-	             double tol, int max_rows, int max_cols, int max_rank, int bs, int r, 
-               kblasRandState_t rand_state, int relative, int num_ops){
-        kblas_dara_batch(handle, rows_batch, cols_batch, M_batch, ldm_batch, A_batch, lda_batch, B_batch, 
-                         ldb_batch, ranks_batch, tol, max_rows, max_cols, max_rank, bs, r, rand_state, 
-	                       relative, num_ops);
-      }
-      void ara(kblasHandle_t handle, int* rows_batch, int* cols_batch, std::complex<float>** M_batch, int* ldm_batch, 
-               std::complex<float>** A_batch, int* lda_batch, std::complex<float>** B_batch, int* ldb_batch, int* ranks_batch, 
-               std::complex<float> tol, int max_rows, int max_cols, int max_rank, int bs, int r, 
-               kblasRandState_t rand_state, int relative, int num_ops){
-      }
-      void ara(kblasHandle_t handle, int* rows_batch, int* cols_batch, std::complex<double>** M_batch, int* ldm_batch, 
-	             std::complex<double>** A_batch, int* lda_batch, std::complex<double>** B_batch, int* ldb_batch, int* ranks_batch, 
-	             std::complex<double> tol, int max_rows, int max_cols, int max_rank, int bs, int r, 
-               kblasRandState_t rand_state, int relative, int num_ops){
-      }
-    }// end namespace kblas
+    } // end namespace kblas
   } // end namespace gpu
 } // end namespace strumpack
+
 #endif // STRUMPACK_KBLAS_WRAPPER_HPP

@@ -268,6 +268,12 @@ namespace strumpack {
 #endif
   }
 
+  template<typename scalar_t,typename integer_t> scalar_t*
+  FrontalMatrixMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+    gpu_check(gpu::copy_host_to_device(dF22, F22_));
+    return dF22;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
@@ -632,15 +638,16 @@ namespace strumpack {
     }
 
 #if 1 // enable for solve on GPU (if factors fit on device)
-    auto total_dmem = total_peak_device_memory_MAGMA(ldata);
-    if (opts.verbose())
-      std::cout << "# Need " << total_dmem / 1.e6 << " MB "
-                << "of device mem, "
-                << gpu::available_memory() / 1.e6
-                << " MB available" << std::endl;
-    if (etree_level == 0 &&
-        total_dmem < 0.9 * gpu::available_memory())
-      return factors_on_device(A, opts, ldata, total_dmem);
+    if (etree_level == 0) {
+      auto total_dmem = total_peak_device_memory_MAGMA(ldata);
+      if (opts.verbose())
+        std::cout << "# Need " << total_dmem / 1.e6 << " MB "
+                  << "of device mem, "
+                  << gpu::available_memory() / 1.e6
+                  << " MB available" << std::endl;
+      if (total_dmem < 0.9 * gpu::available_memory())
+        return factors_on_device(A, opts, ldata, total_dmem);
+    }
 #endif
 
     auto peak_dmem = level_peak_device_memory_MAGMA(ldata);

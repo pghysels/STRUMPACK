@@ -90,34 +90,39 @@ namespace strumpack {
       BLASHandle() {
         gpu_check(cublasCreate(&h_));
 #if defined(STRUMPACK_USE_MAGMA)
-        // magma_init();
         magma_queue_create_from_cuda(0, NULL, h_, NULL, &q_);
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
-        create_kblas_handle();
+        kblasCreate(&k_);
 #endif
       }
-      BLASHandle(Stream& s) : BLASHandle() {
-        set_stream(s);
+      BLASHandle(Stream& s) { //: BLASHandle() {
+        gpu_check(cublasCreate(&h_));
 #if defined(STRUMPACK_USE_MAGMA)
-        magma_init();
         magma_queue_create_from_cuda(0, s, h_, NULL, &q_);
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
-        set_kblas_stream(s);
-        kblasInitRandState(kh_, &rs_, 16384*2, 0);
-        kblasEnableMagma(kh_);
+        kblasCreate(&k_);
+        kblasInitRandState(k_, &r_, 16384*2, 0);
+        kblasEnableMagma(k_);
 #endif
+        set_stream(s);
       }
       ~BLASHandle() {
-        // TODO KBLAS destroy
+#if defined(STRUMPACK_USE_KBLAS)
+        kblasDestroy(&k_);
+#endif
 #if defined(STRUMPACK_USE_MAGMA)
         magma_queue_destroy(q_);
-        // magma_finalize();
 #endif
         gpu_check(cublasDestroy(h_));
       }
-      void set_stream(Stream& s) { gpu_check(cublasSetStream(h_, s)); }
+      void set_stream(Stream& s) {
+        gpu_check(cublasSetStream(h_, s));
+#if defined(STRUMPACK_USE_KBLAS)
+        kblasSetStream(k_, s);
+#endif
+      }
       operator cublasHandle_t&() { return h_; }
       operator const cublasHandle_t&() const { return h_; }
 #if defined(STRUMPACK_USE_MAGMA)
@@ -125,12 +130,10 @@ namespace strumpack {
       operator const magma_queue_t&() const { return q_; }
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
-      void create_kblas_handle() { kblasCreate(&kh_); }
-      kblasHandle_t & kblas_handle() { return kh_; }
-      const kblasHandle_t & kblas_handle() const { return kh_; }
-      kblasRandState_t & kblas_rand_state() { return rs_; }
-      const kblasRandState_t & kblas_rand_state() const { return rs_; }
-      void set_kblas_stream(Stream& s) { kblasSetStream(kh_, s); }
+      operator kblasHandle_t&() { return k_; }
+      operator const kblasHandle_t&() const { return k_; }
+      kblasRandState_t& kblas_rand_state() { return r_; }
+      const kblasRandState_t& kblas_rand_state() const { return r_; }
 #endif
     private:
       cublasHandle_t h_;
@@ -138,8 +141,8 @@ namespace strumpack {
       magma_queue_t q_;
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
-      kblasHandle_t kh_; // TODO need to free this handle!!
-      kblasRandState_t rs_;
+      kblasHandle_t k_;
+      kblasRandState_t r_;
 #endif
     };
 

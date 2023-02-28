@@ -66,7 +66,13 @@ if(STRUMPACK_USE_MAGMA)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.hpp
     ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.cpp)
-  install(FILES MAGMAWrapper.hpp DESTINATION include/dense)
+  # install(FILES MAGMAWrapper.hpp DESTINATION include/dense)
+endif()
+
+if(STRUMPACK_USE_KBLAS)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/KBLASWrapper.hpp)
+  # install(FILES KBLASWrapper.hpp DESTINATION include/dense)
 endif()
 
 add_subdirectory(lapack)

@@ -57,7 +57,9 @@ namespace strumpack {
   template<typename scalar_t> bool is_GPU
   (const SPOptions<scalar_t>& opts) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
-    return opts.use_gpu() && opts.compression() == CompressionType::NONE;
+    return opts.use_gpu() &&
+      (opts.compression() == CompressionType::NONE ||
+       opts.compression() == CompressionType::BLR);
 #endif
     return false;
   }
@@ -75,6 +77,7 @@ namespace strumpack {
     return (opts.compression() == CompressionType::BLR ||
             opts.compression() == CompressionType::BLR_HODLR ||
             opts.compression() == CompressionType::ZFP_BLR_HODLR) &&
+      (!opts.use_gpu() || compressed_parent) &&
       (dsep >= opts.compression_min_sep_size(l) ||
        dsep + dupd >= opts.compression_min_front_size(l));
   }

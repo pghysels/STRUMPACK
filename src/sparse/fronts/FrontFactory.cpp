@@ -71,22 +71,22 @@ namespace strumpack {
     std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> front;
     switch (opts.compression()) {
     case CompressionType::NONE: {
-      if (is_GPU(opts)) {
-#if defined(STRUMPACK_USE_MAGMA)
-        front.reset
-          (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
-#else
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-        front.reset
-          (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
-#endif
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-        front.reset
-          (new FrontSYCL<scalar_t,integer_t>(s, sbegin, send, upd));
-#endif
-        if (root) fc.dense++;
-      }
+//       if (is_GPU(opts)) {
+// #if defined(STRUMPACK_USE_MAGMA)
+//         front.reset
+//           (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
+// #else
+// #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+//         front.reset
+//           (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
+// #endif
+// #endif
+// #if defined(STRUMPACK_USE_SYCL)
+//         front.reset
+//           (new FrontSYCL<scalar_t,integer_t>(s, sbegin, send, upd));
+// #endif
+//         if (root) fc.dense++;
+//       }
     } break;
     case CompressionType::HSS: {
       if (is_HSS(dsep, dupd, compressed_parent, opts)) {
@@ -154,6 +154,24 @@ namespace strumpack {
       }
     } break;
     };
+    if (!front) {
+      if (is_GPU(opts)) {
+#if defined(STRUMPACK_USE_MAGMA)
+        front.reset
+          (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
+#else
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+        front.reset
+          (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
+#endif
+#endif
+#if defined(STRUMPACK_USE_SYCL)
+        front.reset
+          (new FrontSYCL<scalar_t,integer_t>(s, sbegin, send, upd));
+#endif
+        if (root) fc.dense++;
+      }
+    }
     if (!front) {
       // fallback in case support for cublas/zfp/hodlr is missing
       front.reset

@@ -177,12 +177,11 @@ namespace strumpack {
       }
 #endif
       gpu_check(cudaFree(0));
-      gpu::BLASHandle hb;
-      gpu::SOLVERHandle hs;
 #if defined(STRUMPACK_USE_MAGMA)
       magma_init();
-      // gpu::magma::MAGMAQueue mq;
 #endif
+      gpu::BLASHandle hb;
+      gpu::SOLVERHandle hs;
     }
 
     void gemm(BLASHandle& handle, cublasOperation_t transa,
