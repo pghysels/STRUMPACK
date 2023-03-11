@@ -50,6 +50,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using LInfo_t = LevelInfoMAGMA<scalar_t,integer_t>;
 
   public:
@@ -64,9 +65,15 @@ namespace strumpack {
                              const F_t* p, int task_depth) override;
 
     ReturnCode multifrontal_factorization(const SpMat_t& A,
-                                          const SPOptions<scalar_t>& opts,
+                                          const Opts_t& opts,
                                           int etree_level=0,
-                                          int task_depth=0) override;
+                                          int task_depth=0) override {
+      VectorPool<scalar_t> workspace;
+      return factor(A, opts, workspace, etree_level, task_depth);
+    }
+    ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
+                      VectorPool<scalar_t>& workspace,
+                      int etree_level=0, int task_depth=0) override;
 
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,
@@ -81,6 +88,10 @@ namespace strumpack {
       const override;
 #endif
 
+    // std::size_t get_device_F22_worksize() override {
+    //   return dim_upd()*dim_upd();
+    //   // return 0;
+    // };
     scalar_t* get_device_F22(scalar_t* dF22) override;
 
   private:
@@ -89,6 +100,7 @@ namespace strumpack {
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
     std::unique_ptr<gpu::DeviceMemory<char>> dev_factors_ = nullptr;
+    // std::unique_ptr<gpu::DeviceMemory<scalar_t>> dev_Schur_ = nullptr;
 
     FrontalMatrixMAGMA(const FrontalMatrixMAGMA&) = delete;
     FrontalMatrixMAGMA& operator=(FrontalMatrixMAGMA const&) = delete;
@@ -97,10 +109,10 @@ namespace strumpack {
                         char* hea_mem, char* dea_mem);
 
     ReturnCode
-    split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    split_smaller(const SpMat_t& A, const Opts_t& opts,
                   int etree_level=0, int task_depth=0);
     ReturnCode
-    factors_on_device(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    factors_on_device(const SpMat_t& A, const Opts_t& opts,
                       std::vector<LInfo_t>& ldata, std::size_t total_dmem);
 
     void multifrontal_solve(DenseM_t& b) const override;

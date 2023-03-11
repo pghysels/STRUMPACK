@@ -129,8 +129,7 @@ namespace strumpack {
     BLRM_t F11blr_, F12blr_, F21blr_, F22blr_;
     DenseMW_t F22_;
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    gpu::HostMemory<scalar_t> CBpinned_;
-    gpu::DeviceMemory<scalar_t> CBdev_;
+    gpu::DeviceMemory<char> CBdev_;
 #endif
     std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
     std::vector<int> piv_;

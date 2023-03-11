@@ -93,20 +93,6 @@ namespace strumpack {
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
-//     virtual void barrier_world() const {
-// #if defined(STRUMPACK_USE_MPI)
-//       MPIComm c;
-//       c.barrier();
-//       auto pmax = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MAX);
-//       auto pmin = c.reduce(double(strumpack::params::peak_memory) / 1.0e6, MPI_MIN);
-//       if (c.is_root())
-//         std::cout << "# peak memory after sequential tree traversal: "
-//                   << " pmin: " << pmin << " pmax: " << pmax
-//                   << " imbalance: " << pmax/pmin
-//                   << std::endl;
-// #endif
-//     }
-
     virtual void release_work_memory() {
       VectorPool<scalar_t> workspace;
       release_work_memory(workspace);
@@ -155,7 +141,7 @@ namespace strumpack {
 
     virtual std::size_t get_device_F22_worksize() {
       return dim_upd()*dim_upd();
-    };
+    }
     virtual scalar_t* get_device_F22(scalar_t*) {
       std::cerr << "ERROR get_device_F22 not implemented for this front type"
                 << std::endl;;

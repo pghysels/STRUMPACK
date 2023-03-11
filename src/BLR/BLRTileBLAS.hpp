@@ -113,8 +113,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename scalar_t> class VBatchedGEMM {
     public:
-      VBatchedGEMM(std::size_t B, char* dmem) : dmem_(dmem) { reserve(B); }
-      void reserve(std::size_t B) {
+      VBatchedGEMM(std::size_t B, char* dmem) : dmem_(dmem) {
         m_.reserve(B+1);  ldA_.reserve(B+1);  A_.reserve(B);
         n_.reserve(B+1);  ldB_.reserve(B+1);  B_.reserve(B);
         k_.reserve(B+1);  ldC_.reserve(B+1);  C_.reserve(B);
@@ -135,7 +134,7 @@ namespace strumpack {
         k_.push_back(k);  ldC_.push_back(ldC);  C_.push_back(C);
       }
 
-      std::size_t count() { return m_.size(); }
+      // std::size_t count() { return m_.size(); }
 
       static std::size_t dwork_bytes(int batchcount) {
 #if defined(STRUMPACK_USE_MAGMA)
@@ -148,9 +147,7 @@ namespace strumpack {
       }
 
       void run(scalar_t alpha, scalar_t beta,
-               // magma_queue_t& q,
-               gpu::Stream& s,
-               gpu::BLASHandle& h) {
+               gpu::Stream& s, gpu::BLASHandle& h) {
 #if defined(STRUMPACK_USE_MAGMA)
         magma_int_t batchcount = m_.size();
         if (!batchcount) return;
@@ -220,6 +217,63 @@ namespace strumpack {
 #endif
       std::vector<scalar_t*> A_, B_, C_;
       char* dmem_ = nullptr; // only needed for MAGMA
+    };
+
+
+    template<typename scalar_t> class VBatchedTRSMLeftRight {
+      using DenseM_t = DenseMatrix<scalar_t>;
+    public:
+      void add(DenseM_t& A, DenseM_t& Bl, DenseM_t& Br) {
+        if (!Bl.rows() || !Bl.cols()) return;
+        A_.push_back(&A);
+        Bl_.push_back(&Bl);
+        Br_.push_back(&Br);
+      }
+      void run(gpu::BLASHandle& h) {
+#if defined(STRUMPACK_USE_MAGMA)
+        auto B = A_.size();
+        if (!B) return;
+        std::vector<int> mn(3*B);
+        std::vector<scalar_t*> AB(3*B);
+        int maxm = 0, maxnl = 0, maxnr = 0;
+        for (std::size_t i=0; i<B; i++) {
+          mn[i    ] = A_[i]->rows();
+          mn[i+  B] = Bl_[i]->cols();
+          mn[i+2*B] = Br_[i]->rows();
+          maxm = std::max(maxm, mn[i]);
+          maxnl = std::max(maxnl, mn[i+B]);
+          maxnr = std::max(maxnr, mn[i+2*B]);
+          AB[i    ] = A_[i]->data();
+          AB[i+  B] = Bl_[i]->data();
+          AB[i+2*B] = Br_[i]->data();
+        }
+        std::size_t dmem_size =
+          gpu::round_up(3*B*sizeof(int)) +
+          gpu::round_up(3*B*sizeof(scalar_t*));
+        gpu::DeviceMemory<char> dmem(dmem_size);
+        auto dm = dmem.template as<int>();
+        auto dnl = dm + B;
+        auto dnr = dnl + B;
+        auto dA = gpu::aligned_ptr<scalar_t*>(dnr+B);
+        auto dBl = dA + B;
+        auto dBr = dBl + B;
+        gpu_check(gpu::copy_host_to_device(dm, mn.data(), 3*B));
+        gpu_check(gpu::copy_host_to_device(dA, AB.data(), 3*B));
+        gpu::magma::trsm_vbatched_max_nocheck
+          (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
+           maxm, maxnl, dm, dnl, scalar_t(1.),
+           dA, dm, dBl, dm, B, h);
+        gpu::magma::trsm_vbatched_max_nocheck
+          (MagmaRight, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
+           maxnr, maxm, dnr, dm, scalar_t(1.),
+           dA, dm, dBr, dnr, B, h);
+#else
+        std::cout << "VBatchedTRSM TODO" << std::endl;
+#endif
+      }
+
+    private:
+      std::vector<DenseM_t*> A_, Bl_, Br_;
     };
 #endif
 

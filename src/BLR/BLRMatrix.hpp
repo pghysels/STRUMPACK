@@ -40,6 +40,7 @@
 #include "BLROptions.hpp"
 #include "BLRTileBLAS.hpp" // TODO remove
 #include "structured/StructuredMatrix.hpp"
+#include "misc/Tools.hpp"
 
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
@@ -200,6 +201,7 @@ namespace strumpack {
                                        const std::vector<std::size_t>& tiles1,
                                        const std::vector<std::size_t>& tiles2,
                                        const adm_t& admissible,
+                                       VectorPool<scalar_t>& workspace,
                                        const Opts_t& opts);
 #endif
 
@@ -276,7 +278,7 @@ namespace strumpack {
                                  DenseM_t& A, scalar_t*& dA);
       void compress_tile_gpu(gpu::SOLVERHandle& handle,
                              gpu::BLASHandle& blashandle,
-                             std::size_t i, std::size_t j, DenseM_t& A,
+                             std::size_t i, std::size_t j,
                              int* dinfo, scalar_t* work, const Opts_t& opts);
 #endif
 

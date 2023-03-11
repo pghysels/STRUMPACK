@@ -54,8 +54,8 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory
   (VectorPool<scalar_t>& workspace) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    //workspace.restore(CBpinned_);
-    CBdev_.release();
+    // CBdev_.release();
+    workspace.restore(CBdev_);
 #endif
     workspace.restore(CBstorage_);
     F22_.clear();
@@ -397,7 +397,8 @@ namespace strumpack {
             gpu::round_up(sizeof(Trip_t)*(e11.size()+e12.size()+e21.size())) +
             gpu::round_up(sizeof(std::size_t)*(Il.size()+Ir.size())) +
             gpu::round_up(sizeof(gpu::AssembleData<scalar_t>));
-          gpu::DeviceMemory<char> d_mem(d_mem_bytes);
+          // gpu::DeviceMemory<char> d_mem(d_mem_bytes);
+          auto d_mem = workspace.get_device_bytes(d_mem_bytes);
           auto smem = d_mem.template as<scalar_t>();
 
           gpu_check(gpu::memset<scalar_t>(smem, 0, dsep*(dsep+2*dupd)));
@@ -424,9 +425,11 @@ namespace strumpack {
           gpu_check(gpu::copy_host_to_device(dIl, Il.data(), Il.size()));
           gpu_check(gpu::copy_host_to_device(dIr, Ir.data(), Ir.size()));
 
-          CBdev_ = gpu::DeviceMemory<scalar_t>(dupd*dupd);
-          gpu_check(gpu::memset<scalar_t>(CBdev_, 0, dupd*dupd));
-          F22_ = DenseMW_t(dupd, dupd, CBdev_, dupd);
+          CBdev_ = workspace.get_device_bytes(dupd*dupd*sizeof(scalar_t));
+          // gpu::DeviceMemory<scalar_t>(dupd*dupd);
+          scalar_t* dCB = CBdev_.template as<scalar_t>();
+          gpu_check(gpu::memset<scalar_t>(dCB, 0, dupd*dupd));
+          F22_ = DenseMW_t(dupd, dupd, dCB, dupd);
 
           gpu::AssembleData<scalar_t> hasmbl
             (dsep, dupd, dF11.data(), dF12.data(), dF21.data(), F22_.data(),
@@ -442,7 +445,9 @@ namespace strumpack {
           if (dsep)
             BLRM_t::construct_and_partial_factor_gpu
               (dF11, dF12, dF21, F22_, F11blr_, piv_, F12blr_, F21blr_,
-               sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+               sep_tiles_, upd_tiles_, admissibility_, workspace,
+               opts.BLR_options());
+          workspace.restore(d_mem);
         } else
 #endif
           {

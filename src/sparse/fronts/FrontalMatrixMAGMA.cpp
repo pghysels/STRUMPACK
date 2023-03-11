@@ -272,12 +272,14 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
     gpu_check(gpu::copy_host_to_device(dF22, F22_));
     return dF22;
+    // return *dev_Schur_;
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
     host_Schur_.release();
+    // dev_Schur_.release();
   }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -623,9 +625,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+  FrontalMatrixMAGMA<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
+    // template<typename scalar_t,typename integer_t> ReturnCode
+    // FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_factorization
+    // (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    //  int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     gpu::Stream comp_stream, copy_stream;
     gpu::SOLVERHandle solver_handle(comp_stream);
@@ -665,7 +671,8 @@ namespace strumpack {
     for (int l=lvls-1; l>=0; l--)
       peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
     gpu::HostMemory<char> hea_mem(peak_hea_mem);
-    gpu::DeviceMemory<char> all_dmem(peak_dmem);
+    // gpu::DeviceMemory<char> all_dmem(peak_dmem);
+    auto all_dmem = workspace.get_device_bytes(peak_dmem);
     char* old_work = nullptr;
 
     for (int l=lvls-1; l>=0; l--) {
@@ -784,7 +791,11 @@ namespace strumpack {
       gpu_check(gpu::copy_device_to_host
                 (host_Schur_.get(), (scalar_t*)(old_work), dupd*dupd));
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
+      // dev_Schur_.reset(new gpu::DeviceMemory<scalar_t>(dupd*dupd));
+      // gpu_check(gpu::copy_device_to_device<scalar_t>
+      //           (*dev_Schur_, (scalar_t*)(old_work), dupd*dupd));
     }
+    workspace.restore(all_dmem);
     return err_code;
   }
 

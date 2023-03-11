@@ -302,7 +302,7 @@ namespace strumpack {
       DeviceMemory(std::size_t size) {
         if (size) {
           size_ = size;
-#if 0
+#if 1
           if (cudaMalloc(&data_, size*sizeof(T)) != cudaSuccess) {
             std::cerr << "Failed to allocate " << size << " "
                       << typeid(T).name() << " objects" << std::endl;
@@ -312,6 +312,7 @@ namespace strumpack {
           is_managed_ = false;
 #else
           auto e = cudaMalloc(&data_, size*sizeof(T));
+          std::cout << "calling cudaMalloc for device memory" << std::endl;
           if (e == cudaSuccess) {
             STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
             is_managed_ = false;
@@ -348,7 +349,6 @@ namespace strumpack {
       std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
-      // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {
