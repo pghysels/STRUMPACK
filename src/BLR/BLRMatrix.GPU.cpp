@@ -307,7 +307,8 @@ namespace strumpack {
       auto rb2 = B21.rowblocks();
       gpu::Stream copy_stream, comp_stream;
       gpu::BLASHandle handle(comp_stream);
-      gpu::SOLVERHandle solvehandle(comp_stream);
+      gpu::SOLVERHandle solve_handle(comp_stream),
+        solve_handle2(copy_stream);
 
       std::size_t max_m1 = 0;
       for (std::size_t k=0; k<rb; k++)
@@ -333,14 +334,14 @@ namespace strumpack {
         for (std::size_t j=0; j<rb; j++)
           compress_lwork =
             std::max(compress_lwork, gpu::gesvdj_buffersize<scalar_t>
-                     (solvehandle, Jobz::V, B11.tilerows(i), B11.tilecols(j)));
+                     (solve_handle, Jobz::V, B11.tilerows(i), B11.tilecols(j)));
         for (std::size_t j=0; j<rb2; j++) {
           compress_lwork =
             std::max(compress_lwork, gpu::gesvdj_buffersize<scalar_t>
-                     (solvehandle, Jobz::V, B11.tilerows(i), B12.tilecols(j)));
+                     (solve_handle, Jobz::V, B11.tilerows(i), B12.tilecols(j)));
           compress_lwork =
             std::max(compress_lwork, gpu::gesvdj_buffersize<scalar_t>
-                     (solvehandle, Jobz::V, B21.tilerows(j), B11.tilecols(i)));
+                     (solve_handle, Jobz::V, B21.tilerows(j), B11.tilecols(i)));
         }
       }
 #endif
@@ -350,7 +351,7 @@ namespace strumpack {
       compress_lwork += 2*max_m + 3*max_mn;
 
       int getrf_work_size =
-        gpu::getrf_buffersize<scalar_t>(solvehandle, max_m1);
+        gpu::getrf_buffersize<scalar_t>(solve_handle, max_m1);
       auto d_batch_meta = VBatchedGEMM<scalar_t>::dwork_bytes(max_batchcount);
 
       // TODO KBLAS
@@ -382,7 +383,7 @@ namespace strumpack {
       }
 
       for (std::size_t i=0; i<rb; i++) {
-        gpu::getrf(solvehandle, B11.tile(i, i).D(),
+        gpu::getrf(solve_handle2, B11.tile(i, i).D(),
                    d_work_mem, dpiv+B11.tileroff(i), dinfo);
 
 #if defined(STRUMPACK_USE_KBLAS)
@@ -400,18 +401,21 @@ namespace strumpack {
         for (std::size_t j=i+1; j<rb; j++) {
           if (admissible(i, j))
             B11.compress_tile_gpu
-              (solvehandle, handle, i, j, dinfo, d_work_mem, opts);
+              (solve_handle, handle, i, j, dinfo, d_work_mem, opts);
           if (admissible(j, i))
             B11.compress_tile_gpu
-              (solvehandle, handle, j, i, dinfo, d_work_mem, opts);
+              (solve_handle, handle, j, i, dinfo, d_work_mem, opts);
         }
         for (std::size_t j=0; j<rb2; j++) {
           B12.compress_tile_gpu
-            (solvehandle, handle, i, j, dinfo, d_work_mem, opts);
+            (solve_handle, handle, i, j, dinfo, d_work_mem, opts);
           B21.compress_tile_gpu
-            (solvehandle, handle, j, i, dinfo, d_work_mem, opts);
+            (solve_handle, handle, j, i, dinfo, d_work_mem, opts);
         }
 #endif
+        // solve_handle2.synchronize();
+        copy_stream.synchronize(); // this is the stream used for the
+                                   // getrf
 
         VBatchedTRSMLeftRight<scalar_t> batched_trsm;
         for (std::size_t j=i+1; j<rb; j++) {
