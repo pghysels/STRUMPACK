@@ -272,14 +272,12 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
     gpu_check(gpu::copy_host_to_device(dF22, F22_));
     return dF22;
-    // return *dev_Schur_;
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::release_work_memory() {
-    F22_.clear();
-    host_Schur_.release();
-    // dev_Schur_.release();
+  FrontalMatrixMAGMA<scalar_t,integer_t>::
+  release_work_memory(VectorPool<scalar_t>& workspace) {
+    workspace.restore(*host_Schur_);
   }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -295,7 +293,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const F_t* p, int task_depth) {
+   const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
     std::size_t upd2sep;
@@ -320,7 +318,7 @@ namespace strumpack {
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
+    release_work_memory(workspace);
   }
 
   template<typename scalar_t, typename integer_t> void
@@ -506,14 +504,15 @@ namespace strumpack {
     STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
     STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
     host_factors_.reset(new scalar_t[dsep*(dsep+2*dupd)]);
-    host_Schur_.reset(new scalar_t[dupd*dupd]);
+    // host_Schur_.reset(new scalar_t[dupd*dupd]);
+    host_Schur_.reset(new gpu::HostMemory<scalar_t>(dupd*dupd));
     {
       auto fmem = host_factors_.get();
       F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
       F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
       F21_ = DenseMW_t(dupd, dsep, fmem, dupd);
     }
-    F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
+    F22_ = DenseMW_t(dupd, dupd, *host_Schur_, dupd);
     F11_.zero(); F12_.zero();
     F21_.zero(); F22_.zero();
     A.extract_front
@@ -561,11 +560,11 @@ namespace strumpack {
         DenseMW_t dF21(dupd, dsep, dm2122, dupd);
         DenseMW_t dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
         gpu_check(gpu::copy_host_to_device(dF21, F21_));
-        gpu_check(gpu::copy_host_to_device(dF22, host_Schur_.get()));
+        gpu_check(gpu::copy_host_to_device(dF22, F22_));
         gpu::BLASHandle bh;
         gpu::gemm(bh, Trans::N, Trans::N, scalar_t(-1.),
                   dF21, dF12, scalar_t(1.), dF22);
-        gpu_check(gpu::copy_device_to_host(host_Schur_.get(), dF22));
+        gpu_check(gpu::copy_device_to_host(F22_, dF22));
       }
     }
     // count flops
@@ -671,7 +670,6 @@ namespace strumpack {
     for (int l=lvls-1; l>=0; l--)
       peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
     gpu::HostMemory<char> hea_mem(peak_hea_mem);
-    // gpu::DeviceMemory<char> all_dmem(peak_dmem);
     auto all_dmem = workspace.get_device_bytes(peak_dmem);
     char* old_work = nullptr;
 
@@ -787,13 +785,11 @@ namespace strumpack {
     }
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
-      host_Schur_.reset(new scalar_t[dupd*dupd]);
-      gpu_check(gpu::copy_device_to_host
-                (host_Schur_.get(), (scalar_t*)(old_work), dupd*dupd));
-      F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
-      // dev_Schur_.reset(new gpu::DeviceMemory<scalar_t>(dupd*dupd));
-      // gpu_check(gpu::copy_device_to_device<scalar_t>
-      //           (*dev_Schur_, (scalar_t*)(old_work), dupd*dupd));
+      host_Schur_.reset(new gpu::HostMemory<scalar_t>
+                        (workspace.get_pinned(dupd*dupd)));
+      gpu_check(gpu::copy_device_to_host<scalar_t>
+                (*host_Schur_, (scalar_t*)(old_work), dupd*dupd));
+      F22_ = DenseMW_t(dupd, dupd, *host_Schur_, dupd);
     }
     workspace.restore(all_dmem);
     return err_code;

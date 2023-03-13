@@ -177,7 +177,22 @@ namespace strumpack {
     void restore(gpu::HostMemory<scalar_t>& m) {
       if (m.size() == 0) return;
 #pragma omp critical
-      pinned_data_.push_back(std::move(m));
+      {
+        pinned_data_.push_back(std::move(m));
+        if (pinned_data_.size() > 3) {
+          // remove smallest??
+          int pos = 0;
+          std::size_t smin = pinned_data_[0].size();
+          for (std::size_t i=1; i<pinned_data_.size(); i++) {
+            auto ps = pinned_data_[i].size();
+            if (ps < smin) {
+              pos = i;
+              smin = ps;
+            }
+          }
+          pinned_data_.erase(pinned_data_.begin()+pos);
+        }
+      }
     }
     void restore(gpu::DeviceMemory<char>& m) {
       if (m.size() == 0) return;

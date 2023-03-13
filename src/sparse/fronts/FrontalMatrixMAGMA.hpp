@@ -58,11 +58,23 @@ namespace strumpack {
                      std::vector<integer_t>& upd);
     ~FrontalMatrixMAGMA();
 
-    void release_work_memory() override;
+    // void release_work_memory() override;
+    void release_work_memory(VectorPool<scalar_t>& workspace) override;
+
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
-                             const F_t* p, int task_depth) override;
+                             const F_t* p,
+                             int task_depth) override {
+      VectorPool<scalar_t> workspace;
+      extend_add_to_dense
+        (paF11, paF12, paF21, paF22, p, workspace, task_depth);
+    }
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p,
+                             VectorPool<scalar_t>& workspace,
+                             int task_depth) override;
 
     ReturnCode multifrontal_factorization(const SpMat_t& A,
                                           const Opts_t& opts,
@@ -88,19 +100,15 @@ namespace strumpack {
       const override;
 #endif
 
-    // std::size_t get_device_F22_worksize() override {
-    //   return dim_upd()*dim_upd();
-    //   // return 0;
-    // };
     scalar_t* get_device_F22(scalar_t* dF22) override;
 
   private:
-    std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
+    std::unique_ptr<scalar_t[]> host_factors_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
     std::unique_ptr<gpu::DeviceMemory<char>> dev_factors_ = nullptr;
-    // std::unique_ptr<gpu::DeviceMemory<scalar_t>> dev_Schur_ = nullptr;
+    std::unique_ptr<gpu::HostMemory<scalar_t>> host_Schur_ = nullptr;
 
     FrontalMatrixMAGMA(const FrontalMatrixMAGMA&) = delete;
     FrontalMatrixMAGMA& operator=(FrontalMatrixMAGMA const&) = delete;
