@@ -58,9 +58,7 @@ namespace strumpack {
                      std::vector<integer_t>& upd);
     ~FrontalMatrixMAGMA();
 
-    // void release_work_memory() override;
     void release_work_memory(VectorPool<scalar_t>& workspace) override;
-
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
@@ -87,6 +85,8 @@ namespace strumpack {
                       VectorPool<scalar_t>& workspace,
                       int etree_level=0, int task_depth=0) override;
 
+    void multifrontal_solve(DenseM_t& b) const override;
+
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override {}
@@ -94,6 +94,12 @@ namespace strumpack {
     std::string type() const override { return "FrontalMatrixMAGMA"; }
 
 #if defined(STRUMPACK_USE_MPI)
+    void multifrontal_solve(DenseM_t& bloc,
+                            DistributedMatrix<scalar_t>* bdist)
+      const override {
+      multifrontal_solve(bloc);
+    }
+
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FrontalMatrixMPI<scalar_t,integer_t>* pa)
@@ -123,12 +129,10 @@ namespace strumpack {
     factors_on_device(const SpMat_t& A, const Opts_t& opts,
                       std::vector<LInfo_t>& ldata, std::size_t total_dmem);
 
-    void multifrontal_solve(DenseM_t& b) const override;
-
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
 
     void gpu_solve(DenseM_t& b) const;
 

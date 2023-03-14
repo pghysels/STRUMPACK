@@ -262,6 +262,7 @@ namespace strumpack {
     void get_level_fronts(std::vector<F_t*>& ldata, int elvl, int l=0);
 
 #if defined(STRUMPACK_USE_MPI)
+    virtual
     void multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
     virtual void
     forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,

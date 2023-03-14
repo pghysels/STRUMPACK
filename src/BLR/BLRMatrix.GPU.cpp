@@ -53,6 +53,8 @@
 namespace strumpack {
   namespace BLR {
 
+    const int KBLAS_ARA_BLOCK_SIZE = 32;
+
     template<typename scalar_t> void
     multiply_inc_work_size(const BLRTile<scalar_t>& A,
                            const BLRTile<scalar_t>& B,
@@ -117,7 +119,8 @@ namespace strumpack {
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     public:
       void add(std::unique_ptr<BLRTile<scalar_t>>& tile) {
-        if (tile->D().rows() <= 15 || tile->D().cols() <= 15)
+        if (tile->D().rows() <= KBLAS_ARA_BLOCK_SIZE ||
+            tile->D().cols() <= KBLAS_ARA_BLOCK_SIZE)
           return;
         tile_.push_back(&tile);
       }
@@ -130,7 +133,7 @@ namespace strumpack {
         for (std::size_t i=0; i<B; i++) {
           int m = tile_[i]->get()->D().rows(),
             n = tile_[i]->get()->D().cols();
-          auto minmn = std::min(m, n);
+          auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
           smem_size += m*minmn + n*minmn;
           maxminmn = std::max(maxminmn, minmn);
           maxm = std::max(maxm, m);
@@ -153,7 +156,7 @@ namespace strumpack {
         std::vector<scalar_t*> AUV(3*B);
         for (std::size_t i=0; i<B; i++) {
           auto m = mn[i], n = mn[i+B];
-          auto minmn = std::min(m, n);
+          auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
           AUV[i    ] = tile_[i]->get()->D().data();
           AUV[i+  B] = smem;  smem += m*minmn;
           AUV[i+2*B] = smem;  smem += n*minmn;
@@ -162,7 +165,7 @@ namespace strumpack {
         gpu_check(gpu::copy_host_to_device(dA, AUV.data(), 3*B));
         gpu::kblas::ara
           (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
-           tol, maxm, maxn, maxminmn, 32, 10, 1, B);
+           tol, maxm, maxn, maxminmn, KBLAS_ARA_BLOCK_SIZE, 10, 1, B);
         std::vector<int> ranks(B);
         gpu_check(gpu::copy_device_to_host(ranks.data(), dr, B));
         for (std::size_t i=0; i<B; i++) {
@@ -202,7 +205,7 @@ namespace strumpack {
       int m = tilerows(i), n = tilecols(j);
       if (m > 15 && n > 15) {
         auto& A = tile(i, j).D();
-        std::size_t minmn = std::min(m, n);
+        auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
         DenseMW_t dU(m, minmn, work, m);  work += m*minmn;
         DenseMW_t dV(n, minmn, work, n);  work += n*minmn;
         auto diwork = gpu::aligned_ptr<int>(work);
@@ -220,7 +223,8 @@ namespace strumpack {
         int rank = 0;
         gpu::kblas::ara
           (blashandle, d_m, d_n, dAptr, d_m, dUptr, d_m, dVptr, d_n,
-           d_r, opts.rel_tol(), m, n, minmn, 32, 10, 1, 1);
+           d_r, opts.rel_tol(), m, n, minmn,
+           KBLAS_ARA_BLOCK_SIZE, 10, 1, 1);
         gpu_check(gpu::copy_device_to_host(&rank, d_r, 1));
         STRUMPACK_FLOPS(blas::ara_flops(m, n, rank, 10));
         if (rank*(m+n) < m*n) {
@@ -323,8 +327,7 @@ namespace strumpack {
 
       int compress_lwork = 0;
 #if defined(STRUMPACK_USE_KBLAS)
-      const int BLOCK_SIZE = 32;
-      kblas_ara_batch_wsquery<real_t>(handle, BLOCK_SIZE, 2*(rb+rb2-1));
+      kblas_ara_batch_wsquery<real_t>(handle, KBLAS_ARA_BLOCK_SIZE, 2*(rb+rb2-1));
       kblasAllocateWorkspace(handle);
 #else
       // max buffersize for gesvd is not the buffersize of the largest
@@ -344,11 +347,10 @@ namespace strumpack {
                      (solve_handle, Jobz::V, B21.tilerows(j), B11.tilecols(i)));
         }
       }
-#endif
-
-      // TODO not needed when doing batched ARA
+      // not needed when doing batched ARA
       // singular values (real and scalar), U, V and A
       compress_lwork += 2*max_m + 3*max_mn;
+#endif
 
       int getrf_work_size =
         gpu::getrf_buffersize<scalar_t>(solve_handle, max_m1);

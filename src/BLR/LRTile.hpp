@@ -121,10 +121,10 @@ namespace strumpack {
       void draw(std::ostream& of, std::size_t roff,
                 std::size_t coff) const override;
 
-      DenseM_t& D() override { assert(false); return *U_; }
+      DenseM_t& D() override { return *U_; }
       DenseM_t& U() override { return *U_; }
       DenseM_t& V() override { return *V_; }
-      const DenseM_t& D() const override { assert(false); return *U_; }
+      const DenseM_t& D() const override { return *U_; }
       const DenseM_t& U() const override { return *U_; }
       const DenseM_t& V() const override { return *V_; }
 

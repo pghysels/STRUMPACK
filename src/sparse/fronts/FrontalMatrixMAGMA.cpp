@@ -627,10 +627,6 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
-    // template<typename scalar_t,typename integer_t> ReturnCode
-    // FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_factorization
-    // (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-    //  int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     gpu::Stream comp_stream, copy_stream;
     gpu::SOLVERHandle solver_handle(comp_stream);

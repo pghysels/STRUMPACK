@@ -90,10 +90,10 @@ namespace strumpack {
       DenseM_t& D() override { return *D_; }
       const DenseM_t& D() const override { return *D_; }
 
-      DenseM_t& U() override { assert(false); return *D_; }
-      DenseM_t& V() override { assert(false); return *D_; }
-      const DenseM_t& U() const override { assert(false); return *D_; }
-      const DenseM_t& V() const override { assert(false); return *D_; }
+      DenseM_t& U() override { return *D_; }
+      DenseM_t& V() override { return *D_; }
+      const DenseM_t& U() const override { return *D_; }
+      const DenseM_t& V() const override { return *D_; }
 
       LRTile<scalar_t>
       multiply(const BLRTile<scalar_t>& a) const override;
