@@ -306,13 +306,15 @@ namespace strumpack {
           if (cudaMalloc(&data_, size*sizeof(T)) != cudaSuccess) {
             std::cerr << "Failed to allocate " << size << " "
                       << typeid(T).name() << " objects" << std::endl;
+            // this resets the last error to cudaSuccess, otherwise
+            // other checks might fail
+            cudaGetLastError();
             throw std::bad_alloc();
           }
           STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
           is_managed_ = false;
 #else
           auto e = cudaMalloc(&data_, size*sizeof(T));
-          std::cout << "calling cudaMalloc for device memory" << std::endl;
           if (e == cudaSuccess) {
             STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
             is_managed_ = false;

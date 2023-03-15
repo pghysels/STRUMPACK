@@ -397,10 +397,8 @@ namespace strumpack {
             gpu::round_up(sizeof(Trip_t)*(e11.size()+e12.size()+e21.size())) +
             gpu::round_up(sizeof(std::size_t)*(Il.size()+Ir.size())) +
             gpu::round_up(sizeof(gpu::AssembleData<scalar_t>));
-          // gpu::DeviceMemory<char> d_mem(d_mem_bytes);
           auto d_mem = workspace.get_device_bytes(d_mem_bytes);
           auto smem = d_mem.template as<scalar_t>();
-
           gpu_check(gpu::memset<scalar_t>(smem, 0, dsep*(dsep+2*dupd)));
           DenseMW_t dF11(dsep, dsep, smem, dsep);  smem += dsep*dsep;
           DenseMW_t dF12(dsep, dupd, smem, dsep);  smem += dsep*dupd;
@@ -426,7 +424,6 @@ namespace strumpack {
           gpu_check(gpu::copy_host_to_device(dIr, Ir.data(), Ir.size()));
 
           CBdev_ = workspace.get_device_bytes(dupd*dupd*sizeof(scalar_t));
-          // gpu::DeviceMemory<scalar_t>(dupd*dupd);
           scalar_t* dCB = CBdev_.template as<scalar_t>();
           gpu_check(gpu::memset<scalar_t>(dCB, 0, dupd*dupd));
           F22_ = DenseMW_t(dupd, dupd, dCB, dupd);
