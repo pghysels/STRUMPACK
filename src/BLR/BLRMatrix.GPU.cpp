@@ -190,58 +190,8 @@ namespace strumpack {
     private:
       std::vector<std::unique_ptr<BLRTile<scalar_t>>*> tile_;
     };
+#endif
 
-
-    /*
-     * work should be:
-     *   scalar_t:  2*m*n
-     *   int:       3
-     *   scalar_t*: 3
-     * this should always be less than the CUDA version???
-     */
-    template<typename scalar_t> void
-    BLRMatrix<scalar_t>::compress_tile_gpu
-    (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
-     std::size_t i, std::size_t j, int* info,
-     scalar_t* work, const Opts_t& opts) {
-      int m = tilerows(i), n = tilecols(j);
-      if (m > 15 && n > 15) {
-        auto& A = tile(i, j).D();
-        auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
-        DenseMW_t dU(m, minmn, work, m);  work += m*minmn;
-        DenseMW_t dV(n, minmn, work, n);  work += n*minmn;
-        auto diwork = gpu::aligned_ptr<int>(work);
-        auto d_m = diwork;  diwork += 1;
-        auto d_n = diwork;  diwork += 1;
-        auto d_r = diwork;  diwork += 1;
-        int mn[2] = {m, n};
-        gpu_check(gpu::copy_host_to_device(d_m, mn, 2));
-        auto spwork = gpu::aligned_ptr<scalar_t*>(diwork);
-        auto dAptr = spwork;  spwork += 1;
-        auto dUptr = spwork;  spwork += 1;
-        auto dVptr = spwork;  spwork += 1;
-        scalar_t* AUV[3] = {A.data(), dU.data(), dV.data()};
-        gpu_check(gpu::copy_host_to_device(dAptr, AUV, 3));
-        int rank = 0;
-        gpu::kblas::ara
-          (blashandle, d_m, d_n, dAptr, d_m, dUptr, d_m, dVptr, d_n,
-           d_r, opts.rel_tol(), m, n, minmn,
-           KBLAS_ARA_BLOCK_SIZE, 10, 1, 1);
-        gpu_check(gpu::copy_device_to_host(&rank, d_r, 1));
-        STRUMPACK_FLOPS(blas::ara_flops(m, n, rank, 10));
-        if (rank*(m+n) < m*n) {
-          auto dA = tile(i, j).D().data();
-          DenseMW_t tU(m, rank, dA, m), tV(rank, n, dA+m*rank, rank);
-          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-            (new LRTile<scalar_t>(tU, tV));
-          DenseMW_t dUtmp(m, rank, dU, 0, 0), dVtmp(n, rank, dV, 0, 0);
-          gpu_check(gpu::copy_device_to_device(tU, dUtmp));
-          gpu::geam<scalar_t>
-            (blashandle, Trans::C, Trans::N, 1., dVtmp, 0., dVtmp, tV);
-        }
-      }
-    }
-#else
     /*
      * work should be: 2*minmn + 3*m*n + gesdj_buffersize(m, n)
      */
@@ -289,7 +239,6 @@ namespace strumpack {
         }
       }
     }
-#endif
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor_gpu
@@ -300,8 +249,7 @@ namespace strumpack {
      const std::vector<std::size_t>& tiles1,
      const std::vector<std::size_t>& tiles2,
      const DenseMatrix<bool>& admissible,
-     VectorPool<scalar_t>& workspace,
-     const Opts_t& opts) {
+     VectorPool<scalar_t>& workspace, const Opts_t& opts) {
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       auto dsep = A11.rows();
       auto dupd = A12.cols();
@@ -363,27 +311,65 @@ namespace strumpack {
       std::size_t max_work = std::max(getrf_work_size, compress_lwork);
       std::size_t d_mem_size =
         gpu::round_up(sizeof(scalar_t)*
-                      (dsep*dsep + 2*dsep*dupd + max_work)) +
+                      (std::max(dsep,dupd)*max_m + max_work)) +
         gpu::round_up(sizeof(int)*(dsep+1)) +
         3*gpu::round_up(d_batch_meta);
 
       auto dmem = workspace.get_device_bytes(d_mem_size);
-      auto dA11 = dmem.template as<scalar_t>();
-      auto dA12 = dA11 + dsep*dsep;
-      auto dA21 = dA12 + dsep*dupd;
-      auto d_work_mem = dA21 + dupd*dsep;
+      auto temp_col = dmem.template as<scalar_t>();
+      auto d_work_mem = temp_col + std::max(dsep,dupd)*max_m;
       auto dpiv = gpu::aligned_ptr<int>(d_work_mem+max_work);
       auto dinfo = dpiv + dsep;
       auto d_batch_mem = gpu::aligned_ptr<char>(dinfo+1);
 
       gpu::DeviceMemory<char> d_batch_matrix_mem;
 
-      for (std::size_t i=0; i<rb; i++) {
-        for (std::size_t j=0; j<rb; j++)
-          B11.create_dense_tile_gpu(i, j, A11, dA11);
-        for (std::size_t j=0; j<rb2; j++) {
-          B12.create_dense_tile_gpu(i, j, A12, dA12);
-          B21.create_dense_tile_gpu(j, i, A21, dA21);
+      auto dA11 = A11.data();
+      for (std::size_t j=0; j<rb; j++) {
+        auto n = B11.tilecols(j);
+        auto Atmp = temp_col;
+        DenseMW_t Aj(dsep, n, dA11, dsep), Ajtmp(dsep, n, Atmp, dsep);
+        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
+        for (std::size_t i=0; i<rb; i++) {
+          auto m = B11.tilerows(i);
+          DenseMW_t Aij(m, n, dA11, m),
+            Aijtmp(m, n, Ajtmp, B11.tileroff(i), 0);
+          B11.block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
+            (new DenseTile<scalar_t>(Aij));
+          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
+          dA11 += m * n;
+        }
+      }
+      auto dA12 = A12.data();
+      for (std::size_t j=0; j<rb2; j++) {
+        auto n = B12.tilecols(j);
+        auto Atmp = temp_col;
+        DenseMW_t Aj(dsep, n, dA12, dsep), Ajtmp(dsep, n, Atmp, dsep);
+        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
+        for (std::size_t i=0; i<rb; i++) {
+          auto m = B12.tilerows(i);
+          DenseMW_t Aij(m, n, dA12, m),
+            Aijtmp(m, n, Ajtmp, B12.tileroff(i), 0);
+          B12.block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
+            (new DenseTile<scalar_t>(Aij));
+          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
+          dA12 += m * n;
+        }
+      }
+      auto dA21 = A21.data();
+      for (std::size_t j=0; j<rb; j++) {
+        auto n = B21.tilecols(j);
+        auto Atmp = temp_col;
+        DenseMW_t Aj(dupd, n, dA21, dupd), Ajtmp(dupd, n, Atmp, dupd);
+        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
+        for (std::size_t i=0; i<rb2; i++) {
+          auto m = B21.tilerows(i);
+          DenseMW_t Aij(m, n, dA21, m),
+            Aijtmp(m, n, Ajtmp, B21.tileroff(i), 0);
+          B21.block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
+            (new DenseTile<scalar_t>(Aij));
+          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
+          dA21 += m * n;
         }
       }
 
