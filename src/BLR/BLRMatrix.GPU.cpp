@@ -124,7 +124,8 @@ namespace strumpack {
           return;
         tile_.push_back(&tile);
       }
-      void run(gpu::BLASHandle& handle, scalar_t tol) {
+      void run(gpu::BLASHandle& handle,
+               VectorPool<scalar_t>& workspace, scalar_t tol) {
         auto B = tile_.size();
         if (!B) return;
         std::size_t smem_size = 0;
@@ -145,7 +146,7 @@ namespace strumpack {
           gpu::round_up(3*B*sizeof(int)) +
           gpu::round_up(3*B*sizeof(scalar_t*)) +
           gpu::round_up(smem_size*sizeof(scalar_t));
-        gpu::DeviceMemory<char> dmem(dmem_size);
+        auto dmem = workspace.get_device_bytes(dmem_size);
         auto dm = dmem.template as<int>();
         auto dn = dm + B;
         auto dr = dn + B;
@@ -184,6 +185,7 @@ namespace strumpack {
               (handle, Trans::C, Trans::N, 1., dVtmp, 0., dVtmp, tV);
           }
         }
+        workspace.restore(dmem);
       }
     private:
       std::vector<std::unique_ptr<BLRTile<scalar_t>>*> tile_;
@@ -323,11 +325,12 @@ namespace strumpack {
       auto max_mn = max_m*max_m;
       int max_batchcount = std::pow(rb-1+rb2, 2);
 
-      gpu::HostMemory<scalar_t> pinned(max_mn);
+      gpu::HostMemory<scalar_t> pinned = workspace.get_pinned(max_mn);
 
       int compress_lwork = 0;
 #if defined(STRUMPACK_USE_KBLAS)
-      kblas_ara_batch_wsquery<real_t>(handle, KBLAS_ARA_BLOCK_SIZE, 2*(rb+rb2-1));
+      kblas_ara_batch_wsquery<real_t>
+        (handle, KBLAS_ARA_BLOCK_SIZE, 2*(rb+rb2-1));
       kblasAllocateWorkspace(handle);
 #else
       // max buffersize for gesvd is not the buffersize of the largest
@@ -398,7 +401,7 @@ namespace strumpack {
           ara.add(B12.block(i, j));
           ara.add(B21.block(j, i));
         }
-        ara.run(handle, opts.rel_tol());
+        ara.run(handle, workspace, opts.rel_tol());
 #else
         for (std::size_t j=i+1; j<rb; j++) {
           if (admissible(i, j))
@@ -451,7 +454,6 @@ namespace strumpack {
               (B21.tile(k, i), B12.tile(i, j), sVU, sUVU);
 
         if ((sVU+sUVU)*sizeof(scalar_t) > d_batch_matrix_mem.size()) {
-          // d_batch_scalar_mem = gpu::DeviceMemory<scalar_t>(sVU+sUVU);
           workspace.restore(d_batch_matrix_mem);
           d_batch_matrix_mem = workspace.get_device_bytes
             ((sVU+sUVU)*sizeof(scalar_t));
@@ -513,12 +515,14 @@ namespace strumpack {
           piv[l] += B11.tileroff(i);
       if (rb > 0) {
         for (std::size_t j=0; j<rb; j++)
-          B11.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream);
+          B11.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
         for (std::size_t j=0; j<rb2; j++) {
-          B12.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream);
-          B21.tile(j, rb-1).move_gpu_tile_to_cpu(copy_stream);
+          B12.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
+          B21.tile(j, rb-1).move_gpu_tile_to_cpu(copy_stream, pinned);
         }
       }
+      copy_stream.synchronize();
+      workspace.restore(pinned);
       workspace.restore(d_batch_matrix_mem);
       workspace.restore(dmem);
     }

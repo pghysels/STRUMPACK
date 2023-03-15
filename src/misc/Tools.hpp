@@ -179,7 +179,7 @@ namespace strumpack {
 #pragma omp critical
       {
         pinned_data_.push_back(std::move(m));
-        if (pinned_data_.size() > 3) {
+        if (pinned_data_.size() > 4) {
           // remove smallest??
           int pos = 0;
           std::size_t smin = pinned_data_[0].size();
@@ -199,7 +199,7 @@ namespace strumpack {
 #pragma omp critical
       {
         device_bytes_.push_back(std::move(m));
-        if (device_bytes_.size() > 2) {
+        if (device_bytes_.size() > 4) {
           // remove smallest??
           int pos = 0;
           std::size_t smin = device_bytes_[0].size();

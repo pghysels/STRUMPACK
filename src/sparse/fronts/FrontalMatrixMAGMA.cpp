@@ -270,14 +270,16 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> scalar_t*
   FrontalMatrixMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
-    gpu_check(gpu::copy_host_to_device(dF22, F22_));
-    return dF22;
+    // gpu_check(gpu::copy_host_to_device(dF22, F22_));
+    // return dF22;
+    return F22_.data();
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::
   release_work_memory(VectorPool<scalar_t>& workspace) {
-    workspace.restore(*host_Schur_);
+    if (host_Schur_) workspace.restore(*host_Schur_);
+    if (dev_Schur_)  workspace.restore(*dev_Schur_);
   }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -660,7 +662,7 @@ namespace strumpack {
     std::size_t pinned_size = 0;
     for (int l=lvls-1; l>=0; l--)
       pinned_size = std::max(pinned_size, ldata[l].factor_size);
-    gpu::HostMemory<scalar_t> pinned(pinned_size);
+    auto pinned = workspace.get_pinned(pinned_size);
 
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
@@ -781,13 +783,21 @@ namespace strumpack {
     }
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
-      host_Schur_.reset(new gpu::HostMemory<scalar_t>
-                        (workspace.get_pinned(dupd*dupd)));
-      gpu_check(gpu::copy_device_to_host<scalar_t>
-                (*host_Schur_, (scalar_t*)(old_work), dupd*dupd));
-      F22_ = DenseMW_t(dupd, dupd, *host_Schur_, dupd);
+      // host_Schur_.reset(new gpu::HostMemory<scalar_t>
+      //                   (workspace.get_pinned(dupd*dupd)));
+      // gpu_check(gpu::copy_device_to_host<scalar_t>
+      //           (*host_Schur_, (scalar_t*)(old_work), dupd*dupd));
+
+      dev_Schur_.reset(new gpu::DeviceMemory<char>
+                       (workspace.get_device_bytes
+                        (dupd*dupd*sizeof(scalar_t))));
+      auto dF22 = dev_Schur_->template as<scalar_t>();
+      gpu_check(gpu::copy_device_to_device
+                (dF22, (scalar_t*)(old_work), dupd*dupd));
+      F22_ = DenseMW_t(dupd, dupd, dF22, dupd);
     }
     workspace.restore(all_dmem);
+    workspace.restore(pinned);
     return err_code;
   }
 

@@ -106,6 +106,9 @@ namespace strumpack {
       const override;
 #endif
 
+    std::size_t get_device_F22_worksize() override {
+      return 0; //dim_upd()*dim_upd();
+    }
     scalar_t* get_device_F22(scalar_t* dF22) override;
 
   private:
@@ -115,6 +118,7 @@ namespace strumpack {
     int* piv_ = nullptr;
     std::unique_ptr<gpu::DeviceMemory<char>> dev_factors_ = nullptr;
     std::unique_ptr<gpu::HostMemory<scalar_t>> host_Schur_ = nullptr;
+    std::unique_ptr<gpu::DeviceMemory<char>> dev_Schur_ = nullptr;
 
     FrontalMatrixMAGMA(const FrontalMatrixMAGMA&) = delete;
     FrontalMatrixMAGMA& operator=(FrontalMatrixMAGMA const&) = delete;
