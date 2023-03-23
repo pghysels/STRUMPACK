@@ -83,9 +83,9 @@ namespace strumpack {
      *
      */
     template<typename T, int unroll> __global__ void
-    assemble_kernel(unsigned int f0, unsigned int nf, AssembleData<T>* dat) {
-      int idx = (blockIdx.x * blockDim.x) * unroll + threadIdx.x,
-        op = (blockIdx.y + f0) * blockDim.y + threadIdx.y;
+    assemble_kernel(unsigned int nf, AssembleData<T>* dat) {
+      int idx = blockIdx.x * blockDim.x * unroll + threadIdx.x,
+        op = blockIdx.y * blockDim.y + threadIdx.y;
       if (op >= nf) return;
       auto& F = dat[op];
       for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
@@ -157,17 +157,18 @@ namespace strumpack {
         if (nnz) {
           unsigned int nt = 512, ops = 1;
           const int unroll = 8;
-          while (nt*unroll > nnz && nt > 8 && ops < 64) {
-            nt /= 2;
-            ops *= 2;
-          }
-          ops = std::min(ops, nf);
+          // const int unroll = 8;
+          // while (nt*unroll > nnz && nt > 8 && ops < 64) {
+          //   nt /= 2;
+          //   ops *= 2;
+          // }
+          // ops = std::min(ops, nf);
           unsigned int nb = (nnz + nt*unroll - 1) / (nt*unroll),
             nbf = (nf + ops - 1) / ops;
           dim3 block(nt, ops);
           for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Y));
-            assemble_kernel<T,unroll><<<grid,block>>>(f, nf, ddat+f*ops);
+            assemble_kernel<T,unroll><<<grid,block>>>(nf, ddat+f*ops);
           }
         }
       }
@@ -179,11 +180,11 @@ namespace strumpack {
         if (du) {
           const unsigned int unroll = 16;
           unsigned int nt = 512, ops = 1;
-          while (nt > du && ops < 64) {
-            nt /= 2;
-            ops *= 2;
-          }
-          ops = std::min(ops, nf);
+          // while (nt > du && ops < 64) {
+          //   nt /= 2;
+          //   ops *= 2;
+          // }
+          // ops = std::min(ops, nf);
           unsigned int nbx = (du + nt - 1) / nt,
             nby = (du + unroll - 1) / unroll,
             nbf = (nf + ops - 1) / ops;
