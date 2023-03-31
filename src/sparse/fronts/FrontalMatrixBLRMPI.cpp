@@ -307,11 +307,19 @@ namespace strumpack {
       if (lchild_) lchild_->release_work_memory();
       if (rchild_) rchild_->release_work_memory();
       if (dim_sep() && grid2d().active()) {
-        if (dim_upd())
+        // if (dim_upd()) {
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+        if (opts.use_gpu())
+          piv_ = BLRMPI_t::partial_factor_gpu
+            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
+        else
+#endif
           piv_ = BLRMPI_t::partial_factor
             (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
-        else piv_ = F11blr_.factor(adm_, opts.BLR_options());
-        // TODO flops?
+        // } else {
+        //   piv_ = F11blr_.factor(adm_, opts.BLR_options());
+        //   // TODO flops?
+        // }
       }
     }
     if (opts.print_compressed_front_stats()) {

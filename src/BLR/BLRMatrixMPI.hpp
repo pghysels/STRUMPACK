@@ -158,19 +158,28 @@ namespace strumpack {
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
       std::vector<int> factor_col(const adm_t& adm, const Opts_t& opts,
-                                      const std::function<void(int, bool, std::size_t)>& blockcol);
+                                  const std::function
+                                  <void(int, bool, std::size_t)>& blockcol);
 
       void laswp(const std::vector<int>& piv, bool fwd);
 
-      static
-      std::vector<int> partial_factor(BLRMPI_t& A11, BLRMPI_t& A12,
-                                      BLRMPI_t& A21, BLRMPI_t& A22,
-                                      const adm_t& adm, const Opts_t& opts);
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      static std::vector<int>
+      partial_factor_gpu(BLRMPI_t& A11, BLRMPI_t& A12,
+                         BLRMPI_t& A21, BLRMPI_t& A22,
+                         const adm_t& adm, const Opts_t& opts);
+#endif
 
-      static
-      std::vector<int> partial_factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, 
-                                  BLRMPI_t& F22, const adm_t& adm, const Opts_t& opts, 
-                                  const std::function<void(int, bool, std::size_t)>& blockcol);
+      static std::vector<int>
+      partial_factor(BLRMPI_t& A11, BLRMPI_t& A12,
+                     BLRMPI_t& A21, BLRMPI_t& A22,
+                     const adm_t& adm, const Opts_t& opts);
+
+      static std::vector<int>
+      partial_factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21,
+                         BLRMPI_t& F22, const adm_t& adm, const Opts_t& opts,
+                         const std::function
+                         <void(int, bool, std::size_t)>& blockcol);
 
       void compress(const Opts_t& opts);
 
@@ -312,6 +321,28 @@ namespace strumpack {
       bcast_col_of_tiles_along_rows(std::size_t i0, std::size_t i1,
                                     std::size_t j) const;
 
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      DenseTile<scalar_t>
+      bcast_dense_tile_along_col_gpu(std::size_t i, std::size_t j,
+                                     gpu::Stream& stream, scalar_t* dptr,
+                                     scalar_t* pinned=nullptr) const;
+      DenseTile<scalar_t>
+      bcast_dense_tile_along_row_gpu(std::size_t i, std::size_t j,
+                                     gpu::Stream& stream, scalar_t* dptr,
+                                     scalar_t* pinned=nullptr) const;
+
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      bcast_row_of_tiles_along_cols_gpu(std::size_t i,
+                                        std::size_t j0, std::size_t j1,
+                                        gpu::Stream& stream, scalar_t* dptr,
+                                        scalar_t* pinned=nullptr) const;
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
+                                        std::size_t j,
+                                        gpu::Stream& stream, scalar_t* dptr,
+                                        scalar_t* pinned=nullptr) const;
+#endif
+
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_rows(std::size_t i0, std::size_t i1,
                   std::size_t j0, std::size_t j1) const;
@@ -346,6 +377,11 @@ namespace strumpack {
       template<typename T> friend void
       gemm(Trans ta, Trans tb, T alpha, const BLRMatrixMPI<T>& a,
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
+
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      void move_to_gpu(gpu::Stream& s, scalar_t* dptr);
+      void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
+#endif
 
       template<typename T,typename I> friend class strumpack::ExtendAdd;
       template<typename T,typename I> friend class BLRExtendAdd;

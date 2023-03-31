@@ -72,7 +72,7 @@ namespace strumpack {
       std::size_t rank() const override { return std::min(rows(), cols()); }
 
       std::size_t memory() const override { return D_->memory(); }
-      std::size_t nonzeros() const override { return D_->nonzeros(); }
+      std::size_t nonzeros() const override { return rows()*cols(); }
       std::size_t maximum_rank() const override { return 0; }
       bool is_low_rank() const override { return false; };
 
@@ -122,8 +122,10 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) override;
 
-      void move_gpu_tile_to_cpu(gpu::Stream& s,
-                                scalar_t* pinned=nullptr) override;
+      void move_to_cpu(gpu::Stream& s,
+                       scalar_t* pinned=nullptr) override;
+      void move_to_gpu(gpu::Stream& s,
+                       scalar_t*& dptr) override;
 #endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,

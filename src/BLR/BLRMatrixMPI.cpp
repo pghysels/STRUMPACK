@@ -303,6 +303,7 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_row_of_tiles_along_cols
     (std::size_t i, std::size_t j0, std::size_t j1) const {
+      if (!grid()) return {};
       int src = i % grid()->nprows();
       std::size_t msg_size = 0, nr_tiles = 0;
       std::vector<std::int64_t> ranks;
@@ -368,6 +369,7 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_col_of_tiles_along_rows
     (std::size_t i0, std::size_t i1, std::size_t j) const {
+      if (!grid()) return {};
       int src = j % grid()->npcols();
       std::size_t msg_size = 0, nr_tiles = 0;
       std::vector<std::int64_t> ranks;
@@ -2082,10 +2084,6 @@ namespace strumpack {
                                            BLRMPI_t& A21, BLRMPI_t& A22,
                                            const adm_t& adm,
                                            const Opts_t& opts) {
-      assert(A11.rows() == A12.rows() && A11.cols() == A21.cols() &&
-             A21.rows() == A22.rows() && A12.cols() == A22.cols());
-      assert(A11.grid() == A12.grid() && A11.grid() == A21.grid() &&
-             A11.grid() == A22.grid());
       auto B1 = A11.rowblocks();
       auto B2 = A22.rowblocks();
       auto g = A11.grid();
@@ -2118,34 +2116,26 @@ namespace strumpack {
           {
             if (g->is_local_row(i)) {
               // update trailing columns of A11
-              for (std::size_t j=i+1; j<B1; j++) {
-                if (g->is_local_col(j) && adm(i, j)) {
+              for (std::size_t j=i+1; j<B1; j++)
+                if (g->is_local_col(j) && adm(i, j))
 #pragma omp task default(shared) firstprivate(i,j)
                   A11.compress_tile(i, j, opts);
-                }
-              }
-              for (std::size_t j=0; j<B2; j++) {
-                if (g->is_local_col(j)) {
+              for (std::size_t j=0; j<B2; j++)
+                if (g->is_local_col(j))
 #pragma omp task default(shared) firstprivate(i,j)
                   A12.compress_tile(i, j, opts);
-                }
-              }
             }
             if (g->is_local_col(i)) {
               // update trailing rows of A11
-              for (std::size_t j=i+1; j<B1; j++) {
-                if (g->is_local_row(j) && adm(j, i)) {
+              for (std::size_t j=i+1; j<B1; j++)
+                if (g->is_local_row(j) && adm(j, i))
 #pragma omp task default(shared) firstprivate(i,j)
                   A11.compress_tile(j, i, opts);
-                }
-              }
               // update trailing rows of A21
-              for (std::size_t j=0; j<B2; j++) {
-                if (g->is_local_row(j)) {
+              for (std::size_t j=0; j<B2; j++)
+                if (g->is_local_row(j))
 #pragma omp task default(shared) firstprivate(i,j)
                   A21.compress_tile(j, i, opts);
-                }
-              }
             }
           }
         }
@@ -2175,20 +2165,16 @@ namespace strumpack {
             }
           }
           if (g->is_local_col(i)) {
-            for (std::size_t j=i+1; j<B1; j++) {
-              if (g->is_local_row(j)) {
+            for (std::size_t j=i+1; j<B1; j++)
+              if (g->is_local_row(j))
 #pragma omp task default(shared) firstprivate(i,j)
                 trsm(Side::R, UpLo::U, Trans::N, Diag::N,
                      scalar_t(1.), Tii, A11.tile(j, i));
-              }
-            }
-            for (std::size_t j=0; j<B2; j++) {
-              if (g->is_local_row(j)) {
+            for (std::size_t j=0; j<B2; j++)
+              if (g->is_local_row(j))
 #pragma omp task default(shared) firstprivate(i,j)
                 trsm(Side::R, UpLo::U, Trans::N, Diag::N,
                      scalar_t(1.), Tii, A21.tile(j, i));
-              }
-            }
           }
         }
         if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::RL) {
@@ -2215,7 +2201,7 @@ namespace strumpack {
             }
             for (std::size_t k=0, lk=0; k<B2; k++) {
               if (g->is_local_row(k)) {
-                for (std::size_t j=i+1, lj=0; j<B1; j++) {
+                for (std::size_t j=i+1, lj=0; j<B1; j++)
                   if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -2223,13 +2209,12 @@ namespace strumpack {
                          A21.tile_dense(k, j).D());
                     lj++;
                   }
-                }
                 lk++;
               }
             }
             for (std::size_t k=i+1, lk=0; k<B1; k++) {
               if (g->is_local_row(k)) {
-                for (std::size_t j=0, lj=0; j<B2; j++) {
+                for (std::size_t j=0, lj=0; j<B2; j++)
                   if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -2237,13 +2222,12 @@ namespace strumpack {
                          A12.tile_dense(k, j).D());
                     lj++;
                   }
-                }
                 lk++;
               }
             }
             for (std::size_t k=0, lk=0; k<B2; k++) {
               if (g->is_local_row(k)) {
-                for (std::size_t j=0, lj=0; j<B2; j++) {
+                for (std::size_t j=0, lj=0; j<B2; j++)
                   if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -2251,7 +2235,6 @@ namespace strumpack {
                          A22.tile_dense(k, j).D());
                     lj++;
                   }
-                }
                 lk++;
               }
             }
@@ -2282,7 +2265,7 @@ namespace strumpack {
                   if (g->is_local_col(i+1)) {
                     std::size_t lj=0;
                     if (g->is_local_row(i+1)) lj=1;
-                    for (std::size_t j=i+2; j<B1; j++) {
+                    for (std::size_t j=i+2; j<B1; j++)
                       if (g->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k,lj)
                         gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -2290,23 +2273,21 @@ namespace strumpack {
                              A11.tile_dense(j, i+1).D());
                         lj++;
                       }
-                    }
                   }
                   if (g->is_local_row(i+1)) {
                     std::size_t lk=0;
-                    for (std::size_t j=0; j<B2; j++) {
+                    for (std::size_t j=0; j<B2; j++)
                       if (g->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,k,j,lk) 
+#pragma omp task default(shared) firstprivate(i,k,j,lk)
                         gemm(Trans::N, Trans::N, scalar_t(-1.),
                              *(Tkj[0]), *(Tik2[lk]), scalar_t(1.),
                              A12.tile_dense(i+1, j).D());
                         lk++;
                       }
-                    }
                   }
                   if (g->is_local_col(i+1)) {
                     std::size_t lj=0;
-                    for (std::size_t j=0; j<B2; j++) {
+                    for (std::size_t j=0; j<B2; j++)
                       if (g->is_local_row(j)) {
 #pragma omp task default(shared) firstprivate(i,k,j,lj)
                         gemm(Trans::N, Trans::N, scalar_t(-1.),
@@ -2314,7 +2295,6 @@ namespace strumpack {
                              A21.tile_dense(j, i+1).D());
                         lj++;
                       }
-                    }
                   }
                 }
               }

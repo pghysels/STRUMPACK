@@ -722,9 +722,19 @@ namespace strumpack {
       auto F22 = F22blr_.dense();
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         seq_copy_to_buffers(F22, sbuf, pa, this);
-    } else
-      BLR::BLRExtendAdd<scalar_t,integer_t>::
-        seq_copy_to_buffers(F22_, sbuf, pa, this);
+    } else {
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      if (CBdev_.size()) {
+        DenseM_t F22(dim_upd(), dim_upd());
+        gpu_check(gpu::copy_device_to_host
+                  (F22, CBdev_.template as<scalar_t>()));
+        BLR::BLRExtendAdd<scalar_t,integer_t>::
+          seq_copy_to_buffers(F22, sbuf, pa, this);
+      } else
+#endif
+        BLR::BLRExtendAdd<scalar_t,integer_t>::
+          seq_copy_to_buffers(F22_, sbuf, pa, this);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void

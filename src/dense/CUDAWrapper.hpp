@@ -54,7 +54,7 @@ namespace strumpack {
   namespace gpu {
 
     // this is valid for compute capability 3.5 -> 8.0 (and beyond?)
-    //const unsigned int MAX_BLOCKS_X = 4294967295; // 2^32-1
+    //const unsigned int MAX_BLOCKS_X = 4294967295; // 2^31-1
     const unsigned int MAX_BLOCKS_Y = 65535;
     const unsigned int MAX_BLOCKS_Z = 65535;
 
@@ -351,7 +351,12 @@ namespace strumpack {
       std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
-      template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
+      template<typename S> S* as() {
+        return reinterpret_cast<S*>(data_);
+      }
+      template<typename S> const S* as() const {
+        return reinterpret_cast<S*>(data_);
+      }
       void release() {
         if (data_) {
           if (is_managed_) {

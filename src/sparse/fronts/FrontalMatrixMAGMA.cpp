@@ -270,8 +270,6 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> scalar_t*
   FrontalMatrixMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
-    // gpu_check(gpu::copy_host_to_device(dF22, F22_));
-    // return dF22;
     return F22_.data();
   }
 
@@ -287,6 +285,14 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+    if (dev_Schur_->size()) {
+      DenseM_t F22(dim_upd(), dim_upd());
+      gpu_check(gpu::copy_device_to_host
+                (F22, dev_Schur_->template as<scalar_t>()));
+      ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
+        (F22, sbuf, pa, this);
+      return;
+    }
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
       (F22_, sbuf, pa, this);
   }

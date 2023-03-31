@@ -31,11 +31,11 @@
 #include <functional>
 #include <algorithm>
 
+#include "misc/TaskTimer.hpp"
+
 #include "BLRMatrix.hpp"
 #include "BLRTileBLAS.hpp"
-#include "misc/TaskTimer.hpp"
-// for gpu::round_up
-#include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
+#include "BLRBatch.hpp"
 
 #if defined(STRUMPACK_USE_CUDA)
 #include "dense/CUDAWrapper.hpp"
@@ -43,154 +43,37 @@
 #if defined(STRUMPACK_USE_HIP)
 #include "dense/HIPWrapper.hpp"
 #endif
-#if defined(STRUMPACK_USE_MAGMA)
-#include "dense/MAGMAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_KBLAS)
-#include "dense/KBLASWrapper.hpp"
-#endif
+
+#include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
 
 namespace strumpack {
   namespace BLR {
 
-    const int KBLAS_ARA_BLOCK_SIZE = 32;
-
-    template<typename scalar_t> void
-    multiply_inc_work_size(const BLRTile<scalar_t>& A,
-                           const BLRTile<scalar_t>& B,
-                           std::size_t& temp1, std::size_t& temp2) {
-      if (A.is_low_rank()) {
-        if (B.is_low_rank()) {
-          temp1 += A.rank() * B.rank();
-          temp2 += (B.rank() < A.rank()) ?
-            A.rows() * B.rank() : A.rank() * B.cols();
-        } else temp1 += A.rank() * B.cols();
-      } else if (B.is_low_rank())
-        temp1 += A.rows() * B.rank();
-    }
-
-    template<typename scalar_t> void
-    add_tile_mult(BLRTile<scalar_t>& A, BLRTile<scalar_t>& B,
-                  DenseMatrix<scalar_t>& C, VBatchedGEMM<scalar_t>& b1,
-                  VBatchedGEMM<scalar_t>& b2, VBatchedGEMM<scalar_t>& b3,
-                  scalar_t*& d1, scalar_t*& d2) {
-      auto m = A.rows(), n = B.cols(), k = A.cols(),
-        r1 = A.rank(), r2 = B.rank();
-      if (A.is_low_rank()) {
-        if (B.is_low_rank()) {
-          b1.add(r1, r2, k, A.V().data(), B.U().data(), d1);
-          if (r2 < r1) {
-            b2.add(m, r2, r1, A.U().data(), d1, d2);
-            b3.add(m, n, r2, d2, B.V().data(), C.data(), C.ld());
-            d2 += m * r2;
-          } else {
-            b2.add(r1, n, r2, d1, B.V().data(), d2);
-            b3.add(m, n, r1, A.U().data(), d2, C.data(), C.ld());
-            d2 += r1 * n;
-          }
-          d1 += r1 * r2;
-        } else {
-          b1.add(r1, n, k, A.V().data(), B.D().data(), d1);
-          b3.add(m, n, r1, A.U().data(), d1, C.data(), C.ld());
-          d1 += r1 * n;
-        }
-      } else {
-        if (B.is_low_rank()) {
-          b1.add(m, r2, k, A.D().data(), B.U().data(), d1);
-          b3.add(m, n, r2, d1, B.V().data(), C.data(), C.ld());
-          d1 += m * r2;
-        } else
-          b3.add(m, n, k, A.D().data(), B.D().data(), C.data(), C.ld());
-      }
-    }
-
+    /*
+     * Copy from device to device, from column major to tile layout.
+     * dA is a pointer to work memory to temporarily store the entire
+     * block column.
+     */
     template<typename scalar_t>
-    void BLRMatrix<scalar_t>::create_dense_tile_gpu
-    (std::size_t i, std::size_t j, DenseM_t& A, scalar_t*& dA) {
-      DenseMW_t dAij(tilerows(i), tilecols(j), dA, tilerows(i));
-      block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-        (new DenseTile<scalar_t>(dAij));
-      dA += tilerows(i) * tilecols(j);
-      gpu_check(gpu::copy_device_to_device(tile(i, j).D(), tile(A, i, j)));
+    void BLRMatrix<scalar_t>::create_from_column_major_gpu
+    (DenseM_t& A, scalar_t* work) {
+      auto dA = A.data();
+      for (std::size_t j=0; j<colblocks(); j++) {
+        auto n = tilecols(j);
+        DenseMW_t Aj(rows(), n, A, 0, tilecoff(j)),
+          Ajtmp(rows(), n, work, rows());
+        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
+        for (std::size_t i=0; i<rowblocks(); i++) {
+          auto m = tilerows(i);
+          DenseMW_t Aij(m, n, dA, m), Aijtmp(m, n, Ajtmp, tileroff(i), 0);
+          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
+          block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
+            (new DenseTile<scalar_t>(Aij));
+          dA += m * n;
+        }
+      }
     }
 
-#if defined(STRUMPACK_USE_KBLAS)
-    template<typename scalar_t> class VBatchedARA {
-      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-    public:
-      void add(std::unique_ptr<BLRTile<scalar_t>>& tile) {
-        if (tile->D().rows() <= KBLAS_ARA_BLOCK_SIZE ||
-            tile->D().cols() <= KBLAS_ARA_BLOCK_SIZE)
-          return;
-        tile_.push_back(&tile);
-      }
-      void run(gpu::BLASHandle& handle,
-               VectorPool<scalar_t>& workspace, scalar_t tol) {
-        auto B = tile_.size();
-        if (!B) return;
-        std::size_t smem_size = 0;
-        int maxm = 0, maxn = 0, maxminmn = 0;
-        std::vector<int> mn(2*B);
-        for (std::size_t i=0; i<B; i++) {
-          int m = tile_[i]->get()->D().rows(),
-            n = tile_[i]->get()->D().cols();
-          auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
-          smem_size += m*minmn + n*minmn;
-          maxminmn = std::max(maxminmn, minmn);
-          maxm = std::max(maxm, m);
-          maxn = std::max(maxn, n);
-          mn[i  ] = m;
-          mn[i+B] = n;
-        }
-        std::size_t dmem_size =
-          gpu::round_up(3*B*sizeof(int)) +
-          gpu::round_up(3*B*sizeof(scalar_t*)) +
-          gpu::round_up(smem_size*sizeof(scalar_t));
-        auto dmem = workspace.get_device_bytes(dmem_size);
-        auto dm = dmem.template as<int>();
-        auto dn = dm + B;
-        auto dr = dn + B;
-        auto dA = gpu::aligned_ptr<scalar_t*>(dr+B);
-        auto dU = dA + B;
-        auto dV = dU + B;
-        auto smem = gpu::aligned_ptr<scalar_t>(dV+B);
-        std::vector<scalar_t*> AUV(3*B);
-        for (std::size_t i=0; i<B; i++) {
-          auto m = mn[i], n = mn[i+B];
-          auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
-          AUV[i    ] = tile_[i]->get()->D().data();
-          AUV[i+  B] = smem;  smem += m*minmn;
-          AUV[i+2*B] = smem;  smem += n*minmn;
-        }
-        gpu_check(gpu::copy_host_to_device(dm, mn.data(), 2*B));
-        gpu_check(gpu::copy_host_to_device(dA, AUV.data(), 3*B));
-        gpu::kblas::ara
-          (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
-           tol, maxm, maxn, maxminmn, KBLAS_ARA_BLOCK_SIZE, 10, 1, B);
-        std::vector<int> ranks(B);
-        gpu_check(gpu::copy_device_to_host(ranks.data(), dr, B));
-        for (std::size_t i=0; i<B; i++) {
-          auto rank = ranks[i], m = mn[i], n = mn[i+B];
-          STRUMPACK_FLOPS(blas::ara_flops(m, n, rank, 10));
-          if (rank*(m+n) < m*n) {
-            auto dA = AUV[i];
-            DenseMW_t tU(m, rank, dA, m),
-              tV(rank, n, dA+m*rank, rank);
-            *tile_[i] = std::unique_ptr<LRTile<scalar_t>>
-              (new LRTile<scalar_t>(tU, tV));
-            DenseMW_t dUtmp(m, rank, AUV[i+B], m),
-              dVtmp(n, rank, AUV[i+2*B], n);
-            gpu_check(gpu::copy_device_to_device(tU, dUtmp));
-            gpu::geam<scalar_t>
-              (handle, Trans::C, Trans::N, 1., dVtmp, 0., dVtmp, tV);
-          }
-        }
-        workspace.restore(dmem);
-      }
-    private:
-      std::vector<std::unique_ptr<BLRTile<scalar_t>>*> tile_;
-    };
-#endif
 
     /*
      * work should be: 2*minmn + 3*m*n + gesdj_buffersize(m, n)
@@ -264,6 +147,7 @@ namespace strumpack {
       gpu::SOLVERHandle solve_handle(comp_stream),
         solve_handle2(copy_stream);
 
+      int max_batchcount = std::pow(rb-1+rb2, 2);
       std::size_t max_m1 = 0;
       for (std::size_t k=0; k<rb; k++)
         max_m1 = std::max(max_m1, B11.tilerows(k));
@@ -271,15 +155,13 @@ namespace strumpack {
       for (std::size_t k=0; k<rb2; k++)
         max_m = std::max(max_m, B21.tilerows(k));
       auto max_mn = max_m*max_m;
-      int max_batchcount = std::pow(rb-1+rb2, 2);
 
       gpu::HostMemory<scalar_t> pinned = workspace.get_pinned(max_mn);
 
       int compress_lwork = 0;
+
 #if defined(STRUMPACK_USE_KBLAS)
-      kblas_ara_batch_wsquery<real_t>
-        (handle, KBLAS_ARA_BLOCK_SIZE, 2*(rb+rb2-1));
-      kblasAllocateWorkspace(handle);
+      VBatchedARA<scalar_t>::kblas_wsquery(handle, 2*(rb+rb2-1));
 #else
       // max buffersize for gesvd is not the buffersize of the largest
       // matrix, a rectangular matrix seems to need more workspace
@@ -324,54 +206,9 @@ namespace strumpack {
 
       gpu::DeviceMemory<char> d_batch_matrix_mem;
 
-      auto dA11 = A11.data();
-      for (std::size_t j=0; j<rb; j++) {
-        auto n = B11.tilecols(j);
-        auto Atmp = temp_col;
-        DenseMW_t Aj(dsep, n, dA11, dsep), Ajtmp(dsep, n, Atmp, dsep);
-        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
-        for (std::size_t i=0; i<rb; i++) {
-          auto m = B11.tilerows(i);
-          DenseMW_t Aij(m, n, dA11, m),
-            Aijtmp(m, n, Ajtmp, B11.tileroff(i), 0);
-          B11.block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-            (new DenseTile<scalar_t>(Aij));
-          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
-          dA11 += m * n;
-        }
-      }
-      auto dA12 = A12.data();
-      for (std::size_t j=0; j<rb2; j++) {
-        auto n = B12.tilecols(j);
-        auto Atmp = temp_col;
-        DenseMW_t Aj(dsep, n, dA12, dsep), Ajtmp(dsep, n, Atmp, dsep);
-        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
-        for (std::size_t i=0; i<rb; i++) {
-          auto m = B12.tilerows(i);
-          DenseMW_t Aij(m, n, dA12, m),
-            Aijtmp(m, n, Ajtmp, B12.tileroff(i), 0);
-          B12.block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-            (new DenseTile<scalar_t>(Aij));
-          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
-          dA12 += m * n;
-        }
-      }
-      auto dA21 = A21.data();
-      for (std::size_t j=0; j<rb; j++) {
-        auto n = B21.tilecols(j);
-        auto Atmp = temp_col;
-        DenseMW_t Aj(dupd, n, dA21, dupd), Ajtmp(dupd, n, Atmp, dupd);
-        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
-        for (std::size_t i=0; i<rb2; i++) {
-          auto m = B21.tilerows(i);
-          DenseMW_t Aij(m, n, dA21, m),
-            Aijtmp(m, n, Ajtmp, B21.tileroff(i), 0);
-          B21.block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-            (new DenseTile<scalar_t>(Aij));
-          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
-          dA21 += m * n;
-        }
-      }
+      B11.create_from_column_major_gpu(A11, temp_col);
+      B12.create_from_column_major_gpu(A12, temp_col);
+      B21.create_from_column_major_gpu(A21, temp_col);
 
       for (std::size_t i=0; i<rb; i++) {
         gpu::getrf(solve_handle2, B11.tile(i, i).D(),
@@ -483,10 +320,10 @@ namespace strumpack {
 #pragma omp task
             {
               for (std::size_t j=0; j<rb; j++)
-                B11.tile(i-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
+                B11.tile(i-1, j).move_to_cpu(copy_stream, pinned);
               for (std::size_t j=0; j<rb2; j++) {
-                B12.tile(i-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
-                B21.tile(j, i-1).move_gpu_tile_to_cpu(copy_stream, pinned);
+                B12.tile(i-1, j).move_to_cpu(copy_stream, pinned);
+                B21.tile(j, i-1).move_to_cpu(copy_stream, pinned);
               }
             }
 #pragma omp taskwait
@@ -501,10 +338,10 @@ namespace strumpack {
           piv[l] += B11.tileroff(i);
       if (rb > 0) {
         for (std::size_t j=0; j<rb; j++)
-          B11.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
+          B11.tile(rb-1, j).move_to_cpu(copy_stream, pinned);
         for (std::size_t j=0; j<rb2; j++) {
-          B12.tile(rb-1, j).move_gpu_tile_to_cpu(copy_stream, pinned);
-          B21.tile(j, rb-1).move_gpu_tile_to_cpu(copy_stream, pinned);
+          B12.tile(rb-1, j).move_to_cpu(copy_stream, pinned);
+          B21.tile(j, rb-1).move_to_cpu(copy_stream, pinned);
         }
       }
       copy_stream.synchronize();

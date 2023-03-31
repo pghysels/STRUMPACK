@@ -58,7 +58,7 @@ namespace strumpack {
     template<typename scalar_t> class LRTile
       : public BLRTile<scalar_t> {
       using DenseM_t = DenseMatrix<scalar_t>;
-      using DMW_t = DenseMatrixWrapper<scalar_t>;
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
 
     public:
@@ -96,7 +96,7 @@ namespace strumpack {
       LRTile(const DenseM_t& U, const DenseM_t& V);
 
       // TODO where is this used??
-      LRTile(DMW_t& dU, DMW_t& dV);
+      LRTile(DenseMW_t& dU, DenseMW_t& dV);
 
       std::size_t rows() const override { return U_->rows(); }
       std::size_t cols() const override { return V_->cols(); }
@@ -104,7 +104,7 @@ namespace strumpack {
       bool is_low_rank() const override { return true; };
 
       std::size_t memory() const override { return U_->memory() + V_->memory(); }
-      std::size_t nonzeros() const override { return U_->nonzeros() + V_->nonzeros(); }
+      std::size_t nonzeros() const override { return (rows()+cols())*rank(); }
       std::size_t maximum_rank() const override { return U_->cols(); }
 
       void dense(DenseM_t& A) const override;
@@ -149,16 +149,12 @@ namespace strumpack {
                    DenseM_t& B) const override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
-// #if defined(STRUMPACK_USE_MAGMA)
-//       void laswpx(const int* dpiv, magma_queue_t q, bool fwd) override;
-// #endif
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) override;
-#endif
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void move_gpu_tile_to_cpu(gpu::Stream& s,
-                                scalar_t* pinned=nullptr) override;
+      void move_to_cpu(gpu::Stream& s,
+                       scalar_t* pinned=nullptr) override;
+      void move_to_gpu(gpu::Stream& s, scalar_t*& dptr) override;
 #endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,

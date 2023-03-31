@@ -273,8 +273,12 @@ namespace strumpack {
       std::size_t size() const { return size_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
-      // operator void*() { return data_; }
-      template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
+      template<typename S> S* as() {
+        return reinterpret_cast<S*>(data_);
+      }
+      template<typename S> const S* as() const {
+        return reinterpret_cast<S*>(data_);
+      }
       void release() {
         if (data_) {
           if (is_managed_) {
