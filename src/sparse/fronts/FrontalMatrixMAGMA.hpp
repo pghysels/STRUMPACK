@@ -104,6 +104,16 @@ namespace strumpack {
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FrontalMatrixMPI<scalar_t,integer_t>* pa)
       const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa)
+      const override;
+    void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, 
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts)
+      const override;
 #endif
 
     std::size_t get_device_F22_worksize() override {

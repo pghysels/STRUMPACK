@@ -36,8 +36,8 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #endif
-
 
 namespace strumpack {
 
@@ -295,6 +295,39 @@ namespace strumpack {
     }
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
       (F22_, sbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf,
+   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa) const {
+    if (dev_Schur_->size()) {
+      DenseM_t F22(dim_upd(), dim_upd());
+      gpu_check(gpu::copy_device_to_host
+                (F22, dev_Schur_->template as<scalar_t>()));
+      BLR::BLRExtendAdd<scalar_t,integer_t>::
+        seq_copy_to_buffers(F22, sbuf, pa, this);
+      return;
+    }
+    BLR::BLRExtendAdd<scalar_t,integer_t>::
+      seq_copy_to_buffers(F22_, sbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  (std::vector<std::vector<scalar_t>>& sbuf,
+   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa,
+   integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
+    if (dev_Schur_->size()) {
+      DenseM_t F22(dim_upd(), dim_upd());
+      gpu_check(gpu::copy_device_to_host
+                (F22, dev_Schur_->template as<scalar_t>()));
+      BLR::BLRExtendAdd<scalar_t,integer_t>::
+        seq_copy_to_buffers_col(F22, sbuf, pa, this, begin_col, end_col);
+      return;
+    }
+    BLR::BLRExtendAdd<scalar_t,integer_t>::
+      seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
   }
 #endif
 
