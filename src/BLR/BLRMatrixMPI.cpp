@@ -124,6 +124,21 @@ namespace strumpack {
       return Comm().all_reduce(this->rank(), MPI_MAX);
     }
 
+    template<typename scalar_t> std::size_t
+    BLRMatrixMPI<scalar_t>::maxtilerows() const {
+      std::size_t m = 0;
+      for (std::size_t i=0; i<rowblocks(); i++)
+        m = std::max(m, tilerows(i));
+      return m;
+    }
+    template<typename scalar_t> std::size_t
+    BLRMatrixMPI<scalar_t>::maxtilecols() const {
+      std::size_t m = 0;
+      for (std::size_t i=0; i<colblocks(); i++)
+        m = std::max(m, tilecols(i));
+      return m;
+    }
+
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::print(const std::string& name) {
       std::cout << "BLR(" << name << ")="

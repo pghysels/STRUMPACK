@@ -202,6 +202,8 @@ namespace strumpack {
       std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
       std::size_t tileroff(std::size_t i) const { assert(i <= rowblocks()); return roff_[i]; }
       std::size_t tilecoff(std::size_t j) const { assert(j <= colblocks()); return coff_[j]; }
+      std::size_t maxtilerows() const;
+      std::size_t maxtilecols() const;
 
       int rg2p(std::size_t i) const;
       int cg2p(std::size_t j) const;
@@ -325,22 +327,22 @@ namespace strumpack {
       DenseTile<scalar_t>
       bcast_dense_tile_along_col_gpu(std::size_t i, std::size_t j,
                                      gpu::Stream& stream, scalar_t* dptr,
-                                     scalar_t* pinned=nullptr) const;
+                                     gpu::HostMemory<scalar_t>& workspace) const;
       DenseTile<scalar_t>
       bcast_dense_tile_along_row_gpu(std::size_t i, std::size_t j,
                                      gpu::Stream& stream, scalar_t* dptr,
-                                     scalar_t* pinned=nullptr) const;
+                                     gpu::HostMemory<scalar_t>& workspace) const;
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols_gpu(std::size_t i,
                                         std::size_t j0, std::size_t j1,
                                         gpu::Stream& stream, scalar_t* dptr,
-                                        scalar_t* pinned=nullptr) const;
+                                        gpu::HostMemory<scalar_t>& workspace) const;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
                                         std::size_t j,
                                         gpu::Stream& stream, scalar_t* dptr,
-                                        scalar_t* pinned=nullptr) const;
+                                        gpu::HostMemory<scalar_t>& workspace) const;
 #endif
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>

@@ -66,7 +66,7 @@ namespace strumpack {
 
     class Stream {
     public:
-      Stream() { 
+      Stream() {
        gpu_check(hipStreamCreate(&s_));
        //gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
       }
@@ -181,38 +181,49 @@ namespace strumpack {
       return copy_host_to_device
         (d, h.data(), std::size_t(h.rows())*h.cols());
     }
-    template<typename T> void copy_host_to_device_async
-    (T* d, const DenseMatrix<T>& h, const Stream& s) {
-      if (!h.rows() || !h.cols()) return;
+    template<typename T> hipError_t
+    copy_host_to_device_async(T* d, const DenseMatrix<T>& h,
+                              const Stream& s) {
+      if (!h.rows() || !h.cols()) return hipSuccess;
       assert(h.rows() == h.ld());
-      copy_host_to_device_async(d, h.data(), h.rows()*h.cols(), s);
+      return copy_host_to_device_async
+        (d, h.data(), h.rows()*h.cols(), s);
+    }
+    template<typename T> hipError_t
+    copy_host_to_device_async(DenseMatrix<T>& d, const T* h,
+                              const Stream& s) {
+      if (!d.rows() || !d.cols()) return hipSuccess;
+      assert(d.rows() == d.ld());
+      return copy_host_to_device_async
+        (d.data(), h, d.rows()*d.cols(), s);
     }
 
-    template<typename T> void copy_device_to_device
-    (T* d1ptr, const T* d2ptr, std::size_t count) {
-      gpu_check(hipMemcpy(d1ptr, d2ptr, count*sizeof(T),
-                           hipMemcpyDeviceToDevice));
+    template<typename T> hipError_t
+    copy_device_to_device(T* d1ptr, const T* d2ptr, std::size_t count) {
+      return hipMemcpy(d1ptr, d2ptr, count*sizeof(T),
+                       hipMemcpyDeviceToDevice);
     }
-
-    template<typename T> void copy_device_to_device
-    (DenseMatrix<T>& d1, const DenseMatrix<T>& d2) {
+    template<typename T> hipError_t
+    copy_device_to_device(DenseMatrix<T>& d1,
+                          const DenseMatrix<T>& d2) {
       if (!d1.rows() || !d1.cols()) return;
       assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
       if (d1.rows() != d1.ld() || d2.rows() != d2.ld()) {
-        gpu_check(hipMemcpy2D
-                  (d1.data(), d1.ld()*sizeof(T), d2.data(), d2.ld()*sizeof(T),
-                   d2.rows()*sizeof(T), d2.cols(), hipMemcpyDeviceToDevice));
+        return hipMemcpy2D
+          (d1.data(), d1.ld()*sizeof(T), d2.data(), d2.ld()*sizeof(T),
+           d2.rows()*sizeof(T), d2.cols(), hipMemcpyDeviceToDevice);
       } else
-        copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
+        return copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
     }
 
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type>
-    void copy_real_to_scalar(scalar_t* dest, const real_t* src,
-                             std::size_t size) {
-      gpu_check(hipMemset(dest, 0, size*sizeof(scalar_t)));
-      gpu_check(hipMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t),
-                sizeof(real_t), size, hipMemcpyDeviceToDevice));
+    hipError_t
+    copy_real_to_scalar(scalar_t* dest, const real_t* src,
+                        std::size_t size) {
+      hipMemset(dest, 0, size*sizeof(scalar_t));
+      return hipMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t),
+                         sizeof(real_t), size, hipMemcpyDeviceToDevice);
     }
 
     inline std::size_t available_memory() {
@@ -336,9 +347,10 @@ namespace strumpack {
       }
       ~HostMemory() { release(); }
       std::size_t size() const { return size_; }
+      T* data() { return data_; }
+      const T* data() const { return data_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
-      // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {

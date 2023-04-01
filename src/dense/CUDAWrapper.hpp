@@ -256,12 +256,29 @@ namespace strumpack {
         (d, h.data(), std::size_t(h.rows())*h.cols());
     }
     template<typename T> cudaError_t
-    copy_host_to_device_async
-    (T* d, const DenseMatrix<T>& h, const Stream& s) {
+    copy_host_to_device_async(DenseMatrix<T>& d, const DenseMatrix<T>& h,
+                              const Stream& s) {
+      if (!d.rows() || !d.cols()) return cudaSuccess;
+      assert(d.rows() == h.rows() && d.cols() == h.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      return copy_host_to_device_async
+        (d.data(), h.data(), std::size_t(d.rows())*d.cols(), s);
+    }
+    template<typename T> cudaError_t
+    copy_host_to_device_async(T* d, const DenseMatrix<T>& h,
+                              const Stream& s) {
       if (!h.rows() || !h.cols()) return cudaSuccess;
       assert(h.rows() == h.ld());
       return copy_host_to_device_async
         (d, h.data(), h.rows()*h.cols(), s);
+    }
+    template<typename T> cudaError_t
+    copy_host_to_device_async(DenseMatrix<T>& d, const T* h,
+                              const Stream& s) {
+      if (!d.rows() || !d.cols()) return cudaSuccess;
+      assert(d.rows() == d.ld());
+      return copy_host_to_device_async
+        (d.data(), h, d.rows()*d.cols(), s);
     }
     template<typename T> cudaError_t
     copy_device_to_device(T* d1ptr, const T* d2ptr, std::size_t count) {
@@ -414,9 +431,10 @@ namespace strumpack {
       }
       ~HostMemory() { release(); }
       std::size_t size() const { return size_; }
+      T* data() { return data_; }
+      const T* data() const { return data_; }
       operator T*() { return data_; }
       operator const T*() const { return data_; }
-      // operator void*() { return data_; }
       template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
       void release() {
         if (data_) {

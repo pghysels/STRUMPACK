@@ -166,6 +166,8 @@ namespace strumpack {
       std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
       std::size_t tileroff(std::size_t i) const { return roff_[i]; }
       std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
+      std::size_t maxtilerows() const;
+      std::size_t maxtilecols() const;
 
       BLRTile<scalar_t>& tile(std::size_t i, std::size_t j);
       const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const;

@@ -264,6 +264,21 @@ namespace strumpack {
       return mrank;
     }
 
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::maxtilerows() const {
+      std::size_t m = 0;
+      for (std::size_t i=0; i<rowblocks(); i++)
+        m = std::max(m, tilerows(i));
+      return m;
+    }
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::maxtilecols() const {
+      std::size_t m = 0;
+      for (std::size_t i=0; i<colblocks(); i++)
+        m = std::max(m, tilecols(i));
+      return m;
+    }
+
     template<typename scalar_t> DenseMatrix<scalar_t>
     BLRMatrix<scalar_t>::dense() const {
       DenseM_t A(rows(), cols());

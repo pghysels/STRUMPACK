@@ -148,12 +148,8 @@ namespace strumpack {
         solve_handle2(copy_stream);
 
       int max_batchcount = std::pow(rb-1+rb2, 2);
-      std::size_t max_m1 = 0;
-      for (std::size_t k=0; k<rb; k++)
-        max_m1 = std::max(max_m1, B11.tilerows(k));
-      auto max_m = max_m1;
-      for (std::size_t k=0; k<rb2; k++)
-        max_m = std::max(max_m, B21.tilerows(k));
+      std::size_t max_m1 = B11.maxtilerows();
+      std::size_t max_m = std::max(max_m1, B21.maxtilerows());
       auto max_mn = max_m*max_m;
 
       gpu::HostMemory<scalar_t> pinned = workspace.get_pinned(max_mn);
@@ -161,7 +157,7 @@ namespace strumpack {
       int compress_lwork = 0;
 
 #if defined(STRUMPACK_USE_KBLAS)
-      VBatchedARA<scalar_t>::kblas_wsquery(handle, 2*(rb+rb2-1));
+      VBatchedARA<scalar_t>::kblas_wsquery(handle, max_batchcount);
 #else
       // max buffersize for gesvd is not the buffersize of the largest
       // matrix, a rectangular matrix seems to need more workspace
