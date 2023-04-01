@@ -140,17 +140,19 @@ namespace strumpack {
         for (std::size_t j=j0; j<j1; j++)
           if (grid()->is_local_col(j)) {
             auto& t = tile(i, j);
+            auto m = t.rows(), n = t.cols();
             if (t.is_low_rank()) {
+              auto r = t.rank();
               gpu_check(gpu::copy_device_to_host_async
-                        (ptr, t.U().data(), t.U().nonzeros(), stream));
-              ptr += t.U().nonzeros();
+                        (ptr, t.U().data(), m*r, stream));
+              ptr += m*r;
               gpu_check(gpu::copy_device_to_host_async
-                        (ptr, t.V().data(), t.V().nonzeros(), stream));
-              ptr += t.V().nonzeros();
+                        (ptr, t.V().data(), r*n, stream));
+              ptr += r*n;
             } else {
               gpu_check(gpu::copy_device_to_host_async
-                        (ptr, t.D().data(), t.D().nonzeros(), stream));
-              ptr += t.D().nonzeros();
+                        (ptr, t.D().data(), m*n, stream));
+              ptr += m*n;
             }
           }
       }
@@ -196,9 +198,9 @@ namespace strumpack {
       if (grid()->is_local_col(j)) {
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i)) {
-            msg_size += tile(i, j).nonzeros();
-            ranks.push_back(tile(i, j).is_low_rank() ?
-                            tile(i, j).rank() : -1);
+            auto& t = tile(i, j);
+            msg_size += t.nonzeros();
+            ranks.push_back(t.is_low_rank() ? t.rank() : -1);
             nr_tiles++;
           }
       } else {
@@ -218,17 +220,19 @@ namespace strumpack {
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i)) {
             auto& t = tile(i, j);
+            auto m = t.rows(), n = t.cols();
             if (t.is_low_rank()) {
+              auto r = t.rank();
               gpu_check(gpu::copy_device_to_host_async
-                        (ptr, t.U().data(), t.U().nonzeros(), stream));
-              ptr += t.U().nonzeros();
+                        (ptr, t.U().data(), m*r, stream));
+              ptr += m*r;
               gpu_check(gpu::copy_device_to_host_async
-                        (ptr, t.V().data(), t.V().nonzeros(), stream));
-              ptr += t.V().nonzeros();
+                        (ptr, t.V().data(), r*n, stream));
+              ptr += r*n;
             } else {
               gpu_check(gpu::copy_device_to_host_async
-                        (ptr, t.D().data(), t.D().nonzeros(), stream));
-              ptr += t.D().nonzeros();
+                        (ptr, t.D().data(), m*n, stream));
+              ptr += m*n;
             }
           }
       }
@@ -423,19 +427,6 @@ namespace strumpack {
               batchcount++;
               multiply_inc_work_size(*(Tki[lk]), *(Tij[lj++]), sVU, sUVU);
             }
-          lk++;
-        }
-        for (std::size_t k=0, lk=0; k<rb2; k++) {
-          if (!g->is_local_row(k)) continue;
-          for (std::size_t j=i+1, lj=0; j<rb; j++)
-            if (g->is_local_col(j)) {
-              multiply_inc_work_size(*(Tk2i[lk]), *(Tij[lj++]), sVU, sUVU);
-              batchcount++;
-            }
-          lk++;
-        }
-        for (std::size_t k=i+1, lk=0; k<rb; k++) {
-          if (!g->is_local_row(k)) continue;
           for (std::size_t j=0, lj=0; j<rb2; j++)
             if (g->is_local_col(j)) {
               batchcount++;
@@ -445,6 +436,11 @@ namespace strumpack {
         }
         for (std::size_t k=0, lk=0; k<rb2; k++) {
           if (!g->is_local_row(k)) continue;
+          for (std::size_t j=i+1, lj=0; j<rb; j++)
+            if (g->is_local_col(j)) {
+              multiply_inc_work_size(*(Tk2i[lk]), *(Tij[lj++]), sVU, sUVU);
+              batchcount++;
+            }
           for (std::size_t j=0, lj=0; j<rb2; j++)
             if (g->is_local_col(j)) {
               batchcount++;
@@ -472,19 +468,6 @@ namespace strumpack {
               add_tile_mult
                 (*(Tki[lk]), *(Tij[lj++]), A11.tile_dense(k, j).D(),
                  b1, b2, b3, dVU, dUVU);
-          lk++;
-        }
-        for (std::size_t k=0, lk=0; k<rb2; k++) {
-          if (!g->is_local_row(k)) continue;
-          for (std::size_t j=i+1, lj=0; j<rb; j++)
-            if (g->is_local_col(j))
-              add_tile_mult
-                (*(Tk2i[lk]), *(Tij[lj++]), A21.tile_dense(k, j).D(),
-                 b1, b2, b3, dVU, dUVU);
-          lk++;
-        }
-        for (std::size_t k=i+1, lk=0; k<rb; k++) {
-          if (!g->is_local_row(k)) continue;
           for (std::size_t j=0, lj=0; j<rb2; j++)
             if (g->is_local_col(j))
               add_tile_mult
@@ -494,6 +477,11 @@ namespace strumpack {
         }
         for (std::size_t k=0, lk=0; k<rb2; k++) {
           if (!g->is_local_row(k)) continue;
+          for (std::size_t j=i+1, lj=0; j<rb; j++)
+            if (g->is_local_col(j))
+              add_tile_mult
+                (*(Tk2i[lk]), *(Tij[lj++]), A21.tile_dense(k, j).D(),
+                 b1, b2, b3, dVU, dUVU);
           for (std::size_t j=0, lj=0; j<rb2; j++)
             if (g->is_local_col(j))
               add_tile_mult
@@ -501,7 +489,6 @@ namespace strumpack {
                  b1, b2, b3, dVU, dUVU);
           lk++;
         }
-
         b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
         b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
         b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
