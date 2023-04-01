@@ -150,8 +150,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    VBatchedTRSMLeftRight<scalar_t>::add
-    (DenseM_t& A, DenseM_t& Bl, DenseM_t& Br) {
+    VBatchedTRSMLeftRight<scalar_t>::add(DenseM_t& A,
+                                         DenseM_t& Bl, DenseM_t& Br) {
       if (!Bl.rows() || !Bl.cols()) return;
       A_.push_back(&A);
       Bl_.push_back(&Bl);
@@ -159,7 +159,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    VBatchedTRSMLeftRight<scalar_t>::run(gpu::BLASHandle& h) {
+    VBatchedTRSMLeftRight<scalar_t>::run(gpu::BLASHandle& h,
+                                         VectorPool<scalar_t>& workspace) {
 #if defined(STRUMPACK_USE_MAGMA)
       auto B = A_.size();
       if (!B) return;
@@ -180,7 +181,7 @@ namespace strumpack {
       std::size_t dmem_size =
         gpu::round_up(3*B*sizeof(int)) +
         gpu::round_up(3*B*sizeof(scalar_t*));
-      gpu::DeviceMemory<char> dmem(dmem_size);
+      auto dmem = workspace.get_device_bytes(dmem_size);
       auto dm = dmem.template as<int>();
       auto dnl = dm + B;
       auto dnr = dnl + B;
@@ -197,21 +198,23 @@ namespace strumpack {
         (MagmaRight, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
          maxnr, maxm, dnr, dm, scalar_t(1.),
          dA, dm, dBr, dnr, B, h);
+      workspace.restore(dmem);
 #else
       std::cout << "VBatchedTRSMLeftRight TODO" << std::endl;
 #endif
     }
 
     template<typename scalar_t> void
-    VBatchedTRSM<scalar_t>::add
-    (DenseM_t& A, DenseM_t& B) {
+    VBatchedTRSM<scalar_t>::add(DenseM_t& A, DenseM_t& B) {
       if (!B.rows() || !B.cols()) return;
       A_.push_back(&A);
       B_.push_back(&B);
     }
 
     template<typename scalar_t> void
-    VBatchedTRSM<scalar_t>::run(gpu::BLASHandle& h, bool left) {
+    VBatchedTRSM<scalar_t>::run(gpu::BLASHandle& h,
+                                VectorPool<scalar_t>& workspace,
+                                bool left) {
 #if defined(STRUMPACK_USE_MAGMA)
       auto B = A_.size();
       if (!B) return;
@@ -229,7 +232,7 @@ namespace strumpack {
       std::size_t dmem_size =
         gpu::round_up(2*B*sizeof(int)) +
         gpu::round_up(2*B*sizeof(scalar_t*));
-      gpu::DeviceMemory<char> dmem(dmem_size);
+      auto dmem = workspace.get_device_bytes(dmem_size);
       auto dm = dmem.template as<int>();
       auto dn = dm + B;
       auto dA = gpu::aligned_ptr<scalar_t*>(dn+B);
@@ -246,6 +249,7 @@ namespace strumpack {
           (MagmaRight, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            maxn, maxm, dn, dm, scalar_t(1.),
            dA, dm, dB, dn, B, h);
+      workspace.restore(dmem);
 #else
       std::cout << "VBatchedTRSM TODO" << std::endl;
 #endif

@@ -131,6 +131,7 @@ namespace strumpack {
       ranks.push_back(msg_size);
       grid()->col_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
+      // use HostMemory, and reuse?
       std::vector<scalar_t> buf(msg_size);
       auto ptr = buf.data();
       if (grid()->is_local_row(i)) {
@@ -392,8 +393,8 @@ namespace strumpack {
             if (g->is_local_row(j))
               batched_trsm_right.add(Tii.D(), A21.tile(j, i).V());
         }
-        batched_trsm_left.run(handle, true);
-        batched_trsm_right.run(handle, false);
+        batched_trsm_left.run(handle, workspace, true);
+        batched_trsm_right.run(handle, workspace, false);
 
         // Schur complement update
         auto Tij = A11.bcast_row_of_tiles_along_cols_gpu

@@ -256,7 +256,7 @@ namespace strumpack {
           batched_trsm.add(B11.tile(i, i).D(), B12.tile(i, j).U(),
                            B21.tile(j, i).V());
         }
-        batched_trsm.run(handle);
+        batched_trsm.run(handle, workspace);
 
         // Schur complement update
         std::size_t sVU = 0, sUVU = 0;

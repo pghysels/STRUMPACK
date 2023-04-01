@@ -119,7 +119,7 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
       void add(DenseM_t& A, DenseM_t& Bl, DenseM_t& Br);
-      void run(gpu::BLASHandle& h);
+      void run(gpu::BLASHandle& h, VectorPool<scalar_t>& workspace);
 
     private:
       std::vector<DenseM_t*> A_, Bl_, Br_;
@@ -129,7 +129,8 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
       void add(DenseM_t& A, DenseM_t& B);
-      void run(gpu::BLASHandle& h, bool left);
+      void run(gpu::BLASHandle& h, VectorPool<scalar_t>& workspace,
+               bool left);
 
     private:
       std::vector<DenseM_t*> A_, B_;
