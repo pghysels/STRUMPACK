@@ -50,14 +50,15 @@ namespace strumpack {
   namespace BLR {
 
     template<typename scalar_t> void
-    BLRMatrixMPI<scalar_t>::move_to_gpu(scalar_t* dptr, scalar_t* pinned) {
+    BLRMatrixMPI<scalar_t>::move_to_gpu(gpu::Stream& s, scalar_t* dptr,
+                                        scalar_t* pinned) {
 #pragma omp parallel
 #pragma omp single nowait
       for (std::size_t j=0; j<colblockslocal(); j++) {
         auto pin = pinned;
         for (std::size_t i=0; i<rowblockslocal(); i++) {
 #pragma omp task firstprivate(dptr)
-          ltile(i, j).move_to_gpu(dptr, pin);
+          ltile(i, j).move_to_gpu(s, dptr, pin);
           auto nnz = ltile(i, j).nonzeros();
           dptr += nnz;
           pin += nnz;
@@ -67,14 +68,14 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    BLRMatrixMPI<scalar_t>::move_to_cpu(scalar_t* pinned) {
+    BLRMatrixMPI<scalar_t>::move_to_cpu(gpu::Stream& s, scalar_t* pinned) {
 #pragma omp parallel
 #pragma omp single nowait
       for (std::size_t j=0; j<colblockslocal(); j++) {
         auto pin = pinned;
         for (std::size_t i=0; i<rowblockslocal(); i++) {
 #pragma omp task firstprivate(pin)
-          ltile(i, j).move_to_cpu(pin);
+          ltile(i, j).move_to_cpu(s, pin);
           pin += ltile(i, j).nonzeros();
         }
 #pragma omp taskwait
@@ -293,10 +294,10 @@ namespace strumpack {
       gpu::DeviceMemory<char> d_batch_matrix_mem;
 
       // TODO do this column wise to overlap
-      A11.move_to_gpu(dA11, pinned);
-      A12.move_to_gpu(dA12, pinned);
-      A21.move_to_gpu(dA21, pinned);
-      A22.move_to_gpu(dA22, pinned);
+      A11.move_to_gpu(copy_stream, dA11, pinned);
+      A12.move_to_gpu(copy_stream, dA12, pinned);
+      A21.move_to_gpu(copy_stream, dA21, pinned);
+      A22.move_to_gpu(copy_stream, dA22, pinned);
 
       DenseTile<scalar_t> Tii;
       for (std::size_t i=0; i<rb; i++) {
@@ -320,7 +321,7 @@ namespace strumpack {
           if (!g->is_local_col(i)) {
             gpu_check(gpu::copy_host_to_device<int>
                       (dpiv, piv_tile.data(), mi));
-            Tii.move_to_gpu(dcol1);
+            Tii.move_to_gpu(copy_stream, dcol1);
           }
           int r0 = A11.tileroff(i);
           std::transform
@@ -329,7 +330,7 @@ namespace strumpack {
         }
         if (g->is_local_col(i)) {
           g->col_comm().broadcast_from(Tii.D().data(), mi*mi, i % g->nprows());
-          Tii.move_to_gpu(drow1);
+          Tii.move_to_gpu(copy_stream, drow1);
         }
         copy_stream.synchronize();
 
@@ -467,10 +468,10 @@ namespace strumpack {
         b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
         comp_stream.synchronize();
       }
-      A11.move_to_cpu(pinned);
-      A12.move_to_cpu(pinned);
-      A21.move_to_cpu(pinned);
-      A22.move_to_cpu(pinned);
+      A11.move_to_cpu(copy_stream, pinned);
+      A12.move_to_cpu(copy_stream, pinned);
+      A21.move_to_cpu(copy_stream, pinned);
+      A22.move_to_cpu(copy_stream, pinned);
       return piv;
     }
 

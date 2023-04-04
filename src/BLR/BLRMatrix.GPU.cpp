@@ -54,8 +54,8 @@ namespace strumpack {
      * dA is a pointer to work memory to temporarily store the entire
      * block column.
      */
-    template<typename scalar_t>
-    void BLRMatrix<scalar_t>::create_from_column_major_gpu
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_from_column_major_gpu
     (DenseM_t& A, scalar_t* work) {
       auto dA = A.data();
       for (std::size_t j=0; j<colblocks(); j++) {
@@ -74,6 +74,16 @@ namespace strumpack {
       }
     }
 
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::move_to_cpu(gpu::Stream& s, scalar_t* pinned) {
+      auto rb = rowblocks();
+      for (std::size_t j=0; j<colblocks(); j++) {
+        auto n = tilecols(j);
+#pragma omp parallel for schedule(static, 1)
+        for (std::size_t i=0; i<rb; i++)
+          tile(i, j).move_to_cpu(s, pinned+tileroff(i)*n);
+      }
+    }
 
     /*
      * work should be: 2*minmn + 3*m*n + gesdj_buffersize(m, n)
@@ -150,9 +160,9 @@ namespace strumpack {
       int max_batchcount = std::pow(rb-1+rb2, 2);
       std::size_t max_m1 = B11.maxtilerows();
       std::size_t max_m = std::max(max_m1, B21.maxtilerows());
-      auto max_mn = max_m*max_m;
 
-      gpu::HostMemory<scalar_t> pinned = workspace.get_pinned(max_mn);
+      gpu::HostMemory<scalar_t> pinned =
+        workspace.get_pinned(max_m*std::max(dsep,dupd)); //max_mn);
 
       int compress_lwork = 0;
 
@@ -178,7 +188,7 @@ namespace strumpack {
       }
       // not needed when doing batched ARA
       // singular values (real and scalar), U, V and A
-      compress_lwork += 2*max_m + 3*max_mn;
+      compress_lwork += 2*max_m + 3*max_m*max_m;;
 #endif
 
       int getrf_work_size =
@@ -237,9 +247,7 @@ namespace strumpack {
             (solve_handle, handle, j, i, dinfo, d_work_mem, opts);
         }
 #endif
-        // solve_handle2.synchronize();
-        copy_stream.synchronize(); // this is the stream used for the
-                                   // getrf
+        copy_stream.synchronize(); // stream used for getrf
 
         VBatchedTRSMLeftRight<scalar_t> batched_trsm;
         for (std::size_t j=i+1; j<rb; j++) {
@@ -303,6 +311,7 @@ namespace strumpack {
             add_tile_mult(B21.tile(k, i), B12.tile(i, j), dAkj,
                           b1, b2, b3, dVU, dUVU);
           }
+
 #pragma omp parallel
 #pragma omp single nowait
         {
@@ -313,34 +322,40 @@ namespace strumpack {
             b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
           }
           if (i > 0) {
-#pragma omp task
-            {
+#pragma omp taskloop
               for (std::size_t j=0; j<rb; j++)
-                B11.tile(i-1, j).move_to_cpu(pinned);
-              for (std::size_t j=0; j<rb2; j++) {
-                B12.tile(i-1, j).move_to_cpu(pinned);
-                B21.tile(j, i-1).move_to_cpu(pinned);
-              }
-            }
-#pragma omp taskwait
+                B11.tile(j, i-1).move_to_cpu
+                  (copy_stream, pinned+B11.tileroff(j)*B11.tilecols(i-1));
+#pragma omp taskloop
+              for (std::size_t j=0; j<rb2; j++)
+                B12.tile(i-1, j).move_to_cpu
+                  (copy_stream, pinned+B12.tilecoff(j)*B12.tilerows(i-1));
+#pragma omp taskloop
+              for (std::size_t j=0; j<rb2; j++)
+                B21.tile(j, i-1).move_to_cpu
+                  (copy_stream, pinned+B21.tileroff(j)*B21.tilerows(i-1));
           }
         }
         comp_stream.synchronize();
-        copy_stream.synchronize();
+      }
+      if (rb > 0) {
+#pragma omp parallel for schedule(static,1)
+        for (std::size_t j=0; j<rb; j++)
+          B11.tile(j, rb-1).move_to_cpu
+            (copy_stream, pinned+B11.tileroff(j)*B11.tilecols(rb-1));
+#pragma omp parallel for schedule(static,1)
+        for (std::size_t j=0; j<rb2; j++)
+          B12.tile(rb-1, j).move_to_cpu
+            (copy_stream, pinned+B12.tilecoff(j)*B12.tilerows(rb-1));
+#pragma omp parallel for schedule(static,1)
+        for (std::size_t j=0; j<rb2; j++)
+          B21.tile(j, rb-1).move_to_cpu
+            (copy_stream, pinned+B21.tileroff(j)*B21.tilerows(rb-1));
       }
       gpu::copy_device_to_host(piv.data(), dpiv, dsep);
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           piv[l] += B11.tileroff(i);
-      if (rb > 0) {
-        for (std::size_t j=0; j<rb; j++)
-          B11.tile(rb-1, j).move_to_cpu(pinned);
-        for (std::size_t j=0; j<rb2; j++) {
-          B12.tile(rb-1, j).move_to_cpu(pinned);
-          B21.tile(j, rb-1).move_to_cpu(pinned);
-        }
-      }
-      copy_stream.synchronize();
       workspace.restore(pinned);
       workspace.restore(d_batch_matrix_mem);
       workspace.restore(dmem);

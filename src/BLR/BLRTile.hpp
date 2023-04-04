@@ -125,8 +125,9 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       virtual void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) = 0;
 
-      virtual void move_to_cpu(scalar_t* pinned=nullptr) = 0;
-      virtual void move_to_gpu(scalar_t*& dptr, scalar_t* pinned=nullptr) = 0;
+      virtual void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) = 0;
+      virtual void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
+                               scalar_t* pinned=nullptr) = 0;
 #endif
 
       virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,

@@ -276,9 +276,9 @@ namespace strumpack {
                           DenseM_t& A, const Opts_t& opts);
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      // void create_dense_tile_gpu(std::size_t i, std::size_t j,
-      //                            DenseM_t& A, scalar_t*& dA);
       void create_from_column_major_gpu(DenseM_t& A, scalar_t* work);
+      void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
+      void move_column_to_cpu(int j, gpu::Stream& s, scalar_t* pinned);
       void compress_tile_gpu(gpu::SOLVERHandle& handle,
                              gpu::BLASHandle& blashandle,
                              std::size_t i, std::size_t j,

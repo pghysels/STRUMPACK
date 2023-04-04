@@ -152,8 +152,9 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) override;
 
-      void move_to_cpu(scalar_t* pinned=nullptr) override;
-      void move_to_gpu(scalar_t*& dptr, scalar_t* pinned=nullptr) override;
+      void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) override;
+      void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
+                       scalar_t* pinned=nullptr) override;
 #endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,

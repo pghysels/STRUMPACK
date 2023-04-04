@@ -372,8 +372,8 @@ namespace strumpack {
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void move_to_gpu(scalar_t* dptr, scalar_t* pinned);
-      void move_to_cpu(scalar_t* pinned);
+      void move_to_gpu(gpu::Stream& s, scalar_t* dptr, scalar_t* pinned);
+      void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
 #endif
 
       template<typename T,typename I> friend class strumpack::ExtendAdd;
