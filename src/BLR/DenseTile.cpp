@@ -108,32 +108,30 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    DenseTile<scalar_t>::move_to_cpu
-    (gpu::Stream& s, scalar_t* pinned) {
+    DenseTile<scalar_t>::move_to_cpu(scalar_t* pinned) {
       DenseM_t hD(rows(), cols());
       if (!pinned) {
-        gpu_check(gpu::copy_device_to_host_async(hD, D(), s));
+        gpu_check(gpu::copy_device_to_host(hD, D()));
       } else {
-        assert(rows() == 0 || D_->ld() == rows());
-        gpu_check(gpu::copy_device_to_host_async
-                  (pinned, D().data(), rows()*cols(), s));
-        gpu::Event event;
-        event.record(s);
-        event.synchronize();
-        for (std::size_t j=0; j<cols(); j++)
-          for (std::size_t i=0; i<rows(); i++)
-            hD(i, j) = pinned[i+D().ld()*j];
+        DenseMW_t pD(rows(), cols(), pinned, rows());
+        gpu_check(gpu::copy_device_to_host(pD, D()));
+        hD.copy(pD);
       }
       D_.reset(new DenseM_t(std::move(hD)));
     }
 
     template<typename scalar_t> void
-    DenseTile<scalar_t>::move_to_gpu
-    (gpu::Stream& s, scalar_t*& dptr) {
+    DenseTile<scalar_t>::move_to_gpu(scalar_t*& dptr, scalar_t* pinned) {
       DenseMW_t dD(rows(), cols(), dptr, rows());
-      dptr += rows()*cols();
-      gpu_check(gpu::copy_host_to_device(dD, D()));
+      if (!pinned) {
+        gpu_check(gpu::copy_host_to_device(dD, D()));
+      } else {
+        DenseMW_t hD(rows(), cols(), pinned, rows());
+        hD.copy(D());
+        gpu_check(gpu::copy_host_to_device(dD, hD));
+      }
       D_.reset(new DenseMW_t(std::move(dD)));
+      dptr += rows()*cols();
     }
 #endif
 
@@ -147,8 +145,7 @@ namespace strumpack {
     template<typename scalar_t> void DenseTile<scalar_t>::trsm_b
     (gpu::BLASHandle& handle, Side s, UpLo ul, Trans ta,
      Diag d, scalar_t alpha, DenseM_t& a) {
-      strumpack::gpu::trsm
-        (handle, s, ul, ta, d, alpha, a, D());
+      strumpack::gpu::trsm(handle, s, ul, ta, d, alpha, a, D());
     }
 #endif
 

@@ -316,10 +316,10 @@ namespace strumpack {
 #pragma omp task
             {
               for (std::size_t j=0; j<rb; j++)
-                B11.tile(i-1, j).move_to_cpu(copy_stream, pinned);
+                B11.tile(i-1, j).move_to_cpu(pinned);
               for (std::size_t j=0; j<rb2; j++) {
-                B12.tile(i-1, j).move_to_cpu(copy_stream, pinned);
-                B21.tile(j, i-1).move_to_cpu(copy_stream, pinned);
+                B12.tile(i-1, j).move_to_cpu(pinned);
+                B21.tile(j, i-1).move_to_cpu(pinned);
               }
             }
 #pragma omp taskwait
@@ -334,10 +334,10 @@ namespace strumpack {
           piv[l] += B11.tileroff(i);
       if (rb > 0) {
         for (std::size_t j=0; j<rb; j++)
-          B11.tile(rb-1, j).move_to_cpu(copy_stream, pinned);
+          B11.tile(rb-1, j).move_to_cpu(pinned);
         for (std::size_t j=0; j<rb2; j++) {
-          B12.tile(rb-1, j).move_to_cpu(copy_stream, pinned);
-          B21.tile(j, rb-1).move_to_cpu(copy_stream, pinned);
+          B12.tile(rb-1, j).move_to_cpu(pinned);
+          B21.tile(j, rb-1).move_to_cpu(pinned);
         }
       }
       copy_stream.synchronize();

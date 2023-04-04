@@ -324,25 +324,16 @@ namespace strumpack {
                                     std::size_t j) const;
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      DenseTile<scalar_t>
-      bcast_dense_tile_along_col_gpu(std::size_t i, std::size_t j,
-                                     gpu::Stream& stream, scalar_t* dptr,
-                                     gpu::HostMemory<scalar_t>& workspace) const;
-      DenseTile<scalar_t>
-      bcast_dense_tile_along_row_gpu(std::size_t i, std::size_t j,
-                                     gpu::Stream& stream, scalar_t* dptr,
-                                     gpu::HostMemory<scalar_t>& workspace) const;
-
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols_gpu(std::size_t i,
                                         std::size_t j0, std::size_t j1,
-                                        gpu::Stream& stream, scalar_t* dptr,
-                                        gpu::HostMemory<scalar_t>& workspace) const;
+                                        scalar_t* dptr, scalar_t* pinned)
+        const;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
                                         std::size_t j,
-                                        gpu::Stream& stream, scalar_t* dptr,
-                                        gpu::HostMemory<scalar_t>& workspace) const;
+                                        scalar_t* dptr, scalar_t* pinned)
+        const;
 #endif
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
@@ -381,8 +372,8 @@ namespace strumpack {
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void move_to_gpu(gpu::Stream& s, scalar_t* dptr);
-      void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
+      void move_to_gpu(scalar_t* dptr, scalar_t* pinned);
+      void move_to_cpu(scalar_t* pinned);
 #endif
 
       template<typename T,typename I> friend class strumpack::ExtendAdd;

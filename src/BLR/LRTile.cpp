@@ -250,39 +250,38 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRTile<scalar_t>::move_to_cpu(gpu::Stream& s, scalar_t* pinned) {
-      DenseM_t hU(U().rows(), U().cols()),
-        hV(V().rows(), V().cols());
+    LRTile<scalar_t>::move_to_cpu(scalar_t* pinned) {
+      auto m = rows(), n = cols(), r = rank();
+      DenseM_t hU(m, r), hV(r, n);
       if (!pinned) {
-        gpu_check(gpu::copy_device_to_host_async(hU, U(), s));
-        gpu_check(gpu::copy_device_to_host_async(hV, V(), s));
+        gpu_check(gpu::copy_device_to_host(hU, U()));
+        gpu_check(gpu::copy_device_to_host(hV, V()));
       } else {
-        gpu_check(gpu::copy_device_to_host_async
-                  (pinned, U().data(), U().rows()*U().cols(), s));
-        gpu::Event e;
-        e.record(s);
-        e.synchronize();
-        for (std::size_t j=0; j<U().cols(); j++)
-          for (std::size_t i=0; i<U().rows(); i++)
-            hU(i, j) = pinned[i+U().ld()*j];
-        gpu_check(gpu::copy_device_to_host_async
-                  (pinned, V().data(), V().rows()*V().cols(), s));
-        e.record(s);
-        e.synchronize();
-        for (std::size_t j=0; j<V().cols(); j++)
-          for (std::size_t i=0; i<V().rows(); i++)
-            hV(i, j) = pinned[i+V().ld()*j];
+        DenseMW_t pU(m, r, pinned, m), pV(r, n, pinned+m*r, r);
+        gpu_check(gpu::copy_device_to_host(pU, U()));
+        gpu_check(gpu::copy_device_to_host(pV, V()));
+        hU.copy(pU);
+        hV.copy(pV);
       }
       U_.reset(new DenseM_t(std::move(hU)));
       V_.reset(new DenseM_t(std::move(hV)));
     }
 
     template<typename scalar_t> void
-    LRTile<scalar_t>::move_to_gpu(gpu::Stream& s, scalar_t*& dptr) {
-      DenseMW_t dU(rows(), rank(), dptr, rows()); dptr += rows()*rank();
-      DenseMW_t dV(rank(), cols(), dptr, rank()); dptr += rank()*cols();
-      gpu_check(gpu::copy_host_to_device(dU, U()));
-      gpu_check(gpu::copy_host_to_device(dV, V()));
+    LRTile<scalar_t>::move_to_gpu(scalar_t*& dptr, scalar_t* pinned) {
+      auto m = rows(), n = cols(), r = rank();
+      DenseMW_t dU(m, r, dptr, m); dptr += m*r;
+      DenseMW_t dV(r, n, dptr, r); dptr += r*n;
+      if (!pinned) {
+        gpu_check(gpu::copy_host_to_device(dU, U()));
+        gpu_check(gpu::copy_host_to_device(dV, V()));
+      } else {
+        DenseMW_t pU(m, r, pinned, m), pV(r, n, pinned+m*r, r);
+        pU.copy(U());
+        pV.copy(V());
+        gpu_check(gpu::copy_host_to_device(dU, pU));
+        gpu_check(gpu::copy_host_to_device(dV, pV));
+      }
       U_.reset(new DenseMW_t(std::move(dU)));
       V_.reset(new DenseMW_t(std::move(dV)));
     }
