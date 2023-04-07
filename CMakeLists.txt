@@ -74,6 +74,7 @@ endif()
 if(NOT (STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP))
   if(TPL_ENABLE_MAGMA)
     message(STATUS "Disabling MAGMA, it requires CUDA or HIP to be enabled.")
+    set(TPL_ENABLE_MAGMA OFF)
   endif()
 endif()
 
