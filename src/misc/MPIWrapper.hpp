@@ -532,9 +532,8 @@ namespace strumpack {
      * only on the root process.
      */
     template<typename T> T reduce(T t, MPI_Op op) const {
-      if (is_root())
-        MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
-      else MPI_Reduce(&t, &t, 1, mpi_type<T>(), op, 0, comm_);
+      MPI_Reduce(is_root() ? MPI_IN_PLACE : &t, &t, 1,
+                 mpi_type<T>(), op, 0, comm_);
       return t;
     }
 
@@ -579,9 +578,8 @@ namespace strumpack {
      */
     template<typename T> void
     reduce(T* t, int ssize, MPI_Op op, int dest=0) const {
-      if (rank() == dest)
-        MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, dest, comm_);
-      else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, dest, comm_);
+      MPI_Reduce(rank() == dest ? MPI_IN_PLACE : t, t, ssize,
+                 mpi_type<T>(), op, dest, comm_);
     }
 
     template<typename T>
