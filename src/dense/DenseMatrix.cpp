@@ -867,7 +867,7 @@ namespace strumpack {
   template<typename scalar_t> std::ofstream&
   operator<<(std::ofstream& os, const DenseMatrix<scalar_t>& D) {
     int v[3];
-    get_version(v[0], v[1], v[2]);
+    get_version(v, v+1, v+2);
     os.write((const char*)v, sizeof(v));
     os.write((const char*)(&D), sizeof(DenseMatrix<scalar_t>));
     os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
@@ -881,7 +881,7 @@ namespace strumpack {
   template<typename scalar_t> std::ifstream&
   operator>>(std::ifstream& is, DenseMatrix<scalar_t>& D) {
     int v[3], vf[3];
-    get_version(v[0], v[1], v[2]);
+    get_version(v, v+1, v+2);
     is.read((char*)vf, sizeof(vf));
     if (v[0] != vf[0] || v[1] != vf[1] || v[2] != vf[2]) {
       std::cerr << "Warning, file was created with a different"

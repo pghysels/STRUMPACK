@@ -44,16 +44,6 @@
 namespace strumpack { // these are all global variables
 
   /**
-   * Return major.minor.patch STRUMPACK version.
-   * TODO get the git commit ID?
-   *
-   * \param major major version number
-   * \param minor minor version number
-   * \param patch patch version number
-   */
-  void get_version(int& major, int& minor, int& patch);
-
-  /**
    * \brief Enumeration for the possible return codes.
    * \ingroup Enumerations
    */

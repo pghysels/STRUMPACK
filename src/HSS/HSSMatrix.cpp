@@ -470,7 +470,7 @@ namespace strumpack {
     HSSMatrix<scalar_t>::write(const std::string& fname) const {
       std::ofstream f(fname, std::ios::out | std::ios::trunc);
       int v[3];
-      get_version(v[0], v[1], v[2]);
+      get_version(v, v+1, v+2);
       f.write((const char*)v, sizeof(v));
       write(f);
     }
@@ -484,7 +484,7 @@ namespace strumpack {
         std::cerr << e.what() << std::endl;
       }
       int v[3], vf[3];
-      get_version(v[0], v[1], v[2]);
+      get_version(v+0, v+1, v+2);
       f.read((char*)vf, sizeof(vf));
       if (v[0] != vf[0] || v[1] != vf[1] || v[2] != vf[2]) {
         std::cerr << "Warning, file was created with a different"

@@ -30,7 +30,7 @@
 #define STRUMPACK_SPARSE_SOLVER_H
 
 #include <stdint.h>
-#include "StrumpackConfig.hpp"
+#include "StrumpackConfig.h"
 
 #if defined(STRUMPACK_USE_MPI)
 #define OMPI_SKIP_MPICXX 1
