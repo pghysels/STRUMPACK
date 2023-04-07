@@ -90,8 +90,9 @@ inline void get_version(int* major, int* minor, int* patch) {
 inline bool have_parmetis() {
 #if defined(STRUMPACK_USE_PARMETIS)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_scotch() {
