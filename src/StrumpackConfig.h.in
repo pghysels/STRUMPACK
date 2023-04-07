@@ -97,78 +97,89 @@ inline bool have_parmetis() {
 inline bool have_scotch() {
 #if defined(STRUMPACK_USE_SCOTCH)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_pt_scotch() {
 #if defined(STRUMPACK_USE_PTSCOTCH)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_papi() {
 #if defined(STRUMPACK_USE_PAPI)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_combblas() {
 #if defined(STRUMPACK_USE_COMBBLAS)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_butterflypack() {
 #if defined(STRUMPACK_USE_BPACK)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_zfp() {
 #if defined(STRUMPACK_USE_ZFP)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_slate() {
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_getopt() {
 #if defined(STRUMPACK_USE_GETOPT)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_magma() {
 #if defined(STRUMPACK_USE_MAGMA)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_kblas() {
 #if defined(STRUMPACK_USE_KBLAS)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 inline bool have_matlab() {
 #if defined(STRUMPACK_USE_MATLAB)
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 #endif // STRUMPACK_CONFIG_H
