@@ -212,26 +212,9 @@ namespace strumpack {
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
      const std::function<scalar_t(int i, int j)>& Aelem,
-     const opts_t& opts) {
-      rows_ = cols_ = tree.size;
-      structured::ClusterTree full_tree(tree);
-      int min_lvl = 2 + std::ceil(std::log2(c.size()));
-      lvls_ = std::max(min_lvl, full_tree.levels());
-      full_tree.expand_complete_levels(lvls_);
-      leafs_ = full_tree.template leaf_sizes<int>();
-      c_ = &c;
-      Fcomm_ = MPI_Comm_c2f(c_->comm());
-      options_init(opts);
-      perm_.resize(rows_);
-      HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0); // 1 = block extraction, 0 = element
-      HODLR_construct_init_Gram<scalar_t,real_t>
-        (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         &(HODLR_element_evaluation<scalar_t>), nullptr,
-         const_cast<std::function<scalar_t(int i, int j)>*>(&Aelem));
-      perm_init();
-      dist_init();
+     const opts_t& opts) : HODLRMatrix<scalar_t>(c, tree, opts) {
+      // 1 = block extraction, 0 = element
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 0);
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_element_evaluation<scalar_t>), nullptr,
@@ -240,26 +223,10 @@ namespace strumpack {
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const elem_blocks_t& Aelem, const opts_t& opts) {
-      rows_ = cols_ = tree.size;
-      structured::ClusterTree full_tree(tree);
-      int min_lvl = 2 + std::ceil(std::log2(c.size()));
-      lvls_ = std::max(min_lvl, full_tree.levels());
-      full_tree.expand_complete_levels(lvls_);
-      leafs_ = full_tree.template leaf_sizes<int>();
-      c_ = &c;
-      Fcomm_ = MPI_Comm_c2f(c_->comm());
-      options_init(opts);
-      perm_.resize(rows_);
-      HODLR_set_I_option<scalar_t>(options_, "xyzsort", 3);
-      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1); // 1 = block extraction, 0 = element
-      HODLR_construct_init_Gram<scalar_t,real_t>
-        (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
-         lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
-         nullptr, &(HODLR_block_evaluation_seq<scalar_t>),
-         const_cast<elem_blocks_t*>(&Aelem));
-      perm_init();
-      dist_init();
+     const elem_blocks_t& Aelem, const opts_t& opts)
+      : HODLRMatrix<scalar_t>(c, tree, opts) {
+      // 1 = block extraction, 0 = element
+      HODLR_set_I_option<scalar_t>(options_, "elem_extract", 1);
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, nullptr, &(HODLR_block_evaluation_seq<scalar_t>),
