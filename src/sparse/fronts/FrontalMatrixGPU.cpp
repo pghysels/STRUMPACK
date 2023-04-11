@@ -139,8 +139,9 @@ namespace strumpack {
 
     void flops(long long& level_flops, long long& small_flops) {
       level_flops = small_flops = 0;
+      auto N = f.size();
 #pragma omp parallel for reduction(+: level_flops, small_flops)
-      for (std::size_t i=0; i<f.size(); i++) {
+      for (std::size_t i=0; i<N; i++) {
         auto F = f[i];
         auto flops = LU_flops(F->F11_) +
           gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
