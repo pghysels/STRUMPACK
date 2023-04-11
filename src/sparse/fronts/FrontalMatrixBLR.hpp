@@ -56,8 +56,6 @@ namespace strumpack {
 
     void release_work_memory() override;
 
-    void build_front(const SpMat_t& A);
-
     void build_front_cols(const SpMat_t& A, std::size_t i,
                           bool part, std::size_t CP,
                           const std::vector<Triplet<scalar_t>>& e11,
@@ -117,7 +115,6 @@ namespace strumpack {
   private:
     BLRM_t F11blr_, F12blr_, F21blr_, F22blr_;
     DenseM_t F22_;
-    std::vector<int> piv_;
     std::vector<std::size_t> sep_tiles_, upd_tiles_;
     DenseMatrix<bool> admissibility_;
 

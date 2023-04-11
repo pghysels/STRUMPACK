@@ -57,32 +57,6 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLR<scalar_t,integer_t>::build_front(const SpMat_t& A){
-    const auto dsep = dim_sep();
-    const auto dupd = dim_upd();
-    if (dsep) {
-      F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
-      F11blr_.fill(0.);
-      if (dupd) {
-        F12blr_ = BLRM_t(dsep, sep_tiles_, dupd, upd_tiles_);
-        F21blr_ = BLRM_t(dupd, upd_tiles_, dsep, sep_tiles_);
-        F12blr_.fill(0.);
-        F21blr_.fill(0.);
-      }
-    }
-    if (dupd) {
-      F22blr_ = BLRM_t(dupd, upd_tiles_, dupd,  upd_tiles_);
-      F22blr_.fill(0.);
-    }
-    using Trip_t = Triplet<scalar_t>;
-    std::vector<Trip_t> e11, e12, e21;
-    A.push_front_elements(sep_begin_, sep_end_, this->upd(), e11, e12, e21);
-    for (auto& e : e11) F11blr_(e.r, e.c) = e.v;
-    for (auto& e : e12) F12blr_(e.r, e.c) = e.v;
-    for (auto& e : e21) F21blr_(e.r, e.c) = e.v;
-  }
-
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::build_front_cols
   (const SpMat_t& A, std::size_t i, bool part, std::size_t CP,
    const std::vector<Triplet<scalar_t>>& e11,
@@ -325,9 +299,10 @@ namespace strumpack {
     }
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
-    if (opts.BLR_options().low_rank_algorithm() ==
+    auto& blr_opts = opts.BLR_options();
+    if (blr_opts.low_rank_algorithm() ==
         BLR::LowRankAlgorithm::RRQR) {
-      if (opts.BLR_options().BLR_factor_algorithm() ==
+      if (blr_opts.BLR_factor_algorithm() ==
           BLR::BLRFactorAlgorithm::COLWISE) {
         // factor column-block-wise for memory reduction
         if (dsep) {
@@ -340,7 +315,7 @@ namespace strumpack {
           A.push_front_elements
             (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
           BLRM_t::construct_and_partial_factor_col
-            (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
+            (F11blr_, F12blr_, F21blr_, F22blr_, sep_tiles_,
              upd_tiles_, admissibility_, opts.BLR_options(),
              [&](int i, bool part, std::size_t CP) {
                build_front_cols
@@ -362,54 +337,9 @@ namespace strumpack {
           rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
         if (dsep)
           BLRM_t::construct_and_partial_factor
-            (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+            (F11, F12, F21, F22_, F11blr_, F12blr_, F21blr_,
              sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
       }
-#if 0
-      build_front(A);
-      if (lchild_)
-        lchild_->extend_add_to_blr
-          (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
-      if (rchild_)
-        rchild_->extend_add_to_blr
-          (F11blr_, F12blr_, F21blr_, F22blr_, this, task_depth, opts);
-      if (dsep)
-        BLRM_t::construct_and_partial_factor
-          (F11blr_, F12blr_, F21blr_, F22blr_, piv_, sep_tiles_,
-           upd_tiles_, admissibility_, opts.BLR_options());
-#endif
-#if 0
-      DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
-      F11.zero(); F12.zero(); F21.zero();
-      A.extract_front
-        (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
-      if (dupd) {
-        F22_ = DenseM_t(dupd, dupd);
-        F22_.zero();
-      }
-      if (lchild_)
-        lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-      if (rchild_)
-        rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
-      if (dsep) {
-        F11blr_ = BLRM_t
-          (F11, sep_tiles_, admissibility_, piv_, opts.BLR_options());
-        F11.clear();
-        if (dupd) {
-          F12.laswp(piv_, true);
-          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-               scalar_t(1.), F11blr_, F12, task_depth);
-          F12blr_ = BLRM_t(F12, sep_tiles_, upd_tiles_, opts.BLR_options());
-          F12.clear();
-          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-               scalar_t(1.), F11blr_, F21, task_depth);
-          F21blr_ = BLRM_t(F21, upd_tiles_, sep_tiles_, opts.BLR_options());
-          F21.clear();
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
-               scalar_t(1.), F22_, task_depth);
-        }
-      }
-#endif
     } else { // ACA or BACA
       auto F11elem = [&](const std::vector<std::size_t>& lI,
                          const std::vector<std::size_t>& lJ, DenseM_t& B) {
@@ -449,7 +379,7 @@ namespace strumpack {
       };
       BLRM_t::construct_and_partial_factor
         (dsep, dupd, F11elem, F12elem, F21elem, F22elem,
-         F11blr_, piv_, F12blr_, F21blr_, F22blr_,
+         F11blr_, F12blr_, F21blr_, F22blr_,
          sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
     }
     if (lchild_) lchild_->release_work_memory();
@@ -522,7 +452,7 @@ namespace strumpack {
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      bloc.laswp(piv_, true);
+      bloc.laswp(F11blr_.piv(), true);
 #if 1
       BLRM_t::trsmLNU_gemm(F11blr_, F21blr_, bloc, bupd, task_depth);
 #else

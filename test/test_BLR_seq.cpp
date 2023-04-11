@@ -49,15 +49,15 @@ int run(int argc, char* argv[]) {
 
   auto usage = [&]() {
     cout << "# Usage:\n"
-    << "#     OMP_NUM_THREADS=4 ./test1 problem options [BLR Options]\n";
+         << "#     OMP_NUM_THREADS=4 ./test1 problem options [BLR Options]\n";
     /*<< "# where:\n"
-    << "#  - problem: a char that can be\n"
-    << "#      'T': solve a Toeplitz problem\n"
-    << "#            options: m (matrix dimension)\n"
-    << "#      'U': solve an upper triangular Toeplitz problem\n"
-    << "#            options: m (matrix dimension)\n"
-    << "#      'f': read matrix from file (binary)\n"
-    << "#            options: filename\n";*/
+      << "#  - problem: a char that can be\n"
+      << "#      'T': solve a Toeplitz problem\n"
+      << "#            options: m (matrix dimension)\n"
+      << "#      'U': solve an upper triangular Toeplitz problem\n"
+      << "#            options: m (matrix dimension)\n"
+      << "#      'f': read matrix from file (binary)\n"
+      << "#            options: filename\n";*/
     blr_opts.describe_options();
     exit(1);
   };
@@ -65,42 +65,42 @@ int run(int argc, char* argv[]) {
   DenseMatrix<double> A;
 
   /*char test_problem = 'T';
-  if (argc > 1) test_problem = argv[1][0];
-  else usage();
-  switch (test_problem) {
-  case 'T': { // Toeplitz
+    if (argc > 1) test_problem = argv[1][0];
+    else usage();
+    switch (test_problem) {
+    case 'T': { // Toeplitz
     if (argc > 2) m = stoi(argv[2]);
     if (argc <= 2 || m < 0) {
-      cout << "# matrix dimension should be positive integer" << endl;
-      usage();
+    cout << "# matrix dimension should be positive integer" << endl;
+    usage();
     }*/
-    if (argc > 1) m = stoi(argv[1]);
-    if (argc <= 1 || m < 0) {
-      cout << "# matrix dimension should be positive integer" << endl;
-      usage();
-    }
-    A = DenseMatrix<double>(m, m);
-    for (int j=0; j<m; j++)
-      for (int i=0; i<m; i++)
-        A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+  if (argc > 1) m = stoi(argv[1]);
+  if (argc <= 1 || m < 0) {
+    cout << "# matrix dimension should be positive integer" << endl;
+    usage();
+  }
+  A = DenseMatrix<double>(m, m);
+  for (int j=0; j<m; j++)
+    for (int i=0; i<m; i++)
+      A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
   /*} break;
-  case 'U': { // upper triangular Toeplitz
+    case 'U': { // upper triangular Toeplitz
     if (argc > 2) m = stoi(argv[2]);
     if (argc <= 2 || m < 0) {
-      cout << "# matrix dimension should be positive integer" << endl;
-      usage();
+    cout << "# matrix dimension should be positive integer" << endl;
+    usage();
     }
     A = DenseMatrix<double>(m, m);
     for (int j=0; j<m; j++)
-      for (int i=0; i<m; i++)
-        if (i > j) A(i,j) = 0.;
-        else A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
-  } break;
-  case 'L': {
+    for (int i=0; i<m; i++)
+    if (i > j) A(i,j) = 0.;
+    else A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+    } break;
+    case 'L': {
     if (argc > 2) m = stoi(argv[2]);
     if (argc <= 2 || m < 0) {
-      cout << "# matrix dimension should be positive integer" << endl;
-      usage();
+    cout << "# matrix dimension should be positive integer" << endl;
+    usage();
     }
     A = DenseMatrix<double>(m, m);
     A.eye();
@@ -109,24 +109,24 @@ int run(int argc, char* argv[]) {
     U.random();
     V.random();
     gemm(Trans::N, Trans::C, 1./m, U, V, 1., A);
-  } break;
-  case 'f': { // matrix from a file
+    } break;
+    case 'f': { // matrix from a file
     string filename;
     if (argc > 2) filename = argv[2];
     else {
-      cout << "# specify a filename" << endl;
-      usage();
+    cout << "# specify a filename" << endl;
+    usage();
     }
     cout << "Opening file " << filename << endl;
     ifstream file(filename, ifstream::binary);
     file.read(reinterpret_cast<char*>(&m), sizeof(int));
     A = DenseMatrix<double>(m, m);
     file.read(reinterpret_cast<char*>(A.data()), sizeof(double)*m*m);
-  } break;
-  default:
+    } break;
+    default:
     usage();
     exit(1);
-  }*/
+    }*/
   blr_opts.set_from_command_line(argc, argv);
 
   if (blr_opts.verbose()) A.print("A");
@@ -143,46 +143,45 @@ int run(int argc, char* argv[]) {
   adm.fill(true);
   for (std::size_t t=0; t<nt; t++)
     adm(t, t) = false;
-  std::vector<int> piv;
   long long int f0 = 0, ftot = 0;
-  #if defined(STRUMPACK_COUNT_FLOPS)
-    //std::cout << "flop_counter_start" << std::endl;
-    f0 = params::flops;
-    //std::cout << "# start flops       = " << double(f0) << double(params::flops) << std::endl;
-  #endif
+#if defined(STRUMPACK_COUNT_FLOPS)
+  //std::cout << "flop_counter_start" << std::endl;
+  f0 = params::flops;
+  //std::cout << "# start flops       = " << double(f0) << double(params::flops) << std::endl;
+#endif
   TaskTimer t3("Compression");
   t3.start();
-  BLRMatrix<double> B(A, tiles, adm, piv, blr_opts);
+  BLRMatrix<double> B(A, tiles, adm, blr_opts);
   t3.stop();
-  #if defined(STRUMPACK_COUNT_FLOPS)
-    //std::cout << "flop_counter_stop" << std::endl;
-    ftot = params::flops - f0;
-    //std::cout << "# stop flops       = " << double(params::flops) << std::endl;
-  #endif
+#if defined(STRUMPACK_COUNT_FLOPS)
+  //std::cout << "flop_counter_stop" << std::endl;
+  ftot = params::flops - f0;
+  //std::cout << "# stop flops       = " << double(params::flops) << std::endl;
+#endif
   cout << "# created BLR matrix of dimension "
-          << B.rows() << " x " << B.cols() << endl;
+       << B.rows() << " x " << B.cols() << endl;
   //B.print("B");
   //cout << "# compression succeeded!" << endl;
   cout << "# rank(B) = " << B.rank() << endl;
   cout << "# memory(B) = " << B.memory()/1e6 << " MB, "
-        << 100. * B.memory() / A.memory() << "% of dense" << endl;
-  #if defined(STRUMPACK_COUNT_FLOPS)
-    std::cout << "# flops       = " << double(ftot) << std::endl;
-    std::cout << "# time = " << t3.elapsed() << std::endl;
-    //std::cout << "# flop rate = " << ftot / t3.elapsed() / 1e9
-    //              << " GFlop/s" << std::endl;
-  #endif
+       << 100. * B.memory() / A.memory() << "% of dense" << endl;
+#if defined(STRUMPACK_COUNT_FLOPS)
+  std::cout << "# flops       = " << double(ftot) << std::endl;
+  std::cout << "# time = " << t3.elapsed() << std::endl;
+  //std::cout << "# flop rate = " << ftot / t3.elapsed() / 1e9
+  //              << " GFlop/s" << std::endl;
+#endif
 
   //solve AX=Y, A Toeplitz
   A = DenseMatrix<double>(m, m);
-    for (int j=0; j<m; j++)
-      for (int i=0; i<m; i++)
-        A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
+  for (int j=0; j<m; j++)
+    for (int i=0; i<m; i++)
+      A(i,j) = (i==j) ? 1. : 1./(1+abs(i-j));
   DenseMatrix<double> Y(m, 10), X(m, 10);//, T1(m, 10);
   X.random();
   // compute Y <- AX
   gemm(Trans::N, Trans::N, 1., A, X, 0., Y);
-  B.solve(piv, Y);
+  B.solve(Y);
   auto Xnorm = X.normF();
   //Y.scaled_add(-1., X);
   X.scaled_add(-1., Y);

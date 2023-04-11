@@ -84,14 +84,8 @@ namespace strumpack {
                 const std::vector<std::size_t>& coltiles,
                 const Opts_t& opts);
 
-      // implement and test, separate from factorization
-      // BLRMatrix(std::size_t n, const std::vector<std::size_t>& tiles,
-      //           const adm_t& admissible, const elem_t& Aelem,
-      //           std::vector<int>& piv, const Opts_t& opts);
-
       BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
-                const adm_t& admissible, std::vector<int>& piv,
-                const Opts_t& opts);
+                const adm_t& admissible, const Opts_t& opts);
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
                 std::size_t n, const std::vector<std::size_t>& coltiles);
@@ -112,11 +106,13 @@ namespace strumpack {
 
       void clear();
 
-      void solve(const std::vector<int>& P, DenseM_t& x) const {
-        x.laswp(P, true);
+      void solve(DenseM_t& x) const override {
+        x.laswp(piv_, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), *this, x, 0);
         trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), *this, x, 0);
       }
+
+      const std::vector<int>& piv() const { return piv_; }
 
       /**
        * Multiply this BLR matrix with a dense matrix (vector), ie,
@@ -165,7 +161,6 @@ namespace strumpack {
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
                                    DenseM_t& A21, DenseM_t& A22,
                                    BLRMatrix<scalar_t>& B11,
-                                   std::vector<int>& piv,
                                    BLRMatrix<scalar_t>& B12,
                                    BLRMatrix<scalar_t>& B21,
                                    const std::vector<std::size_t>& tiles1,
@@ -178,7 +173,6 @@ namespace strumpack {
                                    BLRMatrix<scalar_t>& B12,
                                    BLRMatrix<scalar_t>& B21,
                                    BLRMatrix<scalar_t>& B22,
-                                   std::vector<int>& piv,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
@@ -189,7 +183,6 @@ namespace strumpack {
                                        BLRMatrix<scalar_t>& B12,
                                        BLRMatrix<scalar_t>& B21,
                                        BLRMatrix<scalar_t>& B22,
-                                       std::vector<int>& piv,
                                        const std::vector<std::size_t>& tiles1,
                                        const std::vector<std::size_t>& tiles2,
                                        const adm_t& admissible,
@@ -204,7 +197,6 @@ namespace strumpack {
                                    const extract_t<scalar_t>& A21,
                                    const extract_t<scalar_t>& A22,
                                    BLRMatrix<scalar_t>& B11,
-                                   std::vector<int>& piv,
                                    BLRMatrix<scalar_t>& B12,
                                    BLRMatrix<scalar_t>& B21,
                                    BLRMatrix<scalar_t>& B22,
@@ -227,6 +219,7 @@ namespace strumpack {
       std::size_t m_ = 0, n_ = 0, nbrows_ = 0, nbcols_ = 0;
       std::vector<std::size_t> roff_, coff_, cl2l_, rl2l_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
+      std::vector<int> piv_;
 
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile(std::size_t i, std::size_t j,
