@@ -35,9 +35,6 @@
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
 #endif
-#if defined(STRUMPACK_USE_MAGMA)
-#include "dense/MAGMAWrapper.hpp"
-#endif
 
 namespace strumpack {
 
@@ -474,11 +471,6 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
-#if defined(STRUMPACK_USE_MAGMA)
-    // TODO why does this need MAGMA?????
-    if (opts.replace_tiny_pivots())
-      magma_init();
-#endif
     const int max_streams = opts.gpu_streams();
     std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
     const int lvls = this->levels();
@@ -693,10 +685,6 @@ namespace strumpack {
                  reinterpret_cast<scalar_t*>(old_work), dupd*dupd));
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
-#if defined(STRUMPACK_USE_MAGMA)
-    if (opts.replace_tiny_pivots())
-      magma_finalize();
-#endif
     return err_code;
   }
 

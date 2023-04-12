@@ -57,7 +57,10 @@ namespace strumpack {
 
       class MAGMAQueue {
       public:
-        MAGMAQueue() { magma_queue_create(0, &q_); }
+        MAGMAQueue() {
+          magma_init();
+          magma_queue_create(0, &q_);
+        }
         MAGMAQueue(Stream& s, BLASHandle& h) {
           magma_init();
 #if defined(STRUMPACK_USE_CUDA)
