@@ -34,11 +34,7 @@
 #include <complex>
 #include <iostream>
 
-//#define STRUMPACK_HIP_HAVE_ROCTHRUST
-#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
 #include <thrust/complex.h>
-#endif
-
 
 namespace strumpack {
   namespace gpu {
@@ -50,9 +46,7 @@ namespace strumpack {
      */
     template<class T> struct real_type { typedef T value_type; };
     template<class T> struct real_type<std::complex<T>> { typedef T value_type; };
-#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
     template<class T> struct real_type<thrust::complex<T>> { typedef T value_type; };
-#endif
 
     /**
      * The types float2 and double2 are binary the same as
@@ -63,71 +57,32 @@ namespace strumpack {
     template<class T> struct primitive_type { typedef T value_type; };
     template<> struct primitive_type<std::complex<float>> { typedef float2 value_type; };
     template<> struct primitive_type<std::complex<double>> { typedef double2 value_type; };
-#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
     template<> struct primitive_type<thrust::complex<float>> { typedef float2 value_type; };
     template<> struct primitive_type<thrust::complex<double>> { typedef double2 value_type; };
-#endif
 
     /**
      * Get the corresponding thrust::complex for std::complex
      */
     template<class T> struct cuda_type { typedef T value_type; };
-#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
     template<class T> struct cuda_type<std::complex<T>> { typedef thrust::complex<T> value_type; };
-#endif
 
-    __device__ float real(const float& a) { return a; }
-    __device__ double real(const double& a) { return a; }
-    __device__ float real(const std::complex<float>& a) { return a.real(); }
-    __device__ double real(const std::complex<double>& a) { return a.real(); }
-#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
-    __device__ float real(const thrust::complex<float>& a) { return a.real(); }
-    __device__ double real(const thrust::complex<double>& a) { return a.real(); }
-#endif
+    __device__ float real_part(const float& a) { return a; }
+    __device__ double real_part(const double& a) { return a; }
+    __device__ float real_part(const std::complex<float>& a) { return a.real(); }
+    __device__ double real_part(const std::complex<double>& a) { return a.real(); }
+    __device__ float real_part(const thrust::complex<float>& a) { return a.real(); }
+    __device__ double real_part(const thrust::complex<double>& a) { return a.real(); }
 
-    __device__ float abs(const float& a) { return (a >= 0) ? a : -a; }
-    __device__ double abs(const double& a) { return  (a >= 0) ? a : -a; }
-    __device__ float abs(const std::complex<float>& a) {
-      return sqrtf(a.real() * a.real() + a.imag() * a.imag());
-    }
-    __device__ double abs(const std::complex<double>& a) {
-      return sqrt(a.real() * a.real() + a.imag() * a.imag());
-    }
-#if defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
-    __device__ float abs(const thrust::complex<float>& a) { return thrust::abs(a); }
-    __device__ double abs(const thrust::complex<double>& a) { return thrust::abs(a); }
-#endif
-
-#if !defined(STRUMPACK_HIP_HAVE_ROCTHRUST)
-    template<typename T> __device__ std::complex<T>
-    operator+(const std::complex<T>& a, const std::complex<T>& b) {
-      return std::complex<T>(a.real() + b.real(), a.imag() + b.imag());
-    }
-    template<typename T> __device__ std::complex<T>
-    operator*(const std::complex<T>& a, const std::complex<T>& b) {
-      return std::complex<T>
-        (a.real() * b.real() - a.imag() * b.imag(),
-         a.imag() * b.real() + a.real() * b.imag());
-    }
-    template<typename T> __device__ std::complex<T>
-    operator+=(std::complex<T>& a, const std::complex<T>& b) {
-      a = std::complex<T>(a.real() + b.real(), a.imag() + b.imag());
-      return a;
-    }
-    template<typename T> __device__ std::complex<T>
-    operator-=(std::complex<T>& a, const std::complex<T>& b) {
-      a = std::complex<T>(a.real() - b.real(), a.imag() - b.imag());
-      return a;
-    }
-    template<typename T> __device__ std::complex<T>
-    operator/=(std::complex<T>& a, const std::complex<T>& b) {
-      auto denom = b.real() * b.real() + b.imag() * b.imag();
-      a = std::complex<T>
-        ((a.real() * b.real() + a.imag() * b.imag()) / denom,
-         (a.imag() * b.real() - a.real() * b.imag()) / denom);
-      return a;
-    }
-#endif
+    __device__ float absolute_value(const float& a) { return (a >= 0) ? a : -a; }
+    __device__ double absolute_value(const double& a) { return  (a >= 0) ? a : -a; }
+    // __device__ float absolute_value(const std::complex<float>& a) {
+    //   return sqrtf(a.real() * a.real() + a.imag() * a.imag());
+    // }
+    // __device__ double absolute_value(const std::complex<double>& a) {
+    //   return sqrt(a.real() * a.real() + a.imag() * a.imag());
+    // }
+    __device__ float absolute_value(const thrust::complex<float>& a) { return thrust::abs(a); }
+    __device__ double absolute_value(const thrust::complex<double>& a) { return thrust::abs(a); }
 
 
     /**
@@ -307,7 +262,7 @@ namespace strumpack {
         // only 1 thread looks for the pivot element
         // this should be optimized?
         if (j == k && i >= k)
-          cabs[i] = abs(M[i+j*NT]);
+          cabs[i] = absolute_value(M[i+j*NT]);
         __syncthreads();
         if (j == k && i == k) {
           p = k;
@@ -357,8 +312,8 @@ namespace strumpack {
         int i = hipThreadIdx_x, j = hipThreadIdx_y;
         if (i == j && i < A.n1) {
           std::size_t k = i + i*A.n1;
-          if (abs(A.F11[k]) < thresh)
-            A.F11[k] = (gpu::real(A.F11[k]) < 0) ? -thresh : thresh;
+          if (absolute_value(A.F11[k]) < thresh)
+            A.F11[k] = (real_part(A.F11[k]) < 0) ? -thresh : thresh;
         }
       }
     }
@@ -369,8 +324,8 @@ namespace strumpack {
       int i = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
       if (i < n) {
         std::size_t k = i + i*n;
-        if (abs(A[k]) < thresh)
-          A[k] = (gpu::real(A[k]) < 0) ? -thresh : thresh;
+        if (absolute_value(A[k]) < thresh)
+          A[k] = (real_part(A[k]) < 0) ? -thresh : thresh;
       }
     }
 
@@ -393,13 +348,13 @@ namespace strumpack {
     replace_pivots_vbatch_kernel(int* dn, T** dA, int* lddA, real_t thresh,
                                  unsigned int batchCount) {
       int i = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x,
-        f = hipBblockIdx_y * hipBlockDim_y + hipThreadIdx_y;
+        f = hipBlockIdx_y * hipBlockDim_y + hipThreadIdx_y;
       if (f >= batchCount) return;
       if (i >= dn[f]) return;
       auto A = dA[f];
       auto ldA = lddA[f];
       std::size_t ii = i + i*ldA;
-      if (absolute_value(A[ii]) < thresh)
+      if (abs(A[ii]) < thresh)
         A[ii] = (real_part(A[ii]) < 0) ? -thresh : thresh;
     }
 
@@ -424,8 +379,7 @@ namespace strumpack {
         hipblasGetStream(handle, &streamId);
         auto f0 = f * ops;
         hipLaunchKernelGGL
-          (HIP_KERNEL_NAME
-           (replace_pivots_vbatch_kernel<T, real_t>),
+          (HIP_KERNEL_NAME(replace_pivots_vbatch_kernel<T_,real_t>),
            grid, block, 0, streamId, dn+f0,
            (T_**)(dA)+f0, lddA+f0, thresh, batchCount-f0);
       }

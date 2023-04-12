@@ -35,9 +35,9 @@
 #include <cassert>
 #include <memory>
 
-#include <hip/hip_runtime_api.h>
-#include <hipblas.h>
-#include <rocsolver.h>
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+#include <rocsolver/rocsolver.h>
 
 #include "DenseMatrix.hpp"
 
