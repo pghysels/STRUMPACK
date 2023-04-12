@@ -222,8 +222,9 @@ namespace strumpack {
           dim3 block(nt, ops);
           for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Y));
-            hipLaunchKernelGGL(HIP_KERNEL_NAME(assemble_kernel<T,unroll>),
-                               grid, block, 0, 0, f, nf, ddat+f*ops);
+            hipLaunchKernelGGL
+              (HIP_KERNEL_NAME(assemble_kernel<T,unroll>),
+               grid, block, 0, 0, f, nf-f*ops, ddat+f*ops);
           }
         }
       }
@@ -251,10 +252,10 @@ namespace strumpack {
               dim3 grid(nbx, ny, std::min(nbf-f, MAX_BLOCKS_Z));
               hipLaunchKernelGGL
                 (HIP_KERNEL_NAME(extend_add_kernel<T_,unroll>),
-                 grid, block, 0, 0, y, nf, dat_+f*ops, true);
+                 grid, block, 0, 0, y, nf-f*ops, dat_+f*ops, true);
               hipLaunchKernelGGL
                 (HIP_KERNEL_NAME(extend_add_kernel<T_,unroll>),
-                 grid, block, 0, 0, y, nf, dat_+f*ops, false);
+                 grid, block, 0, 0, y, nf-f*ops, dat_+f*ops, false);
             }
           }
         }
@@ -386,6 +387,48 @@ namespace strumpack {
         hipLaunchKernelGGL
           (HIP_KERNEL_NAME(replace_pivots_kernel<T_,real_t>),
            (n+NT)/NT, NT, 0, 0, n, (T_*)(A), thresh);
+    }
+
+    template<typename T, typename real_t> __global__ void
+    replace_pivots_vbatch_kernel(int* dn, T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount) {
+      int i = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x,
+        f = hipBblockIdx_y * hipBlockDim_y + hipThreadIdx_y;
+      if (f >= batchCount) return;
+      if (i >= dn[f]) return;
+      auto A = dA[f];
+      auto ldA = lddA[f];
+      std::size_t ii = i + i*ldA;
+      if (absolute_value(A[ii]) < thresh)
+        A[ii] = (real_part(A[ii]) < 0) ? -thresh : thresh;
+    }
+
+    template<typename T, typename real_t>
+    void replace_pivots_vbatched(BLASHandle& handle, int* dn, int max_n,
+                                 T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount) {
+      if (max_n <= 0 || !batchCount) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > max_n) {
+        nt /= 2;
+        ops *= 2;
+      }
+      ops = std::min(ops, batchCount);
+      unsigned int nbx = (max_n + nt - 1) / nt,
+        nbf = (batchCount + ops - 1) / ops;
+      dim3 block(nt, ops);
+      using T_ = typename cuda_type<T>::value_type;
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+        dim3 grid(nbx, std::min(nbf-f, MAX_BLOCKS_Y));
+        hipStream_t streamId;
+        hipblasGetStream(handle, &streamId);
+        auto f0 = f * ops;
+        hipLaunchKernelGGL
+          (HIP_KERNEL_NAME
+           (replace_pivots_vbatch_kernel<T, real_t>),
+           grid, block, 0, streamId, dn+f0,
+           (T_**)(dA)+f0, lddA+f0, thresh, batchCount-f0);
+      }
     }
 
     /**
@@ -583,10 +626,10 @@ namespace strumpack {
         dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Z));
         hipLaunchKernelGGL
           (HIP_KERNEL_NAME(extend_add_rhs_kernel_left),
-           grid, block, 0, 0, N, nrhs, nf, dat_+f*ops);
+           grid, block, 0, 0, N, nrhs, nf-f*ops, dat_+f*ops);
         hipLaunchKernelGGL
           (HIP_KERNEL_NAME(extend_add_rhs_kernel_right),
-           grid, block, 0, 0, N, nrhs, nf, dat_+f*ops);
+           grid, block, 0, 0, N, nrhs, nf-f*ops, dat_+f*ops);
       }
     }
 
@@ -640,7 +683,7 @@ namespace strumpack {
         dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Z));
         hipLaunchKernelGGL
           (HIP_KERNEL_NAME(extract_rhs_kernel),
-           grid, block, 0, 0, N, nrhs, nf, dat_+f*ops);
+           grid, block, 0, 0, N, nrhs, nf-f*ops, dat_+f*ops);
       }
     }
 
@@ -685,6 +728,11 @@ namespace strumpack {
     template void replace_pivots(int, double*, double, gpu::Stream*);
     template void replace_pivots(int, std::complex<float>*, float, gpu::Stream*);
     template void replace_pivots(int, std::complex<double>*, double, gpu::Stream*);
+
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, float**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, double**, int*, double, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<float>**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<double>**, int*, double, unsigned int);
 
   } // end namespace gpu
 } // end namespace strumpack

@@ -157,18 +157,17 @@ namespace strumpack {
         if (nnz) {
           unsigned int nt = 512, ops = 1;
           const int unroll = 8;
-          // const int unroll = 8;
-          // while (nt*unroll > nnz && nt > 8 && ops < 64) {
-          //   nt /= 2;
-          //   ops *= 2;
-          // }
-          // ops = std::min(ops, nf);
+          while (nt*unroll > nnz && nt > 8 && ops < 64) {
+            nt /= 2;
+            ops *= 2;
+          }
+          ops = std::min(ops, nf);
           unsigned int nb = (nnz + nt*unroll - 1) / (nt*unroll),
             nbf = (nf + ops - 1) / ops;
           dim3 block(nt, ops);
           for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Y));
-            assemble_kernel<T,unroll><<<grid,block>>>(nf, ddat+f*ops);
+            assemble_kernel<T,unroll><<<grid,block>>>(nf-f*ops, ddat+f*ops);
           }
         }
       }
@@ -180,11 +179,11 @@ namespace strumpack {
         if (du) {
           const unsigned int unroll = 16;
           unsigned int nt = 512, ops = 1;
-          // while (nt > du && ops < 64) {
-          //   nt /= 2;
-          //   ops *= 2;
-          // }
-          // ops = std::min(ops, nf);
+          while (nt > du && ops < 64) {
+            nt /= 2;
+            ops *= 2;
+          }
+          ops = std::min(ops, nf);
           unsigned int nbx = (du + nt - 1) / nt,
             nby = (du + unroll - 1) / unroll,
             nbf = (nf + ops - 1) / ops;
@@ -196,9 +195,9 @@ namespace strumpack {
             for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
               dim3 grid(nbx, ny, std::min(nbf-f, MAX_BLOCKS_Z));
               extend_add_kernel<T_,unroll><<<grid, block>>>
-                (y, nf, dat_+f*ops, true);
+                (y, nf-f*ops, dat_+f*ops, true);
               extend_add_kernel<T_,unroll><<<grid, block>>>
-                (y, nf, dat_+f*ops, false);
+                (y, nf-f*ops, dat_+f*ops, false);
             }
           }
         }
@@ -330,6 +329,46 @@ namespace strumpack {
         replace_pivots_kernel<T_,real_t><<<(n+NT-1)/NT, NT>>>
           (n, (T_*)(A), thresh);
       gpu_check(cudaPeekAtLastError());
+    }
+
+    template<typename T, typename real_t> __global__ void
+    replace_pivots_vbatch_kernel(int* dn, T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount) {
+      int i = blockIdx.x * blockDim.x + threadIdx.x,
+        f = blockIdx.y * blockDim.y + threadIdx.y;
+      if (f >= batchCount) return;
+      if (i >= dn[f]) return;
+      auto A = dA[f];
+      auto ldA = lddA[f];
+      std::size_t ii = i + i*ldA;
+      if (absolute_value(A[ii]) < thresh)
+        A[ii] = (real_part(A[ii]) < 0) ? -thresh : thresh;
+    }
+
+    template<typename T, typename real_t>
+    void replace_pivots_vbatched(BLASHandle& handle, int* dn, int max_n,
+                                 T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount) {
+      if (max_n <= 0 || !batchCount) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > max_n) {
+        nt /= 2;
+        ops *= 2;
+      }
+      ops = std::min(ops, batchCount);
+      unsigned int nbx = (max_n + nt - 1) / nt,
+        nbf = (batchCount + ops - 1) / ops;
+      dim3 block(nt, ops);
+      using T_ = typename cuda_type<T>::value_type;
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+        dim3 grid(nbx, std::min(nbf-f, MAX_BLOCKS_Y));
+        cudaStream_t streamId;
+        cublasGetStream(handle, &streamId);
+        auto f0 = f * ops;
+        replace_pivots_vbatch_kernel<<<grid, block, 0, streamId>>>
+          (dn+f0, (T_**)(dA)+f0, lddA+f0, thresh, batchCount-f0);
+        gpu_check(cudaPeekAtLastError());
+      }
     }
 
     /**
@@ -519,6 +558,7 @@ namespace strumpack {
         nt /= 2;
         ops *= 2;
       }
+      ops = std::min(ops, nf);
       unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
       dim3 block(nt, ops);
       using T_ = typename cuda_type<T>::value_type;
@@ -526,9 +566,9 @@ namespace strumpack {
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
         dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Z));
         extend_add_rhs_kernel_left<<<grid, block>>>
-          (N, nrhs, nf, dat_+f*ops);
+          (N, nrhs, nf-f*ops, dat_+f*ops);
         extend_add_rhs_kernel_right<<<grid, block>>>
-          (N, nrhs, nf, dat_+f*ops);
+          (N, nrhs, nf-f*ops, dat_+f*ops);
       }
       gpu_check(cudaPeekAtLastError());
     }
@@ -576,6 +616,7 @@ namespace strumpack {
         nt /= 2;
         ops *= 2;
       }
+      ops = std::min(ops, nf);
       unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
       dim3 block(nt, ops);
       using T_ = typename cuda_type<T>::value_type;
@@ -583,7 +624,7 @@ namespace strumpack {
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
         dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Z));
         extract_rhs_kernel<<<grid, block>>>
-          (N, nrhs, nf, dat_+f*ops);
+          (N, nrhs, nf-f*ops, dat_+f*ops);
       }
     }
 
@@ -629,6 +670,11 @@ namespace strumpack {
     template void replace_pivots(int, double*, double, gpu::Stream*);
     template void replace_pivots(int, std::complex<float>*, float, gpu::Stream*);
     template void replace_pivots(int, std::complex<double>*, double, gpu::Stream*);
+
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, float**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, double**, int*, double, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<float>**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<double>**, int*, double, unsigned int);
 
   } // end namespace gpu
 } // end namespace strumpack

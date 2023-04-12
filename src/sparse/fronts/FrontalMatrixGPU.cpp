@@ -424,6 +424,9 @@ namespace strumpack {
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
       gpu_check(gpu::copy_host_to_device(dF11, F11_));
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
+      if (opts.replace_tiny_pivots())
+        gpu::replace_pivots
+          (F11_.rows(), dF11.data(), opts.pivot_threshold());
       int info;
       gpu_check(gpu::copy_device_to_host(&info, dpiv+dsep, 1));
       if (info) err_code = ReturnCode::ZERO_PIVOT;
@@ -431,9 +434,6 @@ namespace strumpack {
       piv_ = pivot_mem_.data();
       gpu_check(gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep));
       gpu_check(gpu::copy_device_to_host(F11_, dF11));
-      if (opts.replace_tiny_pivots())
-        gpu::replace_pivots
-          (F11_.rows(), dF11.data(), opts.pivot_threshold());
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
@@ -475,6 +475,7 @@ namespace strumpack {
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
 #if defined(STRUMPACK_USE_MAGMA)
+    // TODO why does this need MAGMA?????
     if (opts.replace_tiny_pivots())
       magma_init();
 #endif

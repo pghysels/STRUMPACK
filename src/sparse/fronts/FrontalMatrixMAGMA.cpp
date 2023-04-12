@@ -53,9 +53,9 @@ namespace strumpack {
                    const SpMat_t* A=nullptr) {
       auto N = fronts.size();
       f.reserve(N);
-      std::size_t max_dsep = 0;
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FM_t*>(F));
+      std::size_t max_dsep = 0;
 #pragma omp parallel for                                                \
   reduction(max:max_dsep)                                               \
   reduction(+:factor_size,Schur_size,piv_size)                          \
@@ -427,14 +427,16 @@ namespace strumpack {
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
              L.f[i]->piv_, L.dev_getrf_err+i);
-
         // TODO check error code
-        // TODO
-        // if (opts.replace_tiny_pivots())
-        //   gpu::replace_pivots
-        //     (f.dim_sep(), f.F11_.data(),
-        //      opts.pivot_threshold(), comp_stream);
-
+        if (opts.replace_tiny_pivots()) {
+          gpu::replace_pivots_vbatched
+            (blas_handle, d1, L.max_d1_small, F11, ld1,
+             opts.pivot_threshold(), Nsmall);
+          for (std::size_t i=Nsmall; i<N; i++)
+            gpu::replace_pivots
+              (L.f[i]->F11_.rows(), L.f[i]->F11_.data(),
+               opts.pivot_threshold());
+        }
         gpu::laswp_fwd_vbatched
           (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
@@ -534,16 +536,13 @@ namespace strumpack {
       gpu_check(gpu::copy_host_to_device(dF11, F11_));
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
       // TODO check return code!
+      if (opts.replace_tiny_pivots())
+        gpu::replace_pivots
+          (F11_.rows(), dF11.data(), opts.pivot_threshold());
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
       gpu_check(gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep));
       gpu_check(gpu::copy_device_to_host(F11_, dF11));
-      if (opts.replace_tiny_pivots()) {
-        auto thresh = opts.pivot_threshold();
-        for (std::size_t i=0; i<F11_.rows(); i++)
-          if (std::abs(F11_(i,i)) < thresh)
-            F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
-      }
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
@@ -705,14 +704,16 @@ namespace strumpack {
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
              L.f[i]->piv_, L.dev_getrf_err+i);
-
         // TODO check error code
-        // TODO
-        // if (opts.replace_tiny_pivots())
-        //   gpu::replace_pivots
-        //     (f.dim_sep(), f.F11_.data(),
-        //      opts.pivot_threshold(), comp_stream);
-
+        if (opts.replace_tiny_pivots()) {
+          gpu::replace_pivots_vbatched
+            (blas_handle, d1, L.max_d1_small, F11, ld1,
+             opts.pivot_threshold(), Nsmall);
+          for (std::size_t i=Nsmall; i<N; i++)
+            gpu::replace_pivots
+              (L.f[i]->F11_.rows(), L.f[i]->F11_.data(),
+               opts.pivot_threshold());
+        }
         gpu::laswp_fwd_vbatched
           (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
