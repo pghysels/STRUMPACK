@@ -681,7 +681,7 @@ if(STRUMPACK_USE_MPI)
 
     set(test_name "SPARSE_HODLR_mpi_8")
     add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
-      ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+      ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25 --sp_rel_tol 1e-8)
     set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
     set(test_name "SPARSE_HODBF_mpi_10")
