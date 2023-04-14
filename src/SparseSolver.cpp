@@ -251,8 +251,8 @@ namespace strumpack {
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
 
-    integer_t N = matrix()->size(), d = b.cols();
-    assert(N < std::numeric_limits<int>::max());
+    integer_t d = b.cols();
+    assert(matrix()->size() < std::numeric_limits<int>::max());
     DenseM_t bloc(b.rows(), d);
 
     auto spmv = [&](const scalar_t* x, scalar_t* y)
