@@ -1,3 +1,19 @@
+Version 7.1.0 Released April 2023
+=================================
+- Bugfix in matrix equilibration code
+- Several bugfixes, especially for SLATE and large problems on GPU
+- Sparse triangular solve on the GPU when using MAGMA
+- Other MAGMA fixes for the sparse direct solver (MAGMA still optional)
+- New HSS random sketching operators based on sparse Johnson Lindestrauss
+- Fix for HODLRMatrix construction from elements, or blocks
+- Compilation fixes for NVHPC compiler
+- SYCL updates
+- Add lapmr routines, which are not available in Mac LAPACK implementations
+- Support newer ( >= 1.0) ZFP versions
+- Fixes for clang 15
+- Add NDBFS GPU matrix ordering code
+
+
 Version 7.0.1 Released Oct 2022
 ===============================
 - Require C++14 instead of 17
