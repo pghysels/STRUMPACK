@@ -101,9 +101,6 @@ namespace strumpack {
         gpu_check(hipSetDevice(rank % devs));
       }
 #endif
-      gpu_check(hipFree(0));
-      gpu::BLASHandle hb;
-      gpu::SOLVERHandle hs;
     }
 
     void gemm(BLASHandle& handle, hipblasOperation_t transa,
