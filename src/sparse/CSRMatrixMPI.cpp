@@ -795,8 +795,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> Equilibration<scalar_t>
   CSRMatrixMPI<scalar_t,integer_t>::equilibration() const {
     Equil_t eq(lrows_, n_);
-    return eq;
-
     if (!n_) return eq;
     real_t small = blas::lamch<real_t>('S');
     real_t big = 1. / small;
