@@ -57,6 +57,7 @@ namespace strumpack {
     zfp_stream_rewind(stream);
     auto comp_size = zfp_compress(stream, f);
     buffer_.resize(comp_size);
+    STRUMPACK_ADD_MEMORY(buffer_.size()*sizeof(unsigned char));
     zfp_stream_flush(stream);
     zfp_field_free(f);
     zfp_stream_close(stream);
