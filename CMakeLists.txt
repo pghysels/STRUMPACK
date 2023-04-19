@@ -119,7 +119,7 @@ if(STRUMPACK_USE_HIP)
       find_package(hipsparse REQUIRED)
       find_package(rocsolver REQUIRED)
       find_package(rocblas REQUIRED)
-      # find_package(rocthrust REQUIRED)
+      find_package(rocthrust REQUIRED)
       # find_package(rocprim REQUIRED)
     else()
       message(WARNING "HIP compiler not found,"
@@ -678,7 +678,7 @@ endif()
 
 if(hipblas_FOUND)
   target_link_libraries(strumpack PUBLIC
-    roc::hipblas roc::rocblas roc::rocsolver roc::hipsparse)
+    roc::hipblas roc::rocblas roc::rocsolver roc::hipsparse roc::rocthrust)
 endif()
 
 if(CombBLAS_FOUND)
