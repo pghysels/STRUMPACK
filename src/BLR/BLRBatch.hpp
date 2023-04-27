@@ -138,10 +138,12 @@ namespace strumpack {
 
     template<typename scalar_t> class VBatchedARA {
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      using real_t = typename RealType<scalar_t>::value_type;
+
     public:
       void add(std::unique_ptr<BLRTile<scalar_t>>& tile);
       void run(gpu::BLASHandle& handle,
-               VectorPool<scalar_t>& workspace, scalar_t tol);
+               VectorPool<scalar_t>& workspace, real_t tol);
 
       static const int KBLAS_ARA_BLOCK_SIZE;
       static void kblas_wsquery(gpu::BLASHandle& handle,

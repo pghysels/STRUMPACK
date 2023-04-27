@@ -256,7 +256,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t>
-    const int VBatchedARA<scalar_t>::KBLAS_ARA_BLOCK_SIZE = 32;
+    const int VBatchedARA<scalar_t>::KBLAS_ARA_BLOCK_SIZE = 16;
 
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::add(std::unique_ptr<BLRTile<scalar_t>>& tile) {
@@ -269,7 +269,7 @@ namespace strumpack {
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::run(gpu::BLASHandle& handle,
                                VectorPool<scalar_t>& workspace,
-                               scalar_t tol) {
+                               real_t tol) {
 #if defined(STRUMPACK_USE_KBLAS)
       auto B = tile_.size();
       if (!B) return;
