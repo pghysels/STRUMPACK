@@ -200,14 +200,20 @@ c$$$            RWORK( J ) = DZNRM2( SM, A( NFXD+1, J ), 1 )
      $                      JPVT( J ), TAU( J ), RWORK( J ),
      $                      RWORK( N+J ), WORK( 1 ), WORK( JB+1 ),
      $                      N-J+1 )
-               DO C=J,J+FJB-1
-                  IF(ABS(A(C,C))/ABS(A(1,1))<=RTOL .OR.
-     $                 ABS(A(C,C))<=ATOL) THEN
-                   GOTO 99
-                 ELSE
-                   RANK=RANK+1
-                 ENDIF
+               IF( FJB < JB ) THEN
+                  RANK = J - 1 + FJB
+                  GO TO 99
+               ENDIF
+               DO C = J, J + FJB - 1
+c$$$                  IF( ABS(A(C,C))/ABS(A(1,1)) <= RTOL .OR.
+c$$$     $                 ABS(A(C,C)) <= ATOL ) THEN
+                  IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL ) THEN
+                     GO TO 99
+                  ELSE
+                     RANK = RANK + 1
+                  ENDIF
                END DO
+
                J = J + FJB
                GO TO 30
             END IF
@@ -222,21 +228,20 @@ c$$$            RWORK( J ) = DZNRM2( SM, A( NFXD+1, J ), 1 )
             CALL ZLAQP2( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
      $           TAU( J ), RWORK( J ), RWORK( N+J ),
      $           WORK( 1 ) )
-*
-            DO C=J,MINMN
-               IF(ABS(A(C,C))/ABS(A(1,1))<=RTOL .OR.
-     $              ABS(A(C,C))<=ATOL) THEN
-                GOTO 99
-              ELSE
-                RANK=RANK+1
-              ENDIF
+            DO C = J, MINMN
+               IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL .OR.
+     $              ABS( A( C, C ) ) <= ATOL ) THEN
+                  GO TO 99
+               ELSE
+                  RANK = RANK + 1
+               ENDIF
             END DO
          END IF
       END IF
 *
       WORK( 1 ) = IWS
 
-   99 CONTINUE
+ 99   CONTINUE
       RETURN
 *
 *     End of ZGEQP3
