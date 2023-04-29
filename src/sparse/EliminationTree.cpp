@@ -203,9 +203,9 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  EliminationTree<scalar_t,integer_t>::determinant
-  (scalar_t& det) const {
-    return root_->determinant(det);
+  EliminationTree<scalar_t,integer_t>::log_determinant
+  (scalar_t& ldet) const {
+    return root_->log_determinant(ldet);
   }
 
   template<typename scalar_t,typename integer_t> void

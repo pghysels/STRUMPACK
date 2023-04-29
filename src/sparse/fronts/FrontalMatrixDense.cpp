@@ -78,11 +78,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::node_determinant
-  (scalar_t& det) const {
+  FrontalMatrixDense<scalar_t,integer_t>::node_log_determinant
+  (scalar_t& ldet) const {
     for (std::size_t i=0; i<F11_.rows(); i++) {
-      if (piv_[i] != int(i+1)) det = -det;
-      det *= F11_(i, i);
+      if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
+      ldet += F11_(i, i);
     }
     return ReturnCode::SUCCESS;
   }

@@ -78,7 +78,7 @@ namespace strumpack {
                                integer_t& zero,
                                integer_t& pos) const;
 
-    virtual ReturnCode determinant(scalar_t& det) const;
+    virtual ReturnCode log_determinant(scalar_t& ldet) const;
 
     void print_rank_statistics(std::ostream &out) const;
 

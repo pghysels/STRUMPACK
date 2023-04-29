@@ -66,9 +66,9 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
             << neg << ", " << zero << ", " << pos
             <<  " (" << err << ")" << std::endl;
 
-  scalar_t det;
-  err = spss.determinant(det);
-  std::cout << "# DETERMINANT = " << det
+  scalar_t ldet;
+  err = spss.log_determinant(ldet);
+  std::cout << "# LOG DETERMINANT = " << ldet
             <<  " (" << err << ")" << std::endl;
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "

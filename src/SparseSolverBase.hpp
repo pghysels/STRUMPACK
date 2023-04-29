@@ -368,10 +368,10 @@ namespace strumpack {
     ReturnCode inertia(integer_t& neg, integer_t& zero, integer_t& pos);
 
     /**
-     * Return the determinant of the matrix. A sparse matrix needs to
-     * be set before determinant can be computed. The matrix needs to
-     * be factored. If this->factor() was not called already, then it
-     * is called inside the inertia routine.
+     * Return the logarithm of the determinant of the matrix. A sparse
+     * matrix needs to be set before determinant can be computed. The
+     * matrix needs to be factored. If this->factor() was not called
+     * already, then it is called inside the inertia routine.
      *
      * To get accurate determinant the matching needs to be disabled,
      * because the matching applies a non-symmetric permutation.
@@ -386,7 +386,7 @@ namespace strumpack {
      * \param det Will hold the determinant at exit (if return value is
      * ReturnCode::SUCCESS)
      */
-    ReturnCode determinant(scalar_t& det);
+    ReturnCode log_determinant(scalar_t& ldet);
 
     /**
      * Create a gnuplot script to draw/plot the sparse factors. Only

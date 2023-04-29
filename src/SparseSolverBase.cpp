@@ -153,9 +153,9 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  SparseSolverBase<scalar_t,integer_t>::determinant
-  (scalar_t& det) {
-    det = scalar_t(1.);
+  SparseSolverBase<scalar_t,integer_t>::log_determinant
+  (scalar_t& ldet) {
+    ldet = scalar_t(0.);
     if (opts_.matching() != MatchingJob::NONE)
       return ReturnCode::INACCURATE_INERTIA;
     if (!this->factored_) {
@@ -166,21 +166,23 @@ namespace strumpack {
     if (this->equil_.type == EquilibrationType::COLUMN ||
         this->equil_.type == EquilibrationType::BOTH)
       for (integer_t i=0; i<N; i++)
-        det /= equil_.C[i];
+        ldet += std::log(equil_.C[i]);
     if (this->equil_.type == EquilibrationType::ROW ||
         this->equil_.type == EquilibrationType::BOTH)
       for (integer_t i=0; i<N; i++)
-        det /= equil_.R[i];
-    if (opts_.matching() != MatchingJob::NONE)
-      for (integer_t i=0; i<N; i++)
-        if (matching_.Q[i] != i+1)
-          det *= -1;
-    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      for (integer_t i=0; i<N; i++) {
-        det /= matching_.C[i];
-        det /= matching_.R[i];
-      }
-    return tree()->determinant(det);
+        ldet += std::log(equil_.R[i]);
+
+    // if (opts_.matching() != MatchingJob::NONE)
+    //   for (integer_t i=0; i<N; i++)
+    //     if (matching_.Q[i] != i+1)
+    //       det += -1;
+    // if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+    //   for (integer_t i=0; i<N; i++) {
+    //     ldet += matching_.C[i];
+    //     ldet += matching_.R[i];
+    //   }
+
+    return tree()->log_determinant(ldet);
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -133,7 +133,7 @@ namespace strumpack {
                        integer_t& zero,
                        integer_t& pos) const;
 
-    ReturnCode determinant(scalar_t& det) const;
+    ReturnCode log_determinant(scalar_t& ldet) const;
 
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
@@ -374,7 +374,7 @@ namespace strumpack {
                                     integer_t& pos) const {
       return ReturnCode::INACCURATE_INERTIA;
     }
-    virtual ReturnCode node_determinant(scalar_t& det) const {
+    virtual ReturnCode node_log_determinant(scalar_t&) const {
       return ReturnCode::INACCURATE_INERTIA;
     }
 
