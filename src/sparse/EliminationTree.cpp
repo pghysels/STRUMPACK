@@ -202,6 +202,12 @@ namespace strumpack {
     return root_->inertia(neg, zero, pos);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  EliminationTree<scalar_t,integer_t>::determinant
+  (scalar_t& det) const {
+    return root_->determinant(det);
+  }
+
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::draw
   (const SpMat_t& A, const std::string& name) const {

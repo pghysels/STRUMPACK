@@ -52,11 +52,11 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   spss.set_matrix(A);
   if (spss.reorder() != ReturnCode::SUCCESS) {
     std::cout << "problem with reordering of the matrix." << std::endl;
-    return;
+    // return;
   }
   if (spss.factor() != ReturnCode::SUCCESS) {
     std::cout << "problem during factorization of the matrix." << std::endl;
-    return;
+    // return;
   }
   spss.solve(b.data(), x.data());
 
@@ -64,6 +64,11 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   auto err = spss.inertia(neg, zero, pos);
   std::cout << "# INERTIA neg,zero,pos = "
             << neg << ", " << zero << ", " << pos
+            <<  " (" << err << ")" << std::endl;
+
+  scalar_t det;
+  err = spss.determinant(det);
+  std::cout << "# DETERMINANT = " << det
             <<  " (" << err << ")" << std::endl;
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "

@@ -70,10 +70,21 @@ namespace strumpack {
     return ReturnCode::SUCCESS;
   }
 
+
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDense<scalar_t,integer_t>::node_inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     return matrix_inertia(F11_, neg, zero, pos);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDense<scalar_t,integer_t>::node_determinant
+  (scalar_t& det) const {
+    for (std::size_t i=0; i<F11_.rows(); i++) {
+      if (piv_[i] != int(i+1)) det = -det;
+      det *= F11_(i, i);
+    }
+    return ReturnCode::SUCCESS;
   }
 
   template<typename scalar_t,typename integer_t> void

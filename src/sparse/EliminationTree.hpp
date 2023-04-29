@@ -78,6 +78,8 @@ namespace strumpack {
                                integer_t& zero,
                                integer_t& pos) const;
 
+    virtual ReturnCode determinant(scalar_t& det) const;
+
     void print_rank_statistics(std::ostream &out) const;
 
     virtual FrontCounter front_counter() const { return nr_fronts_; }

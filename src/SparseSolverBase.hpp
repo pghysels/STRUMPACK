@@ -368,6 +368,27 @@ namespace strumpack {
     ReturnCode inertia(integer_t& neg, integer_t& zero, integer_t& pos);
 
     /**
+     * Return the determinant of the matrix. A sparse matrix needs to
+     * be set before determinant can be computed. The matrix needs to
+     * be factored. If this->factor() was not called already, then it
+     * is called inside the inertia routine.
+     *
+     * To get accurate determinant the matching needs to be disabled,
+     * because the matching applies a non-symmetric permutation.
+     * Matching can be disabled using
+     * this->options().set_matching(strumpack::MatchingJob::NONE);
+     *
+     * The determinant will not be correct if pivoting was performed,
+     * in which case the return value will be
+     * ReturnCode::INACCURATE_INERTIA.  Inertia also cannot be
+     * computed when compression is applied (fi, HSS, HODLR, ...).
+     *
+     * \param det Will hold the determinant at exit (if return value is
+     * ReturnCode::SUCCESS)
+     */
+    ReturnCode determinant(scalar_t& det);
+
+    /**
      * Create a gnuplot script to draw/plot the sparse factors. Only
      * do this for small matrices! It is very slow!
      *
