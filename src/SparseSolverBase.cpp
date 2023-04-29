@@ -172,7 +172,7 @@ namespace strumpack {
       for (integer_t i=0; i<N; i++)
         det /= equil_.R[i];
     if (opts_.matching() != MatchingJob::NONE)
-      for (integer_t i=0; i<N; i++) {
+      for (integer_t i=0; i<N; i++)
         if (matching_.Q[i] != i+1)
           det *= -1;
     if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
