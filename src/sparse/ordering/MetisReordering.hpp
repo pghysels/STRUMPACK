@@ -109,6 +109,25 @@ namespace strumpack {
        NULL, NULL, NULL, &edge_cut, partitioning.data());
   }
 
+  template<typename integer_t> inline int WRAPPER_METIS_PartGraphKway
+  (idx_t nvtxs, idx_t ncon, integer_t* ptr, integer_t* ind,
+   idx_t nparts, idx_t& edge_cut, std::vector<idx_t>& partitioning) {
+    std::vector<idx_t> ptr_, ind_;
+    ptr_.assign(ptr, ptr+nvtxs+1);
+    ind_.assign(ind, ind+ptr[nvtxs]);
+    int ierr = METIS_PartGraphKway
+      (&nvtxs, &ncon, ptr_.data(), ind_.data(), NULL, NULL, NULL,
+       &nparts, NULL, NULL, NULL, &edge_cut, partitioning.data());
+    return ierr;
+  }
+  template<> inline int WRAPPER_METIS_PartGraphKway
+  (idx_t nvtxs, idx_t ncon, idx_t* ptr, idx_t* ind, idx_t nparts,
+   idx_t& edge_cut, std::vector<idx_t>& partitioning) {
+    return METIS_PartGraphKway
+      (&nvtxs, &ncon, ptr, ind, NULL, NULL, NULL, &nparts,
+       NULL, NULL, NULL, &edge_cut, partitioning.data());
+  }
+
 
   template<typename integer_t> SeparatorTree<integer_t>
   sep_tree_from_metis_sizes(integer_t nodes, integer_t separators,
