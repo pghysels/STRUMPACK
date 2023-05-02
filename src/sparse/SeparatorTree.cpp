@@ -196,40 +196,39 @@ namespace strumpack {
    */
   template<typename integer_t> SeparatorTree<integer_t>
   SeparatorTree<integer_t>::subtree(integer_t p, integer_t P) const {
-    if (!nr_seps_)
-      return SeparatorTree<integer_t>(0);
+    if (!nr_seps_) return SeparatorTree<integer_t>(0);
     std::vector<bool> mark(nr_seps_);
     mark[root()] = true;
-    integer_t nr_subtrees = 1;
+    integer_t nr_subtrees = 1, marked = 1;
     std::function<void(integer_t)> find_roots = [&](integer_t i) {
       if (mark[i]) {
-        if (nr_subtrees < P && lch[i]!=-1 && rch[i]!=-1) {
+        if (nr_subtrees < P && lch[i] != -1 && rch[i] != -1) {
           mark[lch[i]] = true;
           mark[rch[i]] = true;
           mark[i] = false;
+          marked += 2;
           nr_subtrees++;
         }
       } else {
-        if (lch[i]!=-1) find_roots(lch[i]);
-        if (rch[i]!=-1) find_roots(rch[i]);
+        if (lch[i] != -1) find_roots(lch[i]);
+        if (rch[i] != -1) find_roots(rch[i]);
       }
     };
-    // TODO this can get in an infinite loop
-    while (nr_subtrees < P && nr_subtrees < nr_seps_)
+    while (nr_subtrees < P && marked < nr_seps_)
       find_roots(root());
 
     integer_t sub_root = -1;
     std::function<void(integer_t,integer_t&)> find_my_root =
-                         [&](integer_t i, integer_t& r) {
-      if (mark[i]) {
-        if (r++ == p) sub_root = i;
-        return;
-      }
-      if (lch[i]!=-1 && rch[i]!=-1) {
-        find_my_root(lch[i], r);
-        find_my_root(rch[i], r);
-      }
-    };
+      [&](integer_t i, integer_t& r) {
+        if (mark[i]) {
+          if (r++ == p) sub_root = i;
+          return;
+        }
+        if (lch[i] != -1 && rch[i] != -1) {
+          find_my_root(lch[i], r);
+          find_my_root(rch[i], r);
+        }
+      };
     integer_t temp = 0;
     find_my_root(root(), temp);
 
@@ -277,21 +276,22 @@ namespace strumpack {
     SeparatorTree<integer_t> top(top_nodes);
     std::vector<bool> mark(nr_seps_);
     mark[root()] = true;
-    integer_t nr_leafs = 1;
+    integer_t nr_leafs = 1, marked = 1;
     std::function<void(integer_t)> mark_top_tree = [&](integer_t node) {
       if (nr_leafs < P) {
-        if (lch[node]!=-1 && rch[node]!=-1 &&
+        if (lch[node] != -1 && rch[node] != -1 &&
             !mark[lch[node]] && !mark[rch[node]]) {
           mark[lch[node]] = true;
           mark[rch[node]] = true;
           nr_leafs++;
+          marked += 2;
         } else {
-          if (lch[node]!=-1) mark_top_tree(lch[node]);
-          if (rch[node]!=-1) mark_top_tree(rch[node]);
+          if (lch[node] != -1) mark_top_tree(lch[node]);
+          if (rch[node] != -1) mark_top_tree(rch[node]);
         }
       }
     };
-    while (nr_leafs < P && nr_leafs < nr_seps_)
+    while (nr_leafs < P && marked < nr_seps_)
       mark_top_tree(root());
 
     std::function<integer_t(integer_t)> subtree_size = [&](integer_t i) {
