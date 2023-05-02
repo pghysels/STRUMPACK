@@ -1,3 +1,7 @@
+Version 7.1.2 Released May 2023
+===============================
+- Fix hang for small problems
+
 Version 7.1.1 Released April 2023
 =================================
 - Compilation fix for ROCm
