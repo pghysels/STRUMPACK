@@ -82,7 +82,7 @@ namespace strumpack {
   (scalar_t& ldet) const {
     for (std::size_t i=0; i<F11_.rows(); i++) {
       if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
-      ldet += F11_(i, i);
+      ldet += std::log(F11_(i, i));
     }
     return ReturnCode::SUCCESS;
   }

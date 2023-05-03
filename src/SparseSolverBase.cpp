@@ -171,17 +171,6 @@ namespace strumpack {
         this->equil_.type == EquilibrationType::BOTH)
       for (integer_t i=0; i<N; i++)
         ldet += std::log(equil_.R[i]);
-
-    // if (opts_.matching() != MatchingJob::NONE)
-    //   for (integer_t i=0; i<N; i++)
-    //     if (matching_.Q[i] != i+1)
-    //       det += -1;
-    // if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-    //   for (integer_t i=0; i<N; i++) {
-    //     ldet += matching_.C[i];
-    //     ldet += matching_.R[i];
-    //   }
-
     return tree()->log_determinant(ldet);
   }
 
