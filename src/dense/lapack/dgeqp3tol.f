@@ -209,9 +209,8 @@ c$$$                  IF( ABS(A(C,C))/ABS(A(1,1)) <= RTOL .OR.
 c$$$     $                 ABS(A(C,C)) <= ATOL ) THEN
                   IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL ) THEN
                      GO TO 99
-                  ELSE
-                     RANK = RANK + 1
-                 ENDIF
+                  ENDIF
+                  RANK = RANK + 1
                END DO
 
                J = J + FJB
@@ -225,16 +224,20 @@ c$$$     $                 ABS(A(C,C)) <= ATOL ) THEN
 *
 *
          IF( J.LE.MINMN ) THEN
-            CALL DLAQP2( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
-     $                   TAU( J ), WORK( J ), WORK( N+J ),
-     $                   WORK( 2*N+1 ) )
+            CALL MYDLAQP2( M, N-J+1, J-1, A( 1, J ), LDA, JPVT( J ),
+     $           TAU( J ), WORK( J ), WORK( N+J ),
+     $           WORK( 2*N+1 ), FJB, ATOL )
+            IF ( FJB < N-J+1 ) THEN
+               RANK = J - 1 + FJB
+               GO TO 99
+            ENDIF
             DO C = J, MINMN
-               IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL .OR.
-     $              ABS( A( C, C ) ) <= ATOL ) THEN
+c$$$               IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL .OR.
+c$$$     $              ABS( A( C, C ) ) <= ATOL ) THEN
+               IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL ) THEN
                   GO TO 99
-               ELSE
-                  RANK = RANK + 1
                ENDIF
+               RANK = RANK + 1
             END DO
          END IF
       END IF

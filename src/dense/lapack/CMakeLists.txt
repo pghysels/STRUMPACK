@@ -11,7 +11,11 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/slaqps.f
   ${CMAKE_CURRENT_LIST_DIR}/dlaqps.f
   ${CMAKE_CURRENT_LIST_DIR}/claqps.f
-  ${CMAKE_CURRENT_LIST_DIR}/zlaqps.f)
+  ${CMAKE_CURRENT_LIST_DIR}/zlaqps.f
+  ${CMAKE_CURRENT_LIST_DIR}/slaqp2.f
+  ${CMAKE_CURRENT_LIST_DIR}/dlaqp2.f
+  ${CMAKE_CURRENT_LIST_DIR}/claqp2.f
+  ${CMAKE_CURRENT_LIST_DIR}/zlaqp2.f)
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack

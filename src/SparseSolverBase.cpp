@@ -328,8 +328,16 @@ namespace strumpack {
                 << " , type = " << char(equil_.type) << std::endl;
 
     using real_t = typename RealType<scalar_t>::value_type;
-    opts_.set_pivot_threshold
-      (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
+    auto Anorm = matrix()->norm1();
+    opts_.set_pivot_threshold(std::sqrt(blas::lamch<real_t>('E')) * Anorm);
+    // opts_.set_matrix_norm(Anorm);
+    if (opts_.compression() == CompressionType::BLR) {
+      opts_.set_compression_abs_tol(opts_.compression_abs_tol() * Anorm);
+      if (opts_.verbose() && is_root_)
+        std::cout << "# BLR rtol= " << opts_.compression_rel_tol()
+                  << ", atol= " << opts_.compression_abs_tol()
+                  << std::endl;
+    }
 
     auto old_nnz = matrix()->nnz();
     TaskTimer t2("sparsity-symmetrization",
