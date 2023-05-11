@@ -335,10 +335,15 @@ namespace strumpack {
           lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
         if (rchild_)
           rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
+        auto lopts = opts.BLR_options();
+        auto nF11 = F11.normF();   auto nF12 = F12.normF();
+        auto nF21 = F21.normF();   // auto nF22 = F22_.normF();
+        auto nF = std::sqrt(nF11*nF11 + nF12*nF12 + nF21*nF21/* + nF22*nF22*/);
+        lopts.set_abs_tol(lopts.abs_tol() * nF);
         if (dsep)
           BLRM_t::construct_and_partial_factor
             (F11, F12, F21, F22_, F11blr_, F12blr_, F21blr_,
-             sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+             sep_tiles_, upd_tiles_, admissibility_, lopts);
       }
     } else { // ACA or BACA
       auto F11elem = [&](const std::vector<std::size_t>& lI,
