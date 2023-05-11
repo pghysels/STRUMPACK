@@ -64,6 +64,14 @@ namespace strumpack {
     return *std::max_element(n1.begin(), n1.end());
   }
 
+  template<typename scalar_t,typename integer_t>
+  typename RealType<scalar_t>::value_type
+  CSRMatrix<scalar_t,integer_t>::normF() const {
+    return std::sqrt
+      (std::real(std::inner_product
+                 (val_.begin(), val_.end(), val_.begin(), scalar_t(0.))));
+  }
+
   template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::print_dense(const std::string& name) const {
     DenseM_t M(n_, n_);

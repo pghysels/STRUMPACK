@@ -276,6 +276,7 @@ namespace strumpack {
     scalar_t& val(integer_t i) { assert(i < nnz()); return val_[i]; }
 
     virtual real_t norm1() const = 0; //{ assert(false); return -1.; };
+    virtual real_t normF() const = 0; //{ assert(false); return -1.; };
 
     /**
      * Check whether the matrix has a symmetric sparsity pattern (as

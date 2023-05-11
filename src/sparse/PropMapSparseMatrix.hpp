@@ -161,6 +161,7 @@ namespace strumpack {
     void spmv(const scalar_t* x, scalar_t* y) const override {};
 
     real_t norm1() const override { return real_t(1.); }
+    real_t normF() const override { return real_t(1.); }
 
     void permute_columns(const std::vector<integer_t>& perm) override {};
 

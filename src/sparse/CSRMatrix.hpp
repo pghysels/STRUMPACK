@@ -70,6 +70,7 @@ namespace strumpack {
               const scalar_t* values, bool symm_sparsity=false);
 
     real_t norm1() const override;
+    real_t normF() const override;
 
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;

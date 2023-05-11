@@ -250,6 +250,17 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
+  typename RealType<scalar_t>::value_type
+  CSRMatrixMPI<scalar_t,integer_t>::normF() const {
+    return std::sqrt
+      (comm_.all_reduce
+       (std::real(std::inner_product
+                  (val_.begin(), val_.end(), val_.begin(),
+                   scalar_t(0.))),
+        MPI_SUM));
+  }
+
+  template<typename scalar_t,typename integer_t>
   std::unique_ptr<CSRMatrixMPI<scalar_t,integer_t>>
   CSRMatrixMPI<scalar_t,integer_t>::add_missing_diagonal
   (const scalar_t& s) const {
