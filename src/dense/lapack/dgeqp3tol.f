@@ -180,45 +180,49 @@ c$$$  WORK( J ) = DNRM2( SM, A( NFXD+1, J ), 1 )
             WORK( N+J ) = WORK( J )
    20    CONTINUE
 *
-         IF( ( NB.GE.NBMIN ) .AND. ( NB.LT.SMINMN ) .AND.
-     $       ( NX.LT.SMINMN ) ) THEN
-*
-*           Use blocked code initially.
-*
-            J = NFXD + 1
-*
-*           Compute factorization: while loop.
-*
-*
-            TOPBMN = MINMN - NX
-   30       CONTINUE
-            IF( J.LE.TOPBMN ) THEN
-               JB = MIN( NB, TOPBMN-J+1 )
-*
-*              Factorize JB columns among columns J:N.
-*
-               CALL MYDLAQPS( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
-     $              JPVT( J ), TAU( J ), WORK( J ), WORK( N+J ),
-     $              WORK( 2*N+1 ), WORK( 2*N+JB+1 ), N-J+1, ATOL )
-               IF( FJB < JB ) THEN
-                  RANK = J - 1 + FJB
-                  GO TO 99
-               ENDIF
-               DO C = J, J + FJB - 1
-c$$$                  IF( ABS(A(C,C))/ABS(A(1,1)) <= RTOL .OR.
-c$$$     $                 ABS(A(C,C)) <= ATOL ) THEN
-                  IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL ) THEN
-                     GO TO 99
-                  ENDIF
-                  RANK = RANK + 1
-               END DO
+c$$$         IF( ( NB.GE.NBMIN ) .AND. ( NB.LT.SMINMN ) .AND.
+c$$$     $       ( NX.LT.SMINMN ) ) THEN
+c$$$*
+c$$$*           Use blocked code initially.
+c$$$*
+c$$$            J = NFXD + 1
+c$$$*
+c$$$*           Compute factorization: while loop.
+c$$$*
+c$$$*
+c$$$            TOPBMN = MINMN - NX
+c$$$   30       CONTINUE
+c$$$            IF( J.LE.TOPBMN ) THEN
+c$$$               JB = MIN( NB, TOPBMN-J+1 )
+c$$$*
+c$$$*              Factorize JB columns among columns J:N.
+c$$$*
+c$$$               CALL MYDLAQPS( M, N-J+1, J-1, JB, FJB, A( 1, J ), LDA,
+c$$$     $              JPVT( J ), TAU( J ), WORK( J ), WORK( N+J ),
+c$$$     $              WORK( 2*N+1 ), WORK( 2*N+JB+1 ), N-J+1, ATOL )
+c$$$               IF( FJB < JB ) THEN
+c$$$                  RANK = J - 1 + FJB
+c$$$c$$$                  WRITE(*,*) 'DLAQPS', RANK, JB, FJB
+c$$$                  GO TO 99
+c$$$               ENDIF
+c$$$               DO C = J, J + FJB - 1
+c$$$c$$$                  IF( ABS(A(C,C))/ABS(A(1,1)) <= RTOL .OR.
+c$$$c$$$     $                 ABS(A(C,C)) <= ATOL ) THEN
+c$$$                  IF( ABS( A( C, C ) ) / ABS( A( 1, 1 ) ) <= RTOL ) THEN
+c$$$c$$$                     WRITE(*,*) 'rel stopping, ', C
+c$$$                     GO TO 99
+c$$$                  ENDIF
+c$$$                  RANK = RANK + 1
+c$$$               END DO
+c$$$
+c$$$               J = J + FJB
+c$$$               GO TO 30
+c$$$            END IF
+c$$$         ELSE
+c$$$            J = NFXD + 1
+c$$$         END IF
 
-               J = J + FJB
-               GO TO 30
-            END IF
-         ELSE
-            J = NFXD + 1
-         END IF
+         J = NFXD + 1
 *
 *        Use unblocked code to factor the last or only block.
 *
