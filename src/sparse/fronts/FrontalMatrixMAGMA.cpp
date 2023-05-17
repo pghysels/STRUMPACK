@@ -390,8 +390,8 @@ namespace strumpack {
     dev_factors_.reset(new gpu::DeviceMemory<char>(total_factor_dmem));
     char* factors_dptr = dev_factors_->as<char>();
     for (int l=lvls-1; l>=0; l--) {
-      TaskTimer tl("");
-      tl.start();
+      // TaskTimer tl("");
+      // tl.start();
       auto& L = ldata[l];
       // if (opts.verbose()) L.print_info(l, lvls);
       try {
@@ -468,14 +468,14 @@ namespace strumpack {
       L.flops(level_flops, small_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
-      if (opts.verbose()) {
-        auto level_time = tl.elapsed();
-        std::cout << "#   GPU Factorization complete, took: "
-                  << level_time << " seconds, "
-                  << level_flops / 1.e9 << " GFLOPS, "
-                  << (float(level_flops) / level_time) / 1.e9
-                  << " GFLOP/s" << std::endl;
-      }
+      // if (opts.verbose()) {
+      //   auto level_time = tl.elapsed();
+      //   std::cout << "#   GPU Factorization complete, took: "
+      //             << level_time << " seconds, "
+      //             << level_flops / 1.e9 << " GFLOPS, "
+      //             << (float(level_flops) / level_time) / 1.e9
+      //             << " GFLOP/s" << std::endl;
+      // }
     }
     return err_code;
   }
@@ -525,8 +525,8 @@ namespace strumpack {
 #pragma omp single
       rchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
     }
-    TaskTimer tl("");
-    tl.start();
+    // TaskTimer tl("");
+    // tl.start();
     if (dsep) {
       gpu::SOLVERHandle sh;
       gpu::DeviceMemory<scalar_t> dm11
@@ -567,14 +567,14 @@ namespace strumpack {
       trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
       trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
     STRUMPACK_FULL_RANK_FLOPS(level_flops);
-    if (opts.verbose()) {
-      auto level_time = tl.elapsed();
-      std::cout << "#   GPU Factorization complete, took: "
-                << level_time << " seconds, "
-                << level_flops / 1.e9 << " GFLOPS, "
-                << (float(level_flops) / level_time) / 1.e9
-                << " GFLOP/s" << std::endl;
-    }
+    // if (opts.verbose()) {
+    //   auto level_time = tl.elapsed();
+    //   std::cout << "#   GPU Factorization complete, took: "
+    //             << level_time << " seconds, "
+    //             << level_flops / 1.e9 << " GFLOPS, "
+    //             << (float(level_flops) / level_time) / 1.e9
+    //             << " GFLOP/s" << std::endl;
+    // }
     return err_code;
   }
 
@@ -664,8 +664,8 @@ namespace strumpack {
     char* old_work = nullptr;
 
     for (int l=lvls-1; l>=0; l--) {
-      TaskTimer tl("");
-      tl.start();
+      // TaskTimer tl("");
+      // tl.start();
       auto& L = ldata[l];
       // if (opts.verbose()) L.print_info(l, lvls);
       try {
@@ -766,14 +766,14 @@ namespace strumpack {
       L.flops(level_flops, small_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
-      if (opts.verbose()) {
-        auto level_time = tl.elapsed();
-        std::cout << "#   GPU Factorization complete, took: "
-                  << level_time << " seconds, "
-                  << level_flops / 1.e9 << " GFLOPS, "
-                  << (float(level_flops) / level_time) / 1.e9
-                  << " GFLOP/s" << std::endl;
-      }
+      // if (opts.verbose()) {
+      //   auto level_time = tl.elapsed();
+      //   std::cout << "#   GPU Factorization complete, took: "
+      //             << level_time << " seconds, "
+      //             << level_flops / 1.e9 << " GFLOPS, "
+      //             << (float(level_flops) / level_time) / 1.e9
+      //             << " GFLOP/s" << std::endl;
+      // }
     }
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
