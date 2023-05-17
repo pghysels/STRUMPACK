@@ -310,14 +310,21 @@ namespace strumpack {
     if (this->dim_sep()) {
       auto sbloc = slate_matrix(b);
       auto slateF11 = slate_matrix(F11);
-      slate::getrs(slateF11, const_cast<slate::Pivots&>(slate_piv_),
-                   sbloc, slate_opts_);
+      // there is a bug in SLATE's gemmA (when the A matrix is large
+      // and the C matrix is small) for SLATE <= 20220700
+#if SLATE_VERSION > 20220700
+      auto& slopts = slate_opts_;
+#else // run on host
+      std::map<slate::Option, slate::Value> slopts;
+#endif
+      slate::getrs
+        (slateF11, const_cast<slate::Pivots&>(slate_piv_), sbloc, slopts);
       // TODO count flops
       if (this->dim_upd()) {
         auto sbupd = slate_matrix(bupd);
         auto slateF21 = slate_matrix(F21);
         slate::gemm
-          (scalar_t(-1.), slateF21, sbloc, scalar_t(1.), sbupd, slate_opts_);
+          (scalar_t(-1.), slateF21, sbloc, scalar_t(1.), sbupd, slopts);
         // TODO count flops
       }
     }
@@ -371,15 +378,20 @@ namespace strumpack {
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& y, DistM_t& yupd) const {
     if (!grid()->active()) return;
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK) // && (SLATE_VERSION > 20220700)
     if (this->dim_sep()) {
       if (this->dim_upd()) {
+#if SLATE_VERSION > 20220700
+        auto& slopts = slate_opts_;
+#else // run on host
+        std::map<slate::Option, slate::Value> slopts;
+#endif
         TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
         auto sy = slate_matrix(y);
         auto syupd = slate_matrix(yupd);
         auto slateF12 = slate_matrix(F12);
         slate::gemm
-          (scalar_t(-1.), slateF12, syupd, scalar_t(1.), sy, slate_opts_);
+          (scalar_t(-1.), slateF12, syupd, scalar_t(1.), sy, slopts);
         // TODO count flops
       }
     }
