@@ -161,10 +161,9 @@ namespace strumpack {
     std::fstream fs(filename, std::fstream::out);
     fs << name << " = [  % " << rows() << "x" << cols()
        << ", ld=" << ld() << ", norm=" << norm() << std::endl;
-    std::setprecision(16);
     for (std::size_t i=0; i<rows(); i++) {
       for (std::size_t j=0; j<cols(); j++)
-        fs << std::setw(width) << operator()(i,j) << "  ";
+        fs << std::setprecision(16) << std::setw(width) << operator()(i,j) << "  ";
       fs << std::endl;
     }
     fs << "];" << std::endl << std::endl;
