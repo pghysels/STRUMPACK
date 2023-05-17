@@ -393,7 +393,7 @@ namespace strumpack {
       TaskTimer tl("");
       tl.start();
       auto& L = ldata[l];
-      if (opts.verbose()) L.print_info(l, lvls);
+      // if (opts.verbose()) L.print_info(l, lvls);
       try {
         char *work_dptr = nullptr, *ea_dptr = nullptr;
         if (l % 2) {
@@ -667,7 +667,7 @@ namespace strumpack {
       TaskTimer tl("");
       tl.start();
       auto& L = ldata[l];
-      if (opts.verbose()) L.print_info(l, lvls);
+      // if (opts.verbose()) L.print_info(l, lvls);
       try {
         char *work_mem = nullptr, *dea_mem = nullptr;
         scalar_t* dev_factors = nullptr;
