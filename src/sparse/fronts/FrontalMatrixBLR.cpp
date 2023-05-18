@@ -554,7 +554,7 @@ namespace strumpack {
     if (dim_sep()) {
       auto g = A.extract_graph
         (opts.separator_ordering_level(), sep_begin_, sep_end_);
-#if 1
+#if 0
       auto sep_tree = g.recursive_bisection
         (opts.BLR_options().leaf_size(), 0,
          sorder+sep_begin_, nullptr, 0, 0, dim_sep());

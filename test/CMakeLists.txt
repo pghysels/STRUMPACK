@@ -545,7 +545,7 @@ add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavit
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 set(test_name "SPARSE_seq_77")
-add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_enable_METIS_NodeND --sp_compression_min_sep_size 25)
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_enable_METIS_NodeND --sp_compression_min_sep_size 25 --sp_rel_tol 1e-10)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 set(test_name "SPARSE_seq_80")
