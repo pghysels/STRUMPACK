@@ -541,7 +541,10 @@ endif()
 
 # this is to fix a link issue for the fortran example when compiling
 # with clang
-set_property(TARGET strumpack PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_target_properties(strumpack PROPERTIES
+  VERSION "${PROJECT_VERSION}"
+  SOVERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+  POSITION_INDEPENDENT_CODE ON)
 
 
 # see https://github.com/pghysels/STRUMPACK/issues/82
