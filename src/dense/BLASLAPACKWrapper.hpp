@@ -817,6 +817,25 @@ namespace strumpack {
     int sytrs(char s, int n, int nrhs, const std::complex<double>* a, int lda,
               const int* ipiv, std::complex<double>* b, int ldb);
 
+
+    int gels(char t, int m, int n, int nrhs, float* a, int lda,
+             float* b, int ldb, float* work, int lwork);
+    int gels(char t, int m, int n, int nrhs, double* a, int lda,
+             double* b, int ldb, double* work, int lwork);
+    int gels(char t, int m, int n, int nrhs, std::complex<float>* a, int lda,
+             std::complex<float>* b, int ldb, std::complex<float>* work, int lwork);
+    int gels(char t, int m, int n, int nrhs, std::complex<double>* a, int lda,
+             std::complex<double>* b, int ldb, std::complex<double>* work, int lwork);
+    template<typename scalar> inline
+    int gels(char t, int m, int n, int nrhs, scalar* a, int lda,
+             scalar* b, int ldb) {
+      scalar lwork;
+      sytrf(t, m, n, nrhs, a, lda, b, ldb, &lwork, -1);
+      int ilwork = int(std::real(lwork));
+      std::unique_ptr<scalar[]> work(new scalar[ilwork]);
+      return gels(t, m, n, nrhs, a, lda, b, ldb, work.get(), ilwork);
+    }
+
   } //end namespace blas
 } // end namespace strumpack
 

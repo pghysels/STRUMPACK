@@ -77,7 +77,8 @@ namespace strumpack {
                     HODLR::ButterflyMatrix. Does not support
                     float or std::complex<float>. */
        LOSSY,     /*!< Lossy compression matrix */
-       LOSSLESS   /*!< Lossless compressed matrix */
+       LOSSLESS,  /*!< Lossless compressed matrix */
+       HBS        /*!< Hierarchically Block-Separable */
       };
 
     inline std::string get_name(Type a) {

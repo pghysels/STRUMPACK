@@ -568,6 +568,22 @@ namespace strumpack {
       void STRUMPACK_FC_GLOBAL(zsytrs,ZSYTRS)
         (char* s, strumpack_blas_int* n, strumpack_blas_int* nrhs, const std::complex<double>* a, strumpack_blas_int* lda,
          const strumpack_blas_int* ipiv, std::complex<double>* b, strumpack_blas_int* ldb, strumpack_blas_int* info);
+
+
+      void STRUMPACK_FC_GLOBAL(sgels,SGELS)
+        (char* t, strumpack_blas_int* m, strumpack_blas_int* n, strumpack_blas_int* nrhs,
+         float* a, int* lda, float* b, int* ldb, float* work, int* lwork, int* info);
+      void STRUMPACK_FC_GLOBAL(dgels,DGELS)
+        (char* t, strumpack_blas_int* m, strumpack_blas_int* n, strumpack_blas_int* nrhs,
+         double* a, int* lda, double* b, int* ldb, double* work, int* lwork, int* info);
+      void STRUMPACK_FC_GLOBAL(cgels,CGELS)
+        (char* t, strumpack_blas_int* m, strumpack_blas_int* n, strumpack_blas_int* nrhs,
+         std::complex<float>* a, int* lda, std::complex<float>* b, int* ldb,
+         std::complex<float>* work, int* lwork, int* info);
+      void STRUMPACK_FC_GLOBAL(zgels,ZGELS)
+        (char* t, strumpack_blas_int* m, strumpack_blas_int* n, strumpack_blas_int* nrhs,
+         std::complex<double>* a, int* lda, std::complex<double>* b, int* ldb,
+         std::complex<double>* work, int* lwork, int* info);
     }
 
     int ilaenv(int ispec, char name[], char opts[], int n1, int n2, int n3, int n4) {
@@ -1995,6 +2011,35 @@ namespace strumpack {
       return info;
     }
 #endif
+
+    int gels(char t, int m, int n, int nrhs, float* a, int lda,
+             float* b, int ldb, float* work, int lwork) {
+      int info;
+      STRUMPACK_FC_GLOBAL(sgels,SGELS)
+        (&t, &m, &n, &nrhs, a, &lda, b, &ldb, work, &lwork, &info);
+      return info;
+    }
+    int gels(char t, int m, int n, int nrhs, double* a, int lda,
+             double* b, int ldb, double* work, int lwork) {
+      int info;
+      STRUMPACK_FC_GLOBAL(dgels,DGELS)
+        (&t, &m, &n, &nrhs, a, &lda, b, &ldb, work, &lwork, &info);
+      return info;
+    }
+    int gels(char t, int m, int n, int nrhs, std::complex<float>* a, int lda,
+             std::complex<float>* b, int ldb, std::complex<float>* work, int lwork) {
+      int info;
+      STRUMPACK_FC_GLOBAL(cgels,CGELS)
+        (&t, &m, &n, &nrhs, a, &lda, b, &ldb, work, &lwork, &info);
+      return info;
+    }
+    int gels(char t, int m, int n, int nrhs, std::complex<double>* a, int lda,
+             std::complex<double>* b, int ldb, std::complex<double>* work, int lwork) {
+      int info;
+      STRUMPACK_FC_GLOBAL(zgels,ZGELS)
+        (&t, &m, &n, &nrhs, a, &lda, b, &ldb, work, &lwork, &info);
+      return info;
+    }
 
   } //end namespace blas
 } // end namespace strumpack
