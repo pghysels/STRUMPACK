@@ -3,6 +3,7 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/HBSMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/HBSMatrix.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HBSMatrix.compress.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/HBSMatrix.apply.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HBSOptions.hpp
   ${CMAKE_CURRENT_LIST_DIR}/HBSOptions.cpp)
 

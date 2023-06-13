@@ -32,7 +32,7 @@
 #include "HBSMatrix.hpp"
 
 #include "misc/TaskTimer.hpp"
-// #include "HBSMatrix.apply.hpp"
+#include "HBSMatrix.apply.hpp"
 #include "HBSMatrix.compress.hpp"
 // #include "HBSMatrix.compress_stable.hpp"
 // #include "HBSMatrix.compress_kernel.hpp"
@@ -138,12 +138,9 @@ namespace strumpack {
 
     template<typename scalar_t> DenseMatrix<scalar_t>
     HBSMatrix<scalar_t>::dense() const {
-      DenseM_t A(this->rows(), this->cols());
-//       WorkDense<scalar_t> w;
-// #pragma omp parallel if(!omp_in_parallel())
-// #pragma omp single nowait
-//       dense_recursive(A, w, true, this->openmp_task_depth_);
-      return A;
+      DenseM_t id(this->cols(), this->cols());
+      id.eye();
+      return apply(id);
     }
 
     template<typename scalar_t> std::size_t

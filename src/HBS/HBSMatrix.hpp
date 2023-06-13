@@ -48,6 +48,7 @@ namespace strumpack {
   namespace HBS {
 
     template<typename scalar_t> class WorkCompress;
+    template<typename scalar_t> class WorkApply;
 
     /**
      * Enumeration of possible states of an HSS matrix/node. This is
@@ -470,7 +471,7 @@ namespace strumpack {
        * \return The result of this * b.
        * \see applyC, HBS::apply_HBS
        */
-      DenseM_t apply(const DenseM_t& b) const { return DenseM_t(); }
+      DenseM_t apply(const DenseM_t& b) const;
 
       /**
        * Multiply this HBS matrix with a dense matrix (vector), ie,
@@ -484,7 +485,7 @@ namespace strumpack {
        * = rows(op(this))
        * \see applyC, HBS::apply_HBS
        */
-      void mult(Trans op, const DenseM_t& x, DenseM_t& y) const override {}
+      void mult(Trans op, const DenseM_t& x, DenseM_t& y) const override;
 
       /**
        * Multiply the transpose or complex conjugate of this HBS
@@ -495,7 +496,7 @@ namespace strumpack {
        * \return The result of this^C * b.
        * \see apply, HBS::apply_HBS
        */
-      DenseM_t applyC(const DenseM_t& b) const { return DenseM_t(); }
+      DenseM_t applyC(const DenseM_t& b) const;
 
       /**
        * Extract a single element this(i,j) from this HBS matrix. This
@@ -613,6 +614,10 @@ namespace strumpack {
                               const opts_t& opts,
                               WorkCompress<scalar_t>& w,
                               int r, int depth);
+      void apply_fwd(const DenseM_t& b, WorkApply<scalar_t>& w,
+                     int depth) const;
+      void apply_bwd(const DenseM_t& b, scalar_t beta, DenseM_t& c,
+                     WorkApply<scalar_t>& w, int depth) const;
     };
 
     /**

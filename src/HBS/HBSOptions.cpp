@@ -76,29 +76,29 @@ namespace strumpack {
         strcpy(argv[i], cargv[i]);
       }
       option long_options[] =
-        {{"hss_rel_tol",               required_argument, 0, 1},
-         {"hss_abs_tol",               required_argument, 0, 2},
-         {"hss_leaf_size",             required_argument, 0, 3},
-         {"hss_d0",                    required_argument, 0, 4},
-         {"hss_dd",                    required_argument, 0, 5},
-         {"hss_p",                     required_argument, 0, 6},
-         {"hss_nnz0",                  required_argument, 0, 7},
-         {"hss_nnz",                   required_argument, 0, 8},
-         {"hss_max_rank",              required_argument, 0, 9},
-         {"hss_random_distribution",   required_argument, 0, 10},
-         {"hss_random_engine",         required_argument, 0, 11},
-         {"hss_compression_algorithm", required_argument, 0, 12},
-         {"hss_compression_sketch",    required_argument, 0, 13},
-         {"hss_SJLT_algo",             required_argument, 0, 14},
-         {"hss_clustering_algorithm",  required_argument, 0, 15},
-         {"hss_approximate_neighbors", required_argument, 0, 16},
-         {"hss_ann_iterations",        required_argument, 0, 17},
-         {"hss_user_defined_random",   no_argument, 0, 18},
-         {"hss_enable_sync",           no_argument, 0, 19},
-         {"hss_disable_sync",          no_argument, 0, 20},
-         {"hss_log_ranks",             no_argument, 0, 21},
-         {"hss_verbose",               no_argument, 0, 'v'},
-         {"hss_quiet",                 no_argument, 0, 'q'},
+        {{"hbs_rel_tol",               required_argument, 0, 1},
+         {"hbs_abs_tol",               required_argument, 0, 2},
+         {"hbs_leaf_size",             required_argument, 0, 3},
+         {"hbs_d0",                    required_argument, 0, 4},
+         {"hbs_dd",                    required_argument, 0, 5},
+         {"hbs_p",                     required_argument, 0, 6},
+         {"hbs_nnz0",                  required_argument, 0, 7},
+         {"hbs_nnz",                   required_argument, 0, 8},
+         {"hbs_max_rank",              required_argument, 0, 9},
+         {"hbs_random_distribution",   required_argument, 0, 10},
+         {"hbs_random_engine",         required_argument, 0, 11},
+         {"hbs_compression_algorithm", required_argument, 0, 12},
+         {"hbs_compression_sketch",    required_argument, 0, 13},
+         {"hbs_SJLT_algo",             required_argument, 0, 14},
+         {"hbs_clustering_algorithm",  required_argument, 0, 15},
+         {"hbs_approximate_neighbors", required_argument, 0, 16},
+         {"hbs_ann_iterations",        required_argument, 0, 17},
+         {"hbs_user_defined_random",   no_argument, 0, 18},
+         {"hbs_enable_sync",           no_argument, 0, 19},
+         {"hbs_disable_sync",          no_argument, 0, 20},
+         {"hbs_log_ranks",             no_argument, 0, 21},
+         {"hbs_verbose",               no_argument, 0, 'v'},
+         {"hbs_quiet",                 no_argument, 0, 'q'},
          {"help",                      no_argument, 0, 'h'},
          {NULL, 0, NULL, 0}
       };
@@ -244,46 +244,46 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_GETOPT)
       if (!mpi_root()) return;
       std::cout << "# HBS Options:" << std::endl
-                << "#   --hss_rel_tol real_t (default "
+                << "#   --hbs_rel_tol real_t (default "
                 << this->rel_tol() << ")" << std::endl
-                << "#   --hss_abs_tol real_t (default "
+                << "#   --hbs_abs_tol real_t (default "
                 << this->abs_tol() << ")" << std::endl
-                << "#   --hss_leaf_size int (default "
+                << "#   --hbs_leaf_size int (default "
                 << this->leaf_size() << ")" << std::endl
-                << "#   --hss_d0 int (default " << d0() << ")" << std::endl
-                << "#   --hss_dd int (default " << dd() << ")" << std::endl
-                << "#   --hss_p int (default " << p() << ")" << std::endl
-                << "#   --hss_nnz0 int (default " << nnz0() << ")" << std::endl
-                << "#   --hss_nnz int (default " << nnz() << ")" << std::endl
-                << "#   --hss_max_rank int (default "
+                << "#   --hbs_d0 int (default " << d0() << ")" << std::endl
+                << "#   --hbs_dd int (default " << dd() << ")" << std::endl
+                << "#   --hbs_p int (default " << p() << ")" << std::endl
+                << "#   --hbs_nnz0 int (default " << nnz0() << ")" << std::endl
+                << "#   --hbs_nnz int (default " << nnz() << ")" << std::endl
+                << "#   --hbs_max_rank int (default "
                 << this->max_rank() << ")" << std::endl
-                << "#   --hss_random_distribution normal|uniform (default "
+                << "#   --hbs_random_distribution normal|uniform (default "
                 << get_name(random_distribution()) << ")" << std::endl
-                << "#   --hss_random_engine linear|mersenne (default "
+                << "#   --hbs_random_engine linear|mersenne (default "
                 << get_name(random_engine()) << ")" << std::endl
-                << "#   --hss_compression_algorithm original|stable|hard_restart (default "
+                << "#   --hbs_compression_algorithm original|stable|hard_restart (default "
                 << get_name(compression_algorithm()) << ")" << std::endl
-                << "#   --hss_compression_sketch Gaussian|SJLT (default "
+                << "#   --hbs_compression_sketch Gaussian|SJLT (default "
                 << get_name(compression_sketch()) << ")" << std::endl
-                << "#   --hss_SJLT_algo chunk|perm (default "
+                << "#   --hbs_SJLT_algo chunk|perm (default "
                 << get_name(SJLT_algo()) << ")" << std::endl
-                << "#   --hss_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
+                << "#   --hbs_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
                 << get_name(clustering_algorithm()) << ")" << std::endl
-                << "#   --hss_user_defined_random (default "
+                << "#   --hbs_user_defined_random (default "
                 << user_defined_random() << ")" << std::endl
-                << "#   --hss_approximate_neighbors int (default "
+                << "#   --hbs_approximate_neighbors int (default "
                 << approximate_neighbors() << ")" << std::endl
-                << "#   --hss_ann_iterations int (default "
+                << "#   --hbs_ann_iterations int (default "
                 << ann_iterations() << ")" << std::endl
-                << "#   --hss_enable_sync (default "
+                << "#   --hbs_enable_sync (default "
                 << synchronized_compression() << ")" << std::endl
-                << "#   --hss_disable_sync (default "
+                << "#   --hbs_disable_sync (default "
                 << (!synchronized_compression()) << ")" << std::endl
-                << "#   --hss_log_ranks (default "
+                << "#   --hbs_log_ranks (default "
                 << log_ranks() << ")" << std::endl
-                << "#   --hss_verbose or -v (default "
+                << "#   --hbs_verbose or -v (default "
                 << this->verbose() << ")" << std::endl
-                << "#   --hss_quiet or -q (default "
+                << "#   --hbs_quiet or -q (default "
                 << !this->verbose() << ")" << std::endl
                 << "#   --help or -h" << std::endl << std::endl;
 #endif

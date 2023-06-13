@@ -37,13 +37,10 @@ namespace strumpack {
     template<typename scalar_t> class WorkCompress {
     public:
       std::vector<WorkCompress<scalar_t>> c;
-      // std::vector<std::size_t> Ir, Ic, Jr, Jc;
       std::pair<std::size_t,std::size_t> offset;
       int lvl = 0;
-      // scalar_t U_r_max, V_r_max;
-
-      // only needed in the new compression algorithm
       DenseMatrix<scalar_t> Rr, Rc, Sr, Sc;
+
       void split(const std::pair<std::size_t,std::size_t>& dim) {
         if (c.empty()) {
           c.resize(2);
