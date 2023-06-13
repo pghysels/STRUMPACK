@@ -764,11 +764,11 @@ namespace strumpack {
               double* s, double* u, int ldu, double* vt, int ldvt);
     int gesvd(char jobu, char jobvt, int m, int n,
               std::complex<float>* a, int lda,
-              std::complex<float>* s, std::complex<float>* u, int ldu,
+              float* s, std::complex<float>* u, int ldu,
               std::complex<float>* vt, int ldvt);
     int gesvd(char jobu, char jobvt, int m, int n,
               std::complex<double>* a, int lda,
-              std::complex<double>* s, std::complex<double>* u, int ldu,
+              double* s, std::complex<double>* u, int ldu,
               std::complex<double>* vt, int ldvt);
 
     int syevx(char jobz, char range, char uplo, int n, float* a, int lda,

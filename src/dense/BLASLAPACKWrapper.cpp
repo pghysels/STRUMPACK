@@ -1790,13 +1790,13 @@ namespace strumpack {
       return info;
     }
     int gesvd(char jobu, char jobvt, int m, int n, std::complex<float>* a, int lda,
-              std::complex<float>* s, std::complex<float>* u, int ldu,
+              float* s, std::complex<float>* u, int ldu,
               std::complex<float>* vt, int ldvt) {
       std::cout << "TODO gesvd for std::complex<float>" << std::endl;
       return 0;
     }
     int gesvd(char jobu, char jobvt, int m, int n, std::complex<double>* a, int lda,
-              std::complex<double>* s, std::complex<double>* u, int ldu,
+              double* s, std::complex<double>* u, int ldu,
               std::complex<double>* vt, int ldvt) {
       std::cout << "TODO gesvd for std::complex<double>" << std::endl;
       return 0;

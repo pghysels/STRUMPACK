@@ -32,6 +32,7 @@ using namespace std;
 
 #include "dense/DenseMatrix.hpp"
 #include "HSS/HSSMatrix.hpp"
+#include "HBS/HBSMatrix.hpp"
 using namespace strumpack;
 using namespace strumpack::HSS;
 
@@ -124,6 +125,25 @@ int run(int argc, char* argv[]) {
 
   if (hss_opts.verbose()) A.print("A");
   cout << "# tol = " << hss_opts.rel_tol() << endl;
+
+
+  {
+    HBS::HBSMatrix<double> H(A, hss_opts);
+    if (H.is_compressed()) {
+      cout << "# created HBS matrix of dimension "
+           << H.rows() << " x " << H.cols()
+           << " with " << H.levels() << " levels" << endl;
+      cout << "# compression succeeded!" << endl;
+    } else {
+      cout << "# compression failed!!!!!!!!" << endl;
+      return 1;
+    }
+    cout << "# rank(H) = " << H.rank() << endl;
+    cout << "# memory(H) = " << H.memory()/1e6 << " MB, "
+         << 100. * H.memory() / A.memory() << "% of dense" << endl;
+    exit(0);
+  }
+
 
   HSSMatrix<double> H(A, hss_opts);
   if (H.is_compressed()) {

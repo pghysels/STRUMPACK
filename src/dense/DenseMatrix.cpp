@@ -824,13 +824,16 @@ namespace strumpack {
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*std::min(rows(),cols()));
   }
 
-  template<typename scalar_t> std::vector<scalar_t>
+  template<typename scalar_t>
+  std::vector<typename RealType<scalar_t>::value_type>
   DenseMatrix<scalar_t>::singular_values() const {
     DenseMatrix tmp(*this);
     auto minmn = std::min(rows(), cols());
-    std::vector<scalar_t> S(minmn);
-    int info = blas::gesvd('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
-                           S.data(), NULL, 1, NULL, 1);
+    using real_t = typename RealType<scalar_t>::value_type;
+    std::vector<real_t> S(minmn);
+    int info = blas::gesvd
+      ('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
+       S.data(), NULL, 1, NULL, 1);
     if (info)
       std::cout << "ERROR in gesvd: info = " << info << std::endl;
     return S;

@@ -931,7 +931,7 @@ namespace strumpack {
      * Return a vector with the singular values of this matrix. Used
      * only for debugging puposes.
      */
-    std::vector<scalar_t> singular_values() const;
+    std::vector<real_t> singular_values() const;
 
     /**
      * Shift the diagonal with a value sigma, ie. add a scaled
