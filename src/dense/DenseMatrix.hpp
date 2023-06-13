@@ -1347,6 +1347,16 @@ namespace strumpack {
        const DenseMatrix<scalar_t>& b, scalar_t beta,
        scalar_t* c, int ldc, int depth=0);
 
+  template<typename scalar_t> DenseMatrix<scalar_t>
+  gemm(Trans ta, Trans tb, scalar_t alpha, const DenseMatrix<scalar_t>& a,
+       const DenseMatrix<scalar_t>& b, int depth=0) {
+    DenseMatrix<scalar_t> c(ta == Trans::N ? a.rows() : a.cols(),
+                            tb == Trans::N ? b.cols() : b.rows());
+    gemm(ta, tb, alpha, a, b, scalar_t(0.), c, depth);
+    return c;
+  }
+
+
   /**
    * TRMM performs one of the matrix-matrix operations
    *
