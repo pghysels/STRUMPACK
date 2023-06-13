@@ -99,8 +99,8 @@ namespace strumpack {
       U_ = other.U_;
       V_ = other.V_;
       D_ = other.D_;
-      B01_ = other.B01_;
-      B10_ = other.B10_;
+      // B01_ = other.B01_;
+      // B10_ = other.B10_;
     }
 
     template<typename scalar_t> HBSMatrix<scalar_t>&
@@ -108,8 +108,8 @@ namespace strumpack {
       U_ = other.U_;
       V_ = other.V_;
       D_ = other.D_;
-      B01_ = other.B01_;
-      B10_ = other.B10_;
+      // B01_ = other.B01_;
+      // B10_ = other.B10_;
       return *this;
     }
 
@@ -132,8 +132,8 @@ namespace strumpack {
       U_.clear();
       V_.clear();
       D_.clear();
-      B01_.clear();
-      B10_.clear();
+      // B01_.clear();
+      // B10_.clear();
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>

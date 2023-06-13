@@ -602,7 +602,7 @@ namespace strumpack {
 
       std::size_t rows_, cols_;
       std::vector<std::unique_ptr<HBSMatrix<scalar_t>>> ch_;
-      DenseM_t U_, V_, D_, B01_, B10_;
+      DenseM_t U_, V_, D_; // B01_, B10_;
 
       State U_state_, V_state_;
       int openmp_task_depth_;
