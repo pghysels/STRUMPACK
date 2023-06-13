@@ -112,7 +112,8 @@ namespace strumpack {
       if (info)
         std::cerr << "Computation of nullspace failed in QR factorization, "
                   << "info= " << info << std::endl;
-      info = blas::xxgqr(At.rows(), minmn, minmn, At.data(), At.ld(), tau.get());
+      info = blas::xxgqr
+        (At.rows(), minmn, minmn, At.data(), At.ld(), tau.get());
       if (info)
         std::cerr << "Computation of nullspace failed in xxGQR, "
                   << "info= " << info << std::endl;
@@ -128,6 +129,7 @@ namespace strumpack {
       if (info)
         std::cerr << "Computation of colspace failed in QR factorization, "
                   << "info= " << info << std::endl;
+      // TODO check k
       info = blas::xxgqr(A.rows(), k, minmn, A.data(), A.ld(), tau.get());
       if (info)
         std::cerr << "Computation of colspace failed in xxGQR, "
@@ -139,6 +141,9 @@ namespace strumpack {
     HBSMatrix<scalar_t>::compress_recursive
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
      const opts_t& opts, WorkCompress<scalar_t>& w, int r, int depth) {
+
+      std::cout << "in HBSMatrix::compress_recursive" << std::endl;
+
       int d = Rr.cols();
       if (this->leaf()) {
         int m = rows();
@@ -182,40 +187,60 @@ namespace strumpack {
         DenseMW_t
           Sr0(rU0, d, w.Sr, 0, 0),   Sc0(rV0, d, w.Sc, 0, 0),
           Sr1(rU1, d, w.Sr, rU0, 0), Sc1(rV1, d, w.Sc, rV0, 0);
-        gemm(Trans::N, Trans::C, scalar_t(-1.), child(0)->D_, w.c[0].Rr, scalar_t(0), w.c[0].Sr);
-        gemm(Trans::N, Trans::C, scalar_t(-1.), child(1)->D_, w.c[1].Rr, scalar_t(0), w.c[1].Sr);
-        gemm(Trans::C, Trans::N, scalar_t(1.),  child(0)->U_, w.c[0].Sr, scalar_t(0), Sr0);
-        gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->U_, w.c[1].Sr, scalar_t(0), Sr1);
-        gemm(Trans::N, Trans::C, scalar_t(-1.), child(0)->D_, w.c[0].Rc, scalar_t(0), w.c[0].Sc);
-        gemm(Trans::N, Trans::C, scalar_t(-1.), child(1)->D_, w.c[1].Rc, scalar_t(0), w.c[1].Sc);
-        gemm(Trans::C, Trans::N, scalar_t(1.),  child(0)->V_, w.c[0].Sc, scalar_t(0), Sc0);
-        gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->V_, w.c[1].Sc, scalar_t(0), Sc1);
+        gemm(Trans::N, Trans::C, scalar_t(-1.), child(0)->D_, w.c[0].Rr, scalar_t(0.), w.c[0].Sr);
+        gemm(Trans::N, Trans::C, scalar_t(-1.), child(1)->D_, w.c[1].Rr, scalar_t(0.), w.c[1].Sr);
+        gemm(Trans::C, Trans::N, scalar_t(1.),  child(0)->U_, w.c[0].Sr, scalar_t(0.), Sr0);
+        gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->U_, w.c[1].Sr, scalar_t(0.), Sr1);
+        gemm(Trans::N, Trans::C, scalar_t(-1.), child(0)->D_, w.c[0].Rc, scalar_t(0.), w.c[0].Sc);
+        gemm(Trans::N, Trans::C, scalar_t(-1.), child(1)->D_, w.c[1].Rc, scalar_t(0.), w.c[1].Sc);
+        gemm(Trans::C, Trans::N, scalar_t(1.),  child(0)->V_, w.c[0].Sc, scalar_t(0.), Sc0);
+        gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->V_, w.c[1].Sc, scalar_t(0.), Sc1);
       }
       if (w.lvl == 0) {
-
-        // TODO compute D
+        // D = Sr pseudoinv(Rr)
+        // D Rr = Sr     or     Rr* D* = Sr*
+        auto Srt = w.Sr.transpose();
+        blas::gels('T', w.Rr.rows(), w.Rr.cols(), Srt.cols(),
+                   w.Rr.data(), w.Rr.ld(), Srt.data(), Srt.cols());
+        DenseMW_t Dt(w.Rr.rows(), Srt.cols(), Srt.ptr(0, 0), w.Rr.rows());
+        D_ = Dt.transpose();
       } else {
-        auto P = nullspace(Rr, r);
-        auto Q = nullspace(Rc, r);
-        DenseM_t SrP(Sr.rows(), d);
-        gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, P, scalar_t(0.), SrP);
+        auto P = nullspace(w.Rr, r);
+        auto Q = nullspace(w.Rc, r);
+        auto SrP = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, P);
         U_ = colspace(SrP, r);
-        DenseM_t ScQ(Sc.rows(), d);
-        gemm(Trans::N, Trans::N, scalar_t(1.), w.Sc, Q, scalar_t(0.), ScQ);
+        auto ScQ = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sc, Q);
         V_ = colspace(ScQ, r);
 
-        auto IUUSr = w.Sr;
-        DenseM_t USr(U_.rows(), w.Sr.cols());
-        gemm(Trans::C, Trans::N, scalar_t(1.), U_, w.Sr, scalar_t(0.), USr);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), U_, USr, scalar_t(1.), IUUSr);
-        // blas::gels(Trans::N, );
+        // D = (I - U U*) Sr pseudoinv(Rr) + U U* ((I - V V*) Sc pseudoinv(Rc))*
+        // D = D1 + U U* D2*
+        // solve D1 and D2 from the least squares systems
+        //    D1 Rr = (I - U U*) Sr    or    Rr* D1* = Sr* (I - U U*)
+        //    D2 Rc = (I - V V*) Sc    or    Rc* D2* = Sc* (I - V V*)
+        auto SrIUU = w.Sr.transpose();
+        auto SrU = gemm(Trans::C, Trans::N, scalar_t(-1.), w.Sr, U_);
+        gemm(Trans::N, Trans::C, scalar_t(1.), SrU, U_, scalar_t(1.), SrIUU);
+        w.Rr.print("w.Rr");
+        SrIUU.print("SrIUU");
+        int info = blas::gels
+          ('T', w.Rr.rows(), w.Rr.cols(), SrIUU.cols(),
+           w.Rr.data(), w.Rr.ld(), SrIUU.data(), SrIUU.ld());
+        if (info)
+          std::cerr << "xGELS failed with info= " << info << std::endl;
+        DenseMW_t D1t(w.Rr.rows(), SrIUU.cols(), SrIUU.ptr(0, 0), w.Rr.rows());
+        D_ = D1t.transpose();
 
-        auto IVVSc = w.Sc;
-        DenseM_t VSc(V_.rows(), w.Sc.cols());
-        gemm(Trans::C, Trans::N, scalar_t(1.), V_, w.Sc, scalar_t(0.), VSc);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), V_, VSc, scalar_t(1.), IVVSc);
-
-
+        auto ScIVV = w.Sc.transpose();
+        auto ScV = gemm(Trans::C, Trans::N, scalar_t(-1.), w.Sc, V_);
+        gemm(Trans::N, Trans::C, scalar_t(1.), V_, ScV, scalar_t(1.), ScIVV);
+        info = blas::gels
+          ('T', w.Rc.rows(), w.Rc.cols(), ScIVV.cols(),
+           w.Rc.data(), w.Rc.ld(), ScIVV.data(), ScIVV.ld());
+        if (info)
+          std::cerr << "xGELS failed with info= " << info << std::endl;
+        DenseMW_t D2t(w.Rc.rows(), ScIVV.cols(), ScIVV.ptr(0, 0), w.Rc.rows());
+        auto UtD2t = gemm(Trans::C, Trans::C, scalar_t(1.), U_, D2t);
+        gemm(Trans::N, Trans::N, scalar_t(1.), U_, UtD2t, scalar_t(1.), D_);
       }
       this->U_state_ = this->V_state_ = State::COMPRESSED;
     }
