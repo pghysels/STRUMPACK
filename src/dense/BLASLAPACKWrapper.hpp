@@ -830,7 +830,7 @@ namespace strumpack {
     int gels(char t, int m, int n, int nrhs, scalar* a, int lda,
              scalar* b, int ldb) {
       scalar lwork;
-      sytrf(t, m, n, nrhs, a, lda, b, ldb, &lwork, -1);
+      gels(t, m, n, nrhs, a, lda, b, ldb, &lwork, -1);
       int ilwork = int(std::real(lwork));
       std::unique_ptr<scalar[]> work(new scalar[ilwork]);
       return gels(t, m, n, nrhs, a, lda, b, ldb, work.get(), ilwork);
