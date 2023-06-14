@@ -73,22 +73,18 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HBSMatrix<scalar_t>::apply_fwd(const DenseM_t& b, WorkApply<scalar_t>& w,
-                                   int depth) const {
+    HBSMatrix<scalar_t>::apply_fwd(const DenseM_t& b,
+                                   WorkApply<scalar_t>& w) const {
       if (this->leaf()) {
         auto bloc = ConstDenseMatrixWrapperPtr
-          (rows(), b.cols(), b, w.offset.second, 0);
-        w.q = gemm(Trans::C, Trans::N, scalar_t(1.), V_, *bloc, depth);
+          (V_.rows(), b.cols(), b, w.offset.second, 0);
+        w.q = gemm(Trans::C, Trans::N, scalar_t(1.), V_, *bloc);
       } else {
         w.split(child(0)->dims());
-#pragma omp task default(shared)                                        \
-  if(depth < params::task_recursion_cutoff_level)                       \
-  final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        child(0)->apply_fwd(b, w.c[0], depth+1);
-#pragma omp task default(shared)                                        \
-  if(depth < params::task_recursion_cutoff_level)                       \
-  final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        child(1)->apply_fwd(b, w.c[1], depth+1);
+#pragma omp task default(shared)
+        child(0)->apply_fwd(b, w.c[0]);
+#pragma omp task default(shared)
+        child(1)->apply_fwd(b, w.c[1]);
 #pragma omp taskwait
         if (w.lvl != 0) {
           auto qq = vconcat(w.c[0].q, w.c[1].q);
@@ -99,32 +95,27 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HBSMatrix<scalar_t>::apply_bwd(const DenseM_t& b, scalar_t beta,
-                                   DenseM_t& c, WorkApply<scalar_t>& w,
-                                   int depth) const {
+                                   DenseM_t& c,
+                                   WorkApply<scalar_t>& w) const {
       if (this->leaf()) {
-        DenseMW_t cloc(rows(), c.cols(), c, w.offset.second, 0);
+        DenseMW_t cloc(U_.rows(), c.cols(), c, w.offset.first, 0);
         if (w.lvl != 0)
-          gemm(Trans::N, Trans::N, scalar_t(1.), U_, w.u, beta, cloc, depth);
+          gemm(Trans::N, Trans::N, scalar_t(1.), U_, w.u, beta, cloc);
         auto bloc = ConstDenseMatrixWrapperPtr
-          (rows(), b.cols(), b, w.offset.second, 0);
-        gemm(Trans::N, Trans::N, scalar_t(1.), D_, *bloc,
-             scalar_t(1.), cloc, depth);
+          (D_.cols(), b.cols(), b, w.offset.first, 0);
+        gemm(Trans::N, Trans::N, scalar_t(1.), D_, *bloc, scalar_t(1.), cloc);
       } else {
         auto qq = vconcat(w.c[0].q, w.c[1].q);
         auto uu = gemm(Trans::N, Trans::N, scalar_t(1.), D_, qq);
         if (w.lvl != 0)
-          gemm(Trans::N, Trans::N, scalar_t(1.), U_, w.u, beta, uu, depth);
-        w.c[0].u = DenseM_t(child(0)->U_.rows(), uu.cols(), uu, 0, 0);
-        w.c[1].u = DenseM_t(child(1)->U_.rows(), uu.cols(),
-                            uu, child(0)->U_.rows(), 0);
-#pragma omp task default(shared)                                        \
-  if(depth < params::task_recursion_cutoff_level)                       \
-  final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        child(0)->apply_bwd(b, beta, c, w.c[0], depth+1);
-#pragma omp task default(shared)                                        \
-  if(depth < params::task_recursion_cutoff_level)                       \
-  final(depth >= params::task_recursion_cutoff_level-1) mergeable
-        child(1)->apply_bwd(b, beta, c, w.c[1], depth+1);
+          gemm(Trans::N, Trans::N, scalar_t(1.), U_, w.u, scalar_t(1.), uu);
+        w.c[0].u = DenseM_t(child(0)->U_.cols(), uu.cols(), uu, 0, 0);
+        w.c[1].u = DenseM_t(child(1)->U_.cols(), uu.cols(),
+                            uu, child(0)->U_.cols(), 0);
+#pragma omp task default(shared)
+        child(0)->apply_bwd(b, beta, c, w.c[0]);
+#pragma omp task default(shared)
+        child(1)->apply_bwd(b, beta, c, w.c[1]);
 #pragma omp taskwait
       }
     }

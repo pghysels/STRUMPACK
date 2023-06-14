@@ -57,48 +57,34 @@ namespace strumpack {
 
     template<typename scalar_t> void HBSMatrix<scalar_t>::compress
     (const DenseM_t& A, const opts_t& opts) {
-      // AFunctor<scalar_t> afunc(A);
-
-      int d_old = 0, d = opts.d0() + opts.p(), total_nnz = 0;
+      int r = opts.d0();
+      int s = 3 * r;
       auto n = this->cols();
       auto rgen = random::make_random_generator<real_t>
         (opts.random_engine(), opts.random_distribution());
 
-      DenseM_t Rr, Rc, Sr, Sc;
+      DenseM_t Rr(n, s), Rc(n, s), Sr(n, s), Sc(n, s);
       WorkCompress<scalar_t> w;
-      while (!this->is_compressed()) {
-        Rr.resize(n, d);   Rc.resize(n, d);
-        Sr.resize(n, d);   Sc.resize(n, d);
-        DenseMW_t Rr_new(n, d-d_old, Rr, 0, d_old),
-          Rc_new(n, d-d_old, Rc, 0, d_old),
-          Sr_new(n, d-d_old, Sr, 0, d_old),
-          Sc_new(n, d-d_old, Sc, 0, d_old);
-        Rr_new.random(*rgen);
-        Rc_new.copy(Rr_new);
-        STRUMPACK_RANDOM_FLOPS
-          (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
-        gemm(Trans::N, Trans::N, scalar_t(1.), A, Rr_new, scalar_t(0.), Sr_new);
-        gemm(Trans::C, Trans::N, scalar_t(1.), A, Rc_new, scalar_t(0.), Sc_new);
+      Rr.random(*rgen);
+      Rc.copy(Rr);
+      // Rc.random(*rgen);
+      STRUMPACK_RANDOM_FLOPS
+        (rgen->flops_per_prng() * Rr.rows() * Rr.cols());
+      gemm(Trans::N, Trans::N, scalar_t(1.), A, Rr, scalar_t(0.), Sr);
+      gemm(Trans::C, Trans::N, scalar_t(1.), A, Rc, scalar_t(0.), Sc);
 
-        if (opts.verbose()) {
-          std::cout << "# compressing with d = " << d-opts.p()
-                    << " + " << opts.p() << " (original)" << std::endl;
-          if (opts.compression_sketch() == CompressionSketch::SJLT)
-            std::cout << "# nnz total = " << total_nnz << std::endl;
-        }
+      if (opts.verbose()) {
+        std::cout << "# compressing with s = " << s << std::endl;
+        // if (opts.compression_sketch() == CompressionSketch::SJLT)
+        //   std::cout << "# nnz total = " << total_nnz << std::endl;
+      }
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
-        compress_recursive
-          (Rr, Rc, Sr, Sc, opts, w, d-d_old, this->openmp_task_depth_);
-        if (!this->is_compressed()) {
-          d_old = d;
-          d = 2 * (d_old - opts.p()) + opts.p();
-        }
-      }
+      compress_recursive(Rr, Rc, Sr, Sc, opts, w, r);
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    nullspace(DenseMatrix<scalar_t>& A, int k) {
+    nullspace(const DenseMatrix<scalar_t>& A, int k) {
       // return last r columns of a full QR factorization of A^T
       auto At = A.transpose();
       k = std::max(std::min(k, (int)(At.cols())), 0);
@@ -118,7 +104,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    colspace(DenseMatrix<scalar_t>& A, int k) {
+    colspace(const DenseMatrix<scalar_t>& a, int k) {
+      auto A = a;
       int minmn = std::min(A.rows(), A.cols());
       k = std::min(minmn, k);
       std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
@@ -127,9 +114,7 @@ namespace strumpack {
       if (info)
         std::cerr << "Computation of colspace failed in QR factorization, "
                   << "info= " << info << std::endl;
-      // TODO check k
-      // A.print("A");
-      // std::cout << "k= " << k << std::endl;
+      // TODO check k <= minmn?
       info = blas::xxgqr(A.rows(), k, minmn, A.data(), A.ld(), tau.get());
       if (info)
         std::cerr << "Computation of colspace failed in xxGQR, "
@@ -138,7 +123,8 @@ namespace strumpack {
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    pseudoinv(DenseMatrix<scalar_t>& A) {
+    pseudoinv(const DenseMatrix<scalar_t>& a) {
+      auto A = a;
       int minmn = std::min(A.rows(), A.cols());
       using real_t = typename RealType<scalar_t>::value_type;
       std::vector<real_t> s(minmn);
@@ -149,6 +135,7 @@ namespace strumpack {
       if (info)
         std::cerr << "SVD failed to converge" << std::endl;
       for (int i=0; i<minmn; i++)
+        // TODO check for small singular values?
         blas::scal(A.rows(), scalar_t(1./s[i]), U.ptr(0, i), 1);
       return gemm(Trans::C, Trans::C, scalar_t(1.), Vt, U);
     }
@@ -156,59 +143,53 @@ namespace strumpack {
     template<typename scalar_t> void
     HBSMatrix<scalar_t>::compress_recursive
     (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
-     const opts_t& opts, WorkCompress<scalar_t>& w, int r, int depth) {
-      int d = Rr.cols();
+     const opts_t& opts, WorkCompress<scalar_t>& w, int r) {
+      int s = Rr.cols();
       if (this->leaf()) {
         int m = rows();
-        w.Rr = DenseM_t(m, d, Rr, w.offset.first, 0);
-        w.Rc = DenseM_t(m, d, Rc, w.offset.first, 0);
-        w.Sr = DenseM_t(m, d, Sr, w.offset.first, 0);
-        w.Sc = DenseM_t(m, d, Sc, w.offset.first, 0);
+        w.Rr = DenseM_t(m, s, Rr, w.offset.first, 0);
+        w.Rc = DenseM_t(m, s, Rc, w.offset.first, 0);
+        w.Sr = DenseM_t(m, s, Sr, w.offset.first, 0);
+        w.Sc = DenseM_t(m, s, Sc, w.offset.first, 0);
       } else {
         w.split(child(0)->dims());
-        bool tasked = depth < params::task_recursion_cutoff_level;
-        if (tasked) {
-#pragma omp task default(shared)                                        \
-  final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          child(0)->compress_recursive
-            (Rr, Rc, Sr, Sc, opts, w.c[0], r, depth+1);
-#pragma omp task default(shared)                                        \
-  final(depth >= params::task_recursion_cutoff_level-1) mergeable
-          child(1)->compress_recursive
-            (Rr, Rc, Sr, Sc, opts, w.c[1], r, depth+1);
+#pragma omp task default(shared)
+        child(0)->compress_recursive(Rr, Rc, Sr, Sc, opts, w.c[0], r);
+#pragma omp task default(shared)
+        child(1)->compress_recursive(Rr, Rc, Sr, Sc, opts, w.c[1], r);
 #pragma omp taskwait
-        } else {
-          child(0)->compress_recursive(Rr, Rc, Sr, Sc, opts, w.c[0], r, depth+1);
-          child(1)->compress_recursive(Rr, Rc, Sr, Sc, opts, w.c[1], r, depth+1);
-        }
         if (!child(0)->is_compressed() ||
             !child(1)->is_compressed()) return;
         auto rU0 = child(0)->U_.cols();   auto rV0 = child(0)->V_.cols();
         auto rU1 = child(1)->U_.cols();   auto rV1 = child(1)->V_.cols();
-        w.Rr = DenseM_t(rV0 + rV1, d);
-        w.Rc = DenseM_t(rU0 + rU1, d);
+        w.Rr = DenseM_t(rV0 + rV1, s);
+        w.Rc = DenseM_t(rU0 + rU1, s);
         DenseMW_t
-          Rr0(rV0, d, w.Rr, 0, 0),   Rc0(rU0, d, w.Rc, 0, 0),
-          Rr1(rV1, d, w.Rr, rV0, 0), Rc1(rU1, d, w.Rc, rU0, 0);
+          Rr0(rV0, s, w.Rr, 0, 0),   Rc0(rU0, s, w.Rc, 0, 0),
+          Rr1(rV1, s, w.Rr, rV0, 0), Rc1(rU1, s, w.Rc, rU0, 0);
         gemm(Trans::C, Trans::N, scalar_t(1.), child(0)->V_, w.c[0].Rr, scalar_t(0.), Rr0);
         gemm(Trans::C, Trans::N, scalar_t(1.), child(1)->V_, w.c[1].Rr, scalar_t(0.), Rr1);
         gemm(Trans::C, Trans::N, scalar_t(1.), child(0)->U_, w.c[0].Rc, scalar_t(0.), Rc0);
         gemm(Trans::C, Trans::N, scalar_t(1.), child(1)->U_, w.c[1].Rc, scalar_t(0.), Rc1);
 
-        w.Sr = DenseM_t(rU0 + rU1, d);
-        w.Sc = DenseM_t(rV0 + rV1, d);
+        w.Sr = DenseM_t(rU0 + rU1, s);
+        w.Sc = DenseM_t(rV0 + rV1, s);
         DenseMW_t
-          Sr0(rU0, d, w.Sr, 0, 0),   Sc0(rV0, d, w.Sc, 0, 0),
-          Sr1(rU1, d, w.Sr, rU0, 0), Sc1(rV1, d, w.Sc, rV0, 0);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), child(0)->D_, w.c[0].Rr, scalar_t(0.), w.c[0].Sr);
-        gemm(Trans::N, Trans::N, scalar_t(-1.), child(1)->D_, w.c[1].Rr, scalar_t(0.), w.c[1].Sr);
+          Sr0(rU0, s, w.Sr, 0, 0),   Sc0(rV0, s, w.Sc, 0, 0),
+          Sr1(rU1, s, w.Sr, rU0, 0), Sc1(rV1, s, w.Sc, rV0, 0);
+        gemm(Trans::N, Trans::N, scalar_t(-1.), child(0)->D_, w.c[0].Rr, scalar_t(1.), w.c[0].Sr);
+        gemm(Trans::N, Trans::N, scalar_t(-1.), child(1)->D_, w.c[1].Rr, scalar_t(1.), w.c[1].Sr);
         gemm(Trans::C, Trans::N, scalar_t(1.),  child(0)->U_, w.c[0].Sr, scalar_t(0.), Sr0);
         gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->U_, w.c[1].Sr, scalar_t(0.), Sr1);
-        gemm(Trans::C, Trans::N, scalar_t(-1.), child(0)->D_, w.c[0].Rc, scalar_t(0.), w.c[0].Sc);
-        gemm(Trans::C, Trans::N, scalar_t(-1.), child(1)->D_, w.c[1].Rc, scalar_t(0.), w.c[1].Sc);
+        gemm(Trans::C, Trans::N, scalar_t(-1.), child(0)->D_, w.c[0].Rc, scalar_t(1.), w.c[0].Sc);
+        gemm(Trans::C, Trans::N, scalar_t(-1.), child(1)->D_, w.c[1].Rc, scalar_t(1.), w.c[1].Sc);
         gemm(Trans::C, Trans::N, scalar_t(1.),  child(0)->V_, w.c[0].Sc, scalar_t(0.), Sc0);
         gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->V_, w.c[1].Sc, scalar_t(0.), Sc1);
       }
+
+      // TODO make sure w.Sr, etc, are not destroyed, still needed for
+      // next level
+
       if (w.lvl == 0) {
         // D = Sr pseudoinv(Rr)
         D_ = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, pseudoinv(w.Rr));

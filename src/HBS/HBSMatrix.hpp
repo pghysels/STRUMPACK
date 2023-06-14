@@ -613,11 +613,14 @@ namespace strumpack {
                               DenseM_t& Sr, DenseM_t& Sc,
                               const opts_t& opts,
                               WorkCompress<scalar_t>& w,
-                              int r, int depth);
-      void apply_fwd(const DenseM_t& b, WorkApply<scalar_t>& w,
-                     int depth) const;
+                              int r);
+      void apply_fwd(const DenseM_t& b, WorkApply<scalar_t>& w) const;
       void apply_bwd(const DenseM_t& b, scalar_t beta, DenseM_t& c,
-                     WorkApply<scalar_t>& w, int depth) const;
+                     WorkApply<scalar_t>& w) const;
+
+      template<typename T> friend
+      void apply_HBS(Trans ta, const HBSMatrix<T>& a, const DenseMatrix<T>& b,
+                     T beta, DenseMatrix<T>& c);
     };
 
     /**

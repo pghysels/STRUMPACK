@@ -154,21 +154,19 @@ namespace strumpack {
     template<typename scalar_t> std::size_t
     HBSMatrix<scalar_t>::memory() const {
       if (!this->active()) return 0;
-      // std::size_t mem = sizeof(*this) + U_.memory() + V_.memory()
-      //   + D_.memory() + B01_.memory() + B10_.memory();
-      // for (auto& c : this->ch_) mem += c->memory();
-      // return mem;
-      return 0;
+      std::size_t mem = sizeof(*this) + U_.memory() + V_.memory()
+        + D_.memory();
+      for (auto& c : this->ch_) mem += c->memory();
+      return mem;
     }
 
     template<typename scalar_t> std::size_t
     HBSMatrix<scalar_t>::nonzeros() const {
       if (!this->active()) return 0;
-      // std::size_t nnz = sizeof(*this) + U_.nonzeros() + V_.nonzeros()
-      //   + D_.nonzeros() + B01_.nonzeros() + B10_.nonzeros();
-      // for (auto& c : this->ch_) nnz += c->nonzeros();
-      // return nnz;
-      return 0;
+      std::size_t nnz = sizeof(*this) + U_.nonzeros() + V_.nonzeros()
+        + D_.nonzeros();
+      for (auto& c : this->ch_) nnz += c->nonzeros();
+      return nnz;
     }
 
     template<typename scalar_t> std::size_t
@@ -217,19 +215,17 @@ namespace strumpack {
     template<typename scalar_t> void apply_HBS
     (Trans op, const HBSMatrix<scalar_t>& A, const DenseMatrix<scalar_t>& B,
      scalar_t beta, DenseMatrix<scalar_t>& C) {
-//       WorkApply<scalar_t> w;
-//       std::atomic<long long int> flops(0);
-// #pragma omp parallel if(!omp_in_parallel())
-// #pragma omp single nowait
-//       {
-//         if (op == Trans::N) {
-//           A.apply_fwd(B, w, true, A.openmp_task_depth_, flops);
-//           A.apply_bwd(B, beta, C, w, true, A.openmp_task_depth_, flops);
-//         } else {
-//           A.applyT_fwd(B, w, true, A.openmp_task_depth_, flops);
-//           A.applyT_bwd(B, beta, C, w, true, A.openmp_task_depth_, flops);
-//         }
-//       }
+      WorkApply<scalar_t> w;
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+      {
+        if (op == Trans::N) {
+          A.apply_fwd(B, w);
+          A.apply_bwd(B, beta, C, w);
+        } else {
+          std::cerr << "Tranpose multiplication not implemented yet" << std::endl;
+        }
+      }
     }
 
 
