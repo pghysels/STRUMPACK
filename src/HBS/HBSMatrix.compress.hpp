@@ -55,8 +55,9 @@ namespace strumpack {
     };
 
 
-    template<typename scalar_t> void HBSMatrix<scalar_t>::compress
-    (const DenseM_t& A, const opts_t& opts) {
+    template<typename scalar_t> void
+    HBSMatrix<scalar_t>::compress(const DenseM_t& A,
+                                  const opts_t& opts) {
       int r = opts.d0();
       int s = 3 * r;
       auto n = this->cols();
@@ -67,12 +68,10 @@ namespace strumpack {
       WorkCompress<scalar_t> w;
       Rr.random(*rgen);
       Rc.copy(Rr);
-      // Rc.random(*rgen);
       STRUMPACK_RANDOM_FLOPS
         (rgen->flops_per_prng() * Rr.rows() * Rr.cols());
       gemm(Trans::N, Trans::N, scalar_t(1.), A, Rr, scalar_t(0.), Sr);
       gemm(Trans::C, Trans::N, scalar_t(1.), A, Rc, scalar_t(0.), Sc);
-
       if (opts.verbose()) {
         std::cout << "# compressing with s = " << s << std::endl;
         // if (opts.compression_sketch() == CompressionSketch::SJLT)
@@ -95,12 +94,14 @@ namespace strumpack {
       if (info)
         std::cerr << "Computation of nullspace failed in QR factorization, "
                   << "info= " << info << std::endl;
+      DenseMatrix<scalar_t> Qt(At.rows(), At.rows());
+      copy(At.rows(), At.cols(), At, 0, 0, Qt, 0, 0);
       info = blas::xxgqr
-        (At.rows(), minmn, minmn, At.data(), At.ld(), tau.get());
+        (Qt.rows(), Qt.cols(), minmn, Qt.data(), Qt.ld(), tau.get());
       if (info)
         std::cerr << "Computation of nullspace failed in xxGQR, "
                   << "info= " << info << std::endl;
-      return DenseMatrix<scalar_t>(At.rows(), k, At, 0, At.cols()-k);
+      return DenseMatrix<scalar_t>(Qt.rows(), k, Qt, 0, Qt.cols()-k);
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
@@ -141,9 +142,11 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HBSMatrix<scalar_t>::compress_recursive
-    (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,
-     const opts_t& opts, WorkCompress<scalar_t>& w, int r) {
+    HBSMatrix<scalar_t>::compress_recursive(DenseM_t& Rr, DenseM_t& Rc,
+                                            DenseM_t& Sr, DenseM_t& Sc,
+                                            const opts_t& opts,
+                                            WorkCompress<scalar_t>& w,
+                                            int r) {
       int s = Rr.cols();
       if (this->leaf()) {
         int m = rows();
@@ -186,10 +189,6 @@ namespace strumpack {
         gemm(Trans::C, Trans::N, scalar_t(1.),  child(0)->V_, w.c[0].Sc, scalar_t(0.), Sc0);
         gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->V_, w.c[1].Sc, scalar_t(0.), Sc1);
       }
-
-      // TODO make sure w.Sr, etc, are not destroyed, still needed for
-      // next level
-
       if (w.lvl == 0) {
         // D = Sr pseudoinv(Rr)
         D_ = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, pseudoinv(w.Rr));
@@ -203,8 +202,9 @@ namespace strumpack {
           auto ScQ = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sc, Q);
           V_ = colspace(ScQ, r);
         }
+        // D = (I - U U*) Sr pseudoinv(Rr) +
+        //             U U* ((I - V V*) Sc pseudoinv(Rc))*
         D_ = DenseM_t(U_.rows(), V_.rows());
-        // D = (I - U U*) Sr pseudoinv(Rr) + U U* ((I - V V*) Sc pseudoinv(Rc))*
         {
           gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, pseudoinv(w.Rr),
                scalar_t(0.), D_);
