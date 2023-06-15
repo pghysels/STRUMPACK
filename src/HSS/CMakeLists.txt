@@ -24,6 +24,7 @@ install(FILES
   HSSExtra.hpp
   HSSMatrixBase.hpp
   HSSOptions.hpp
+  HSSMatrix.sketch.hpp
   DESTINATION include/HSS)
 
 
