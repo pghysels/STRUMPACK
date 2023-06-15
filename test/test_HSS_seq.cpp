@@ -121,15 +121,15 @@ int run(int argc, char* argv[]) {
     usage();
     exit(1);
   }
-  hss_opts.set_from_command_line(argc, argv);
-
-  if (hss_opts.verbose()) A.print("A");
-  cout << "# tol = " << hss_opts.rel_tol() << endl;
-
 
   {
+    // A.print_to_file("A", "A.m", 12);
+    std::cout << "======= HBS ======================" << std::endl;
+
     HBS::HBSOptions<double> hbs_opts;
     hbs_opts.set_from_command_line(argc, argv);
+    cout << "# tol = " << hbs_opts.rel_tol() << endl;
+
     HBS::HBSMatrix<double> H(A, hbs_opts);
     if (H.is_compressed()) {
       cout << "# created HBS matrix of dimension "
@@ -143,8 +143,8 @@ int run(int argc, char* argv[]) {
     cout << "# rank(H) = " << H.rank() << endl;
     cout << "# memory(H) = " << H.memory()/1e6 << " MB, "
          << 100. * H.memory() / A.memory() << "% of dense" << endl;
-    // H.print_info();
     auto Hdense = H.dense();
+    // Hdense.print_to_file("H", "H.m", 12);
     Hdense.scaled_add(-1., A);
     cout << "# relative error = ||A-H*I||_F/||A||_F = "
          << Hdense.normF() / A.normF() << endl;
@@ -154,9 +154,15 @@ int run(int argc, char* argv[]) {
       cout << "ERROR: compression error too big!!" << endl;
       return 1;
     }
-    exit(0);
+    // exit(0);
+    std::cout << "==================================" << std::endl;
   }
 
+
+  std::cout << "======= HSS ======================" << std::endl;
+  hss_opts.set_from_command_line(argc, argv);
+  if (hss_opts.verbose()) A.print("A");
+  cout << "# tol = " << hss_opts.rel_tol() << endl;
 
   HSSMatrix<double> H(A, hss_opts);
   if (H.is_compressed()) {

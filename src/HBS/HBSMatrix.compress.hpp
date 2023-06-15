@@ -58,35 +58,43 @@ namespace strumpack {
     template<typename scalar_t> void
     HBSMatrix<scalar_t>::compress(const DenseM_t& A,
                                   const opts_t& opts) {
-      int r = opts.d0();
-      int s = 3 * r;
-      auto n = this->cols();
       auto rgen = random::make_random_generator<real_t>
         (opts.random_engine(), opts.random_distribution());
-
-      DenseM_t Rr(n, s), Rc(n, s), Sr(n, s), Sc(n, s);
-      WorkCompress<scalar_t> w;
-      Rr.random(*rgen);
-      Rc.copy(Rr);
-      STRUMPACK_RANDOM_FLOPS
-        (rgen->flops_per_prng() * Rr.rows() * Rr.cols());
-      gemm(Trans::N, Trans::N, scalar_t(1.), A, Rr, scalar_t(0.), Sr);
-      gemm(Trans::C, Trans::N, scalar_t(1.), A, Rc, scalar_t(0.), Sc);
-      if (opts.verbose()) {
-        std::cout << "# compressing with s = " << s << std::endl;
-        // if (opts.compression_sketch() == CompressionSketch::SJLT)
-        //   std::cout << "# nnz total = " << total_nnz << std::endl;
-      }
+      DenseM_t Rr, Rc, Sr, Sc;
+      int s_old = 0;
+      int r = opts.leaf_size();
+      // int r = opts.d0();
+      auto n = this->cols();
+      while (!is_compressed()) {
+        int s = 3 * r + opts.p();
+        WorkCompress<scalar_t> w;
+        Rr.resize(n, s);  DenseMW_t Rr_new(n, s-s_old, Rr, 0, s_old);
+        Rc.resize(n, s);  DenseMW_t Rc_new(n, s-s_old, Rc, 0, s_old);
+        Sr.resize(n, s);  DenseMW_t Sr_new(n, s-s_old, Sr, 0, s_old);
+        Sc.resize(n, s);  DenseMW_t Sc_new(n, s-s_old, Sc, 0, s_old);
+        Rr_new.random(*rgen);
+        Rc_new.copy(Rr_new);
+        STRUMPACK_RANDOM_FLOPS
+          (rgen->flops_per_prng() * Rr_new.rows() * Rr_new.cols());
+        gemm(Trans::N, Trans::N, scalar_t(1.), A, Rr_new, scalar_t(0.), Sr_new);
+        gemm(Trans::C, Trans::N, scalar_t(1.), A, Rc_new, scalar_t(0.), Sc_new);
+        if (opts.verbose()) {
+          std::cout << "# compressing with s = " << s
+                    << " = 3 * " << r << " + " << opts.p() << std::endl;
+          // if (opts.compression_sketch() == CompressionSketch::SJLT)
+          //   std::cout << "# nnz total = " << total_nnz << std::endl;
+        }
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
-      compress_recursive(Rr, Rc, Sr, Sc, opts, w, r);
+        compress_recursive(Rr, Rc, Sr, Sc, opts, w, r);
+        r *= 2;
+      }
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
     nullspace(const DenseMatrix<scalar_t>& A, int k) {
       // return last r columns of a full QR factorization of A^T
       auto At = A.transpose();
-      k = std::max(std::min(k, (int)(At.cols())), 0);
       int minmn = std::min(At.rows(), At.cols());
       std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
       auto info = blas::geqrf
@@ -94,29 +102,43 @@ namespace strumpack {
       if (info)
         std::cerr << "Computation of nullspace failed in QR factorization, "
                   << "info= " << info << std::endl;
-      DenseMatrix<scalar_t> Qt(At.rows(), At.rows());
-      copy(At.rows(), At.cols(), At, 0, 0, Qt, 0, 0);
+      DenseMatrix<scalar_t> Q(At.rows(), At.rows());
+      // TODO this can fail if At.cols > At.rows?
+      copy(At.rows(), At.cols(), At, 0, 0, Q, 0, 0);
       info = blas::xxgqr
-        (Qt.rows(), Qt.cols(), minmn, Qt.data(), Qt.ld(), tau.get());
+        (Q.rows(), Q.cols(), minmn, Q.data(), Q.ld(), tau.get());
       if (info)
         std::cerr << "Computation of nullspace failed in xxGQR, "
                   << "info= " << info << std::endl;
-      return DenseMatrix<scalar_t>(Qt.rows(), k, Qt, 0, Qt.cols()-k);
+      k = std::min(k, (int)(At.rows()));
+      return DenseMatrix<scalar_t>(Q.rows(), k, Q, 0, Q.cols()-k);
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    colspace(const DenseMatrix<scalar_t>& a, int k) {
-      auto A = a;
+    colspace(DenseMatrix<scalar_t>& A, int k,
+             const HBSOptions<scalar_t>& opts) {
       int minmn = std::min(A.rows(), A.cols());
       k = std::min(minmn, k);
       std::unique_ptr<scalar_t[]> tau(new scalar_t[minmn]);
+#if 0
       auto info = blas::geqrf
         (A.rows(), A.cols(), A.data(), A.ld(), tau.get());
       if (info)
         std::cerr << "Computation of colspace failed in QR factorization, "
                   << "info= " << info << std::endl;
-      // TODO check k <= minmn?
       info = blas::xxgqr(A.rows(), k, minmn, A.data(), A.ld(), tau.get());
+#else
+      int r = 0;
+      std::vector<int> ind(A.cols());
+      auto info = blas::geqp3tol
+        (A.rows(), A.cols(), A.data(), A.ld(), ind.data(), tau.get(),
+         r, opts.rel_tol(), opts.abs_tol());
+      if (info)
+        std::cerr << "Computation of colspace failed in QR factorization, "
+                  << "info= " << info << std::endl;
+      k = std::min(r, k);
+      info = blas::xxgqr(A.rows(), k, k, A.data(), A.ld(), tau.get());
+#endif
       if (info)
         std::cerr << "Computation of colspace failed in xxGQR, "
                   << "info= " << info << std::endl;
@@ -124,7 +146,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> DenseMatrix<scalar_t>
-    pseudoinv(const DenseMatrix<scalar_t>& a) {
+    pinv(const DenseMatrix<scalar_t>& a) {
       auto A = a;
       int minmn = std::min(A.rows(), A.cols());
       using real_t = typename RealType<scalar_t>::value_type;
@@ -141,12 +163,21 @@ namespace strumpack {
       return gemm(Trans::C, Trans::C, scalar_t(1.), Vt, U);
     }
 
+
+    /**
+     * Based on: "LINEAR-COMPLEXITY BLACK-BOX RANDOMIZED COMPRESSION
+     * OF RANK-STRUCTURED MATRICES" by JAMES LEVITT AND PER-GUNNAR
+     * MARTINSSON. Algorithm 4.1.
+     *
+     * See https://arxiv.org/abs/2205.02990
+     */
     template<typename scalar_t> void
     HBSMatrix<scalar_t>::compress_recursive(DenseM_t& Rr, DenseM_t& Rc,
                                             DenseM_t& Sr, DenseM_t& Sc,
                                             const opts_t& opts,
                                             WorkCompress<scalar_t>& w,
                                             int r) {
+      // if (is_compressed()) return;
       int s = Rr.cols();
       if (this->leaf()) {
         int m = rows();
@@ -190,36 +221,37 @@ namespace strumpack {
         gemm(Trans::C, Trans::N, scalar_t(1.),  child(1)->V_, w.c[1].Sc, scalar_t(0.), Sc1);
       }
       if (w.lvl == 0) {
-        // D = Sr pseudoinv(Rr)
-        D_ = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, pseudoinv(w.Rr));
+        // D = Sr pinv(Rr)
+        D_ = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, pinv(w.Rr));
+        U_state_ = V_state_ = State::COMPRESSED;
       } else {
         {
           auto P = nullspace(w.Rr, r);
           auto SrP = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, P);
-          U_ = colspace(SrP, r);
+          U_ = colspace(SrP, r, opts);
+          if (int(U_.cols()) >= r - opts.p()) return;
+          U_state_ = State::COMPRESSED;
         } {
           auto Q = nullspace(w.Rc, r);
           auto ScQ = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sc, Q);
-          V_ = colspace(ScQ, r);
+          V_ = colspace(ScQ, r, opts);
+          if (int(V_.cols()) >= r - opts.p()) return;
+          V_state_ = State::COMPRESSED;
         }
-        // D = (I - U U*) Sr pseudoinv(Rr) +
-        //             U U* ((I - V V*) Sc pseudoinv(Rc))*
+        // D = (I - U U*) Sr pinv(Rr) + U U* ((I - V V*) Sc pinv(Rc))*
         D_ = DenseM_t(U_.rows(), V_.rows());
         {
-          gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, pseudoinv(w.Rr),
-               scalar_t(0.), D_);
+          gemm(Trans::N, Trans::N, scalar_t(1.), w.Sr, pinv(w.Rr), scalar_t(0.), D_);
           auto USrRr = gemm(Trans::C, Trans::N, scalar_t(1.), U_, D_);
           gemm(Trans::N, Trans::N, scalar_t(-1.), U_, USrRr, scalar_t(1.), D_);
         } {
-          auto IVVScRc = gemm
-            (Trans::N, Trans::N, scalar_t(1.), w.Sc, pseudoinv(w.Rc));
+          auto IVVScRc = gemm(Trans::N, Trans::N, scalar_t(1.), w.Sc, pinv(w.Rc));
           auto VScRc = gemm(Trans::C, Trans::N, scalar_t(1.), V_, IVVScRc);
           gemm(Trans::N, Trans::N, scalar_t(-1.), V_, VScRc, scalar_t(1.), IVVScRc);
           auto UIVVScRc = gemm(Trans::C, Trans::C, scalar_t(1.), U_, IVVScRc);
           gemm(Trans::N, Trans::N, scalar_t(1.), U_, UIVVScRc, scalar_t(1.), D_);
         }
       }
-      this->U_state_ = this->V_state_ = State::COMPRESSED;
     }
 
   } // end namespace HBS

@@ -58,12 +58,12 @@ namespace strumpack {
           DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
           DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
           if (d_old == 0) {
-            S.add_columns(d,opts.nnz0());
+            S.add_columns(d, opts.nnz0());
             Rr_new.copy(S.SJLT_to_dense());
             matrix_times_SJLT(A, S, Sr_new);
             matrixT_times_SJLT(A, S, Sc_new);
             total_nnz += opts.nnz0();
-          } else{
+          } else {
             SJLTMatrix<scalar_t,int> temp
               (S.get_g(), nnz_cur, n, d-d_old, chunk);
             total_nnz += nnz_cur;

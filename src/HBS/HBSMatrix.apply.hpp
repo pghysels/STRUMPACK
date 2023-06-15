@@ -72,6 +72,13 @@ namespace strumpack {
       return c;
     }
 
+    /**
+     * Based on: "LINEAR-COMPLEXITY BLACK-BOX RANDOMIZED COMPRESSION
+     * OF RANK-STRUCTURED MATRICES" by JAMES LEVITT AND PER-GUNNAR
+     * MARTINSSON. Algorithm 3.1.
+     *
+     * See https://arxiv.org/abs/2205.02990
+     */
     template<typename scalar_t> void
     HBSMatrix<scalar_t>::apply_fwd(const DenseM_t& b,
                                    WorkApply<scalar_t>& w) const {
