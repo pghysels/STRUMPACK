@@ -38,6 +38,7 @@ program fexample
   ! compressed sparse row representation
   integer, dimension (:), allocatable, target :: rptr, cind
   real(kind=8), dimension(:), allocatable, target :: val
+  real(kind=8) :: residual, ri
 
   ! solution and right hand-side vectors
   real(kind=8), dimension(:), allocatable, target :: x, b
@@ -46,7 +47,7 @@ program fexample
   type(STRUMPACK_SparseSolver) :: S
 
 
-  k = 400
+  k = 100
   write(*,*) "# Solving a ", k, "^2 Poisson problem\n"
 
   call STRUMPACK_init_mt(S, STRUMPACK_DOUBLE, STRUMPACK_MT, 0, c_null_ptr, 1)
@@ -132,10 +133,23 @@ program fexample
   call STRUMPACK_set_csr_matrix &
        (S, c_loc(n), c_loc(rptr), c_loc(cind), c_loc(val), 1);
 
-  ! use geometric nested dissection
+  ! Use geometric nested dissection
   ierr = STRUMPACK_reorder_regular(S, k, k, 1, 1, 1)
+  ! If not using a regular mesh, then call
+  !ierr = STRUMPACK_reorder(S)
 
   ! Solve will internally call factor (and reorder if necessary).
   ierr = STRUMPACK_solve(S, c_loc(b), c_loc(x), 0);
+
+  ! check residual norm
+  residual = 0.
+  do r = 1, n
+     ri = b(r)
+     do i = rptr(r)+1, rptr(r+1)
+        ri = ri - val(i) * x(cind(i)+1)
+     end do
+     residual = residual + ri*ri
+  end do
+  write(*,*) "||b-Ax||_2/||b||_2 = ", sqrt(residual)/sqrt(real(n))
 
 end program fexample
