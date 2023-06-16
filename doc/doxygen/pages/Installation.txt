@@ -18,8 +18,6 @@ follows:
 > make -j4
 > make install
 > make examples -j4
-> make tests -j4
-> make test    # can fail on login nodes
 \endcode
 
 The above will only work if you have the following dependencies, and
@@ -170,18 +168,14 @@ or
 
 - __SLATE__ is a modern ScaLAPACK alternative, bringing support for
   GPU acceleration. It can be found at: \n
-  https://bitbucket.org/icl/slate \n
+  https://github.com/icl-utk-edu/slate \n
   Support for SLATE in STRUMPACK can be enabled with for instance:
 \code {.bash}
-> export blaspp_DIR=/blaspp/install/dir/
-> export lapackpp_DIR=/lapackpp/install/dir/
-> export slate_DIR=/slate/install/dir/
+> export SLATE_DIR=/slate/install/dir/
 > cmake ../ -DTPL_ENABLE_SLATE=ON
 \endcode
   This requires that SLATE was configured/installed using CMake, and
-  the blaspp_DIR, lapackpp_DIR and slate_DIR variables point to the
-  installation path. As SLATE is still under active development, SLATE
-  support in STRUMPACK is experimental.
+  the SLATE_DIR variable points to the installation path.
 
 
 - __PARMETIS__ (optional, only used when compiling with MPI) for
