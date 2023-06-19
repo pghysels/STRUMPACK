@@ -409,7 +409,7 @@ namespace strumpack {
         auto k0 = kid0[node];
         auto kbeg = kids.begin() + k0;
         auto kend = kbeg + nc;
-        std::sort(kbeg, kend, [&w](auto a, auto b) {
+        std::sort(kbeg, kend, [&w](integer_t a, integer_t b) {
           return w[a] > w[b]; });
         std::vector<integer_t> sk(kbeg, kend);
         integer_t wl = 0, wr = 0, ncl = 0, ncr = 0;
