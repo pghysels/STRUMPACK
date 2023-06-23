@@ -1,5 +1,6 @@
 target_sources(strumpack
   PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip
   ${CMAKE_CURRENT_LIST_DIR}/FrontFactory.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDense.cpp

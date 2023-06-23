@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.21)
 project(STRUMPACK VERSION 7.1.3 LANGUAGES CXX C Fortran)
 cmake_policy(SET CMP0074 NEW)
 
@@ -112,20 +112,14 @@ if(STRUMPACK_USE_HIP)
       " proceeding with CUDA support instead of HIP.")
     set(STRUMPACK_USE_HIP OFF)
   else()
-    find_package(HIP MODULE)
-    if(HIP_FOUND)
-      set(STRUMPACK_HIP_PLATFORM_HCC ON)
-      find_package(hipblas REQUIRED)
-      find_package(hipsparse REQUIRED)
-      find_package(rocsolver REQUIRED)
-      find_package(rocblas REQUIRED)
-      find_package(rocprim REQUIRED)
-      find_package(rocthrust REQUIRED)
-    else()
-      message(WARNING "HIP compiler not found,"
-        " proceeding without HIP support.")
-      set(STRUMPACK_USE_HIP OFF)
-    endif()
+    enable_language(HIP)
+    find_package(hip REQUIRED)
+    find_package(hipblas REQUIRED)
+    find_package(hipsparse REQUIRED)
+    find_package(rocsolver REQUIRED)
+    find_package(rocblas REQUIRED)
+    find_package(rocprim REQUIRED)
+    find_package(rocthrust REQUIRED)
   endif()
 endif()
 
@@ -520,24 +514,26 @@ if(TPL_ENABLE_COMBBLAS)
   endif()
 endif()
 
-if(STRUMPACK_USE_HIP)
-  set_source_files_properties(
-    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-    src/dense/HIPWrapper.hip.cpp
-    PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
-  if(BUILD_SHARED_LIBS)
-    set(STATIC_OR_SHARED SHARED)
-  else()
-    set(STATIC_OR_SHARED STATIC)
-  endif()
-  hip_add_library(
-    strumpack
-    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-    src/dense/HIPWrapper.hip.cpp
-    ${STATIC_OR_SHARED})
-else()
-  add_library(strumpack "")
-endif()
+# if(STRUMPACK_USE_HIP)
+#   set_source_files_properties(
+#     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+#     src/dense/HIPWrapper.hip.cpp
+#     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
+#   if(BUILD_SHARED_LIBS)
+#     set(STATIC_OR_SHARED SHARED)
+#   else()
+#     set(STATIC_OR_SHARED STATIC)
+#   endif()
+#   hip_add_library(
+#     strumpack
+#     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+#     src/dense/HIPWrapper.hip.cpp
+#     ${STATIC_OR_SHARED})
+# else()
+#   add_library(strumpack "")
+# endif()
+
+add_library(strumpack "")
 
 # this is to fix a link issue for the fortran example when compiling
 # with clang
