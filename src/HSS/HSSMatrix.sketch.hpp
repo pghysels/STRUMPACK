@@ -42,12 +42,12 @@
 namespace strumpack {
   namespace HSS {
 
-    template<typename scalar_t> class BinaryCRSMarix {
+    template<typename scalar_t> class BinaryCRSMatrix {
     public:
-      BinaryCRSMarix(std::size_t n_rows, std::size_t n_cols) :
+      BinaryCRSMatrix(std::size_t n_rows, std::size_t n_cols) :
         nnz_(std::size_t(0)), n_cols_(n_cols), n_rows_(n_rows),
         one_(scalar_t(1.)), col_ind_({}), row_ptr_({std::size_t(0)}) {}
-      BinaryCRSMarix(std::vector<std::size_t> col_ind,
+      BinaryCRSMatrix(std::vector<std::size_t> col_ind,
                      std::vector<std::size_t> row_ptr,
                      std::size_t n_cols) :
         nnz_(col_ind.size()), n_cols_(n_cols),
@@ -99,7 +99,7 @@ namespace strumpack {
        * Appends the cols of a second B-CRS
        * matrix to the end of this matrix:
        */
-      void append_cols(BinaryCRSMarix<scalar_t>& T) {
+      void append_cols(BinaryCRSMatrix<scalar_t>& T) {
         if (T.n_rows() != n_rows_) {
           std::cout << "# Cannot append a matrix with"
                     << " the wrong number of rows" << std::endl
@@ -155,12 +155,12 @@ namespace strumpack {
       std::vector<std::size_t> col_ind_, row_ptr_;
     };
 
-    template<typename scalar_t> class BinaryCCSMarix {
+    template<typename scalar_t> class BinaryCCSMatrix {
     public:
-      BinaryCCSMarix(std::size_t n_rows, std::size_t n_cols) :
+      BinaryCCSMatrix(std::size_t n_rows, std::size_t n_cols) :
         nnz_(std::size_t(0)), n_cols_(n_cols), n_rows_(n_rows),
         one_(scalar_t(1.)), row_ind_({}), col_ptr_({std::size_t(0)}) {}
-      BinaryCCSMarix(std::vector<std::size_t> row_ind,
+      BinaryCCSMatrix(std::vector<std::size_t> row_ind,
                      std::vector<std::size_t> col_ptr,
                      std::size_t n_rows) :
         nnz_(row_ind.size()), n_cols_(col_ptr.size()-1),
@@ -193,7 +193,7 @@ namespace strumpack {
           std::cout << vec[i] << std::endl;
       }
 
-      void append_cols(BinaryCCSMarix<scalar_t>& T) {
+      void append_cols(BinaryCCSMatrix<scalar_t>& T) {
         if (T.n_rows() != n_rows_) {
           std::cout << "# Cannot append a matrix with"
                     << " the wrong number of rows" << std::endl;
@@ -272,10 +272,10 @@ namespace strumpack {
         seed_ = seed;
         e_.seed(seed_);
       }
-      void createSJLTCRS(BinaryCRSMarix<scalar_t>& A,
-                         BinaryCRSMarix<scalar_t>& B,
-                         BinaryCCSMarix<scalar_t>& Ac,
-                         BinaryCCSMarix<scalar_t>& Bc,
+      void createSJLTCRS(BinaryCRSMatrix<scalar_t>& A,
+                         BinaryCRSMatrix<scalar_t>& B,
+                         BinaryCCSMatrix<scalar_t>& Ac,
+                         BinaryCCSMatrix<scalar_t>& Bc,
                          std::size_t nnz, std::size_t n_rows,
                          std::size_t n_cols) {
         if (nnz > n_cols) {
@@ -363,10 +363,10 @@ namespace strumpack {
         Bc.set_ptrs(Bc_final_inds, Bc_col_ptr);
       }
 
-      void createSJLTCRS_Chunks(BinaryCRSMarix<scalar_t>& A,
-                                BinaryCRSMarix<scalar_t>& B,
-                                BinaryCCSMarix<scalar_t>& Ac,
-                                BinaryCCSMarix<scalar_t>& Bc,
+      void createSJLTCRS_Chunks(BinaryCRSMatrix<scalar_t>& A,
+                                BinaryCRSMatrix<scalar_t>& B,
+                                BinaryCCSMatrix<scalar_t>& Ac,
+                                BinaryCCSMatrix<scalar_t>& Bc,
                                 std::size_t nnz, std::size_t n_rows,
                                 std::size_t n_cols) {
         if (nnz > n_cols) {
@@ -492,10 +492,10 @@ namespace strumpack {
       SJLTMatrix(SJLTGenerator<scalar_t, integer_t>& g, std::size_t nnz,
                  std::size_t n_rows, std::size_t n_cols, bool chunk) :
         g_(&g), nnz_(nnz), n_rows_(n_rows), n_cols_(n_cols),
-        A_(BinaryCRSMarix<scalar_t>(0, n_cols)),
-        B_(BinaryCRSMarix<scalar_t>(0, n_cols)),
-        Ac_(BinaryCCSMarix<scalar_t>(n_rows, 0)),
-        Bc_(BinaryCCSMarix<scalar_t>(n_rows, 0)),
+        A_(BinaryCRSMatrix<scalar_t>(0, n_cols)),
+        B_(BinaryCRSMatrix<scalar_t>(0, n_cols)),
+        Ac_(BinaryCCSMatrix<scalar_t>(n_rows, 0)),
+        Bc_(BinaryCCSMatrix<scalar_t>(n_rows, 0)),
         chunk_(chunk) {
         if (chunk_)
           g_->createSJLTCRS_Chunks(A_, B_, Ac_, Bc_, nnz_, n_rows_, n_cols_);
@@ -508,11 +508,11 @@ namespace strumpack {
           std::cout << "# nnz bigger than n_cols cannot proceed" << std::endl;;
           return;
         }
-        BinaryCRSMarix<scalar_t> A_temp(0, new_cols);
-        BinaryCRSMarix<scalar_t> B_temp(0, new_cols);
+        BinaryCRSMatrix<scalar_t> A_temp(0, new_cols);
+        BinaryCRSMatrix<scalar_t> B_temp(0, new_cols);
         /* Fix this */
-        BinaryCCSMarix<scalar_t> Ac_temp(n_rows_, 0);
-        BinaryCCSMarix<scalar_t> Bc_temp(n_rows_, 0);
+        BinaryCCSMatrix<scalar_t> Ac_temp(n_rows_, 0);
+        BinaryCCSMatrix<scalar_t> Bc_temp(n_rows_, 0);
         if (chunk_)
           g_->createSJLTCRS_Chunks(A_temp, B_temp, Ac_temp, Bc_temp,
                                    nnz, n_rows_, new_cols);
@@ -561,10 +561,10 @@ namespace strumpack {
         }
       }
 
-      BinaryCRSMarix<scalar_t>& get_A() { return A_; }
-      BinaryCRSMarix<scalar_t>& get_B() { return B_; }
-      BinaryCCSMarix<scalar_t>& get_Ac() { return Ac_; }
-      BinaryCCSMarix<scalar_t>& get_Bc() { return Bc_; }
+      BinaryCRSMatrix<scalar_t>& get_A() { return A_; }
+      BinaryCRSMatrix<scalar_t>& get_B() { return B_; }
+      BinaryCCSMatrix<scalar_t>& get_Ac() { return Ac_; }
+      BinaryCCSMatrix<scalar_t>& get_Bc() { return Bc_; }
 
       std::size_t get_n_rows() const { return n_rows_; }
       std::size_t get_n_cols() const { return n_cols_; }
@@ -602,8 +602,8 @@ namespace strumpack {
     private:
       SJLTGenerator<scalar_t,integer_t>* g_ = nullptr;
       std::size_t nnz_, n_rows_, n_cols_;
-      BinaryCRSMarix<scalar_t> A_, B_;
-      BinaryCCSMarix<scalar_t> Ac_, Bc_;
+      BinaryCRSMatrix<scalar_t> A_, B_;
+      BinaryCCSMatrix<scalar_t> Ac_, Bc_;
       bool chunk_ = true;
     };
 
