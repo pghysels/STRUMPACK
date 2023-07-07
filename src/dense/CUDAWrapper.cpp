@@ -227,24 +227,24 @@ namespace strumpack {
                        std::complex<double>,
                        DenseMatrix<std::complex<double>>&);
 
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, float* A, int lda, int* Lwork) {
+    void getrf_buffersize(SOLVERHandle& handle, int m, int n,
+			  float* A, int lda, int* Lwork) {
       gpu_check(cusolverDnSgetrf_bufferSize(handle, m, n, A, lda, Lwork));
     }
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, double *A, int lda,
-     int* Lwork) {
+    void getrf_buffersize(SOLVERHandle& handle, int m, int n,
+			  double *A, int lda,
+			  int* Lwork) {
       gpu_check(cusolverDnDgetrf_bufferSize(handle, m, n, A, lda, Lwork));
     }
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, std::complex<float>* A, int lda,
-     int *Lwork) {
+    void getrf_buffersize(SOLVERHandle& handle, int m, int n,
+			  std::complex<float>* A, int lda,
+			  int *Lwork) {
       gpu_check(cusolverDnCgetrf_bufferSize
                 (handle, m, n, reinterpret_cast<cuComplex*>(A), lda, Lwork));
     }
-    void getrf_buffersize
-    (SOLVERHandle& handle, int m, int n, std::complex<double>* A, int lda,
-     int *Lwork) {
+    void getrf_buffersize(SOLVERHandle& handle, int m, int n,
+			  std::complex<double>* A, int lda,
+			  int *Lwork) {
       gpu_check(cusolverDnZgetrf_bufferSize
                 (handle, m, n,
                  reinterpret_cast<cuDoubleComplex*>(A), lda, Lwork));

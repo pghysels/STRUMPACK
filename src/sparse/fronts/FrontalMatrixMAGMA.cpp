@@ -231,7 +231,7 @@ namespace strumpack {
     }
 
     // static const int FRONT_SMALL = 10000000;
-    static const int MIN_BATCH_COUNT = 8;
+    static const int MIN_BATCH_COUNT = 0;
     std::vector<FM_t*> f;
     std::size_t factor_size = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0, work_bytes, ea_bytes,

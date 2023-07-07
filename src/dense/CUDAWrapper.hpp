@@ -63,6 +63,10 @@ namespace strumpack {
 
     void init();
 
+    inline void gpu_peek_at_last_error() {
+      gpu_check(cudaPeekAtLastError());
+    }
+
     inline void synchronize() {
       gpu_check(cudaDeviceSynchronize());
     }
