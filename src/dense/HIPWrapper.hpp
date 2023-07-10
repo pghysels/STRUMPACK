@@ -43,7 +43,7 @@
 
 namespace strumpack {
   namespace gpu {
-7
+
     const unsigned int MAX_BLOCKS_Y = 65535;
     const unsigned int MAX_BLOCKS_Z = 65535;
 
@@ -59,8 +59,12 @@ namespace strumpack {
 
     void init();
 
-    inline void gpu_peek_at_last_error() {
+    inline void peek_at_last_error() {
       gpu_check(hipPeekAtLastError());
+    }
+
+    inline void get_last_error() {
+      hipGetLastError();
     }
 
     inline void synchronize() {

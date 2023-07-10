@@ -129,11 +129,11 @@ namespace strumpack {
           (m, n, max_m, max_n, max_minmn, max_mxn,
            dA_array, ldda, dipiv_array, info_array,
            work, lwork, batchCount, queue);
-	if (info)
-	  std::cerr << "ERROR: magma_sgetrf_vbatched_max_nocheck_work "
-		    << "failed with info= " << info << std::endl;
-	gpu_peek_at_last_error();
-	return info;
+        if (info)
+          std::cerr << "ERROR: magma_sgetrf_vbatched_max_nocheck_work "
+                    << "failed with info= " << info << std::endl;
+        get_last_error();
+        return info;
       }
       inline magma_int_t getrf_vbatched_max_nocheck_work
       (magma_int_t* m, magma_int_t* n,
@@ -148,11 +148,11 @@ namespace strumpack {
           (m, n, max_m, max_n, max_minmn, max_mxn,
            dA_array, ldda, dipiv_array, info_array,
            work, lwork, batchCount, queue);
-	if (info)
-	  std::cerr << "ERROR: magma_dgetrf_vbatched_max_nocheck_work "
-		    << "failed with info= " << info << std::endl;
-	gpu_peek_at_last_error();
-	return info;
+        if (info)
+          std::cerr << "ERROR: magma_dgetrf_vbatched_max_nocheck_work "
+                    << "failed with info= " << info << std::endl;
+        get_last_error();
+        return info;
       }
       inline magma_int_t getrf_vbatched_max_nocheck_work
       (magma_int_t* m, magma_int_t* n,
@@ -167,11 +167,11 @@ namespace strumpack {
           (m, n, max_m, max_n, max_minmn, max_mxn,
            (magmaFloatComplex**)dA_array, ldda,
            dipiv_array, info_array, work, lwork, batchCount, queue);
-	if (info)
-	  std::cerr << "ERROR: magma_cgetrf_vbatched_max_nocheck_work "
-		    << "failed with info= " << info << std::endl;
-	gpu_peek_at_last_error();
-	return info;
+        if (info)
+          std::cerr << "ERROR: magma_cgetrf_vbatched_max_nocheck_work "
+                    << "failed with info= " << info << std::endl;
+        get_last_error();
+        return info;
       }
       inline magma_int_t getrf_vbatched_max_nocheck_work
       (magma_int_t* m, magma_int_t* n,
@@ -186,11 +186,11 @@ namespace strumpack {
           (m, n, max_m, max_n, max_minmn, max_mxn,
            (magmaDoubleComplex**)dA_array, ldda,
            dipiv_array, info_array, work, lwork, batchCount, queue);
-	if (info)
-	  std::cerr << "ERROR: magma_zgetrf_vbatched_max_nocheck_work "
-		    << "failed with info= " << info << std::endl;
-	gpu_peek_at_last_error();
-	return info;
+        if (info)
+          std::cerr << "ERROR: magma_zgetrf_vbatched_max_nocheck_work "
+                    << "failed with info= " << info << std::endl;
+        get_last_error();
+        return info;
       }
 
       inline void trsm_vbatched_max_nocheck
@@ -204,7 +204,7 @@ namespace strumpack {
         magmablas_strsm_vbatched_max_nocheck
           (side, uplo, transA, diag, max_m, max_n, m, n, alpha, dA_array,
            ldda, dB_array, lddb, batchCount, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void trsm_vbatched_max_nocheck
       (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
@@ -217,7 +217,7 @@ namespace strumpack {
         magmablas_dtrsm_vbatched_max_nocheck
           (side, uplo, transA, diag, max_m, max_n, m, n, alpha, dA_array,
            ldda, dB_array, lddb, batchCount, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void trsm_vbatched_max_nocheck
       (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
@@ -233,7 +233,7 @@ namespace strumpack {
           (side, uplo, transA, diag, max_m, max_n, m, n, alpha_,
            (magmaFloatComplex**)dA_array, ldda,
            (magmaFloatComplex**)dB_array, lddb, batchCount, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void trsm_vbatched_max_nocheck
       (magma_side_t side, magma_uplo_t uplo, magma_trans_t transA,
@@ -249,7 +249,7 @@ namespace strumpack {
           (side, uplo, transA, diag, max_m, max_n, m, n, alpha_,
            (magmaDoubleComplex**)dA_array, ldda,
            (magmaDoubleComplex**)dB_array, lddb, batchCount, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
 
       inline void gemm_vbatched_max_nocheck
@@ -266,7 +266,7 @@ namespace strumpack {
           (transA, transB, m, n, k, alpha, dA_array, ldda,
            dB_array, lddb, beta, dC_array, lddc, batchCount,
            max_m, max_n, max_k, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void gemm_vbatched_max_nocheck
       (magma_trans_t transA, magma_trans_t transB,
@@ -282,7 +282,7 @@ namespace strumpack {
           (transA, transB, m, n, k, alpha, dA_array, ldda,
            dB_array, lddb, beta, dC_array, lddc, batchCount,
            max_m, max_n, max_k, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void gemm_vbatched_max_nocheck
       (magma_trans_t transA, magma_trans_t transB,
@@ -304,7 +304,7 @@ namespace strumpack {
            (magmaFloatComplex**)dB_array, lddb, beta_,
            (magmaFloatComplex**)dC_array, lddc, batchCount,
            max_m, max_n, max_k, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void gemm_vbatched_max_nocheck
       (magma_trans_t transA, magma_trans_t transB,
@@ -326,7 +326,7 @@ namespace strumpack {
            (magmaDoubleComplex**)dB_array, lddb, beta_,
            (magmaDoubleComplex**)dC_array, lddc, batchCount,
            max_m, max_n, max_k, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
 
       inline void gemv_vbatched_max_nocheck
@@ -342,7 +342,7 @@ namespace strumpack {
            const_cast<float**>(dA_array), ldda,
            const_cast<float**>(dB_array), lddb, beta,
            dC_array, lddc, batchCount, max_m, max_n, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void gemv_vbatched_max_nocheck
       (magma_trans_t trans, magma_int_t *m, magma_int_t *n, double alpha,
@@ -357,7 +357,7 @@ namespace strumpack {
            const_cast<double**>(dA_array), ldda,
            const_cast<double**>(dB_array), lddb, beta,
            dC_array, lddc, batchCount, max_m, max_n, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void gemv_vbatched_max_nocheck
       (magma_trans_t trans, magma_int_t *m, magma_int_t *n, std::complex<float> alpha,
@@ -376,7 +376,7 @@ namespace strumpack {
            (magmaFloatComplex**)(const_cast<std::complex<float>**>(dB_array)), lddb, beta_,
            (magmaFloatComplex**)dC_array, lddc, batchCount,
            max_m, max_n, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
       inline void gemv_vbatched_max_nocheck
       (magma_trans_t trans, magma_int_t *m, magma_int_t *n,
@@ -396,7 +396,7 @@ namespace strumpack {
            (magmaDoubleComplex**)(const_cast<std::complex<double>**>(dB_array)), lddb, beta_,
            (magmaDoubleComplex**)dC_array, lddc, batchCount,
            max_m, max_n, queue);
-	gpu_peek_at_last_error();
+        get_last_error();
       }
 
     } // end namespace magma
