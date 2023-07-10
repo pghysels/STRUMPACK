@@ -74,7 +74,7 @@ namespace strumpack {
     auto n = size();
 #pragma omp parallel for
     for (integer_t r=0; r<n; r++)
-      std::sort(&ind_[ptr_[r]], &ind_[ptr_[r+1]]);
+       std::sort(ind_.data()+ptr_[r], ind_.data()+ptr_[r + 1]);
   }
 
   template<typename integer_t> void
