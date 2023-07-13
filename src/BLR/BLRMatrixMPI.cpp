@@ -124,6 +124,17 @@ namespace strumpack {
       return Comm().all_reduce(this->rank(), MPI_MAX);
     }
 
+    template<typename scalar_t>
+    typename RealType<scalar_t>::value_type
+    BLRMatrixMPI<scalar_t>::normF() const {
+      real_t nrm2 = 0.;
+      for (auto& b : blocks_) {
+        auto nrm = b->normF();
+        nrm2 += nrm*nrm;
+      }
+      return std::sqrt(nrm2);
+    }
+
     template<typename scalar_t> void
     BLRMatrixMPI<scalar_t>::print(const std::string& name) {
       std::cout << "BLR(" << name << ")="

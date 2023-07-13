@@ -39,6 +39,7 @@ namespace strumpack {
 
     template<typename scalar_t> class DenseTile
       : public BLRTile<scalar_t> {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DMW_t = DenseMatrixWrapper<scalar_t>;
       using BLRT_t = BLRTile<scalar_t>;
@@ -60,6 +61,8 @@ namespace strumpack {
 
       void dense(DenseM_t& A) const override { A = D_; }
       DenseM_t dense() const override { return D_; }
+
+      real_t normF() const { return D_.normF(); }
 
       std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 

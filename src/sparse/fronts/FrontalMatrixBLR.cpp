@@ -316,7 +316,7 @@ namespace strumpack {
             (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
           BLRM_t::construct_and_partial_factor_col
             (F11blr_, F12blr_, F21blr_, F22blr_, sep_tiles_,
-             upd_tiles_, admissibility_, opts.BLR_options(),
+             upd_tiles_, admissibility_, blr_opts,
              [&](int i, bool part, std::size_t CP) {
                build_front_cols
                  (A, i, part, CP, e11, e12, e21, task_depth, opts);
@@ -335,10 +335,16 @@ namespace strumpack {
           lchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
         if (rchild_)
           rchild_->extend_add_to_dense(F11, F12, F21, F22_, this, task_depth);
+        auto nF11 = F11.normF();
+        auto nF12 = F12.normF();
+        auto nF21 = F21.normF();
+        auto nF = std::sqrt(nF11*nF11 + nF12*nF12 + nF21*nF21);
+        auto lopts = blr_opts;
+        lopts.set_abs_tol(lopts.abs_tol() * nF);
         if (dsep)
           BLRM_t::construct_and_partial_factor
             (F11, F12, F21, F22_, F11blr_, F12blr_, F21blr_,
-             sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+             sep_tiles_, upd_tiles_, admissibility_, lopts);
       }
     } else { // ACA or BACA
       auto F11elem = [&](const std::vector<std::size_t>& lI,
@@ -380,7 +386,7 @@ namespace strumpack {
       BLRM_t::construct_and_partial_factor
         (dsep, dupd, F11elem, F12elem, F21elem, F22elem,
          F11blr_, F12blr_, F21blr_, F22blr_,
-         sep_tiles_, upd_tiles_, admissibility_, opts.BLR_options());
+         sep_tiles_, upd_tiles_, admissibility_, blr_opts);
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();

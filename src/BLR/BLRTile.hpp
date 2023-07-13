@@ -45,6 +45,7 @@ namespace strumpack {
     template<typename scalar_t> class DenseTile;
 
     template<typename scalar_t> class BLRTile {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
       using DMW_t = DenseMatrixWrapper<scalar_t>;
@@ -62,6 +63,8 @@ namespace strumpack {
       virtual bool is_low_rank() const = 0;
       virtual void dense(DenseM_t& A) const = 0;
       virtual DenseM_t dense() const = 0;
+
+      virtual real_t normF() const = 0;
 
       virtual std::unique_ptr<BLRTile<scalar_t>> clone() const = 0;
 
