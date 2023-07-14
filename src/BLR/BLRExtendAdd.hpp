@@ -53,48 +53,65 @@ namespace strumpack {
       using VVS_t = std::vector<std::vector<scalar_t>>;
 
     public:
-      static void copy_to_buffers
-      (const DistM_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I);
-      static void copy_to_buffers
-      (const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I);
-      static void copy_to_buffers_col
-      (const DistM_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I, integer_t begin_col, integer_t end_col);
-      static void copy_to_buffers_col
-      (const BLRMPI_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const VI_t& I, integer_t begin_col, integer_t end_col);
+      static void
+      copy_to_buffers(const DistM_t& CB, VVS_t& sbuf,
+                      const FBLRMPI_t* pa, const VI_t& I);
+      static void
+      copy_to_buffers(const BLRMPI_t& CB, VVS_t& sbuf,
+                      const FBLRMPI_t* pa, const VI_t& I);
+      static void
+      copy_to_buffers_col(const DistM_t& CB, VVS_t& sbuf,
+                          const FBLRMPI_t* pa, const VI_t& I,
+                          integer_t begin_col, integer_t end_col);
+      static void
+      copy_to_buffers_col(const BLRMPI_t& CB, VVS_t& sbuf,
+                          const FBLRMPI_t* pa, const VI_t& I,
+                          integer_t begin_col, integer_t end_col);
 
-      static void copy_from_buffers
-      (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-       scalar_t** pbuf, const FBLRMPI_t* pa, const FMPI_t* ch);
-      static void copy_from_buffers_col
-      (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-       scalar_t** pbuf, const FBLRMPI_t* pa, const FMPI_t* ch, 
-       integer_t begin_col, integer_t end_col);
-      static void copy_from_buffers
-      (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-       scalar_t** pbuf, const FBLRMPI_t* pa, const FBLRMPI_t* ch);
-       static void copy_from_buffers_col
-      (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-       scalar_t** pbuf, const FBLRMPI_t* pa, const FBLRMPI_t* ch, 
-       integer_t begin_col, integer_t end_col);
+      static void
+      copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
+                        BLRMPI_t& F21, BLRMPI_t& F22, scalar_t** pbuf,
+                        const FBLRMPI_t* pa, const FMPI_t* ch);
+      static void
+      copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                            BLRMPI_t& F21, BLRMPI_t& F22, scalar_t** pbuf,
+                            const FBLRMPI_t* pa, const FMPI_t* ch,
+                            integer_t begin_col, integer_t end_col);
+      static void
+      copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
+                        BLRMPI_t& F21, BLRMPI_t& F22, scalar_t** pbuf,
+                        const FBLRMPI_t* pa, const FBLRMPI_t* ch);
+      static void
+      copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                            BLRMPI_t& F21, BLRMPI_t& F22, scalar_t** pbuf,
+                            const FBLRMPI_t* pa, const FBLRMPI_t* ch,
+                            integer_t begin_col, integer_t end_col);
 
-      static void seq_copy_to_buffers
-      (const DenseM_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const F_t* ch);
-      static void seq_copy_to_buffers
-      (const BLR_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const F_t* ch);
-      static void seq_copy_to_buffers_col
-      (const DenseM_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const F_t* ch, 
-       integer_t begin_col, integer_t end_col);
-       static void blrseq_copy_to_buffers_col
-      (const BLR_t& CB, VVS_t& sbuf, const FBLRMPI_t* pa, const F_t* ch, 
-       integer_t begin_col, integer_t end_col, const BLROptions<scalar_t>& opts);
+      static void
+      seq_copy_to_buffers(const DenseM_t& CB, VVS_t& sbuf,
+                          const FBLRMPI_t* pa, const F_t* ch);
+      static void
+      seq_copy_to_buffers(const BLR_t& CB, VVS_t& sbuf,
+                          const FBLRMPI_t* pa, const F_t* ch);
+      static void
+      seq_copy_to_buffers_col(const DenseM_t& CB, VVS_t& sbuf,
+                              const FBLRMPI_t* pa, const F_t* ch,
+                              integer_t begin_col, integer_t end_col);
+      static void
+      blrseq_copy_to_buffers_col(const BLR_t& CB, VVS_t& sbuf,
+                                 const FBLRMPI_t* pa, const F_t* ch,
+                                 integer_t begin_col, integer_t end_col,
+                                 const BLROptions<scalar_t>& opts);
 
-      static void seq_copy_from_buffers
-      (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
-       scalar_t*& pbuf, const FBLRMPI_t* pa, const F_t* ch);
-      static void seq_copy_from_buffers_col
-      (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22, 
-       scalar_t*& pbuf, const FBLRMPI_t* pa, const F_t* ch,
-       integer_t begin_col, integer_t end_col);
+      static void
+      seq_copy_from_buffers(BLRMPI_t& F11, BLRMPI_t& F12,
+                            BLRMPI_t& F21, BLRMPI_t& F22, scalar_t*& pbuf,
+                            const FBLRMPI_t* pa, const F_t* ch);
+      static void
+      seq_copy_from_buffers_col(BLRMPI_t& F11, BLRMPI_t& F12,
+                                BLRMPI_t& F21, BLRMPI_t& F22, scalar_t*& pbuf,
+                                const FBLRMPI_t* pa, const F_t* ch,
+                                integer_t begin_col, integer_t end_col);
     };
 
   } // end namespace BLR

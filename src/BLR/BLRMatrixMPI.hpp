@@ -122,6 +122,7 @@ namespace strumpack {
      */
     template<typename scalar_t> class BLRMatrixMPI
       : public structured::StructuredMatrix<scalar_t> {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -145,6 +146,8 @@ namespace strumpack {
       std::size_t total_memory() const;
       std::size_t total_nonzeros() const;
       std::size_t max_rank() const;
+
+      real_t normF() const;
 
       const MPIComm& Comm() const { return grid_->Comm(); }
 

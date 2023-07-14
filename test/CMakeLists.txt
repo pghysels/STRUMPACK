@@ -128,6 +128,27 @@ set(test_name "HSS_seq_21")
 add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 500 --hss_leaf_size 1 --hss_rel_tol 1 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 64 --hss_dd 4)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
 
+set(test_name "HSS_seq_22")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch Gaussian)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_23")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo chunk --hss_nnz0 2 --hss_nnz 2)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_24")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo chunk --hss_nnz0 4 --hss_nnz 4)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_25")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo perm --hss_nnz0 2 --hss_nnz 2)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+set(test_name "HSS_seq_26")
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 1000 --hss_leaf_size 32 --hss_rel_tol 1e-5 --hss_abs_tol 1e-10 --hss_enable_sync --hss_compression_algorithm stable --hss_d0 8 --hss_dd 8 --hss_compression_sketch SJLT --hss_SJLT_algo perm --hss_nnz0 4 --hss_nnz 4)
+set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=3")
+
+
 set(test_name "BLR_seq_1")
 add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm RL)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
@@ -491,7 +512,7 @@ add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq rdb968/rdb968.
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 set(test_name "SPARSE_seq_50")
-add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_enable_METIS_NodeND --sp_compression_min_sep_size 25)
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq utm300/utm300.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_enable_METIS_NodeND --sp_compression_min_sep_size 25 --sp_rel_tol 1e-12)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 set(test_name "SPARSE_seq_56")
@@ -524,7 +545,7 @@ add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavit
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 set(test_name "SPARSE_seq_77")
-add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_enable_METIS_NodeND --sp_compression_min_sep_size 25)
+add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq cavity16/cavity16.mtx --sp_compression BLR --sp_enable_replace_tiny_pivots --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_enable_METIS_NodeND --sp_compression_min_sep_size 25 --sp_rel_tol 1e-10)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 set(test_name "SPARSE_seq_80")
@@ -660,7 +681,7 @@ if(STRUMPACK_USE_MPI)
 
     set(test_name "SPARSE_HODLR_mpi_8")
     add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
-      ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25)
+      ${MPIEXEC_POSTFLAGS} rdb968/rdb968.mtx --sp_compression HODLR --hodlr_leaf_size 4 --hodlr_rel_tol 1 --hodlr_abs_tol 1e-10 --hodlr_rank_guess 16 --sp_reordering_method metis --sp_compression_min_sep_size 25 --sp_rel_tol 1e-8)
     set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
     set(test_name "SPARSE_HODBF_mpi_10")

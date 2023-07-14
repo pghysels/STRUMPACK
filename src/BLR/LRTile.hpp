@@ -46,6 +46,7 @@ namespace strumpack {
      */
     template<typename scalar_t> class LRTile
       : public BLRTile<scalar_t> {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
@@ -94,6 +95,13 @@ namespace strumpack {
 
       void dense(DenseM_t& A) const override;
       DenseM_t dense() const override;
+
+      real_t normF() const {
+        std::cerr << "WARNING: normF of compressed BLR matrix is not supported."
+                  << std::endl;
+        assert(false);
+        return 0.;
+      }
 
       std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 

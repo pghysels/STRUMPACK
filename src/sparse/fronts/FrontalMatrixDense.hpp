@@ -102,13 +102,6 @@ namespace strumpack {
                               int etree_level=0, int task_depth=0) override;
 
     void
-    forward_multifrontal_solve(DenseM_t& b, DenseM_t* work, int etree_level=0,
-                               int task_depth=0) const override;
-    void
-    backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int etree_level=0,
-                                int task_depth=0) const override;
-
-    void
     extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                           const std::vector<std::size_t>& J,
                           DenseM_t& B, int task_depth) const override;
@@ -151,10 +144,10 @@ namespace strumpack {
 
     virtual void
     fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd, int etree_level,
-                     int task_depth) const;
+                     int task_depth) const override;
     virtual void
     bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd, int etree_level,
-                     int task_depth) const;
+                     int task_depth) const override;
 
     ReturnCode matrix_inertia(const DenseM_t& F,
                               integer_t& neg,

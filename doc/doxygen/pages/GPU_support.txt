@@ -10,7 +10,7 @@ and LAPACK, and in the distributed memory setting also ScaLAPACK.  For
 the BLAS and LAPACK operations, we use CUDA, cuBLAS and cuSOLVER for
 acceleration using NVIDIA GPUs. As a ScaLAPACK alternative with GPU
 off-loading capabilities we use SLATE: \n
-https://bitbucket.org/icl/slate/src/master/
+https://github.com/icl-utk-edu/slate
 
 See the \link installation Installation and Requirements \endlink page
 for instructions on how to build STRUMPACK with support for CUDA, and

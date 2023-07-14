@@ -715,12 +715,12 @@ namespace strumpack {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (lchild_) {
       auto el = lchild_->multifrontal_factorization
-	(A, opts, etree_level+1, task_depth);
+        (A, opts, etree_level+1, task_depth);
       if (el != ReturnCode::SUCCESS) err_code = el;
     }
     if (rchild_) {
       auto er = rchild_->multifrontal_factorization
-	(A, opts, etree_level+1, task_depth);
+        (A, opts, etree_level+1, task_depth);
       if (er != ReturnCode::SUCCESS) err_code = er;
     }
 
@@ -754,7 +754,7 @@ namespace strumpack {
     TaskTimer tl("");
     tl.start();
     if (dsep) {
-      cl::sycl::queue q(cl::sycl::default_selector{});
+      cl::sycl::queue q; //(cl::sycl::default_selector{});
       auto scratchpad_size = std::max
         (dpcpp::getrf_buffersize<scalar_t>(q, dsep, dsep, dsep),
          dpcpp::getrs_buffersize<scalar_t>
@@ -829,7 +829,7 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
-    cl::sycl::queue q(cl::sycl::default_selector{});
+    cl::sycl::queue q; //(cl::sycl::default_selector{});
     // cl::sycl::queue q(cl::sycl::cpu_selector{});
     if (opts.verbose())
       std::cout << "# SYCL/DPC++ selected device: "
@@ -968,11 +968,11 @@ namespace strumpack {
     return err_code;
   }
 
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& b, const GPUFactors<scalar_t>* gpu_factors) const {
-    FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
-  }
+  // template<typename scalar_t,typename integer_t> void
+  // FrontSYCL<scalar_t,integer_t>::multifrontal_solve
+  // (DenseM_t& b, const GPUFactors<scalar_t>* gpu_factors) const {
+  //   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
+  // }
 
   template<typename scalar_t,typename integer_t> void
   FrontSYCL<scalar_t,integer_t>::forward_multifrontal_solve

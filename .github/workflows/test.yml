@@ -22,20 +22,20 @@ jobs:
           export BLUE="\033[34;1m"
           mkdir -p installDir
 
-          printf  "${BLUE} PG; Installing gcc-9 via apt\n"
+          printf  "${BLUE} PG; Installing gcc via apt\n"
           sudo apt-get update
           sudo apt-get install build-essential software-properties-common -y
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update
-          sudo apt-get install gcc-9 g++-9 -y
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
-          export CXX="g++-9"
-          export CC="gcc-9"
-          printf "${BLUE} PG; Done installing gcc-9 via apt\n"
+          sudo apt-get install gcc g++ -y
+          # sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 60 --slave /usr/bin/g++ g++ /usr/bin/g++-10
+          export CXX="g++"
+          export CC="gcc"
+          printf "${BLUE} PG; Done installing gcc via apt\n"
 
           printf "${BLUE} PG; Installing gfortran via apt\n"
-          sudo apt-get install gfortran-9 -y
-          sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
+          sudo apt-get install gfortran -y
+          # sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-10 60
           printf "${BLUE} PG; Done installing gfortran via apt\n"
 
           printf "${BLUE} PG; Installing openmpi\n"

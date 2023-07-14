@@ -206,6 +206,8 @@ namespace strumpack {
       void delete_trailing_block() override;
       void reset() override;
 
+      const HSSFactorsMPI<scalar_t>& ULV() { return this->ULV_mpi_; }
+
     private:
       using delemw_t = typename std::function
         <void(const std::vector<std::size_t>& I,

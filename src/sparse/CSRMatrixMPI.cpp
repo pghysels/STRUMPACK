@@ -465,10 +465,10 @@ namespace strumpack {
       // like std::partition but on ind and val arrays simultaneously
       auto lo = ptr_[row];
       auto hi = ptr_[row+1];
-      auto first_ind = &ind_[lo];
-      auto last_ind = &ind_[hi];
-      auto first_val = &val_[lo];
-      auto last_val = &val_[hi];
+      auto first_ind = ind_.data() + lo;
+      auto last_ind = ind_.data() + hi;
+      auto first_val = val_.data() + lo;
+      auto last_val = val_.data() + hi;
       while (1) {
         while ((first_ind != last_ind) && is_diag(*first_ind)) {
           ++first_ind; ++first_val;
@@ -803,8 +803,10 @@ namespace strumpack {
       for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
         eq.R[r] = std::max(eq.R[r], std::abs(val_[j]));
     auto mM = std::minmax_element(eq.R.begin(), eq.R.end());
-    real_t rmin = comm_.all_reduce(*(mM.first), MPI_MIN),
-      rmax = comm_.all_reduce(*(mM.second), MPI_MAX);
+    real_t rmin = lrows_ ? *(mM.first) : std::numeric_limits<real_t>::max();
+    real_t rmax = lrows_ ? *(mM.second) : 0;
+    rmin = comm_.all_reduce(rmin, MPI_MIN);
+    rmax = comm_.all_reduce(rmax, MPI_MAX);
     eq.Amax = rmax;
     if (rmin == 0.) {
       for (integer_t r=0; r<lrows_; r++)
@@ -828,8 +830,10 @@ namespace strumpack {
     }
     comm_.all_reduce(eq.C, MPI_MAX);
     mM = std::minmax_element(eq.C.begin(), eq.C.end());
-    real_t cmin = comm_.all_reduce(*(mM.first), MPI_MIN),
-      cmax = comm_.all_reduce(*(mM.second), MPI_MAX);
+    real_t cmin = lrows_ ? *(mM.first) : std::numeric_limits<real_t>::max();
+    real_t cmax = lrows_ ? *(mM.second) : 0;
+    cmin = comm_.all_reduce(cmin, MPI_MIN);
+    cmax = comm_.all_reduce(cmax, MPI_MAX);
     if (cmin == 0.) {
       for (integer_t i=0; i<n_; i++)
         if (eq.C[i] == 0.) {

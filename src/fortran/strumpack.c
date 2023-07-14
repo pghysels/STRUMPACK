@@ -177,82 +177,26 @@
 #define SWIG_as_voidptrptr(a) ((void)SWIG_as_voidptr(*a),(void**)(a)) 
 
 
-#ifdef __STDC_NO_COMPLEX__
-#error "This generated file requires C complex number support"
-#endif
-
-
-#include <complex.h>
-
-#define SWIG_ccomplex_construct(REAL, IMAG) ((REAL) + I * (IMAG))
-
-
-typedef void* CSPStructMat;
-#include "../StructuredMatrixMPI.h"
+#include "../StrumpackSparseSolver.h"
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-int SP_s_struct_from_dense2d_f(CSPStructMat* S, int comm,
-                               int rows, int cols, const float* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts) {
-  return SP_s_struct_from_dense2d
-    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
+void STRUMPACK_init_f(STRUMPACK_SparseSolver* S, int comm,
+                      STRUMPACK_PRECISION precision,
+                      STRUMPACK_INTERFACE interface,
+                      int argc, char* argv[], int verbose) {
+#if defined(STRUMPACK_USE_MPI)
+  STRUMPACK_init(S, MPI_Comm_f2c(comm),
+                 precision, interface,
+                 argc, argv, verbose);
+#else
+  printf("ERROR: MPI not available.\n");
+#endif
 }
-int SP_d_struct_from_dense2d_f(CSPStructMat* S, int comm,
-                               int rows, int cols, const double* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts) {
-  return SP_d_struct_from_dense2d
-    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
-}
-int SP_c_struct_from_dense2d_f(CSPStructMat* S, int comm,
-                               int rows, int cols, const float _Complex* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts) {
-  return SP_c_struct_from_dense2d
-    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
-}
-int SP_z_struct_from_dense2d_f(CSPStructMat* S, int comm,
-                               int rows, int cols, const double _Complex* A,
-                               int IA, int JA, int* DESCA,
-                               const CSPOptions* opts) {
-  return SP_z_struct_from_dense2d
-    (S, MPI_Comm_f2c(comm), rows, cols, A, IA, JA, DESCA, opts);
-}
-int SP_s_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
-                                    int rows, int cols,
-                                    float A(int i, int j),
-                                    const CSPOptions* opts) {
-  return SP_s_struct_from_elements_mpi
-    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
-}
-int SP_d_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
-                                    int rows, int cols,
-                                    double A(int i, int j),
-                                    const CSPOptions* opts) {
-  return SP_d_struct_from_elements_mpi
-    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
-}
-int SP_c_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
-                                    int rows, int cols,
-                                    float _Complex A(int i, int j),
-                                    const CSPOptions* opts) {
-  return SP_c_struct_from_elements_mpi
-    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
-}
-int SP_z_struct_from_elements_mpi_f(CSPStructMat* S, int comm,
-                                    int rows, int cols,
-                                    double _Complex A(int i, int j),
-                                    const CSPOptions* opts) {
-  return SP_z_struct_from_elements_mpi
-    (S, MPI_Comm_f2c(comm), rows, cols, A, opts);
-}
-
 #ifdef __cplusplus
 }
 #endif
-
 
 

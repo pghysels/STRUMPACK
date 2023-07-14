@@ -510,7 +510,7 @@ namespace strumpack {
           fs = d1*(d1 + 2.0*d2);
           switch (prop_map_) {
           case ProportionalMapping::FLOPS: {
-            dsep_work = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
+            dleaf_work = 2.0/3.0*d1*d1*d1 + 2.0*d1*d1*d2 + 2.0*d2*d2*d1;
           } break;
           case ProportionalMapping::FACTOR_MEMORY: {
             dleaf_work = fs;

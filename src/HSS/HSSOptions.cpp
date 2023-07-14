@@ -48,6 +48,22 @@ namespace strumpack {
       }
     }
 
+    std::string get_name(CompressionSketch a) {
+      switch (a) {
+      case CompressionSketch::GAUSSIAN: return "Gaussian";
+      case CompressionSketch::SJLT: return "SJLT";
+      default: return "unknown";
+      }
+    }
+
+    std::string get_name(SJLTAlgo a) {
+      switch (a) {
+      case SJLTAlgo::CHUNK: return "chunking SJLT sampling ";
+      case SJLTAlgo::PERM: return "permutation SJLT sampling ";
+      default: return "unknown";
+      }
+    }
+
     template<typename scalar_t> void
     HSSOptions<scalar_t>::set_from_command_line
     (int argc, const char* const* cargv) {
@@ -66,17 +82,21 @@ namespace strumpack {
          {"hss_d0",                    required_argument, 0, 4},
          {"hss_dd",                    required_argument, 0, 5},
          {"hss_p",                     required_argument, 0, 6},
-         {"hss_max_rank",              required_argument, 0, 7},
-         {"hss_random_distribution",   required_argument, 0, 8},
-         {"hss_random_engine",         required_argument, 0, 9},
-         {"hss_compression_algorithm", required_argument, 0, 10},
-         {"hss_clustering_algorithm",  required_argument, 0, 11},
-         {"hss_approximate_neighbors", required_argument, 0, 12},
-         {"hss_ann_iterations",        required_argument, 0, 13},
-         {"hss_user_defined_random",   no_argument, 0, 14},
-         {"hss_enable_sync",           no_argument, 0, 15},
-         {"hss_disable_sync",          no_argument, 0, 16},
-         {"hss_log_ranks",             no_argument, 0, 17},
+         {"hss_nnz0",                  required_argument, 0, 7},
+         {"hss_nnz",                   required_argument, 0, 8},
+         {"hss_max_rank",              required_argument, 0, 9},
+         {"hss_random_distribution",   required_argument, 0, 10},
+         {"hss_random_engine",         required_argument, 0, 11},
+         {"hss_compression_algorithm", required_argument, 0, 12},
+         {"hss_compression_sketch",    required_argument, 0, 13},
+         {"hss_SJLT_algo",             required_argument, 0, 14},
+         {"hss_clustering_algorithm",  required_argument, 0, 15},
+         {"hss_approximate_neighbors", required_argument, 0, 16},
+         {"hss_ann_iterations",        required_argument, 0, 17},
+         {"hss_user_defined_random",   no_argument, 0, 18},
+         {"hss_enable_sync",           no_argument, 0, 19},
+         {"hss_disable_sync",          no_argument, 0, 20},
+         {"hss_log_ranks",             no_argument, 0, 21},
          {"hss_verbose",               no_argument, 0, 'v'},
          {"hss_quiet",                 no_argument, 0, 'q'},
          {"help",                      no_argument, 0, 'h'},
@@ -117,10 +137,18 @@ namespace strumpack {
         } break;
         case 7: {
           std::istringstream iss(optarg);
+          iss >> nnz0_; set_nnz0(nnz0_);
+        } break;
+        case 8: {
+          std::istringstream iss(optarg);
+          iss >> nnz_; set_nnz(nnz_);
+        } break;
+        case 9: {
+          std::istringstream iss(optarg);
           iss >> this->max_rank_;
           this->set_max_rank(this->max_rank_);
         } break;
-        case 8: {
+        case 10: {
           std::istringstream iss(optarg);
           std::string s; iss >> s;
           if (s.compare("normal") == 0)
@@ -132,7 +160,7 @@ namespace strumpack {
                       << " recognized, use 'normal' or 'uniform'."
                       << std::endl;
         } break;
-        case 9: {
+        case 11: {
           std::istringstream iss(optarg);
           std::string s; iss >> s;
           if (s.compare("linear") == 0)
@@ -143,7 +171,7 @@ namespace strumpack {
             std::cerr << "# WARNING: random number engine not recognized,"
                       << " use 'linear' or 'mersenne'." << std::endl;
         } break;
-        case 10: {
+        case 12: {
           std::istringstream iss(optarg);
           std::string s; iss >> s;
           if (s.compare("original") == 0)
@@ -157,25 +185,49 @@ namespace strumpack {
                       << " use 'original', 'stable' or 'hard_restart'."
                       << std::endl;
         } break;
-        case 11: {
+        case 13: {
+          std::istringstream iss(optarg);
+          std::string s; iss >> s;
+          if (s.compare("Gaussian") == 0)
+            set_compression_sketch(CompressionSketch::GAUSSIAN);
+          else if (s.compare("SJLT") == 0)
+            set_compression_sketch(CompressionSketch::SJLT);
+          else
+            std::cerr << "# WARNING: compression sketch not recognized,"
+                      << " use 'Gaussian', or 'SJLT'."
+                      << std::endl;
+        } break;
+        case 14: {
+          std::istringstream iss(optarg);
+          std::string s; iss >> s;
+          if (s.compare("chunk") == 0)
+            set_SJLT_algo(SJLTAlgo::CHUNK);
+          else if (s.compare("perm") == 0)
+            set_SJLT_algo(SJLTAlgo::PERM);
+          else
+            std::cerr << "# WARNING: compression sketch not recognized,"
+                      << " use 'chunk', or 'perm'."
+                      << std::endl;
+        } break;
+        case 15: {
           std::istringstream iss(optarg);
           std::string s; iss >> s;
           set_clustering_algorithm(get_clustering_algorithm(s));
         } break;
-        case 12: {
+        case 16: {
           std::istringstream iss(optarg);
           iss >> approximate_neighbors_;
           set_approximate_neighbors(approximate_neighbors_);
         } break;
-        case 13: {
+        case 17: {
           std::istringstream iss(optarg);
           iss >> ann_iterations_;
           set_ann_iterations(ann_iterations_);
         } break;
-        case 14: { set_user_defined_random(true); } break;
-        case 15: { set_synchronized_compression(true); } break;
-        case 16: { set_synchronized_compression(false); } break;
-        case 17: { set_log_ranks(true); } break;
+        case 18: { set_user_defined_random(true); } break;
+        case 19: { set_synchronized_compression(true); } break;
+        case 20: { set_synchronized_compression(false); } break;
+        case 21: { set_log_ranks(true); } break;
         case 'v': this->set_verbose(true); break;
         case 'q': this->set_verbose(false); break;
         case 'h': describe_options(); break;
@@ -201,6 +253,8 @@ namespace strumpack {
                 << "#   --hss_d0 int (default " << d0() << ")" << std::endl
                 << "#   --hss_dd int (default " << dd() << ")" << std::endl
                 << "#   --hss_p int (default " << p() << ")" << std::endl
+                << "#   --hss_nnz0 int (default " << nnz0() << ")" << std::endl
+                << "#   --hss_nnz int (default " << nnz() << ")" << std::endl
                 << "#   --hss_max_rank int (default "
                 << this->max_rank() << ")" << std::endl
                 << "#   --hss_random_distribution normal|uniform (default "
@@ -208,9 +262,13 @@ namespace strumpack {
                 << "#   --hss_random_engine linear|mersenne (default "
                 << get_name(random_engine()) << ")" << std::endl
                 << "#   --hss_compression_algorithm original|stable|hard_restart (default "
-                << get_name(compression_algorithm())<< ")" << std::endl
+                << get_name(compression_algorithm()) << ")" << std::endl
+                << "#   --hss_compression_sketch Gaussian|SJLT (default "
+                << get_name(compression_sketch()) << ")" << std::endl
+                << "#   --hss_SJLT_algo chunk|perm (default "
+                << get_name(SJLT_algo()) << ")" << std::endl
                 << "#   --hss_clustering_algorithm natural|2means|kdtree|pca|cobble (default "
-                << get_name(clustering_algorithm())<< ")" << std::endl
+                << get_name(clustering_algorithm()) << ")" << std::endl
                 << "#   --hss_user_defined_random (default "
                 << user_defined_random() << ")" << std::endl
                 << "#   --hss_approximate_neighbors int (default "

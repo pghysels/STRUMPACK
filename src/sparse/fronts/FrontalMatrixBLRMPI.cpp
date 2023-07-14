@@ -307,10 +307,16 @@ namespace strumpack {
       if (lchild_) lchild_->release_work_memory();
       if (rchild_) rchild_->release_work_memory();
       if (dim_sep() && grid2d().active()) {
+        auto nF11 = F11blr_.normF();
+        auto nF12 = F12blr_.normF();
+        auto nF21 = F21blr_.normF();
+        auto nF = std::sqrt(nF11*nF11 + nF12*nF12 + nF21*nF21);
+        auto lopts = opts.BLR_options();
+        lopts.set_abs_tol(lopts.abs_tol() * nF);
         if (dim_upd())
           piv_ = BLRMPI_t::partial_factor
-            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
-        else piv_ = F11blr_.factor(adm_, opts.BLR_options());
+            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, lopts);
+        else piv_ = F11blr_.factor(adm_, lopts);
         // TODO flops?
       }
     }

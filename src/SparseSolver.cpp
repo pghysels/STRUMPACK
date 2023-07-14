@@ -145,10 +145,91 @@ namespace strumpack {
     return this->solve(*B, X, use_initial_guess);
   }
 
+  template<typename scalar_t,typename integer_t> void
+  SparseSolver<scalar_t,integer_t>::transform_x0
+  (DenseM_t& x, DenseM_t& xtmp) {
+    integer_t N = matrix()->size(), d = x.cols();
+    auto& P = reordering()->iperm();
+    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          x(i, j) = x(i, j) / matching_.C[i];
+    if (opts_.matching() == MatchingJob::NONE)
+      xtmp.copy(x);
+    else
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          xtmp(i, j) = x(matching_.Q[i], j);
+    if (this->equil_.type == EquilibrationType::COLUMN ||
+        this->equil_.type == EquilibrationType::BOTH)
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          xtmp(i, j) = xtmp(i, j) / equil_.C[i];
+    for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+      for (integer_t i=0; i<N; i++)
+        x(i, j) = xtmp(P[i], j);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  SparseSolver<scalar_t,integer_t>::transform_x
+  (DenseM_t& x, DenseM_t& xtmp) {
+    integer_t N = matrix()->size(), d = x.cols();
+    auto& Pi = reordering()->perm();
+    for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+      for (integer_t i=0; i<N; i++)
+        xtmp(i, j) = x(Pi[i], j);
+    if (this->equil_.type == EquilibrationType::COLUMN ||
+        this->equil_.type == EquilibrationType::BOTH)
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          xtmp(i, j) = equil_.C[i] * xtmp(i, j);
+    if (opts_.matching() == MatchingJob::NONE)
+      x.copy(xtmp);
+    else {
+      for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+        for (integer_t i=0; i<N; i++)
+          x(matching_.Q[i], j) = xtmp(i, j);
+      if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+        for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+          for (integer_t i=0; i<N; i++)
+            x(i, j) = matching_.C[i] * x(i, j);
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  SparseSolver<scalar_t,integer_t>::transform_b
+  (const DenseM_t& b, DenseM_t& bloc) {
+    using real_t = typename RealType<scalar_t>::value_type;
+    integer_t N = matrix()->size(), d = b.cols();
+    auto& P = reordering()->iperm();
+    std::vector<real_t> R(N, 1.);
+    if (equil_.type == EquilibrationType::ROW ||
+        equil_.type == EquilibrationType::BOTH)
+      for (integer_t i=0; i<N; i++)
+        R[i] *= equil_.R[i];
+    if (this->reordered_ &&
+        opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
+      for (integer_t i=0; i<N; i++)
+        R[i] *= matching_.R[i];
+    for (integer_t j=0; j<d; j++)
+#pragma omp parallel for
+      for (integer_t i=0; i<N; i++) {
+        auto p = P[i];
+        bloc(i, j) = R[p] * b(p, j);
+      }
+  }
+
   template<typename scalar_t,typename integer_t> ReturnCode
   SparseSolver<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
-    using real_t = typename RealType<scalar_t>::value_type;
     TaskTimer t("solve");
     this->perf_counters_start();
     t.start();
@@ -159,7 +240,6 @@ namespace strumpack {
       ReturnCode ierr = this->reorder();
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
-
     // factor needs to be called, except for the non-preconditioned
     // solvers
     if (!this->factored_ &&
@@ -171,57 +251,18 @@ namespace strumpack {
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
 
-    integer_t N = matrix()->size(), d = b.cols();
-    assert(N < std::numeric_limits<int>::max());
+    integer_t d = b.cols();
+    assert(matrix()->size() < std::numeric_limits<int>::max());
     DenseM_t bloc(b.rows(), d);
 
     auto spmv = [&](const scalar_t* x, scalar_t* y)
                 { matrix()->spmv(x, y); };
     Krylov_its_ = 0;
 
-    auto& P = reordering()->iperm();
-
-    std::vector<real_t> C(N, 1.);
-    if (equil_.type == EquilibrationType::COLUMN ||
-        equil_.type == EquilibrationType::BOTH)
-      for (integer_t i=0; i<N; i++) C[i] *= equil_.C[i];
-    if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-      for (integer_t i=0; i<N; i++) C[i] *= matching_.C[i];
-
     if (use_initial_guess &&
-        opts_.Krylov_solver() != KrylovSolver::DIRECT) {
-      if (opts_.matching() == MatchingJob::NONE)
-        for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-          for (integer_t i=0; i<N; i++) {
-            auto p = P[i];
-            bloc(i, j) = x(p, j) / C[p];
-          }
-      else
-        for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-          for (integer_t i=0; i<N; i++) {
-            auto pq = P[matching_.Q[i]];
-            bloc(i, j) = x(pq, j) / C[pq];
-          }
-      x.copy(bloc);
-    }
-
-    {
-      std::vector<real_t> R(N, 1.);
-      if (equil_.type == EquilibrationType::ROW ||
-          equil_.type == EquilibrationType::BOTH)
-        for (integer_t i=0; i<N; i++) R[i] *= equil_.R[i];
-      if (this->reordered_ &&
-          opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
-        for (integer_t i=0; i<N; i++) R[i] *= matching_.R[i];
-      for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-        for (integer_t i=0; i<N; i++) {
-          auto p = P[i];
-          bloc(i, j) = R[p] * b(p, j);
-        }
-    }
+        opts_.Krylov_solver() != KrylovSolver::DIRECT)
+      transform_x0(x, bloc);
+    transform_b(b, bloc);
 
     auto MFsolve =
       [&](scalar_t* w) {
@@ -286,21 +327,7 @@ namespace strumpack {
          use_initial_guess, opts_.verbose() && is_root_);
     }
     }
-
-    if (opts_.matching() == MatchingJob::NONE) {
-      auto& Pi = reordering()->perm();
-      for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-        for (integer_t i=0; i<N; i++)
-          bloc(i, j) = x(Pi[i], j) * C[i];
-    } else
-      for (integer_t j=0; j<d; j++)
-#pragma omp parallel for
-        for (integer_t i=0; i<N; i++) {
-          auto qp = matching_.Q[P[i]];
-          bloc(qp, j) = x(i, j) * C[qp];
-        }
-    x.copy(bloc);
+    transform_x(x, bloc);
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");

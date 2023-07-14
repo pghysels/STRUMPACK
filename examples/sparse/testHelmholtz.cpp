@@ -44,7 +44,8 @@ extern "C" {
   void STRUMPACK_FC_GLOBAL_(genmatrix3d_anal,GENMATRIX3D_ANAL)
     (void*,void*,void*,void*,void*,void*,void*,void*,void*,void*);
   void STRUMPACK_FC_GLOBAL(genmatrix3d,GENMATRIX3D)
-    (void*,void*,void*,void*,void*,void*,void*,void*,void*,void*,void*,void*,void*);
+    (void*,void*,void*,void*,void*,void*,void*,void*,
+     void*,void*,void*,void*,void*);
 }
 
 /**
@@ -57,21 +58,17 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
   std::int64_t nx_ex = nx;
   nx = std::max(std::int64_t(1), nx - 2 * npml);
   MPIComm c;
-
   std::int64_t rank = c.rank(), P = c.size();
   std::int64_t n_local = std::round(std::floor(float(nx_ex) / P));
-  std::int64_t remaindar = nx_ex%P;
-  std::int64_t low_f;
-  std::int64_t high_f;
-  if(rank+1<=remaindar){
+  std::int64_t remaindar = nx_ex%P, low_f, high_f;
+  if (rank+1 <= remaindar) {
     high_f = (rank+1)*(n_local+1);
     low_f = high_f - (n_local+1) + 1;
-  }else{
+  } else {
     high_f = remaindar*(n_local+1)+(rank+1-remaindar)*n_local;
     low_f = high_f - (n_local) + 1;
   }
-  n_local = high_f - low_f+1;
-
+  n_local = high_f - low_f + 1;
   STRUMPACK_FC_GLOBAL(genmatrix3d_anal,GENMATRIX3D_ANAL)
     (&nx, &nx, &nx, &n_local, &npml, &n, &nnz, &fromfile, datafile, &rank);
 
@@ -102,13 +99,11 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
   c.all_gather(dist.data()+1, 1);
   for (int p=0; p<P; p++) dist[p+1] += dist[p];
 
-  CSRMatrixMPI<std::complex<realt>,std::int64_t> A
+  return CSRMatrixMPI<std::complex<realt>,std::int64_t>
     (lrows, ptr_loc.data(), ind_loc.data(), val_loc.data(),
-     dist.data(), MPI_COMM_WORLD, false); 
-
-  return A;
+     dist.data(), MPI_COMM_WORLD, false);
 }
- 
+
 int main(int argc, char* argv[]) {
   using realt = double;
   using scalart = std::complex<realt>;
@@ -136,10 +131,7 @@ int main(int argc, char* argv[]) {
     spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
     spss.options().set_from_command_line(argc, argv);
 
-
-    CSRMatrixMPI<scalart,std::int64_t> A;
-    A = Helmholtz3D<realt>(nx);
-    // std::cout<<"done here"<<std::endl;
+    auto A = Helmholtz3D<realt>(nx);
     spss.set_matrix(A);
     if (spss.reorder(nx, nx, nx) != ReturnCode::SUCCESS) {
       std::cout << "problem with reordering of the matrix." << std::endl;

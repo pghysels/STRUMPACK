@@ -76,19 +76,6 @@ namespace strumpack {
                                           int etree_level=0,
                                           int task_depth=0) override;
 
-    std::unique_ptr<GPUFactors<scalar_t>> move_to_gpu() const override;
-
-    void multifrontal_solve(DenseM_t& b,
-                            const GPUFactors<scalar_t>* gpu_factors)
-      const override;
-
-    void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
-                                    int etree_level=0, int task_depth=0)
-      const override;
-    void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
-                                     int etree_level=0, int task_depth=0)
-      const override;
-
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override {}
@@ -120,46 +107,9 @@ namespace strumpack {
                              int etree_level=0, int task_depth=0);
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
-                          int etree_level, int task_depth) const;
-
-
-    void rhs_to_contig(LInfo_t& L, const DenseM_t& b, scalar_t* bptr) const;
-    void rhs_from_contig(LInfo_t& L, DenseM_t& b, const scalar_t* bptr) const;
-
-    void assemble_rhs(int nrhs, LInfo_t& L, scalar_t* db, scalar_t* dbupd,
-                      scalar_t* old_dbupd, char* dea_mem, char* hea_mem,
-                      std::size_t mem_size) const;
-    void extract_rhs(int nrhs, LInfo_t& L, scalar_t* dy, scalar_t* dyupd,
-                     scalar_t* old_dyupd, char* dea_mem, char* hea_mem,
-                     std::size_t mem_size) const;
-
-    void fwd_solve_gpu(DenseM_t& b, DenseM_t* work,
-                       const GPUFactors<scalar_t>* gpu_factors) const;
-    void fwd_small_fronts(int nrhs, LInfo_t& L,
-                          gpu::FrontData<scalar_t>* fdata,
-                          gpu::FrontData<scalar_t>* dfdata,
-                          scalar_t* dL, int* dpiv,
-                          scalar_t* db, scalar_t* dbupd) const;
-    void fwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dL, int* dpiv,
-                          int* derr, scalar_t* db, scalar_t* dbupd,
-                          std::vector<gpu::BLASHandle>& blas_handles,
-                          std::vector<gpu::SOLVERHandle>& solver_handles)
-      const;
-
-
-    void bwd_solve_gpu(DenseM_t& y, DenseM_t* work,
-                       const GPUFactors<scalar_t>* gpu_factors) const;
-    void bwd_small_fronts(int nrhs, LInfo_t& L,
-                          gpu::FrontData<scalar_t>* fdata,
-                          gpu::FrontData<scalar_t>* dfdata,
-                          scalar_t* dU, scalar_t* dy, scalar_t* dyupd) const;
-    void bwd_large_fronts(int nrhs, LInfo_t& L, scalar_t* dU,
-                          scalar_t* db, scalar_t* dbupd,
-                          std::vector<gpu::BLASHandle>& blas_handles,
-                          std::vector<gpu::SOLVERHandle>& solver_handles)
-      const;
+                          int etree_level, int task_depth) const override;
 
     ReturnCode node_inertia(integer_t& neg,
                             integer_t& zero,

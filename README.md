@@ -7,7 +7,7 @@ the U.S. Dept. of Energy).  All rights reserved.
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)
 
-   [http://portal.nersc.gov/project/sparse/strumpack/v6.3.1/](http://portal.nersc.gov/project/sparse/strumpack/v6.3.1/)
+   [http://portal.nersc.gov/project/sparse/strumpack/v7.1.3/](http://portal.nersc.gov/project/sparse/strumpack/v7.1.3/)
 
 
 ## Website
@@ -20,7 +20,7 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
  - Wajih Boukaram - wajih.boukaram@lbl.gov
-
+ - Yotam Yaniv - yotamya@math.ucla.edu (UCLA)
 
 ## Past contributors
  - Ryan Synk

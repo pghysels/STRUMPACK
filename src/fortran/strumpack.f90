@@ -36,6 +36,7 @@ module strumpack
  private
 
  ! DECLARATION CONSTRUCTS
+ public :: STRUMPACK_init
  ! typedef enum STRUMPACK_PRECISION
  enum, bind(c)
   enumerator :: STRUMPACK_FLOAT
@@ -156,6 +157,10 @@ module strumpack
  public :: STRUMPACK_SUCCESS, STRUMPACK_MATRIX_NOT_SET, STRUMPACK_REORDERING_ERROR, STRUMPACK_ZERO_PIVOT, &
     STRUMPACK_NO_CONVERGENCE, STRUMPACK_INACCURATE_INERTIA
  public :: STRUMPACK_init_mt
+ public :: STRUMPACK_set_distributed_csr_matrix
+ public :: STRUMPACK_update_distributed_csr_matrix_values
+ public :: STRUMPACK_set_MPIAIJ_matrix
+ public :: STRUMPACK_update_MPIAIJ_matrix_values
  public :: STRUMPACK_destroy
  public :: STRUMPACK_set_csr_matrix
  public :: STRUMPACK_update_csr_matrix_values
@@ -240,6 +245,19 @@ module strumpack
 
 ! WRAPPER DECLARATIONS
 interface
+subroutine STRUMPACK_init(s, comm, precision, interface, argc, argv, verbose) &
+bind(C, name="STRUMPACK_init_f")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver) :: s
+integer(C_INT), intent(in), value :: comm
+integer(C_INT), intent(in), value :: precision
+integer(C_INT), intent(in), value :: interface
+integer(C_INT), intent(in), value :: argc
+type(C_PTR), value :: argv
+integer(C_INT), intent(in), value :: verbose
+end subroutine
+
 subroutine STRUMPACK_init_mt(s, precision, interface, argc, argv, verbose) &
 bind(C, name="STRUMPACK_init_mt")
 use, intrinsic :: ISO_C_BINDING
@@ -250,6 +268,62 @@ integer(C_INT), intent(in), value :: interface
 integer(C_INT), intent(in), value :: argc
 type(C_PTR), value :: argv
 integer(C_INT), intent(in), value :: verbose
+end subroutine
+
+subroutine STRUMPACK_set_distributed_csr_matrix(s, local_rows, row_ptr, col_ind, values, dist, symmetric_pattern) &
+bind(C, name="STRUMPACK_set_distributed_csr_matrix")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver), intent(in), value :: s
+type(C_PTR), intent(in), value :: local_rows
+type(C_PTR), intent(in), value :: row_ptr
+type(C_PTR), intent(in), value :: col_ind
+type(C_PTR), intent(in), value :: values
+type(C_PTR), intent(in), value :: dist
+integer(C_INT), intent(in), value :: symmetric_pattern
+end subroutine
+
+subroutine STRUMPACK_update_distributed_csr_matrix_values(s, local_rows, row_ptr, col_ind, values, dist, symmetric_pattern) &
+bind(C, name="STRUMPACK_update_distributed_csr_matrix_values")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver), intent(in), value :: s
+type(C_PTR), intent(in), value :: local_rows
+type(C_PTR), intent(in), value :: row_ptr
+type(C_PTR), intent(in), value :: col_ind
+type(C_PTR), intent(in), value :: values
+type(C_PTR), intent(in), value :: dist
+integer(C_INT), intent(in), value :: symmetric_pattern
+end subroutine
+
+subroutine STRUMPACK_set_MPIAIJ_matrix(s, n, d_ptr, d_ind, d_val, o_ptr, o_ind, o_val, garray) &
+bind(C, name="STRUMPACK_set_MPIAIJ_matrix")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver), intent(in), value :: s
+type(C_PTR), intent(in), value :: n
+type(C_PTR), intent(in), value :: d_ptr
+type(C_PTR), intent(in), value :: d_ind
+type(C_PTR), intent(in), value :: d_val
+type(C_PTR), intent(in), value :: o_ptr
+type(C_PTR), intent(in), value :: o_ind
+type(C_PTR), intent(in), value :: o_val
+type(C_PTR), intent(in), value :: garray
+end subroutine
+
+subroutine STRUMPACK_update_MPIAIJ_matrix_values(s, n, d_ptr, d_ind, d_val, o_ptr, o_ind, o_val, garray) &
+bind(C, name="STRUMPACK_update_MPIAIJ_matrix_values")
+use, intrinsic :: ISO_C_BINDING
+import :: strumpack_sparsesolver
+type(STRUMPACK_SparseSolver), intent(in), value :: s
+type(C_PTR), intent(in), value :: n
+type(C_PTR), intent(in), value :: d_ptr
+type(C_PTR), intent(in), value :: d_ind
+type(C_PTR), intent(in), value :: d_val
+type(C_PTR), intent(in), value :: o_ptr
+type(C_PTR), intent(in), value :: o_ind
+type(C_PTR), intent(in), value :: o_val
+type(C_PTR), intent(in), value :: garray
 end subroutine
 
 subroutine STRUMPACK_destroy(s) &

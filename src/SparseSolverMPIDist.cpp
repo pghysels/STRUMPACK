@@ -210,9 +210,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::separator_reordering() {
     // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
-    // using real_t = typename RealType<scalar_t>::value_type;
-    // auto shifted_mat = mat_mpi_->add_missing_diagonal
-    //   (std::sqrt(blas::lamch<real_t>('E')) * mat_mpi_->norm1());
+    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
     // tree_mpi_dist_->separator_reordering(opts_, *shifted_mat);
     tree_mpi_dist_->separator_reordering(opts_, *mat_mpi_);
   }
@@ -220,9 +218,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
     // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
-    // using real_t = typename RealType<scalar_t>::value_type;
-    // auto shifted_mat = mat_mpi_->add_missing_diagonal
-    //   (std::sqrt(blas::lamch<real_t>('E')) * mat_mpi_->norm1());
+    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
     // tree_mpi_dist_.reset
     //   (new EliminationTreeMPIDist<scalar_t,integer_t>
     //    (opts_, *shifted_mat, *nd_mpi_, comm_));
@@ -295,6 +291,8 @@ namespace strumpack {
           for (std::size_t i=0; i<nloc; i++)
             C[i] /= this->matching_.C[i + mat_mpi_->begin_row()];
         x.scale_rows_real(C);
+
+        // TODO this needs to apply the (inverse) matching permutation!!
       }
     }
 
@@ -365,14 +363,14 @@ namespace strumpack {
     }; break;
     }
 
+    if (this->equil_.type == EquilibrationType::COLUMN ||
+        this->equil_.type == EquilibrationType::BOTH)
+      x.scale_rows_real(this->equil_.C.data() + mat_mpi_->begin_row());
     if (opts_.matching() != MatchingJob::NONE) {
       permute_vector(x, this->matching_.Q, mat_mpi_->dist(), comm_);
       if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
         x.scale_rows_real(this->matching_.C.data() + mat_mpi_->begin_row());
     }
-    if (this->equil_.type == EquilibrationType::COLUMN ||
-        this->equil_.type == EquilibrationType::BOTH)
-      x.scale_rows_real(this->equil_.C.data() + mat_mpi_->begin_row());
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");

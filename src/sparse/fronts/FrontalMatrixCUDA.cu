@@ -83,9 +83,9 @@ namespace strumpack {
      *
      */
     template<typename T, int unroll> __global__ void
-    assemble_kernel(unsigned int f0, unsigned int nf, AssembleData<T>* dat) {
-      int idx = (blockIdx.x * blockDim.x) * unroll + threadIdx.x,
-        op = (blockIdx.y + f0) * blockDim.y + threadIdx.y;
+    assemble_kernel(unsigned int nf, AssembleData<T>* dat) {
+      int idx = blockIdx.x * blockDim.x * unroll + threadIdx.x,
+        op = blockIdx.y * blockDim.y + threadIdx.y;
       if (op >= nf) return;
       auto& F = dat[op];
       for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
@@ -167,7 +167,7 @@ namespace strumpack {
           dim3 block(nt, ops);
           for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
             dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Y));
-            assemble_kernel<T,unroll><<<grid,block>>>(f, nf, ddat+f*ops);
+            assemble_kernel<T,unroll><<<grid,block>>>(nf-f*ops, ddat+f*ops);
           }
         }
       }
@@ -195,9 +195,9 @@ namespace strumpack {
             for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
               dim3 grid(nbx, ny, std::min(nbf-f, MAX_BLOCKS_Z));
               extend_add_kernel<T_,unroll><<<grid, block>>>
-                (y, nf, dat_+f*ops, true);
+                (y, nf-f*ops, dat_+f*ops, true);
               extend_add_kernel<T_,unroll><<<grid, block>>>
-                (y, nf, dat_+f*ops, false);
+                (y, nf-f*ops, dat_+f*ops, false);
             }
           }
         }
@@ -329,6 +329,46 @@ namespace strumpack {
         replace_pivots_kernel<T_,real_t><<<(n+NT-1)/NT, NT>>>
           (n, (T_*)(A), thresh);
       gpu_check(cudaPeekAtLastError());
+    }
+
+    template<typename T, typename real_t> __global__ void
+    replace_pivots_vbatch_kernel(int* dn, T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount) {
+      int i = blockIdx.x * blockDim.x + threadIdx.x,
+        f = blockIdx.y * blockDim.y + threadIdx.y;
+      if (f >= batchCount) return;
+      if (i >= dn[f]) return;
+      auto A = dA[f];
+      auto ldA = lddA[f];
+      std::size_t ii = i + i*ldA;
+      if (absolute_value(A[ii]) < thresh)
+        A[ii] = (real_part(A[ii]) < 0) ? -thresh : thresh;
+    }
+
+    template<typename T, typename real_t>
+    void replace_pivots_vbatched(BLASHandle& handle, int* dn, int max_n,
+                                 T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount) {
+      if (max_n <= 0 || !batchCount) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > max_n) {
+        nt /= 2;
+        ops *= 2;
+      }
+      ops = std::min(ops, batchCount);
+      unsigned int nbx = (max_n + nt - 1) / nt,
+        nbf = (batchCount + ops - 1) / ops;
+      dim3 block(nt, ops);
+      using T_ = typename cuda_type<T>::value_type;
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+        dim3 grid(nbx, std::min(nbf-f, MAX_BLOCKS_Y));
+        cudaStream_t streamId;
+        cublasGetStream(handle, &streamId);
+        auto f0 = f * ops;
+        replace_pivots_vbatch_kernel<<<grid, block, 0, streamId>>>
+          (dn+f0, (T_**)(dA)+f0, lddA+f0, thresh, batchCount-f0);
+        gpu_check(cudaPeekAtLastError());
+      }
     }
 
     /**
@@ -468,162 +508,70 @@ namespace strumpack {
       solve_block_kernel<T,NT>(A.n1, nrhs, A.F11, A.F12, A.piv);
     }
 
-    template<typename T, int NT, int alpha, int beta> __device__ void
-    gemmNN_block_inner_kernel(int m, int n, int k,
-                              T* Aglobal, T* Bglobal, T* Cglobal) {
-      using cuda_primitive_t = typename primitive_type<T>::value_type;
-      __shared__ cuda_primitive_t B_[NT*NT], A_[NT*NT];
-      T *B = reinterpret_cast<T*>(B_), *A = reinterpret_cast<T*>(A_);
-      int j = threadIdx.x, i = threadIdx.y;
-      for (int cb=0; cb<n; cb+=NT) {
-        int c = cb + j;
-        // put NT columns of Bglobal in shared memory B
-        if (i < k && c < n)
-          B[j+i*NT] = Bglobal[i+c*k];
-        __syncthreads();
-        for (int rb=0; rb<m; rb+=NT) {
-          int r = rb + i;
-          // put NT rows of F21 in shared memory A
-          if (r < m && j < k)
-            A[j+i*NT] = Aglobal[r+j*m];
-          __syncthreads(); // wait for A and B
-          if (c < n && r < m) {
-            T tmp(0.);
-            // l < n <= NT, by using k<NT this can be unrolled
-            for (int l=0; l<k; l++)
-              tmp += A[l+i*NT] * B[j+l*NT];
-            Cglobal[r+c*m] = T(alpha) * tmp + T(beta) * Cglobal[r+c*m];
-          }
-          __syncthreads(); // sync before reading new A/B
-        }
-      }
-    }
-    /**
-     * Compute C = alpha*A*B + beta*C, with a single thread block,
-     * with NT x NT threads. A is m x k, and k <= NT. B is m x n and C
-     * is m x n.
-     */
-    template<typename T, int NT, int alpha, int beta> __global__ void
-    gemmNN_block_inner_kernel_batched(int nrhs, FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
-      gemmNN_block_inner_kernel<T,NT,alpha,beta>
-        (A.n2, nrhs, A.n1, A.F21, A.F12, A.F22);
-    }
-
-    /**
-     * Compute a matrix vector product C = alpha*A + beta*C with a
-     * single 1 x NT thread block. A is m x k, with m <= NT. B is k x
-     * 1, C is m x 1.
-     */
-    template<typename T, int NT, int alpha, int beta> __device__ void
-    gemvN_block_inner_kernel(int m, int k,
-                             T* Aglobal, T* Bglobal, T* Cglobal) {
-      using cuda_primitive_t = typename primitive_type<T>::value_type;
-      __shared__ cuda_primitive_t B_[NT];
-      T *B = reinterpret_cast<T*>(B_);
-      int i = threadIdx.y;
-      B[i] = Bglobal[i];
-      __syncthreads();
-      for (int r=i; r<m; r+=NT) {
-        T tmp(0.);
-        for (int j=0; j<k; j++) // j < k <= NT
-          tmp += Aglobal[r+j*m] * B[j];
-        Cglobal[r] = T(alpha) * tmp + T(beta) * Cglobal[r];
-      }
-    }
-    template<typename T, int NT, int alpha, int beta> __global__ void
-    gemvN_block_inner_kernel_batched(FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
-      gemvN_block_inner_kernel<T,NT,alpha,beta>
-        (A.n2, A.n1, A.F21, A.F12, A.F22);
-    }
-
     /**
      * Single extend-add operation along the column dimension, for the
      * solve.  d1 is the size of F11, d2 is the size of F22.
      */
     template<typename T> __device__ void
-    ea_rhs_kernel(int x, int y, int nrhs, int dsep, int dupd, int dCB,
+    ea_rhs_kernel(int r, int N, int nrhs,
+                  int dsep, int dupd, int dCB,
                   T* b, T* bupd, T* CB, std::size_t* I) {
-      if (x >= nrhs || y >= dCB) return;
-      auto Iy = I[y];
-      if (Iy < dsep) b[Iy+x*dsep] += CB[y+x*dCB];
-      else bupd[Iy-dsep+x*dupd] += CB[y+x*dCB];
+      if (r >= dCB) return;
+      auto Ir = I[r];
+      for (int c=0; c<nrhs; c++)
+        if (Ir < dsep) b[Ir+c*N] += CB[r+c*dCB];
+        else bupd[Ir-dsep+c*dupd] += CB[r+c*dCB];
     }
 
     template<typename T> __global__ void
     extend_add_rhs_kernel_left
-    (int nrhs, unsigned int by0, AssembleData<T>* dat) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
-      if (F.CB1)
-        ea_rhs_kernel(x, y, nrhs, F.d1, F.d2, F.dCB1,
-                      F.F11, F.F21, F.CB1, F.I1);
+    (int N, int nrhs, unsigned int nf, AssembleData<T>* dat) {
+      int r = blockIdx.x * blockDim.x + threadIdx.x,
+        i = blockIdx.y * blockDim.y + threadIdx.y;
+      if (i >= nf) return;
+      auto& f = dat[i];
+      if (f.CB1)
+        ea_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB1,
+                      f.F11, f.F21, f.CB1, f.I1);
     }
     template<typename T> __global__ void
     extend_add_rhs_kernel_right
-    (int nrhs, unsigned int by0, AssembleData<T>* dat) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
-      if (F.CB2)
-        ea_rhs_kernel(x, y, nrhs, F.d1, F.d2, F.dCB2,
-                      F.F11, F.F21, F.CB2, F.I2);
+    (int N, int nrhs, unsigned int nf, AssembleData<T>* dat) {
+      int r = blockIdx.x * blockDim.x + threadIdx.x,
+        i = blockIdx.y * blockDim.y + threadIdx.y;
+      if (i >= nf) return;
+      auto& f = dat[i];
+      if (f.CB2)
+        ea_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB2,
+                      f.F11, f.F21, f.CB2, f.I2);
     }
-
 
     template<typename T> void
-    extend_add_rhs(int nrhs, unsigned int nf,
+    extend_add_rhs(int N, int nrhs, unsigned int nf,
                    AssembleData<T>* dat, AssembleData<T>* ddat) {
-      unsigned int nty = 64, nby = 0;
-      for (int f=0; f<nf; f++) {
-        int b = dat[f].dCB1 / nty + (dat[f].dCB1 % nty != 0);
-        if (b > nby) nby = b;
-        b = dat[f].dCB2 / nty + (dat[f].dCB2 % nty != 0);
-        if (b > nby) nby = b;
+      int du = 0;
+      for (unsigned int f=0; f<nf; f++)
+        du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
+      if (!du) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > du && ops < 64) {
+        nt /= 2;
+        ops *= 2;
       }
-      int ntx = (nrhs == 1) ? 1 : 16;
-      int nbx = nrhs / ntx + (nrhs % ntx != 0);
-      dim3 block(ntx, nty);
+      ops = std::min(ops, nf);
+      unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
+      dim3 block(nt, ops);
       using T_ = typename cuda_type<T>::value_type;
       auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
-      for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
-        int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
-        for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
-          dim3 grid(nbx, nbyy, std::min(nf-f, MAX_BLOCKS_Z));
-          extend_add_rhs_kernel_left<<<grid, block>>>(nrhs, by, dat_+f);
-        }
-      }
-      gpu_check(cudaPeekAtLastError());
-      gpu_check(cudaDeviceSynchronize());
-      for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
-        int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
-        for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
-          dim3 grid(nbx, nbyy, std::min(nf-f, MAX_BLOCKS_Z));
-          extend_add_rhs_kernel_right<<<grid, block>>>(nrhs, by, dat_+f);
-        }
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
+        dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Z));
+        extend_add_rhs_kernel_left<<<grid, block>>>
+          (N, nrhs, nf-f*ops, dat_+f*ops);
+        extend_add_rhs_kernel_right<<<grid, block>>>
+          (N, nrhs, nf-f*ops, dat_+f*ops);
       }
       gpu_check(cudaPeekAtLastError());
     }
-
-    template<typename T, int NT> void
-    fwd_block_batch(int nrhs, unsigned int count,
-                    FrontData<T>* dat) {
-      if (!count) return;
-      using T_ = typename cuda_type<T>::value_type;
-      auto dat_ = reinterpret_cast<FrontData<T_>*>(dat);
-      dim3 block(NT, NT);
-      solve_block_kernel_batched<T_,NT><<<count, block>>>(nrhs, dat_);
-      if (nrhs == 1) {
-        dim3 block1(1, NT);
-        gemvN_block_inner_kernel_batched
-          <T_,NT,-1,1><<<count, block1>>>(dat_);
-      } else
-        gemmNN_block_inner_kernel_batched
-          <T_,NT,-1,1><<<count, block>>>(nrhs, dat_);
-    }
-
 
 
     /**
@@ -631,145 +579,52 @@ namespace strumpack {
      * solve.  d1 is the size of F11, d2 is the size of F22.
      */
     template<typename T> __device__ void
-    extract_rhs_kernel(int x, int y, int nrhs, int dsep, int dupd, int dCB,
+    extract_rhs_kernel(int r, int N, int nrhs,
+                       int dsep, int dupd, int dCB,
                        T* b, T* bupd, T* CB, std::size_t* I) {
-      if (x >= nrhs || y >= dCB) return;
-      auto Iy = I[y];
-      if (Iy < dsep) CB[y+x*dCB] = b[Iy+x*dsep];
-      else CB[y+x*dCB] = bupd[Iy-dsep+x*dupd];
+      if (r >= dCB) return;
+      auto Ir = I[r];
+      for (int c=0; c<nrhs; c++)
+        if (Ir < dsep) CB[r+c*dCB] = b[Ir+c*N];
+        else CB[r+c*dCB] = bupd[Ir-dsep+c*dupd];
     }
 
     template<typename T> __global__ void
-    extract_rhs_kernel(int nrhs, unsigned int by0, AssembleData<T>* dat) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x,
-        y = (blockIdx.y + by0) * blockDim.y + threadIdx.y;
-      auto& F = dat[blockIdx.z];
-      if (F.CB1)
-        extract_rhs_kernel(x, y, nrhs, F.d1, F.d2, F.dCB1,
-                           F.F11, F.F21, F.CB1, F.I1);
-      if (F.CB2)
-        extract_rhs_kernel(x, y, nrhs, F.d1, F.d2, F.dCB2,
-                           F.F11, F.F21, F.CB2, F.I2);
+    extract_rhs_kernel(int N, int nrhs, unsigned int nf,
+                       AssembleData<T>* dat) {
+      int r = blockIdx.x * blockDim.x + threadIdx.x,
+        i = blockIdx.y * blockDim.y + threadIdx.y;
+      if (i >= nf) return;
+      auto& f = dat[i];
+      if (f.CB1)
+        extract_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB1,
+                           f.F11, f.F21, f.CB1, f.I1);
+      if (f.CB2)
+        extract_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB2,
+                           f.F11, f.F21, f.CB2, f.I2);
     }
 
     template<typename T> void
-    extract_rhs(int nrhs, unsigned int nf, AssembleData<T>* dat,
+    extract_rhs(int N, int nrhs, unsigned int nf, AssembleData<T>* dat,
                 AssembleData<T>* ddat) {
-      unsigned int nty = 64, nby = 0;
-      for (int f=0; f<nf; f++) {
-        int b = dat[f].dCB1 / nty + (dat[f].dCB1 % nty != 0);
-        if (b > nby) nby = b;
-        b = dat[f].dCB2 / nty + (dat[f].dCB2 % nty != 0);
-        if (b > nby) nby = b;
+      int du = 0;
+      for (unsigned int f=0; f<nf; f++)
+        du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
+      if (!du) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > du && ops < 64) {
+        nt /= 2;
+        ops *= 2;
       }
-      int ntx = (nrhs == 1) ? 1 : 16;
-      int nbx = nrhs / ntx + (nrhs % ntx != 0);
-      dim3 block(ntx, nty);
+      ops = std::min(ops, nf);
+      unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
+      dim3 block(nt, ops);
       using T_ = typename cuda_type<T>::value_type;
       auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
-      for (unsigned int by=0; by<nby; by+=MAX_BLOCKS_Y) {
-        int nbyy = std::min(nby-by, MAX_BLOCKS_Y);
-        for (unsigned int f=0; f<nf; f+=MAX_BLOCKS_Z) {
-          dim3 grid(nbx, nbyy, std::min(nf-f, MAX_BLOCKS_Z));
-          extract_rhs_kernel<<<grid, block>>>(nrhs, by, dat_+f);
-        }
-      }
-    }
-
-
-
-    /**
-     * Compute a matrix vector product C = alpha*A + beta*C with a
-     * single 1 x NT thread block. A is m x k, with k <= NT. B is k x
-     * 1, C is m x 1.
-     */
-    template<typename T, int NT, int alpha, int beta> __device__ void
-    gemvN_block_outer_kernel(int m, int k,
-                             T* Aglobal, T* Bglobal, T* Cglobal) {
-      using cuda_primitive_t = typename primitive_type<T>::value_type;
-      __shared__ cuda_primitive_t B_[NT], C_[NT];
-      T *B = reinterpret_cast<T*>(B_), *C = reinterpret_cast<T*>(C_);
-      int i = threadIdx.y;
-      C[i] = T(0.);
-      for (int c=0; c<k; c+=NT) {
-        B[i] = Bglobal[c+i];
-        __syncthreads();
-        if (i < m) {
-          T tmp(0.);
-          for (int j=0; j<min(NT, k-c); j++)
-            tmp += Aglobal[i+(c+j)*m] * B[j];
-          C[i] += tmp;
-        }
-      }
-      if (i < m)
-        Cglobal[i] = T(alpha) * C[i] + T(beta) * Cglobal[i];
-    }
-    template<typename T, int NT, int alpha, int beta> __global__ void
-    gemvN_block_outer_kernel_batched(FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
-      // F12 is F12, F21 holds yupd, F11 holds y
-      gemvN_block_outer_kernel<T,NT,alpha,beta>
-        (A.n1, A.n2, A.F12, A.F21, A.F11);
-    }
-
-
-    template<typename T, int NT, int alpha, int beta> __device__ void
-    gemmNN_block_outer_kernel(int m, int n, int k,
-                              T* Aglobal, T* Bglobal, T* Cglobal) {
-      using cuda_primitive_t = typename primitive_type<T>::value_type;
-      __shared__ cuda_primitive_t B_[NT*NT], A_[NT*NT], C_[NT*NT];
-      T *A = reinterpret_cast<T*>(A_), *B = reinterpret_cast<T*>(B_),
-        *C = reinterpret_cast<T*>(C_);
-      int j = threadIdx.x, i = threadIdx.y;
-      for (int nb=0; nb<n; nb+=NT) {
-        int n_ = nb + j;
-        C[i+j*NT] = T(0.);
-        for (int kb=0; kb<k; kb+=NT) {
-          int dk = min(NT, k-kb);
-          if (j < dk && i < m)
-            A[i+j*NT] = Aglobal[i+(kb+j)*m];
-          if (i < dk && n_ < n)
-            B[i+j*NT] = Bglobal[(kb+i)+n_*k];
-          __syncthreads();
-          if (i < m && n_ < n) {
-            T tmp(0.);
-            for (int l=0; l<dk; l++)
-              tmp += A[i+l*NT] * B[l+j*NT];
-            C[i+j*NT] += tmp;
-          }
-          __syncthreads();
-        }
-        if (i < m && n_ < n)
-          Cglobal[i+n_*m] = T(alpha) * C[i+j*NT] + T(beta) * Cglobal[i+n_*m];
-      }
-    }
-    /**
-     * Compute C = alpha*A*B + beta*C, with a single thread block,
-     * with NT x NT threads. A is m x k, and k <= NT. B is m x n and C
-     * is m x n.
-     */
-    template<typename T, int NT, int alpha, int beta> __global__ void
-    gemmNN_block_outer_kernel_batched(int nrhs, FrontData<T>* dat) {
-      FrontData<T>& A = dat[blockIdx.x];
-      gemmNN_block_outer_kernel<T,NT,alpha,beta>
-        (A.n1, nrhs, A.n2, A.F12, A.F21, A.F11);
-    }
-
-
-    template<typename T, int NT> void
-    bwd_block_batch(int nrhs, unsigned int count,
-                    FrontData<T>* dat) {
-      if (!count) return;
-      using T_ = typename cuda_type<T>::value_type;
-      auto dat_ = reinterpret_cast<FrontData<T_>*>(dat);
-      if (nrhs == 1) {
-        dim3 block(1, NT);
-        gemvN_block_outer_kernel_batched
-          <T_,NT,-1,1><<<count, block>>>(dat_);
-      } else {
-        dim3 block(NT, NT);
-        gemmNN_block_outer_kernel_batched
-          <T_,NT,-1,1><<<count, block>>>(nrhs, dat_);
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
+        dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Z));
+        extract_rhs_kernel<<<grid, block>>>
+          (N, nrhs, nf-f*ops, dat_+f*ops);
       }
     }
 
@@ -780,15 +635,15 @@ namespace strumpack {
     template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
     template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-    template void extend_add_rhs(int, unsigned int, AssembleData<float>*, AssembleData<float>*);
-    template void extend_add_rhs(int, unsigned int, AssembleData<double>*, AssembleData<double>*);
-    template void extend_add_rhs(int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
-    template void extend_add_rhs(int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-    template void extract_rhs(int, unsigned int, AssembleData<float>*, AssembleData<float>*);
-    template void extract_rhs(int, unsigned int, AssembleData<double>*, AssembleData<double>*);
-    template void extract_rhs(int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
-    template void extract_rhs(int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
+    template void extract_rhs(int, int, unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void extract_rhs(int, int, unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void extract_rhs(int, int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void extract_rhs(int, int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
 
     template void factor_block_batch<float,8,float>(unsigned int, FrontData<float>*, bool, float, int*);
@@ -816,46 +671,10 @@ namespace strumpack {
     template void replace_pivots(int, std::complex<float>*, float, gpu::Stream*);
     template void replace_pivots(int, std::complex<double>*, double, gpu::Stream*);
 
-    template void fwd_block_batch<float,8>(int, unsigned int, FrontData<float>*);
-    template void fwd_block_batch<double,8>(int, unsigned int, FrontData<double>*);
-    template void fwd_block_batch<std::complex<float>,8>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void fwd_block_batch<std::complex<double>,8>(int, unsigned int, FrontData<std::complex<double>>*);
-
-    template void fwd_block_batch<float,16>(int, unsigned int, FrontData<float>*);
-    template void fwd_block_batch<double,16>(int, unsigned int, FrontData<double>*);
-    template void fwd_block_batch<std::complex<float>,16>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void fwd_block_batch<std::complex<double>,16>(int, unsigned int, FrontData<std::complex<double>>*);
-
-    template void fwd_block_batch<float,24>(int, unsigned int, FrontData<float>*);
-    template void fwd_block_batch<double,24>(int, unsigned int, FrontData<double>*);
-    template void fwd_block_batch<std::complex<float>,24>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void fwd_block_batch<std::complex<double>,24>(int, unsigned int, FrontData<std::complex<double>>*);
-
-    template void fwd_block_batch<float,32>(int, unsigned int, FrontData<float>*);
-    template void fwd_block_batch<double,32>(int, unsigned int, FrontData<double>*);
-    template void fwd_block_batch<std::complex<float>,32>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void fwd_block_batch<std::complex<double>,32>(int, unsigned int, FrontData<std::complex<double>>*);
-
-
-    template void bwd_block_batch<float,8>(int, unsigned int, FrontData<float>*);
-    template void bwd_block_batch<double,8>(int, unsigned int, FrontData<double>*);
-    template void bwd_block_batch<std::complex<float>,8>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void bwd_block_batch<std::complex<double>,8>(int, unsigned int, FrontData<std::complex<double>>*);
-
-    template void bwd_block_batch<float,16>(int, unsigned int, FrontData<float>*);
-    template void bwd_block_batch<double,16>(int, unsigned int, FrontData<double>*);
-    template void bwd_block_batch<std::complex<float>,16>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void bwd_block_batch<std::complex<double>,16>(int, unsigned int, FrontData<std::complex<double>>*);
-
-    template void bwd_block_batch<float,24>(int, unsigned int, FrontData<float>*);
-    template void bwd_block_batch<double,24>(int, unsigned int, FrontData<double>*);
-    template void bwd_block_batch<std::complex<float>,24>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void bwd_block_batch<std::complex<double>,24>(int, unsigned int, FrontData<std::complex<double>>*);
-
-    template void bwd_block_batch<float,32>(int, unsigned int, FrontData<float>*);
-    template void bwd_block_batch<double,32>(int, unsigned int, FrontData<double>*);
-    template void bwd_block_batch<std::complex<float>,32>(int, unsigned int, FrontData<std::complex<float>>*);
-    template void bwd_block_batch<std::complex<double>,32>(int, unsigned int, FrontData<std::complex<double>>*);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, float**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, double**, int*, double, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<float>**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<double>**, int*, double, unsigned int);
 
   } // end namespace gpu
 } // end namespace strumpack

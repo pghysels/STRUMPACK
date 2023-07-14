@@ -95,6 +95,12 @@ namespace strumpack {
   CompressedSparseMatrix<scalar_t,integer_t>::matching
   (MatchingJob job, bool apply) {
     Match_t M(job, n_);
+    if (job == MatchingJob::NONE)
+      return M;
+    if (job == MatchingJob::MAX_CARDINALITY) {
+      std::cerr << "# ERROR: matching job not supported." << std::endl;
+      return M;
+    }
     if (job == MatchingJob::COMBBLAS) {
       std::cerr << "# ERROR: CombBLAS matching only supported in parallel."
                 << std::endl;

@@ -182,7 +182,15 @@ namespace strumpack {
      */
     ReturnCode factor();
 
+    /**
+     * OBSOLETE if the factors fit in device memory they will already
+     * be on the device
+     */
     void move_to_gpu();
+    /**
+     * TODO implement this to clear the device memory, but still keep
+     * the factors in host memory
+     */
     void remove_from_gpu();
 
     /**

@@ -96,18 +96,20 @@ namespace strumpack {
              typename real_t = typename RealType<T>::value_type>
     void replace_pivots(int, T*, real_t, gpu::Stream* = nullptr);
 
-    template<typename T> void
-    extend_add_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);
-    template<typename T, int NT=32> void
-    fwd_block_batch(int, unsigned int, FrontData<T>*);
+    template<typename T,
+             typename real_t = typename RealType<T>::value_type>
+    void replace_pivots_vbatched(BLASHandle& handle, int* dn, int max_n,
+                                 T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount);
 
     template<typename T> void
-    extract_rhs(int, unsigned int, AssembleData<T>*, AssembleData<T>*);
-    template<typename T, int NT=32> void
-    bwd_block_batch(int, unsigned int, FrontData<T>*);
+    extend_add_rhs(int, int, unsigned int, AssembleData<T>*, AssembleData<T>*);
 
+    template<typename T> void
+    extract_rhs(int, int, unsigned int, AssembleData<T>*, AssembleData<T>*);
 
-    constexpr int align_max_struct() {
+    // constexpr
+    inline int align_max_struct() {
       auto m = sizeof(std::complex<double>);
       m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
       m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));

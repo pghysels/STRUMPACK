@@ -35,7 +35,7 @@
 #include <cassert>
 #include <memory>
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "oneapi/mkl.hpp"
 
 #include "DenseMatrix.hpp"
@@ -46,7 +46,7 @@ namespace strumpack {
 
     inline void init() {
       std::cout << "# initializing DPC++/SYCL" << std::endl;
-      cl::sycl::queue q(cl::sycl::default_selector{});
+      cl::sycl::queue q; //(cl::sycl::default_selector{});
       cl::sycl::malloc_device<int>(0, q);
     }
 

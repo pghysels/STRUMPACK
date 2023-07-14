@@ -74,7 +74,7 @@ namespace strumpack {
     auto n = size();
 #pragma omp parallel for
     for (integer_t r=0; r<n; r++)
-      std::sort(&ind_[ptr_[r]], &ind_[ptr_[r+1]]);
+       std::sort(ind_.data()+ptr_[r], ind_.data()+ptr_[r + 1]);
   }
 
   template<typename integer_t> void
@@ -181,6 +181,35 @@ namespace strumpack {
     }
     std::swap(ptr_, ptr);
     std::swap(ind_, ind);
+  }
+
+  template<typename integer_t> std::vector<std::size_t>
+  CSRGraph<integer_t>::partition_K_way(int K,
+                                       integer_t* order, integer_t* iorder,
+                                       integer_t lo, integer_t sep_begin,
+                                       integer_t sep_end) const {
+    int info = 0;
+    idx_t cut = 0;
+    std::vector<idx_t> part(size());
+    info = WRAPPER_METIS_PartGraphKway
+      (size(), 1, ptr(), ind(), K, cut, part);
+    if (info != METIS_OK) {
+      std::cerr << "METIS_PartGraphKway for separator"
+        " reordering returned: " << info << std::endl;
+      exit(1);
+    }
+    std::vector<std::size_t> tiles(K), toff(K+1);
+    for (integer_t i=0; i<size(); i++)
+      tiles[part[i]]++;
+    std::partial_sum(tiles.begin(), tiles.end(), toff.begin()+1);
+    for (int p=0, c=sep_begin+lo; p<K; p++)
+      for (integer_t i=sep_begin; i<sep_end; i++)
+        if (part[i] == p)
+          order[i] = c++;
+    if (iorder)
+      for (integer_t i=sep_begin; i<sep_end; i++)
+        iorder[order[i]-lo] = i;
+    return tiles;
   }
 
   template<typename integer_t> structured::ClusterTree

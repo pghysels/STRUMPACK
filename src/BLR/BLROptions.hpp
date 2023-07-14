@@ -47,13 +47,13 @@ namespace strumpack {
       return real_t(1e-4);
     }
     template<typename real_t> inline real_t default_BLR_abs_tol() {
-      return real_t(1e-10);
+      return real_t(1e-12);
     }
     template<> inline float default_BLR_rel_tol() {
       return 1e-2;
     }
     template<> inline float default_BLR_abs_tol() {
-      return 1e-5;
+      return 1e-6;
     }
 
     enum class LowRankAlgorithm { RRQR, ACA, BACA };

@@ -19,6 +19,7 @@ install(FILES
   SparseSolverBase.hpp
   StrumpackSparseSolver.hpp
   StrumpackSparseSolver.h
+  StrumpackConfig.hpp
   DESTINATION include)
 
 
@@ -37,14 +38,14 @@ if(STRUMPACK_USE_MPI)
 endif()
 
 
-configure_file(StrumpackConfig.hpp.in
-  ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp)
+configure_file(StrumpackConfig.h.in
+  ${PROJECT_BINARY_DIR}/StrumpackConfig.h)
 
 install(FILES
-  ${PROJECT_BINARY_DIR}/StrumpackConfig.hpp
+  ${PROJECT_BINARY_DIR}/StrumpackConfig.h
   DESTINATION include)
 
-# add build folder as include dir for StrumpackConfig.hpp and
+# add build folder as include dir for StrumpackConfig.h and
 # StrumpackFortranCInterface.h, also add the current src/ folder as
 # include dir
 target_include_directories(strumpack PUBLIC

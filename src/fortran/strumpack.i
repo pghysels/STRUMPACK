@@ -42,5 +42,31 @@
 // enum STRUMPACK_KRYLOV_SOLVER (since fortran is case insensitive)
 %rename("get_%s") STRUMPACK_Krylov_solver;
 
+%rename("STRUMPACK_init") STRUMPACK_init_f;
+
+%inline %{
+#include "../StrumpackSparseSolver.h"
+#include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void STRUMPACK_init_f(STRUMPACK_SparseSolver* S, int comm,
+                      STRUMPACK_PRECISION precision,
+                      STRUMPACK_INTERFACE interface,
+                      int argc, char* argv[], int verbose) {
+#if defined(STRUMPACK_USE_MPI)
+  STRUMPACK_init(S, MPI_Comm_f2c(comm),
+                 precision, interface,
+                 argc, argv, verbose);
+#else
+  printf("ERROR: MPI not available.\n");
+#endif
+}
+#ifdef __cplusplus
+}
+#endif
+%}
+
 // Process and create wrappers for the following header file
 %include "../StrumpackSparseSolver.h"

@@ -369,11 +369,11 @@ extern "C" {
   }
 
   void STRUMPACK_move_to_gpu(STRUMPACK_SparseSolver S) {
-    switch_precision(move_to_gpu());
+    // switch_precision(move_to_gpu());
   }
 
   void STRUMPACK_remove_from_gpu(STRUMPACK_SparseSolver S) {
-    switch_precision(remove_from_gpu());
+    // switch_precision(remove_from_gpu());
   }
 
   void STRUMPACK_delete_factors(STRUMPACK_SparseSolver S) {

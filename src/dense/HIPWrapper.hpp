@@ -35,9 +35,9 @@
 #include <cassert>
 #include <memory>
 
-#include <hip/hip_runtime_api.h>
-#include <hipblas.h>
-#include <rocsolver.h>
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+#include <rocsolver/rocsolver.h>
 
 #include "DenseMatrix.hpp"
 
@@ -59,6 +59,14 @@ namespace strumpack {
 
     void init();
 
+    inline void peek_at_last_error() {
+      gpu_check(hipPeekAtLastError());
+    }
+
+    inline void get_last_error() {
+      hipGetLastError();
+    }
+
     inline void synchronize() {
       gpu_check(hipDeviceSynchronize());
     }
@@ -77,6 +85,7 @@ namespace strumpack {
     class BLASHandle {
     public:
       BLASHandle() { gpu_check(hipblasCreate(&h_)); }
+      BLASHandle(Stream& s) : BLASHandle() { set_stream(s); }
       ~BLASHandle() { gpu_check(hipblasDestroy(h_)); }
       void set_stream(Stream& s) { gpu_check(hipblasSetStream(h_, s)); }
       operator hipblasHandle_t&() { return h_; }
@@ -89,6 +98,7 @@ namespace strumpack {
     class SOLVERHandle {
     public:
       SOLVERHandle() { gpu_check(rocblas_create_handle(&h_)); }
+      SOLVERHandle(Stream& s) : SOLVERHandle() { set_stream(s); }
       ~SOLVERHandle() { gpu_check(rocblas_destroy_handle(h_)); }
       void set_stream(Stream& s) { rocblas_set_stream(h_, s); }
       operator rocblas_handle&() { return h_; }

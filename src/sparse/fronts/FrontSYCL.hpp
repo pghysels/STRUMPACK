@@ -64,10 +64,6 @@ namespace strumpack {
 					  int etree_level=0,
 					  int task_depth=0) override;
 
-    void multifrontal_solve(DenseM_t& b,
-                            const GPUFactors<scalar_t>* gpu_factors)
-      const override;
-
     void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
                                     int etree_level=0, int task_depth=0)
       const override;
@@ -105,9 +101,9 @@ namespace strumpack {
 			     int etree_level=0, int task_depth=0);
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;

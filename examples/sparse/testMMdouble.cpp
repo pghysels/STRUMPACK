@@ -41,47 +41,6 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
 
   int N = A.size();
   std::vector<scalar_t> b(N), x(N), x_exact(N);
-
-#if 0
-  std::ifstream file;
-  std::cout<<argv[2]<<std::endl;
-  std::string ff(argv[2]);
-  file.open(ff);
-  int num_row, num_col, tmp, rowidx,colidx;
-  // Ignore comments headers
-  while (file.peek() == '%') file.ignore(2048, '\n');
-  //Read number of rows and columns
-  file >> num_row >> num_col;
-  std::cout<<file.is_open()<<std::endl;
-
-  // fill the matrix with data
-  for (int l = 0; l < num_row; l++)
-  {
-      double data; 
-      file >>data ;
-      b.data()[l] = data;
-  }
-  file.close();
-
-  std::ifstream file1;
-  std::cout<<argv[3]<<std::endl;
-  std::string ff1(argv[3]);
-  file1.open(ff1);
-  // Ignore comments headers
-  while (file1.peek() == '%') file1.ignore(2048, '\n');
-  //Read number of rows and columns
-  file1 >> num_row >> num_col;
-  std::cout<<file1.is_open()<<std::endl;
-  // fill the matrix with data
-  for (int l = 0; l < num_row; l++)
-  {
-      double data; 
-      file1 >>data ;
-      x_exact.data()[l] = data;
-  }
-  file1.close();
-
-#else
   {
     using real_t = typename RealType<scalar_t>::value_type;
     auto rgen = random::make_default_random_generator<real_t>();
@@ -89,7 +48,6 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
       xi = scalar_t(rgen->get());
   }
   A.spmv(x_exact.data(), b.data());
-#endif  
 
 #if 0
   spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);

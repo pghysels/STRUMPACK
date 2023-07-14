@@ -25,8 +25,10 @@
  *             (Lawrence Berkeley National Lab, Computational Research
  *             Division).
  */
-#ifndef STRUMPACK_CONFIG_HPP
-#define STRUMPACK_CONFIG_HPP
+#ifndef STRUMPACK_CONFIG_H
+#define STRUMPACK_CONFIG_H
+
+#include <stdbool.h>
 
 #cmakedefine STRUMPACK_USE_MPI
 #cmakedefine STRUMPACK_USE_OPENMP
@@ -71,5 +73,114 @@
 #define STRUMPACK_VERSION_MINOR @STRUMPACK_VERSION_MINOR@
 #define STRUMPACK_VERSION_PATCH @STRUMPACK_VERSION_PATCH@
 
-#endif // STRUMPACK_CONFIG_HPP
+/**
+ * Return major.minor.patch STRUMPACK version.
+ * TODO get the git commit ID?
+ *
+ * \param major major version number
+ * \param minor minor version number
+ * \param patch patch version number
+ */
+inline void get_version(int* major, int* minor, int* patch) {
+  *major = STRUMPACK_VERSION_MAJOR;
+  *minor = STRUMPACK_VERSION_MINOR;
+  *patch = STRUMPACK_VERSION_PATCH;
+}
 
+inline bool have_parmetis() {
+#if defined(STRUMPACK_USE_PARMETIS)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_scotch() {
+#if defined(STRUMPACK_USE_SCOTCH)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_pt_scotch() {
+#if defined(STRUMPACK_USE_PTSCOTCH)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_papi() {
+#if defined(STRUMPACK_USE_PAPI)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_combblas() {
+#if defined(STRUMPACK_USE_COMBBLAS)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_butterflypack() {
+#if defined(STRUMPACK_USE_BPACK)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_zfp() {
+#if defined(STRUMPACK_USE_ZFP)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_slate() {
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_getopt() {
+#if defined(STRUMPACK_USE_GETOPT)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_magma() {
+#if defined(STRUMPACK_USE_MAGMA)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_kblas() {
+#if defined(STRUMPACK_USE_KBLAS)
+  return true;
+#else
+  return false;
+#endif
+}
+
+inline bool have_matlab() {
+#if defined(STRUMPACK_USE_MATLAB)
+  return true;
+#else
+  return false;
+#endif
+}
+
+#endif // STRUMPACK_CONFIG_H
