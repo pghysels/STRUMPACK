@@ -60,17 +60,17 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   }
   spss.solve(b.data(), x.data());
 
-  // std::size_t subs = 0, zeros = 0;
-  // auto err0 = spss.subnormals(subs, zeros);
-  // std::cout << "# SUBNORMALS = " << subs
-  //           << "   ZEROS = " << zeros
-  //           << " (" << err0 << ")" << std::endl;
+  std::size_t subs = 0, zeros = 0;
+  auto err0 = spss.subnormals(subs, zeros);
+  std::cout << "# SUBNORMALS = " << subs
+            << "   ZEROS = " << zeros
+            << " (" << err0 << ")" << std::endl;
 
-  // integer_t neg, zero, pos;
-  // auto err = spss.inertia(neg, zero, pos);
-  // std::cout << "# INERTIA neg,zero,pos = "
-  //           << neg << ", " << zero << ", " << pos
-  //           <<  " (" << err << ")" << std::endl;
+  integer_t neg, zero, pos;
+  auto err = spss.inertia(neg, zero, pos);
+  std::cout << "# INERTIA neg,zero,pos = "
+            << neg << ", " << zero << ", " << pos
+            <<  " (" << err << ")" << std::endl;
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;
