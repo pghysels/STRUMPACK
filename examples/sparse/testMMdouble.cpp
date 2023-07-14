@@ -52,11 +52,12 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
 #if 0
   spss.options().set_reordering_method(ReorderingStrategy::GEOMETRIC);
   spss.set_matrix(A);
-  if (spss.reorder(cbrt(num_row),cbrt(num_row),cbrt(num_row)) != ReturnCode::SUCCESS) {
+  if (spss.reorder(cbrt(num_row),cbrt(num_row),cbrt(num_row))
+      != ReturnCode::SUCCESS) {
     std::cout << "problem with reordering of the matrix." << std::endl;
     return;
   }
-#else 
+#else
   spss.set_matrix(A);
   if (spss.reorder() != ReturnCode::SUCCESS) {
     std::cout << "problem with reordering of the matrix." << std::endl;
@@ -88,8 +89,9 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   strumpack::blas::axpy(N, scalar_t(-1.), x_exact.data(), 1, x.data(), 1);
   auto nrm_error = strumpack::blas::nrm2(N, x.data(), 1);
   auto nrm_x_exact = strumpack::blas::nrm2(N, x_exact.data(), 1);
-  std::cout << "# RELATIVE ERROR (|x-xtrue|_2/|xtrue|_2) = " << (nrm_error/nrm_x_exact) << std::endl;
-  
+  std::cout << "# RELATIVE ERROR (|x-xtrue|_2/|xtrue|_2) = "
+            << (nrm_error/nrm_x_exact) << std::endl;
+
   double nm1=0;
   double nm2=0;
   for(int64_t i=0; i<N; i++){
