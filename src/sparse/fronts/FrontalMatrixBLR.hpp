@@ -130,6 +130,9 @@ namespace strumpack {
 
     long long node_factor_nonzeros() const override;
 
+    virtual ReturnCode node_subnormals(std::size_t& ns,
+                                       std::size_t& nz) const override;
+
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::dim_sep;

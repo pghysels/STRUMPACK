@@ -59,6 +59,9 @@ namespace strumpack {
       std::size_t maximum_rank() const override { return 0; }
       bool is_low_rank() const override { return false; };
 
+      std::size_t subnormals() const override { return D_.subnormals(); }
+      std::size_t zeros() const override { return D_.zeros(); }
+
       void dense(DenseM_t& A) const override { A = D_; }
       DenseM_t dense() const override { return D_; }
 

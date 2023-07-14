@@ -37,6 +37,24 @@
 namespace strumpack {
   namespace BLR {
 
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::subnormals() const {
+      std::size_t sn = 0;
+      for (std::size_t j=0; j<colblocks(); j++)
+        for (std::size_t i=0; i<rowblocks(); i++)
+          sn += tile(i, j).subnormals();
+      return sn;
+    }
+
+    template<typename scalar_t> std::size_t
+    BLRMatrix<scalar_t>::zeros() const {
+      std::size_t nz = 0;
+      for (std::size_t j=0; j<colblocks(); j++)
+        for (std::size_t i=0; i<rowblocks(); i++)
+          nz += tile(i, j).zeros();
+      return nz;
+    }
+
     template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
     (DenseM_t& A, const std::vector<std::size_t>& rowtiles,
      const std::vector<std::size_t>& coltiles, const Opts_t& opts)

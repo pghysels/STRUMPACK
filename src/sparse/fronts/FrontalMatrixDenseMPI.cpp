@@ -551,6 +551,39 @@ namespace strumpack {
     return matrix_inertia(F11_, neg, zero, pos);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_subnormals
+  (std::size_t& ns, std::size_t& nz) const {
+    const auto dsep = this->dim_sep();
+    if (!dsep || !grid()->active())
+      return ReturnCode::SUCCESS;
+#if defined(STRUMPACK_USE_ZFP)
+    if (compressed_) {
+      if (dsep) {
+        DistM_t F11(grid(), dsep, dsep);
+        auto wF11 = F11.dense_wrapper();
+        F11c_.decompress(wF11);
+        ns += wF11.subnormals();
+        nz += wF11.zeros();
+        const auto dupd = this->dim_upd();
+        if (dupd) {
+          DistM_t F12(grid(), dsep, dupd), F21(grid(), dupd, dsep);
+          auto wF12 = F12.dense_wrapper();
+          auto wF21 = F21.dense_wrapper();
+          F12c_.decompress(wF12);
+          F21c_.decompress(wF21);
+          ns += wF12.subnormals() + wF21.subnormals();
+          nz += wF12.zeros() + wF21.zeros();
+        }
+      }
+      return ReturnCode::SUCCESS;
+    }
+#endif
+    ns += F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
+    nz += F11_.zeros() + F12_.zeros() + F21_.zeros();
+    return ReturnCode::SUCCESS;
+  }
+
   // explicit template instantiations
   template class FrontalMatrixDenseMPI<float,int>;
   template class FrontalMatrixDenseMPI<double,int>;

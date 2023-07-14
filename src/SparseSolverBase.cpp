@@ -152,6 +152,17 @@ namespace strumpack {
     return tree()->inertia(neg, zero, pos);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::subnormals
+  (std::size_t& ns, std::size_t& nz) {
+    ns = nz = 0;
+    if (!this->factored_) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    return tree()->subnormals(ns, nz);
+  }
+
   template<typename scalar_t,typename integer_t> void
   SparseSolverBase<scalar_t,integer_t>::draw
   (const std::string& name) const {

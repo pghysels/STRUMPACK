@@ -76,6 +76,21 @@ namespace strumpack {
     return matrix_inertia(F11_, neg, zero, pos);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDense<scalar_t,integer_t>::node_subnormals
+  (std::size_t& ns, std::size_t& nz) const {
+    auto dns = F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
+    auto dnz = F11_.zeros() + F12_.zeros() + F21_.zeros();
+    if (dns || dnz)
+      std::cout << "DENSE front ds= " << this->dim_sep()
+                << " du= " << this->dim_upd()
+                << " subnormals= " << dns
+                << " zeros= " << dnz << std::endl;
+    ns += dns;
+    nz += dnz;
+    return ReturnCode::SUCCESS;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,

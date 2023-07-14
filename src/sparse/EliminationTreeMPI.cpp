@@ -88,6 +88,16 @@ namespace strumpack {
     return info;
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  EliminationTreeMPI<scalar_t,integer_t>::subnormals
+  (std::size_t& ns, std::size_t& nz) const {
+    auto info = EliminationTree<scalar_t,integer_t>::subnormals(ns, nz);
+    ns = comm_.all_reduce(ns, MPI_SUM);
+    nz = comm_.all_reduce(nz, MPI_SUM);
+    return info;
+  }
+
+
   // explicit template specializations
   template class EliminationTreeMPI<float,int>;
   template class EliminationTreeMPI<double,int>;

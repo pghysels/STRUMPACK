@@ -60,11 +60,17 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   }
   spss.solve(b.data(), x.data());
 
-  integer_t neg, zero, pos;
-  auto err = spss.inertia(neg, zero, pos);
-  std::cout << "# INERTIA neg,zero,pos = "
-            << neg << ", " << zero << ", " << pos
-            <<  " (" << err << ")" << std::endl;
+  // std::size_t subs = 0, zeros = 0;
+  // auto err0 = spss.subnormals(subs, zeros);
+  // std::cout << "# SUBNORMALS = " << subs
+  //           << "   ZEROS = " << zeros
+  //           << " (" << err0 << ")" << std::endl;
+
+  // integer_t neg, zero, pos;
+  // auto err = spss.inertia(neg, zero, pos);
+  // std::cout << "# INERTIA neg,zero,pos = "
+  //           << neg << ", " << zero << ", " << pos
+  //           <<  " (" << err << ")" << std::endl;
 
   std::cout << "# COMPONENTWISE SCALED RESIDUAL = "
             << A.max_scaled_residual(x.data(), b.data()) << std::endl;
@@ -72,7 +78,8 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   strumpack::blas::axpy(N, scalar_t(-1.), x_exact.data(), 1, x.data(), 1);
   auto nrm_error = strumpack::blas::nrm2(N, x.data(), 1);
   auto nrm_x_exact = strumpack::blas::nrm2(N, x_exact.data(), 1);
-  std::cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << std::endl;
+  std::cout << "# RELATIVE ERROR (|x-xtrue|_2/|xtrue|_2) = "
+            << (nrm_error/nrm_x_exact) << std::endl;
 }
 
 int main(int argc, char* argv[]) {

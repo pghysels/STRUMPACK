@@ -839,8 +839,8 @@ namespace strumpack {
      * to be allocated.
      * \param depth current OpenMP task recursion depth
      */
-    void LQ
-    (DenseMatrix<scalar_t>& L, DenseMatrix<scalar_t>& Q, int depth) const;
+    void LQ(DenseMatrix<scalar_t>& L,
+            DenseMatrix<scalar_t>& Q, int depth) const;
 
     /**
      * Builds an orthonormal basis for the columns in this matrix,
@@ -975,6 +975,13 @@ namespace strumpack {
      * \see write
      */
     static DenseMatrix<scalar_t> read(const std::string& fname);
+
+
+    /**
+     * Return number of subnormal elements in the matrix.
+     */
+    std::size_t subnormals() const;
+    std::size_t zeros() const;
 
   private:
     void ID_column_GEQP3

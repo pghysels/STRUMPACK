@@ -675,6 +675,10 @@ namespace strumpack {
                 std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
                 int max_rank, const BLACSGrid* grid_T);
 
+
+    std::size_t subnormals() const;
+    std::size_t zeros() const;
+
     /**
      * Default row blocksize used for 2D block cyclic
      * dustribution. This is set during CMake configuration.

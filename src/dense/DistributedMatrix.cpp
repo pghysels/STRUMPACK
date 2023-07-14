@@ -1081,6 +1081,30 @@ namespace strumpack {
     trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), R1, X);
   }
 
+
+  template<typename scalar_t> std::size_t
+  DistributedMatrix<scalar_t>::subnormals() const {
+    if (!data_) return 0;
+    std::size_t ns = 0;
+    for (int c=0; c<lcols_; c++)
+      for (int r=0; r<lrows_; r++)
+        if (!std::isnormal(std::real(operator()(r, c))) &&
+            !std::isnormal(std::imag(operator()(r, c))))
+          ns++;
+    return ns;
+  }
+  template<typename scalar_t> std::size_t
+  DistributedMatrix<scalar_t>::zeros() const {
+    if (!data_) return 0;
+    std::size_t nz = 0;
+    for (int c=0; c<lcols_; c++)
+      for (int r=0; r<lrows_; r++)
+        if (operator()(r, c) == scalar_t(0.))
+          nz++;
+    return nz;
+  }
+
+
   template<typename scalar_t> void gemm
   (Trans ta, Trans tb, scalar_t alpha, const DistributedMatrix<scalar_t>& A,
    const DistributedMatrix<scalar_t>& B,
