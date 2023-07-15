@@ -558,11 +558,11 @@ namespace strumpack {
   (std::size_t& ns, std::size_t& nz) const {
     auto dns = F11blr_.subnormals() + F12blr_.subnormals() + F21blr_.subnormals();
     auto dnz = F11blr_.zeros() + F12blr_.zeros() + F21blr_.zeros();
-    if (dns || dnz)
-      std::cout << "BLR front ds= " << this->dim_sep()
-                << " du= " << this->dim_upd()
-                << " subnormals= " << dns
-                << " zeros= " << dnz << std::endl;
+    // if (dns || dnz)
+    //   std::cout << "BLR front ds= " << this->dim_sep()
+    //             << " du= " << this->dim_upd()
+    //             << " subnormals= " << dns
+    //             << " zeros= " << dnz << std::endl;
     ns += dns;
     nz += dnz;
     return ReturnCode::SUCCESS;

@@ -81,11 +81,11 @@ namespace strumpack {
   (std::size_t& ns, std::size_t& nz) const {
     auto dns = F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
     auto dnz = F11_.zeros() + F12_.zeros() + F21_.zeros();
-    if (dns || dnz)
-      std::cout << "DENSE front ds= " << this->dim_sep()
-                << " du= " << this->dim_upd()
-                << " subnormals= " << dns
-                << " zeros= " << dnz << std::endl;
+    // if (dns || dnz)
+    //   std::cout << "DENSE front ds= " << this->dim_sep()
+    //             << " du= " << this->dim_upd()
+    //             << " subnormals= " << dns
+    //             << " zeros= " << dnz << std::endl;
     ns += dns;
     nz += dnz;
     return ReturnCode::SUCCESS;
