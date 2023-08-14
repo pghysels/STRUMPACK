@@ -111,49 +111,97 @@ namespace strumpack {
       ranks.push_back(msg_size);
       grid()->col_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
+
       // assert(pinned.size() >= msg_size);
-      auto ptr = pinned;
-      if (grid()->is_local_row(i)) {
+#if 0  //cuda-aware mpi 
+        gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+        scalar_t *ptr = dpinptr.template as<scalar_t>();
+        //auto ptr = pinned;
+        if (grid()->is_local_row(i)) {
+          for (std::size_t j=j0; j<j1; j++)
+            if (grid()->is_local_col(j)) {
+              auto& t = tile(i, j);
+              auto m = t.rows(), n = t.cols();
+              if (t.is_low_rank()) {
+                auto r = t.rank();
+                gpu_check(gpu::copy_device_to_device(ptr, t.U()));
+                ptr += m*r;
+                gpu_check(gpu::copy_device_to_device(ptr, t.V()));
+                ptr += r*n;
+              } else {
+                gpu_check(gpu::copy_device_to_device(ptr, t.D()));
+                ptr += m*n;
+              }
+            }
+        }
+        //gpu_check(cudaPeekAtLastError());
+        ptr = dpinptr; //device mem
+        //ptr = pinned;
+        grid()->col_comm().broadcast_from(ptr, msg_size, src);
+        Tij.reserve(nr_tiles);
+        auto m = tilerows(i);
         for (std::size_t j=j0; j<j1; j++)
           if (grid()->is_local_col(j)) {
-            auto& t = tile(i, j);
-            auto m = t.rows(), n = t.cols();
-            if (t.is_low_rank()) {
-              auto r = t.rank();
-              gpu_check(gpu::copy_device_to_host(ptr, t.U()));
+            auto r = ranks[Tij.size()];
+            auto n = tilecols(j);
+            if (r != -1) {
+              DenseMW_t dU(m, r, dptr, m);  dptr += m*r;
+              DenseMW_t dV(r, n, dptr, r);  dptr += r*n;
+              gpu_check(gpu::copy_device_to_device(dU, ptr));
               ptr += m*r;
-              gpu_check(gpu::copy_device_to_host(ptr, t.V()));
+              gpu_check(gpu::copy_device_to_device(dV, ptr));
               ptr += r*n;
+              Tij.emplace_back(new LRTile<scalar_t>(dU, dV));
             } else {
-              gpu_check(gpu::copy_device_to_host(ptr, t.D()));
+              DenseMW_t dD(m, n, dptr, m);  dptr += m*n;
+              gpu_check(gpu::copy_device_to_device(dD, ptr));
               ptr += m*n;
+              Tij.emplace_back(new DenseTile<scalar_t>(dD));
             }
           }
-      }
-      // TODO CUDA aware MPI
-      ptr = pinned;
-      grid()->col_comm().broadcast_from(ptr, msg_size, src);
-      Tij.reserve(nr_tiles);
-      auto m = tilerows(i);
-      for (std::size_t j=j0; j<j1; j++)
-        if (grid()->is_local_col(j)) {
-          auto r = ranks[Tij.size()];
-          auto n = tilecols(j);
-          if (r != -1) {
-            DenseMW_t dU(m, r, dptr, m);  dptr += m*r;
-            DenseMW_t dV(r, n, dptr, r);  dptr += r*n;
-            gpu_check(gpu::copy_host_to_device(dU, ptr));
-            ptr += m*r;
-            gpu_check(gpu::copy_host_to_device(dV, ptr));
-            ptr += r*n;
-            Tij.emplace_back(new LRTile<scalar_t>(dU, dV));
-          } else {
-            DenseMW_t dD(m, n, dptr, m);  dptr += m*n;
-            gpu_check(gpu::copy_host_to_device(dD, ptr));
-            ptr += m*n;
-            Tij.emplace_back(new DenseTile<scalar_t>(dD));
-          }
+#else
+        auto ptr = pinned;
+        if (grid()->is_local_row(i)) {
+          for (std::size_t j=j0; j<j1; j++)
+            if (grid()->is_local_col(j)) {
+              auto& t = tile(i, j);
+              auto m = t.rows(), n = t.cols();
+              if (t.is_low_rank()) {
+                auto r = t.rank();
+                gpu_check(gpu::copy_device_to_host(ptr, t.U()));
+                ptr += m*r;
+                gpu_check(gpu::copy_device_to_host(ptr, t.V()));
+                ptr += r*n;
+              } else {
+                gpu_check(gpu::copy_device_to_host(ptr, t.D()));
+                ptr += m*n;
+              }
+            }
         }
+        ptr = pinned;
+        grid()->col_comm().broadcast_from(ptr, msg_size, src);
+        Tij.reserve(nr_tiles);
+        auto m = tilerows(i);
+        for (std::size_t j=j0; j<j1; j++)
+          if (grid()->is_local_col(j)) {
+            auto r = ranks[Tij.size()];
+            auto n = tilecols(j);
+            if (r != -1) {
+              DenseMW_t dU(m, r, dptr, m);  dptr += m*r;
+              DenseMW_t dV(r, n, dptr, r);  dptr += r*n;
+              gpu_check(gpu::copy_host_to_device(dU, ptr));
+              ptr += m*r;
+              gpu_check(gpu::copy_host_to_device(dV, ptr));
+              ptr += r*n;
+              Tij.emplace_back(new LRTile<scalar_t>(dU, dV));
+            } else {
+              DenseMW_t dD(m, n, dptr, m);  dptr += m*n;
+              gpu_check(gpu::copy_host_to_device(dD, ptr));
+              ptr += m*n;
+              Tij.emplace_back(new DenseTile<scalar_t>(dD));
+            }
+          }
+#endif
       // stream.synchronize();
       return Tij;
     }
@@ -187,6 +235,52 @@ namespace strumpack {
       grid()->row_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
       // assert(pinned.size() >= msg_size);
+#if 0  //cuda-aware mpi 
+      gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+      scalar_t *ptr = dpinptr.template as<scalar_t>();
+      //auto ptr = pinned;
+      if (grid()->is_local_col(j)) {
+        for (std::size_t i=i0; i<i1; i++)
+          if (grid()->is_local_row(i)) {
+            auto& t = tile(i, j);
+            auto m = t.rows(), n = t.cols();
+            if (t.is_low_rank()) {
+              auto r = t.rank();
+              gpu_check(gpu::copy_device_to_device(ptr, t.U()));
+              ptr += m*r;
+              gpu_check(gpu::copy_device_to_device(ptr, t.V()));
+              ptr += r*n;
+            } else {
+              gpu_check(gpu::copy_device_to_device(ptr, t.D()));
+              ptr += m*n;
+            }
+          }
+      }
+      ptr = dpinptr; //device mem
+      //ptr = pinned;
+      grid()->row_comm().broadcast_from(ptr, msg_size, src);
+      Tij.reserve(nr_tiles);
+      auto n = tilecols(j); 
+      for (std::size_t i=i0; i<i1; i++)
+        if (grid()->is_local_row(i)) {
+          auto r = ranks[Tij.size()];
+          auto m = tilerows(i);
+          if (r != -1) {
+            DenseMW_t dU(m, r, dptr, m);  dptr += m*r;
+            DenseMW_t dV(r, n, dptr, r);  dptr += r*n;
+            gpu_check(gpu::copy_device_to_device(dU, ptr));
+            ptr += m*r;
+            gpu_check(gpu::copy_device_to_device(dV, ptr));
+            ptr += r*n;
+            Tij.emplace_back(new LRTile<scalar_t>(dU, dV));
+          } else {
+            DenseMW_t dD(m, n, dptr, m);  dptr += m*n;
+            gpu_check(gpu::copy_device_to_device(dD, ptr));
+            ptr += m*n;
+            Tij.emplace_back(new DenseTile<scalar_t>(dD));
+          }
+        }
+#else
       auto ptr = pinned;
       if (grid()->is_local_col(j)) {
         for (std::size_t i=i0; i<i1; i++)
@@ -205,7 +299,6 @@ namespace strumpack {
             }
           }
       }
-      // TODO CUDA aware MPI
       ptr = pinned;
       grid()->row_comm().broadcast_from(ptr, msg_size, src);
       Tij.reserve(nr_tiles);
@@ -229,6 +322,7 @@ namespace strumpack {
             Tij.emplace_back(new DenseTile<scalar_t>(dD));
           }
         }
+#endif
       return Tij;
     }
 
@@ -288,8 +382,27 @@ namespace strumpack {
       auto dA21  = dA12 + A12.lrows() * A12.lcols();
       auto dA22  = dA21 + A21.lrows() * A21.lcols();
 
+#if 0 //cuda aware
+      std::size_t dpinned_size =
+        std::max(max_m1, A22.maxtilerows()) *
+        std::max(std::max(A11.lcols(), A11.lrows()),
+                 std::max(A22.lcols(), A22.lrows()));
+      gpu::DeviceMemory<scalar_t> dpinned(dpinned_size);
+      //auto d_pinned = dpinned.template as<scalar_t>();
+      scalar_t *d_pinned = dpinned.template as<scalar_t>();
+      //auto dpinptr1 = dpinptr;
+      //test begin
+      //gpu::DeviceMemory<int> d_test (1);
+      //auto d_msgsize = d_test.template as<int>();
+      //test end
+#endif
       gpu::DeviceMemory<int> dpiv(max_m1+1);
+#if 0
+      auto dpiv_ptr = dpiv.template as<int>();
+      auto dinfo = dpiv_ptr + max_m1;
+#else
       auto dinfo = dpiv + max_m1;
+#endif
       gpu::DeviceMemory<char> d_batch_mem(3*d_batch_meta);
       gpu::DeviceMemory<char> d_batch_matrix_mem;
 
@@ -299,6 +412,43 @@ namespace strumpack {
       A21.move_to_gpu(copy_stream, dA21, pinned);
       A22.move_to_gpu(copy_stream, dA22, pinned);
 
+#if 0  // CUDA aware
+      DenseTile<scalar_t> Tii;
+      for (std::size_t i=0; i<rb; i++) {
+        auto mi = A11.tilerows(i);
+        DenseMW_t test(mi, mi, dcol1, mi);
+        Tii = DenseTile<scalar_t>(test);
+        //scalar_t *ptr = Tii.D().data();
+        //Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi));//!!
+        if (g->is_local_row(i)) {
+          piv_tile.resize(mi);
+          if (g->is_local_col(i)) {
+            gpu::getrf<scalar_t>
+              (solve_handle, A11.tile(i, i).D(), dwork, dpiv, dinfo);
+            comp_stream.synchronize();
+            gpu_check(gpu::copy_device_to_device
+                      (Tii.D(), A11.tile(i, i).D()));
+            //ptr = A11.tile(i, i).D().data();
+            //gpu_check(gpu::copy_device_to_host<int>
+            //          (piv_tile.data(), dpiv, mi));
+          }
+          int src = i % g->npcols();
+          g->row_comm().broadcast_from(dpiv_ptr, mi, src);
+          g->row_comm().broadcast_from(Tii.D().data(), mi*mi, src);
+          //g->row_comm().broadcast_from(ptr, mi*mi, src);
+          gpu_check(gpu::copy_device_to_host<int>
+                      (piv_tile.data(), dpiv, mi));
+          int r0 = A11.tileroff(i);
+          std::transform
+            (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
+             [r0](int p) -> int { return p + r0; });
+        }
+        if (g->is_local_col(i)) {
+          g->col_comm().broadcast_from(Tii.D().data(), mi*mi, i % g->nprows());
+          //g->col_comm().broadcast_from(ptr, mi*mi, i % g->nprows());
+        }
+        copy_stream.synchronize();
+#else
       DenseTile<scalar_t> Tii;
       for (std::size_t i=0; i<rb; i++) {
         auto mi = A11.tilerows(i);
@@ -314,7 +464,6 @@ namespace strumpack {
             gpu_check(gpu::copy_device_to_host<int>
                       (piv_tile.data(), dpiv, mi));
           }
-          // TODO CUDA aware bcast?
           int src = i % g->npcols();
           g->row_comm().broadcast_from(piv_tile, src);
           g->row_comm().broadcast_from(Tii.D().data(), mi*mi, src);
@@ -333,6 +482,7 @@ namespace strumpack {
           Tii.move_to_gpu(copy_stream, drow1);
         }
         copy_stream.synchronize();
+#endif
 
 #if defined(STRUMPACK_USE_KBLAS)
         VBatchedARA<scalar_t> ara;
@@ -383,6 +533,16 @@ namespace strumpack {
         comp_stream.synchronize();
 
         // Schur complement update
+#if 0
+        auto Tij = A11.bcast_row_of_tiles_along_cols_gpu
+          (i, i+1, rb, drow1, d_pinned);
+        auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
+          (i, 0, rb2, drow2, d_pinned);
+        auto Tki = A11.bcast_col_of_tiles_along_rows_gpu
+          (i+1, rb, i, dcol1, d_pinned);
+        auto Tk2i = A21.bcast_col_of_tiles_along_rows_gpu
+          (0, rb2, i, dcol2, d_pinned);
+#else
         auto Tij = A11.bcast_row_of_tiles_along_cols_gpu
           (i, i+1, rb, drow1, pinned);
         auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
@@ -391,6 +551,7 @@ namespace strumpack {
           (i+1, rb, i, dcol1, pinned);
         auto Tk2i = A21.bcast_col_of_tiles_along_rows_gpu
           (0, rb2, i, dcol2, pinned);
+#endif
 
         int batchcount = 0;
         std::size_t sVU = 0, sUVU = 0;

@@ -297,6 +297,20 @@ namespace strumpack {
         return copy_device_to_device
           (d1.data(), d2.data(), d1.rows()*d1.cols());
     }
+    template<typename T> cudaError_t
+    copy_device_to_device(DenseMatrix<T>& d1, const T* d2) {
+      if (!d1.rows() || !d1.cols()) return cudaSuccess;
+      assert(d1.rows() == d1.ld());
+      return copy_device_to_device
+        (d1.data(), d2, std::size_t(d1.rows())*d1.cols());
+    }
+    template<typename T> cudaError_t
+    copy_device_to_device(T* d1, const DenseMatrix<T>& d2) {
+      if (!d2.rows() || !d2.cols()) return cudaSuccess;
+      assert(d2.rows() == d2.ld());
+      return copy_device_to_device
+        (d1, d2.data(), std::size_t(d2.rows())*d2.cols());
+    }
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type>
     cudaError_t
