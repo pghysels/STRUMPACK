@@ -1,3 +1,15 @@
+Version 7.1.4 Released Aug 2023
+===============================
+- Memory leak fix from MPI_Datatypes
+- Set RPATH in strumpack library
+- Add counting of subnormal number in the sparse factors
+- Changes in the BLR compression tolerances in the sparse solver,
+  using a scaled absolute tolerance
+- Fixes in the sparse solver using MAGMA, resetting error codes
+  which show up in larger systems, but are not actually errors.
+- Set SOVERSION
+- Update CMake for HIP, using enable_language(HIP), requires CMake 3.21
+
 Version 7.1.3 Released May 2023
 ===============================
 - Workaround for SLATE bug in gemmA: disabling GPU off-loading in
