@@ -113,10 +113,10 @@ namespace strumpack {
       msg_size = ranks.back();
 
       // assert(pinned.size() >= msg_size);
-#if 0  //cuda-aware mpi 
-        gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+#if 1  //cuda-aware mpi 
+        gpu::DeviceMemory<scalar_t> dpinptr(msg_size); 
         scalar_t *ptr = dpinptr.template as<scalar_t>();
-        //auto ptr = pinned;
+        //auto ptr = pinned; // not working correctly
         if (grid()->is_local_row(i)) {
           for (std::size_t j=j0; j<j1; j++)
             if (grid()->is_local_col(j)) {
@@ -134,9 +134,8 @@ namespace strumpack {
               }
             }
         }
-        //gpu_check(cudaPeekAtLastError());
         ptr = dpinptr; //device mem
-        //ptr = pinned;
+        //ptr = pinned; // not working correctly
         grid()->col_comm().broadcast_from(ptr, msg_size, src);
         Tij.reserve(nr_tiles);
         auto m = tilerows(i);
@@ -235,10 +234,10 @@ namespace strumpack {
       grid()->row_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
       // assert(pinned.size() >= msg_size);
-#if 0  //cuda-aware mpi 
+#if 1  //cuda-aware mpi 
       gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
       scalar_t *ptr = dpinptr.template as<scalar_t>();
-      //auto ptr = pinned;
+      //auto ptr = pinned; // not working correctly
       if (grid()->is_local_col(j)) {
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i)) {
@@ -257,7 +256,7 @@ namespace strumpack {
           }
       }
       ptr = dpinptr; //device mem
-      //ptr = pinned;
+      //ptr = pinned; // not working correctly
       grid()->row_comm().broadcast_from(ptr, msg_size, src);
       Tij.reserve(nr_tiles);
       auto n = tilecols(j); 
@@ -382,22 +381,16 @@ namespace strumpack {
       auto dA21  = dA12 + A12.lrows() * A12.lcols();
       auto dA22  = dA21 + A21.lrows() * A21.lcols();
 
-#if 0 //cuda aware
+#if 1 //cuda aware, not working correctly
       std::size_t dpinned_size =
         std::max(max_m1, A22.maxtilerows()) *
         std::max(std::max(A11.lcols(), A11.lrows()),
                  std::max(A22.lcols(), A22.lrows()));
-      gpu::DeviceMemory<scalar_t> dpinned(dpinned_size);
-      //auto d_pinned = dpinned.template as<scalar_t>();
-      scalar_t *d_pinned = dpinned.template as<scalar_t>();
-      //auto dpinptr1 = dpinptr;
-      //test begin
-      //gpu::DeviceMemory<int> d_test (1);
-      //auto d_msgsize = d_test.template as<int>();
-      //test end
+      gpu::DeviceMemory<scalar_t> d_pinned(dpinned_size);
+      //scalar_t *d_pinned = dpinned.template as<scalar_t>();
 #endif
       gpu::DeviceMemory<int> dpiv(max_m1+1);
-#if 0
+#if 1
       auto dpiv_ptr = dpiv.template as<int>();
       auto dinfo = dpiv_ptr + max_m1;
 #else
@@ -412,14 +405,12 @@ namespace strumpack {
       A21.move_to_gpu(copy_stream, dA21, pinned);
       A22.move_to_gpu(copy_stream, dA22, pinned);
 
-#if 0  // CUDA aware
+#if 1  // CUDA aware
       DenseTile<scalar_t> Tii;
       for (std::size_t i=0; i<rb; i++) {
         auto mi = A11.tilerows(i);
         DenseMW_t test(mi, mi, dcol1, mi);
         Tii = DenseTile<scalar_t>(test);
-        //scalar_t *ptr = Tii.D().data();
-        //Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi));//!!
         if (g->is_local_row(i)) {
           piv_tile.resize(mi);
           if (g->is_local_col(i)) {
@@ -428,14 +419,10 @@ namespace strumpack {
             comp_stream.synchronize();
             gpu_check(gpu::copy_device_to_device
                       (Tii.D(), A11.tile(i, i).D()));
-            //ptr = A11.tile(i, i).D().data();
-            //gpu_check(gpu::copy_device_to_host<int>
-            //          (piv_tile.data(), dpiv, mi));
           }
           int src = i % g->npcols();
           g->row_comm().broadcast_from(dpiv_ptr, mi, src);
           g->row_comm().broadcast_from(Tii.D().data(), mi*mi, src);
-          //g->row_comm().broadcast_from(ptr, mi*mi, src);
           gpu_check(gpu::copy_device_to_host<int>
                       (piv_tile.data(), dpiv, mi));
           int r0 = A11.tileroff(i);
@@ -445,7 +432,6 @@ namespace strumpack {
         }
         if (g->is_local_col(i)) {
           g->col_comm().broadcast_from(Tii.D().data(), mi*mi, i % g->nprows());
-          //g->col_comm().broadcast_from(ptr, mi*mi, i % g->nprows());
         }
         copy_stream.synchronize();
 #else
@@ -533,7 +519,7 @@ namespace strumpack {
         comp_stream.synchronize();
 
         // Schur complement update
-#if 0
+#if 1
         auto Tij = A11.bcast_row_of_tiles_along_cols_gpu
           (i, i+1, rb, drow1, d_pinned);
         auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
