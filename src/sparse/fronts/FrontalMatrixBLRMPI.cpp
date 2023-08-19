@@ -310,7 +310,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
         if (opts.use_gpu())
           piv_ = BLRMPI_t::partial_factor_gpu
-            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options());
+            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, opts.BLR_options(), opts);
         else
 #endif
           piv_ = BLRMPI_t::partial_factor

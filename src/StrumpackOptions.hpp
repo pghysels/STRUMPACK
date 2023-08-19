@@ -745,6 +745,17 @@ namespace strumpack {
     void set_gpu_streams(int s) { gpu_streams_ = s; }
 
     /**
+     * Enable GPU aware MPi. This only works when STRUMPACK
+     * was configured with GPU support (through CUDA, MAGMA or SLATE)
+     */
+    void enable_gpu_aware_mpi() { use_gpu_aware_mpi_ = true; }
+
+    /**
+     * Disable GPU off-loading.
+     */
+    void disable_gpu_aware_mpi() { use_gpu_aware_mpi_ = false; }
+
+    /**
      * Enable OpenMP tasking traversal of the supernodal tree in the
      * sparse solver. This requires more (peak) memory, but scales
      * better with OpenMP threads.
@@ -1126,6 +1137,11 @@ namespace strumpack {
     bool use_gpu() const { return use_gpu_; }
 
     /**
+     * Check wheter or not to use GPU aware MPI.
+     */
+    bool use_gpu_aware_mpi() const { return use_gpu_aware_mpi_; }
+
+    /**
      * Check wheter or not to use OpenMP tree traversal is the sparse
      * solver.
      */
@@ -1263,8 +1279,10 @@ namespace strumpack {
     /** GPU options */
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
     bool use_gpu_ = true;
+    bool use_gpu_aware_mpi_ = true;
 #else
     bool use_gpu_ = false;
+    bool use_gpu_aware_mpi_ = false;
 #endif
     int gpu_streams_ = default_gpu_streams();
 
