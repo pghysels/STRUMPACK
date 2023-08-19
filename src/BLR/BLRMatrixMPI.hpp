@@ -35,6 +35,7 @@
 #include "dense/DistributedMatrix.hpp"
 #include "BLRMatrix.hpp"
 #include "BLRTile.hpp"
+#include "StrumpackOptions.hpp"
 
 namespace strumpack {
 
@@ -167,7 +168,8 @@ namespace strumpack {
       static std::vector<int>
       partial_factor_gpu(BLRMPI_t& A11, BLRMPI_t& A12,
                          BLRMPI_t& A21, BLRMPI_t& A22,
-                         const adm_t& adm, const Opts_t& opts);
+                         const adm_t& adm, const Opts_t& opts,
+                         const SPOptions<scalar_t>& spopts);
 #endif
 
       static std::vector<int>
@@ -327,12 +329,14 @@ namespace strumpack {
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols_gpu(std::size_t i,
                                         std::size_t j0, std::size_t j1,
-                                        scalar_t* dptr, scalar_t* pinned)
+                                        scalar_t* dptr, scalar_t* pinned,
+                                        const SPOptions<scalar_t>& spopts)
         const;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
                                         std::size_t j,
-                                        scalar_t* dptr, scalar_t* pinned)
+                                        scalar_t* dptr, scalar_t* pinned,
+                                        const SPOptions<scalar_t>& spopts)
         const;
 #endif
 

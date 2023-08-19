@@ -171,19 +171,21 @@ namespace strumpack {
        {"sp_enable_gpu",                no_argument, 0, 36},
        {"sp_disable_gpu",               no_argument, 0, 37},
        {"sp_gpu_streams",               required_argument, 0, 38},
-       {"sp_lossy_precision",           required_argument, 0, 39},
-       {"sp_hss_min_sep_size",          required_argument, 0, 40},
-       {"sp_hss_min_front_size",        required_argument, 0, 41},
-       {"sp_hodlr_min_sep_size",        required_argument, 0, 42},
-       {"sp_hodlr_min_front_size",      required_argument, 0, 43},
-       {"sp_blr_min_sep_size",          required_argument, 0, 44},
-       {"sp_blr_min_front_size",        required_argument, 0, 45},
-       {"sp_lossy_min_sep_size",        required_argument, 0, 46},
-       {"sp_lossy_min_front_size",      required_argument, 0, 47},
-       {"sp_nd_planar_levels",          required_argument, 0, 48},
-       {"sp_proportional_mapping",      required_argument, 0, 49},
-       {"sp_enable_openmp_tree",        no_argument, 0, 50},
-       {"sp_disable_openmp_tree",       no_argument, 0, 51},
+       {"sp_enable_gpu_aware_mpi",      no_argument, 0, 39},
+       {"sp_disable_gpu_aware_mpi",     no_argument, 0, 40},
+       {"sp_lossy_precision",           required_argument, 0, 41},
+       {"sp_hss_min_sep_size",          required_argument, 0, 42},
+       {"sp_hss_min_front_size",        required_argument, 0, 43},
+       {"sp_hodlr_min_sep_size",        required_argument, 0, 44},
+       {"sp_hodlr_min_front_size",      required_argument, 0, 45},
+       {"sp_blr_min_sep_size",          required_argument, 0, 46},
+       {"sp_blr_min_front_size",        required_argument, 0, 47},
+       {"sp_lossy_min_sep_size",        required_argument, 0, 48},
+       {"sp_lossy_min_front_size",      required_argument, 0, 49},
+       {"sp_nd_planar_levels",          required_argument, 0, 50},
+       {"sp_proportional_mapping",      required_argument, 0, 51},
+       {"sp_enable_openmp_tree",        no_argument, 0, 52},
+       {"sp_disable_openmp_tree",       no_argument, 0, 53},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -352,65 +354,67 @@ namespace strumpack {
         iss >> gpu_streams_;
         set_gpu_streams(gpu_streams_);
       } break;
-      case 39: {
+      case 39: enable_gpu_aware_mpi(); break;
+      case 40: disable_gpu_aware_mpi(); break;
+      case 41: {
         std::istringstream iss(optarg);
         iss >> lossy_precision_;
         set_lossy_precision(lossy_precision_);
-      } break;
-      case 40: {
-        std::istringstream iss(optarg);
-        int min_sep;
-        iss >> min_sep;
-        set_hss_min_sep_size(min_sep);
-      } break;
-      case 41: {
-        std::istringstream iss(optarg);
-        int min_front;
-        iss >> min_front;
-        set_hss_min_front_size(min_front);
       } break;
       case 42: {
         std::istringstream iss(optarg);
         int min_sep;
         iss >> min_sep;
-        set_hodlr_min_sep_size(min_sep);
+        set_hss_min_sep_size(min_sep);
       } break;
       case 43: {
         std::istringstream iss(optarg);
         int min_front;
         iss >> min_front;
-        set_hodlr_min_front_size(min_front);
+        set_hss_min_front_size(min_front);
       } break;
       case 44: {
         std::istringstream iss(optarg);
         int min_sep;
         iss >> min_sep;
-        set_blr_min_sep_size(min_sep);
+        set_hodlr_min_sep_size(min_sep);
       } break;
       case 45: {
         std::istringstream iss(optarg);
         int min_front;
         iss >> min_front;
-        set_blr_min_front_size(min_front);
+        set_hodlr_min_front_size(min_front);
       } break;
       case 46: {
         std::istringstream iss(optarg);
         int min_sep;
         iss >> min_sep;
-        set_lossy_min_sep_size(min_sep);
+        set_blr_min_sep_size(min_sep);
       } break;
       case 47: {
         std::istringstream iss(optarg);
         int min_front;
         iss >> min_front;
-        set_lossy_min_front_size(min_front);
+        set_blr_min_front_size(min_front);
       } break;
       case 48: {
+        std::istringstream iss(optarg);
+        int min_sep;
+        iss >> min_sep;
+        set_lossy_min_sep_size(min_sep);
+      } break;
+      case 49: {
+        std::istringstream iss(optarg);
+        int min_front;
+        iss >> min_front;
+        set_lossy_min_front_size(min_front);
+      } break;
+      case 50: {
         std::istringstream iss(optarg);
         iss >> nd_planar_levels_;
         set_nd_planar_levels(nd_planar_levels_);
       } break;
-      case 49: {
+      case 51: {
         std::string s; std::istringstream iss(optarg); iss >> s;
         for (auto& c : s) c = std::toupper(c);
         if (s == "FLOPS") set_proportional_mapping(ProportionalMapping::FLOPS);
@@ -420,8 +424,8 @@ namespace strumpack {
                " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
                        << std::endl;
       } break;
-      case 50: enable_openmp_tree(); break;
-      case 51: disable_openmp_tree(); break;
+      case 52: enable_openmp_tree(); break;
+      case 53: disable_openmp_tree(); break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -555,6 +559,8 @@ namespace strumpack {
     std::cout << "#   --sp_gpu_streams (default "
               << gpu_streams() << ")" << std::endl
               << "#          number of GPU streams" << std::endl;
+    std::cout << "#   --sp_enable_gpu_aware_mpi" << std::endl;
+    std::cout << "#   --sp_disable_gpu_aware_mpi" << std::endl;
     std::cout << "#   --sp_enable_openmp_tree (default "
               << std::boolalpha << use_openmp_tree_ << ")" << std::endl
               << "#          uses more memory, but scales better with OpenMP threads"
