@@ -95,8 +95,8 @@ namespace strumpack {
 
       LRTile(const DenseM_t& U, const DenseM_t& V);
 
-      // TODO where is this used??
       LRTile(DenseMW_t& dU, DenseMW_t& dV);
+      LRTile(DenseMW_t&& dU, DenseMW_t&& dV);
 
       std::size_t rows() const override { return U_->rows(); }
       std::size_t cols() const override { return V_->cols(); }

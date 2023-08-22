@@ -91,6 +91,11 @@ namespace strumpack {
       U_.reset(new DenseMW_t(dU));
       V_.reset(new DenseMW_t(dV));
     }
+    template<typename scalar_t> LRTile<scalar_t>::LRTile
+    (DenseMW_t&& dU, DenseMW_t&& dV) {
+      U_.reset(new DenseMW_t(std::move(dU)));
+      V_.reset(new DenseMW_t(std::move(dV)));
+    }
 
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {

@@ -1056,11 +1056,34 @@ namespace strumpack {
     }
 
     DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>& D) {
-      this->data_ = &D(0,0); 
-      this->rows_ = D.rows(); 
+      this->data_ = D.data();
+      this->rows_ = D.rows();
       this->cols_ = D.cols();
       this->ld_ = D.ld();
     }
+
+    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>& D) = delete;
+
+    /**
+     * Constructing a DenseMatrixWrapper from a const DenseMatrix is
+     * not allowed due to const-ness.
+     */
+    DenseMatrixWrapper(const DenseMatrix<scalar_t>&) = delete;
+
+    /**
+     * Default move constructor.
+     */
+    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>&& D) {
+      this->data_ = D.data();
+      this->rows_ = D.rows();
+      this->cols_ = D.cols();
+      this->ld_ = D.ld();
+    }
+
+    /**
+     * Moving from a DenseMatrix is not allowed.
+     */
+    DenseMatrixWrapper(DenseMatrix<scalar_t>&&) = delete;
 
     /**
      * Virtual destructor. Since a DenseMatrixWrapper does not
@@ -1102,42 +1125,15 @@ namespace strumpack {
      */
     std::size_t nonzeros() const override { return 0; }
 
-    /**
-     * Default copy constructor, from another DenseMatrixWrapper.
-     */
-    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>&) = default;
 
     /**
-     * Constructing a DenseMatrixWrapper from a DenseMatrixWrapper is
-     * not allowed.
-     * TODO Why not??!! just delegate to DenseMatrixWrapper(m, n, D, i, j)??
+     * Assignment operator. Shallow copy only. This only copies the
+     * wrapper object. Does not copy matrix elements.
+     *
+     * \param D matrix wrapper to copy from, this will be duplicated
      */
-    DenseMatrixWrapper(const DenseMatrix<scalar_t>&) = delete;
-
-    /**
-     * Default move constructor.
-     */
-    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>&&) = default;
-
-    /**
-     * Moving from a DenseMatrix is not allowed.
-     */
-    DenseMatrixWrapper(DenseMatrix<scalar_t>&&) = delete;
-
-    // /**
-    //  * Assignment operator. Shallow copy only. This only copies the
-    //  * wrapper object. Does not copy matrix elements.
-    //  *
-    //  * \param D matrix wrapper to copy from, this will be duplicated
-    //  */
-    // DenseMatrixWrapper<scalar_t>&
-    // operator=(const DenseMatrixWrapper<scalar_t>& D) {
-    //   this->data_ = D.data();
-    //   this->rows_ = D.rows();
-    //   this->cols_ = D.cols();
-    //   this->ld_ = D.ld();
-    //   return *this;
-    // }
+    DenseMatrixWrapper<scalar_t>&
+    operator=(const DenseMatrixWrapper<scalar_t>& D) = delete;
 
     /**
      * Move assignment. This moves only the wrapper.

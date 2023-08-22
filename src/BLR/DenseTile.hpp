@@ -59,7 +59,9 @@ namespace strumpack {
       DenseTile() {}
       DenseTile(std::size_t m, std::size_t n) { D_.reset(new DenseM_t(m, n)); }
       DenseTile(const DenseM_t& D) { D_.reset(new DenseM_t(D)); }
+      DenseTile(const DenseMW_t& D) = delete;
       DenseTile(DenseMW_t& D) { D_.reset(new DenseMW_t(D)); }
+      DenseTile(DenseMW_t&& D) { D_.reset(new DenseMW_t(std::move(D))); }
 
       std::size_t rows() const override { return D_->rows(); }
       std::size_t cols() const override { return D_->cols(); }
