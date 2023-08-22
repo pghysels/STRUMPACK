@@ -309,9 +309,17 @@ namespace strumpack {
       }
       gpu_check(gpu::copy_host_to_device(dm, mn.data(), 2*B));
       gpu_check(gpu::copy_host_to_device(dA, AUV.data(), 3*B));
+#if 0 // TODO figure out why this fails, negative ranks etc
       gpu::kblas::ara
         (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
          tol, maxm, maxn, maxminmn, KBLAS_ARA_BLOCK_SIZE, 10, 1, B);
+#else
+      for (std::size_t i=0; i<B; i++)
+        gpu::kblas::ara
+          (handle, dm+i, dn+i, dA+i, dm+i, dU+i, dm+i, dV+i, dn+i, dr+i,
+           tol, maxm, maxn, maxminmn, KBLAS_ARA_BLOCK_SIZE, 10, 1, 1);
+#endif
+
       std::vector<int> ranks(B);
       gpu_check(gpu::copy_device_to_host(ranks.data(), dr, B));
       for (std::size_t i=0; i<B; i++) {
@@ -321,8 +329,7 @@ namespace strumpack {
           auto dA = AUV[i];
           DenseMW_t tU(m, rank, dA, m),
             tV(rank, n, dA+m*rank, rank);
-          *tile_[i] = std::unique_ptr<LRTile<scalar_t>>
-            (new LRTile<scalar_t>(tU, tV));
+          tile_[i]->reset(new LRTile<scalar_t>(tU, tV));
           DenseMW_t dUtmp(m, rank, AUV[i+B], m),
             dVtmp(n, rank, AUV[i+2*B], n);
           gpu_check(gpu::copy_device_to_device(tU, dUtmp));
@@ -340,11 +347,8 @@ namespace strumpack {
     VBatchedARA<scalar_t>::kblas_wsquery(gpu::BLASHandle& handle,
                                          int batchcount) {
 #if defined(STRUMPACK_USE_KBLAS)
-      // TODO fix for complex!!
-      using real_t = typename RealType<scalar_t>::value_type;
-      kblas_ara_batch_wsquery<real_t>
+      gpu::kblas::ara_workspace<scalar_t>
         (handle, KBLAS_ARA_BLOCK_SIZE, batchcount);
-      kblasAllocateWorkspace(handle);
 #endif
     }
 

@@ -48,6 +48,26 @@ namespace strumpack {
   namespace gpu {
     namespace kblas {
 
+      template<typename scalar_t> void
+      ara_workspace(BLASHandle& handle,
+                    int blocksize, int batchcount) {
+        kblas_ara_batch_wsquery<scalar_t>(handle, blocksize, batchcount);
+        kblasAllocateWorkspace(handle);
+      }
+      template<> void
+      ara_workspace<std::complex<float>>(BLASHandle& handle,
+                                         int blocksize, int batchcount) {
+        kblas_ara_batch_wsquery<cuComplex>(handle, blocksize, batchcount);
+        kblasAllocateWorkspace(handle);
+      }
+      template<> void
+      ara_workspace<std::complex<double>>(BLASHandle& handle,
+                                          int blocksize, int batchcount) {
+        kblas_ara_batch_wsquery<cuDoubleComplex>
+          (handle, blocksize, batchcount);
+        kblasAllocateWorkspace(handle);
+      }
+
       void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
                float** M_batch, int* ldm_batch,
                float** A_batch, int* lda_batch,
