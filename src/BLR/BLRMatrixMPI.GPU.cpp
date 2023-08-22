@@ -87,7 +87,8 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_row_of_tiles_along_cols_gpu
     (std::size_t i, std::size_t j0, std::size_t j1,
-     scalar_t* dptr, scalar_t* pinned, const SPOptions<scalar_t>& spopts) const {
+     scalar_t* dptr, scalar_t* pinned, VectorPool<scalar_t>& workspace,
+     const SPOptions<scalar_t>& spopts) const {
       if (!grid()) return {};
       int src = i % grid()->nprows();
       std::size_t msg_size = 0, nr_tiles = 0;
@@ -112,10 +113,12 @@ namespace strumpack {
       grid()->col_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
 
-      // assert(pinned.size() >= msg_size);
-      if (spopts.use_gpu_aware_mpi()){
-        gpu::DeviceMemory<scalar_t> dpinptr(msg_size); 
-        scalar_t *ptr = dpinptr.template as<scalar_t>();
+      if (spopts.use_gpu_aware_mpi()) {
+        // assert(pinned_size >= msg_size);
+        // gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+        auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
+        //scalar_t *ptr = dpinptr.template as<scalar_t>();
+        scalar_t *ptr = dbytes.template as<scalar_t>();
         //auto ptr = pinned; // not working correctly
         if (grid()->is_local_row(i)) {
           for (std::size_t j=j0; j<j1; j++)
@@ -134,7 +137,8 @@ namespace strumpack {
               }
             }
         }
-        ptr = dpinptr; //device mem
+        //ptr = dpinptr; //device mem
+        ptr = dbytes.template as<scalar_t>();
         //ptr = pinned; // not working correctly
         grid()->col_comm().broadcast_from(ptr, msg_size, src);
         Tij.reserve(nr_tiles);
@@ -158,6 +162,7 @@ namespace strumpack {
               Tij.emplace_back(new DenseTile<scalar_t>(dD));
             }
           }
+        workspace.restore(dbytes);
       } else { //NOT gpu_aware_mpi
         auto ptr = pinned;
         if (grid()->is_local_row(i)) {
@@ -483,9 +488,9 @@ namespace strumpack {
           comp_stream.synchronize();
           // Schur complement update
           auto Tij = A11.bcast_row_of_tiles_along_cols_gpu
-            (i, i+1, rb, drow1, d_pinned, spopts);
+            (i, i+1, rb, drow1, d_pinned, workspace, spopts);
           auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
-            (i, 0, rb2, drow2, d_pinned, spopts);
+            (i, 0, rb2, drow2, d_pinned, workspace, spopts);
           auto Tki = A11.bcast_col_of_tiles_along_rows_gpu
             (i+1, rb, i, dcol1, d_pinned, spopts);
           auto Tk2i = A21.bcast_col_of_tiles_along_rows_gpu
@@ -662,9 +667,9 @@ namespace strumpack {
 
           // Schur complement update
           auto Tij = A11.bcast_row_of_tiles_along_cols_gpu
-            (i, i+1, rb, drow1, pinned, spopts);
+            (i, i+1, rb, drow1, pinned, workspace, spopts);
           auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
-            (i, 0, rb2, drow2, pinned, spopts);
+            (i, 0, rb2, drow2, pinned, workspace, spopts);
           auto Tki = A11.bcast_col_of_tiles_along_rows_gpu
             (i+1, rb, i, dcol1, pinned, spopts);
           auto Tk2i = A21.bcast_col_of_tiles_along_rows_gpu
