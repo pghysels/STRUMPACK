@@ -736,7 +736,7 @@ install(TARGETS strumpack EXPORT STRUMPACKTargets
 
 
 # export targets and all
-set(ConfigPackageLocation lib/cmake/STRUMPACK)
+set(ConfigPackageLocation ${CMAKE_INSTALL_LIBDIR}/cmake/STRUMPACK)
 
 install(EXPORT STRUMPACKTargets FILE strumpack-targets.cmake
   NAMESPACE STRUMPACK:: DESTINATION ${ConfigPackageLocation})
