@@ -114,7 +114,6 @@ namespace strumpack {
       msg_size = ranks.back();
 
       if (spopts.use_gpu_aware_mpi()) {
-        std::cout << "bcast_row - gpu aware" << std::endl;
         // assert(pinned_size >= msg_size);
         // gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
         auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
@@ -242,7 +241,6 @@ namespace strumpack {
       msg_size = ranks.back();
       // assert(pinned.size() >= msg_size);
       if (spopts.use_gpu_aware_mpi()){
-        std::cout << "bcast_col - gpu aware" << std::endl;
         //gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
         //scalar_t *ptr = dpinptr.template as<scalar_t>();
         auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
@@ -400,7 +398,6 @@ namespace strumpack {
                   std::max(A22.lcols(), A22.lrows()));*/
         gpu::DeviceMemory<scalar_t> d_pinned(1);
         //---
-        std::cout << "main - gpu aware" << std::endl;
         gpu::DeviceMemory<int> dpiv(max_m1+1);
         auto dpiv_ptr = dpiv.template as<int>();
         auto dinfo = dpiv_ptr + max_m1;
@@ -413,55 +410,10 @@ namespace strumpack {
         A21.move_to_gpu(copy_stream, dA21, pinned);
         A22.move_to_gpu(copy_stream, dA22, pinned);
 
-#if 1  // CUDA aware
-      DenseTile<scalar_t> Tii;
-      for (std::size_t i=0; i<rb; i++) {
-        auto mi = A11.tilerows(i);
-        Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi););
-        //scalar_t *ptr = Tii.D().data();
-        //Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi));//!!
-        if (g->is_local_row(i)) {
-          piv_tile.resize(mi);
-          if (g->is_local_col(i)) {
-            gpu::getrf<scalar_t>
-              (solve_handle, A11.tile(i, i).D(), dwork, dpiv, dinfo);
-            comp_stream.synchronize();
-            gpu_check(gpu::copy_device_to_device
-                      (Tii.D(), A11.tile(i, i).D()));
-          }
-          int src = i % g->npcols();
-          g->row_comm().broadcast_from(dpiv_ptr, mi, src);
-          g->row_comm().broadcast_from(Tii.D().data(), mi*mi, src);
-          gpu_check(gpu::copy_device_to_host<int>
-                      (piv_tile.data(), dpiv, mi));
-          int r0 = A11.tileroff(i);
-          std::transform
-            (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
-             [r0](int p) -> int { return p + r0; });
-        }
-        if (g->is_local_col(i)) {
-          g->col_comm().broadcast_from(Tii.D().data(), mi*mi, i % g->nprows());
-        }
-        copy_stream.synchronize();
-#else
-      DenseTile<scalar_t> Tii;
-      for (std::size_t i=0; i<rb; i++) {
-        auto mi = A11.tilerows(i);
-        Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, pinned, mi));
-        if (g->is_local_row(i)) {
-          piv_tile.resize(mi);
-          if (g->is_local_col(i)) {
-            gpu::getrf<scalar_t>
-              (solve_handle, A11.tile(i, i).D(), dwork, dpiv, dinfo);
-            comp_stream.synchronize();
-            gpu_check(gpu::copy_device_to_host
-                      (Tii.D(), A11.tile(i, i).D()));
-      //if (spopts.use_gpu_aware_mpi()){
         DenseTile<scalar_t> Tii;
         for (std::size_t i=0; i<rb; i++) {
           auto mi = A11.tilerows(i);
-          DenseMW_t test(mi, mi, dcol1, mi);
-          Tii = DenseTile<scalar_t>(test);
+          Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi););
           if (g->is_local_row(i)) {
             piv_tile.resize(mi);
             if (g->is_local_col(i)) {
