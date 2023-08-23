@@ -414,7 +414,7 @@ namespace strumpack {
         DenseTile<scalar_t> Tii;
         for (std::size_t i=0; i<rb; i++) {
           auto mi = A11.tilerows(i);
-          Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi););
+          Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi));
           if (g->is_local_row(i)) {
             piv_tile.resize(mi);
             if (g->is_local_col(i)) {
