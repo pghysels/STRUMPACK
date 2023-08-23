@@ -114,6 +114,10 @@ namespace strumpack {
       msg_size = ranks.back();
 
       if (spopts.use_gpu_aware_mpi()) {
+<<<<<<< HEAD
+=======
+        std::cout << "bcast_row - gpu aware" << std::endl;
+>>>>>>> 5bd891642cd78af3a69cd1593d6b685049789e26
         // assert(pinned_size >= msg_size);
         // gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
         auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
@@ -241,6 +245,10 @@ namespace strumpack {
       msg_size = ranks.back();
       // assert(pinned.size() >= msg_size);
       if (spopts.use_gpu_aware_mpi()){
+<<<<<<< HEAD
+=======
+        std::cout << "bcast_col - gpu aware" << std::endl;
+>>>>>>> 5bd891642cd78af3a69cd1593d6b685049789e26
         //gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
         //scalar_t *ptr = dpinptr.template as<scalar_t>();
         auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
@@ -413,7 +421,12 @@ namespace strumpack {
         DenseTile<scalar_t> Tii;
         for (std::size_t i=0; i<rb; i++) {
           auto mi = A11.tilerows(i);
+<<<<<<< HEAD
           Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi););
+=======
+          DenseMW_t test(mi, mi, dcol1, mi);
+          Tii = DenseTile<scalar_t>(test);
+>>>>>>> 5bd891642cd78af3a69cd1593d6b685049789e26
           if (g->is_local_row(i)) {
             piv_tile.resize(mi);
             if (g->is_local_col(i)) {
