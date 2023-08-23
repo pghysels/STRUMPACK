@@ -114,6 +114,7 @@ namespace strumpack {
       msg_size = ranks.back();
 
       if (spopts.use_gpu_aware_mpi()) {
+        std::cout << "bcast_row - gpu aware" << std::endl;
         // assert(pinned_size >= msg_size);
         // gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
         auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
@@ -214,7 +215,8 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_col_of_tiles_along_rows_gpu
     (std::size_t i0, std::size_t i1, std::size_t j,
-     scalar_t* dptr, scalar_t* pinned, const SPOptions<scalar_t>& spopts) const {
+     scalar_t* dptr, scalar_t* pinned, VectorPool<scalar_t>& workspace,
+     const SPOptions<scalar_t>& spopts) const {
       if (!grid()) return {};
       int src = j % grid()->npcols();
       std::size_t msg_size = 0, nr_tiles = 0;
@@ -240,8 +242,11 @@ namespace strumpack {
       msg_size = ranks.back();
       // assert(pinned.size() >= msg_size);
       if (spopts.use_gpu_aware_mpi()){
-        gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
-        scalar_t *ptr = dpinptr.template as<scalar_t>();
+        std::cout << "bcast_col - gpu aware" << std::endl;
+        //gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+        //scalar_t *ptr = dpinptr.template as<scalar_t>();
+        auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
+        scalar_t *ptr = dbytes.template as<scalar_t>();
         //auto ptr = pinned; // not working correctly
         if (grid()->is_local_col(j)) {
           for (std::size_t i=i0; i<i1; i++)
@@ -260,7 +265,8 @@ namespace strumpack {
               }
             }
         }
-        ptr = dpinptr; //device mem
+        //ptr = dpinptr; //device mem
+        ptr = dbytes.template as<scalar_t>();
         //ptr = pinned; // not working correctly
         grid()->row_comm().broadcast_from(ptr, msg_size, src);
         Tij.reserve(nr_tiles);
@@ -388,19 +394,16 @@ namespace strumpack {
 
       if (spopts.use_gpu_aware_mpi()){ 
         //--- this part of cuda aware, not working correctly
-        std::size_t dpinned_size =
+        /*std::size_t dpinned_size =
           std::max(max_m1, A22.maxtilerows()) *
           std::max(std::max(A11.lcols(), A11.lrows()),
-                  std::max(A22.lcols(), A22.lrows()));
-        gpu::DeviceMemory<scalar_t> d_pinned(dpinned_size);
+                  std::max(A22.lcols(), A22.lrows()));*/
+        gpu::DeviceMemory<scalar_t> d_pinned(1);
         //---
-      //}
+        std::cout << "main - gpu aware" << std::endl;
         gpu::DeviceMemory<int> dpiv(max_m1+1);
-      //if (spopts.use_gpu_aware_mpi()){
         auto dpiv_ptr = dpiv.template as<int>();
         auto dinfo = dpiv_ptr + max_m1;
-      //} else 
-        //auto dinfo = dpiv + max_m1;
         gpu::DeviceMemory<char> d_batch_mem(3*d_batch_meta);
         gpu::DeviceMemory<char> d_batch_matrix_mem;
 
@@ -410,7 +413,6 @@ namespace strumpack {
         A21.move_to_gpu(copy_stream, dA21, pinned);
         A22.move_to_gpu(copy_stream, dA22, pinned);
 
-      //if (spopts.use_gpu_aware_mpi()){
         DenseTile<scalar_t> Tii;
         for (std::size_t i=0; i<rb; i++) {
           auto mi = A11.tilerows(i);
@@ -492,9 +494,9 @@ namespace strumpack {
           auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
             (i, 0, rb2, drow2, d_pinned, workspace, spopts);
           auto Tki = A11.bcast_col_of_tiles_along_rows_gpu
-            (i+1, rb, i, dcol1, d_pinned, spopts);
+            (i+1, rb, i, dcol1, d_pinned, workspace, spopts);
           auto Tk2i = A21.bcast_col_of_tiles_along_rows_gpu
-            (0, rb2, i, dcol2, d_pinned, spopts);
+            (0, rb2, i, dcol2, d_pinned, workspace, spopts);
 
           int batchcount = 0;
           std::size_t sVU = 0, sUVU = 0;
@@ -671,9 +673,9 @@ namespace strumpack {
           auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
             (i, 0, rb2, drow2, pinned, workspace, spopts);
           auto Tki = A11.bcast_col_of_tiles_along_rows_gpu
-            (i+1, rb, i, dcol1, pinned, spopts);
+            (i+1, rb, i, dcol1, pinned, workspace, spopts);
           auto Tk2i = A21.bcast_col_of_tiles_along_rows_gpu
-            (0, rb2, i, dcol2, pinned, spopts);
+            (0, rb2, i, dcol2, pinned, workspace, spopts);
 
           int batchcount = 0;
           std::size_t sVU = 0, sUVU = 0;
