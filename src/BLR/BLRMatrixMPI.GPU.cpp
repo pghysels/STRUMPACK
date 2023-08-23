@@ -288,6 +288,7 @@ namespace strumpack {
               Tij.emplace_back(new DenseTile<scalar_t>(dD));
             }
           }
+        workspace.restore(dbytes);
       } else {  //NOT gpu_aware_mpi
         auto ptr = pinned;
         if (grid()->is_local_col(j)) {
