@@ -337,6 +337,7 @@ namespace strumpack {
       bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
                                         std::size_t j,
                                         scalar_t* dptr, scalar_t* pinned,
+                                        VectorPool<scalar_t>& workspace,
                                         const SPOptions<scalar_t>& spopts)
         const;
 #endif
