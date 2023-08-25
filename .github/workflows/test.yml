@@ -77,7 +77,6 @@ jobs:
           rm -rf build
           mkdir -p build
           mkdir -p install
-          export STRUMPACK_DIR=`pwd`/install
           cd build
           export CRAYPE_LINK_TYPE=dynamic
           cmake .. \
@@ -93,6 +92,13 @@ jobs:
           make install
           make examples
           printf "${BLUE} PG; Done installing STRUMPACK from source\n"
+          cd ../
+          export STRUMPACK_DIR=`pwd`/install
+          cd test/build_external/
+          mkdir -p build
+          cd build
+          cmake ../
+          make
 
       - name: Test
         run: |
@@ -103,6 +109,7 @@ jobs:
       - name: External build
         run: |
           cd $GITHUB_WORKSPACE
+          export STRUMPACK_DIR=`pwd`/install
           cd test/build_external/
           mkdir -p build
           cd build
