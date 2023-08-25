@@ -20,6 +20,7 @@ install(FILES
   StrumpackSparseSolver.hpp
   StrumpackSparseSolver.h
   StrumpackConfig.hpp
+  StrumpackSparseSolverMixedPrecision.hpp
   DESTINATION include)
 
 

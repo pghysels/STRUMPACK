@@ -31,7 +31,7 @@
 #include <random>
 #include "structured/ClusterTree.hpp"
 #include "BLR/BLRMatrixMPI.hpp"
-#include "../src/misc/TaskTimer.hpp"
+#include "misc/TaskTimer.hpp"
 
 using namespace std;
 using namespace strumpack;
