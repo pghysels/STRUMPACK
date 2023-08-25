@@ -76,6 +76,8 @@ jobs:
           cd $GITHUB_WORKSPACE
           rm -rf build
           mkdir -p build
+          mkdir -p install
+          export STRUMPACK_DIR=`pwd`/install
           cd build
           export CRAYPE_LINK_TYPE=dynamic
           cmake .. \
@@ -83,7 +85,7 @@ jobs:
             -DCMAKE_C_COMPILER=mpicc \
             -DCMAKE_CXX_COMPILER=mpic++ \
             -DCMAKE_Fortran_COMPILER=mpif90 \
-            -DCMAKE_INSTALL_PREFIX=. \
+            -DCMAKE_INSTALL_PREFIX=../install \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
             -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
@@ -101,7 +103,6 @@ jobs:
       - name: External build
         run: |
           cd $GITHUB_WORKSPACE
-          export STRUMPACK_DIR=`pwd`/build
           cd test/build_external/
           mkdir -p build
           cd build
