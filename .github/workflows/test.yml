@@ -97,3 +97,13 @@ jobs:
           cd $GITHUB_WORKSPACE
           export TEST_NUMBER=${{ matrix.test }}
           sh ./.ci_tests.sh
+
+      - name: External build
+        run: |
+          cd $GITHUB_WORKSPACE
+          export STRUMPACK_DIR=`pwd`/build
+          cd test/build_external/
+          mkdir -p build
+          cd build
+          cmake ../
+          make
