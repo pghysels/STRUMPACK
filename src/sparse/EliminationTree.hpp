@@ -34,14 +34,13 @@
 
 #include "dense/DenseMatrix.hpp"
 #include "CompressedSparseMatrix.hpp"
-#include "fronts/FrontFactory.hpp"
-#include "fronts/FrontalMatrix.hpp"
 #include "StrumpackOptions.hpp"
-#include "SeparatorTree.hpp"
+#include "fronts/FrontFactory.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix;
+  template<typename integer_t> class SeparatorTree;
 
   // TODO rename this to SuperNodalTree?
   template<typename scalar_t,typename integer_t>

@@ -32,6 +32,7 @@
 #include "EliminationTree.hpp"
 #include "fronts/FrontFactory.hpp"
 #include "fronts/FrontalMatrix.hpp"
+#include "SeparatorTree.hpp"
 
 namespace strumpack {
 
