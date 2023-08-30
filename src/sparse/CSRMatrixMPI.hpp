@@ -113,6 +113,7 @@ namespace strumpack {
     void spmv(const DenseM_t& x, DenseM_t& y) const override;
     void spmv(const scalar_t* x, scalar_t* y) const override;
 
+    using CompressedSparseMatrix<scalar_t,integer_t>::permute;
     void permute(const integer_t* iorder, const integer_t* order) override;
 
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> gather() const;
