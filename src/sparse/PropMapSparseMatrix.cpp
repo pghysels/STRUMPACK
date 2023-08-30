@@ -77,10 +77,10 @@ namespace strumpack {
           auto& d = dest[j];
           auto hip = std::get<0>(d) + std::get<1>(d);
           for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d)) {
-	    auto ps = scnts.data() + p;
+            auto ps = scnts.data() + p;
 #pragma omp atomic update
-            *ps++;
-	  }
+            (*ps)++;
+          }
         }
       }
     }

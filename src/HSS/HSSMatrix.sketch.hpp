@@ -683,11 +683,11 @@ namespace strumpack {
           }
           // subtract cols
           for (std::size_t l=startB; l<endB; l++) {
-	    auto cBl = col_B[l];
-	    if (cBl >= j && cBl < n + j)
+            auto cBl = col_B[l];
+            if (cBl >= j && cBl < n + j)
               for (size_t r=0; r<rows; r++)
                 A(r, cBl-j) -= alpha * Mk[r]; // M(r,k);
-	  }
+          }
         }
       }
     }

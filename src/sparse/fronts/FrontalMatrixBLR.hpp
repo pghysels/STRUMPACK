@@ -63,7 +63,6 @@ namespace strumpack {
                           const std::vector<Triplet<scalar_t>>& e21,
                           int task_depth, const Opts_t& opts);
 
-    using F_t::extend_add_to_dense;
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
@@ -74,7 +73,6 @@ namespace strumpack {
                                BLRM_t& paF21, BLRM_t& paF22, const F_t* p,
                                integer_t begin_col, integer_t end_col,
                                int task_depth, const Opts_t& opts) override;
-    using F_t::sample_CB;
     void sample_CB(const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
                    DenseM_t& Sc, F_t* pa, int task_depth) override;
 
@@ -85,12 +83,10 @@ namespace strumpack {
     ReturnCode factor_node(const SpMat_t& A, const Opts_t& opts,
                            int etree_level=0, int task_depth=0);
 
-    using F_t::forward_multifrontal_solve;
     void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
                                     int etree_level=0, int task_depth=0)
       const override;
 
-    using F_t::backward_multifrontal_solve;
     void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int
                                      etree_level=0, int task_depth=0)
       const override;
@@ -142,6 +138,12 @@ namespace strumpack {
     using F_t::dim_upd;
     using F_t::sep_begin_;
     using F_t::sep_end_;
+
+    // suppress warnings
+    using F_t::extend_add_to_dense;
+    using F_t::sample_CB;
+    using F_t::forward_multifrontal_solve;
+    using F_t::backward_multifrontal_solve;
   };
 
 } // end namespace strumpack

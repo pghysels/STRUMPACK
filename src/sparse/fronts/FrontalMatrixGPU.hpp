@@ -67,7 +67,6 @@ namespace strumpack {
 
     void release_work_memory() override;
 
-    using F_t::extend_add_to_dense;
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
@@ -120,6 +119,9 @@ namespace strumpack {
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+
+    // suppress warnings
+    using F_t::extend_add_to_dense;
 
     template<typename T,typename I> friend class LevelInfo;
   };
