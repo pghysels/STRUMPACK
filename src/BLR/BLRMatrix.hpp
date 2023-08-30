@@ -262,6 +262,10 @@ namespace strumpack {
       template<typename T> friend
       void draw(const BLRMatrix<T>& H, const std::string& name);
       template<typename T,typename I> friend class BLRExtendAdd;
+
+      // suppress warnings
+      using structured::StructuredMatrix<scalar_t>::mult;
+      using structured::StructuredMatrix<scalar_t>::solve;
     };
 
     template<typename scalar_t> void

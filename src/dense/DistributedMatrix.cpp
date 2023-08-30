@@ -87,7 +87,6 @@ namespace strumpack {
    std::size_t i, std::size_t j) : _rows(m), _cols(n), _i(i), _j(j) {
     assert(!A.active() || m+i <= std::size_t(A.rows()));
     assert(!A.active() || n+j <= std::size_t(A.cols()));
-    assert(m >= 0 && n >= 0 && i >=0 && j >= 0);
     this->data_ = A.data();
     std::copy(A.desc(), A.desc()+9, this->desc_);
     this->lrows_ = A.lrows();   this->lcols_ = A.lcols();

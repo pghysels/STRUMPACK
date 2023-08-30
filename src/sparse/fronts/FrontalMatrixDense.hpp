@@ -163,6 +163,9 @@ namespace strumpack {
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+
+    // suppress warnings
+    using F_t::sample_CB;
   };
 
 } // end namespace strumpack

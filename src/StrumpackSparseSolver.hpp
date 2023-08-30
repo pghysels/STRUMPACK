@@ -246,6 +246,7 @@ namespace strumpack {
     using SPBase_t::factored_;
     using SPBase_t::reordered_;
     using SPBase_t::Krylov_its_;
+    using SPBase_t::solve_internal;
   };
 
   template<typename scalar_t,typename integer_t>

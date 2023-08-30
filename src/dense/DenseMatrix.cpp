@@ -326,7 +326,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> B(I.size(), cols());
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
-        assert(I[i] >= 0 && I[i] < rows());
+        assert(I[i] < rows());
         B(i, j) = operator()(I[i], j);
       }
     return B;
@@ -351,7 +351,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> B(rows(), I.size());
     for (std::size_t j=0; j<I.size(); j++)
       for (std::size_t i=0; i<rows(); i++) {
-        assert(I[i] >= 0 && I[j] < cols());
+        assert(I[j] < cols());
         B(i, j) = operator()(i, I[j]);
       }
     return B;
@@ -364,8 +364,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> B(I.size(), J.size());
     for (std::size_t j=0; j<J.size(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
-        assert(I[i] >= 0 && I[i] < rows());
-        assert(J[j] >= 0 && J[j] < cols());
+        assert(I[i] < rows() && J[j] < cols());
         B(i, j) = operator()(I[i], J[j]);
       }
     return B;

@@ -233,18 +233,16 @@ namespace strumpack {
     public:
       AFunctor(const DenseM_t& A) : _A(A) {}
       const DenseM_t& _A;
-      void operator()
-      (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+      void operator()(DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
         gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
         gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
       }
-      void operator()(const std::vector<size_t>& I,
-                      const std::vector<size_t>& J, DenseM_t& B) {
+      void operator()(const std::vector<std::size_t>& I,
+                      const std::vector<std::size_t>& J, DenseM_t& B) {
         assert(I.size() == B.rows() && J.size() == B.cols());
         for (std::size_t j=0; j<J.size(); j++)
           for (std::size_t i=0; i<I.size(); i++) {
-            assert(I[i] >= 0 && I[i] < _A.rows() &&
-                   J[j] >= 0 && J[j] < _A.cols());
+            assert(I[i] < _A.rows() && J[j] < _A.cols());
             B(i,j) = _A(I[i], J[j]);
           }
       }

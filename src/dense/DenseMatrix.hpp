@@ -1166,6 +1166,8 @@ namespace strumpack {
           this->operator()(i, j) = a(i, j);
       return *this;
     }
+
+    using DenseMatrix<scalar_t>::operator=;
   };
 
 

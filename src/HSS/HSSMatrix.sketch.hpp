@@ -636,17 +636,17 @@ namespace strumpack {
           auto Mk = M.ptr(0,k-i);
           // add cols
           for (std::size_t l=start_A; l<end_A; l++) {
-            auto cAl = col_A[l] - j;
-            if (cAl < n && cAl >= 0)
+            auto cAl = col_A[l];
+            if (cAl < n + j && cAl >= j)
               for (size_t r=0; r<rows; r++)
-                A(r,cAl) += Mk[r]; // M(r,k);
+                A(r, cAl-j) += Mk[r]; // M(r,k);
           }
           // subtract cols
           for (std::size_t l=startB; l<endB; l++) {
-            auto cBl = col_B[l] - j;
-            if (cBl >= 0 && cBl < n)
+            auto cBl = col_B[l];
+            if (cBl >= j && cBl < n + j)
               for (size_t r=0; r<rows; r++)
-                A(r, cBl) -= Mk[r]; // M(r,k);
+                A(r, cBl-j) -= Mk[r]; // M(r,k);
           }
         }
       } else if (alpha == scalar_t(-1.)) {
@@ -656,17 +656,17 @@ namespace strumpack {
           auto Mk = M.ptr(0, k-i);
           // add cols
           for (std::size_t l=start_A; l<end_A; l++) {
-            auto cAl = col_A[l] - j;
-            if (cAl < n && cAl >= 0)
+            auto cAl = col_A[l];
+            if (cAl < n + j && cAl >= j)
               for (size_t r=0; r<rows; r++)
-                A(r, cAl) -= Mk[r]; // M(r,k);
+                A(r, cAl-j) -= Mk[r]; // M(r,k);
           }
           // subtract cols
           for (std::size_t l=startB; l<endB; l++) {
-            auto cBl = col_B[l] - j;
-            if(cBl >= 0 && cBl < n)
-              for(size_t r = 0; r < rows; r++)
-                A(r, cBl) += Mk[r]; // M(r,k);
+            auto cBl = col_B[l];
+            if (cBl >= j && cBl < n + j)
+              for (size_t r=0; r<rows; r++)
+                A(r, cBl-j) += Mk[r]; // M(r,k);
           }
         }
       } else {
@@ -676,18 +676,18 @@ namespace strumpack {
           auto Mk = M.ptr(0, k-i);
           // add cols
           for (std::size_t l=start_A; l<end_A; l++) {
-            auto cAl = col_A[l] - j;
-            if (cAl < n && cAl >= 0)
+            auto cAl = col_A[l];
+            if (cAl < n + j && cAl >= j)
               for (size_t r=0; r<rows; r++)
-                A(r, cAl) += alpha * Mk[r]; // M(r,k);
+                A(r, cAl-j) += alpha * Mk[r]; // M(r,k);
           }
           // subtract cols
           for (std::size_t l=startB; l<endB; l++) {
-            auto cBl = col_B[l] - j;
-            if (cBl >= 0 && cBl < n)
+	    auto cBl = col_B[l];
+	    if (cBl >= j && cBl < n + j)
               for (size_t r=0; r<rows; r++)
-                A(r, cBl) -= alpha * Mk[r]; // M(r,k);
-          }
+                A(r, cBl-j) -= alpha * Mk[r]; // M(r,k);
+	  }
         }
       }
     }
@@ -744,69 +744,63 @@ namespace strumpack {
 #pragma omp parallel for
         for (std::size_t k=0; k<cols; k++) {
           // iterate through the columns of A, B
-          for (size_t c=j; c<j+n; c++) {
-            std::size_t startA = col_ptr_A[c],
-              endA = col_ptr_A[c+1];
+          for (auto c=j; c<j+n; c++) {
+            auto startA = col_ptr_A[c], endA = col_ptr_A[c+1];
             scalar_t Akc = 0;
-            for (std::size_t l=startA; l<endA; l++) {
-              std::size_t r = row_ind_A[l] - i;
-              if (r >= 0 && r < m)
-                Akc += blas::my_conj(M(r,k));
+            for (auto l=startA; l<endA; l++) {
+              auto r = row_ind_A[l];
+              if (r >= i && r < m + i)
+                Akc += blas::my_conj(M(r-i, k));
             }
-            std::size_t startB = col_ptr_B[c],
-              endB = col_ptr_B[c+1];
-            for (std::size_t l=startB; l<endB; l++) {
-              std::size_t r = row_ind_B[l] - i;
-              if (r >= 0 && r < m)
-                Akc -= blas::my_conj(M(r,k));
+            auto startB = col_ptr_B[c], endB = col_ptr_B[c+1];
+            for (auto l=startB; l<endB; l++) {
+              auto r = row_ind_B[l];
+              if (r >= i && r < m + i)
+                Akc -= blas::my_conj(M(r-i, k));
             }
-            A(k,c-j) += Akc;
+            A(k, c-j) += Akc;
           }
         }
       } else if (alpha == scalar_t(-1.)) {
 #pragma omp parallel for
         for (std::size_t k=0; k<cols; k++) {
           // iterate through the columns of A, B
-          for(size_t c=j; c<j+n; c++) {
-            std::size_t startA = col_ptr_A[c],
-              endA = col_ptr_A[c+1];
+          for (auto c=j; c<j+n; c++) {
+            auto startA = col_ptr_A[c], endA = col_ptr_A[c+1];
             scalar_t Akc = 0;
-            for(std::size_t l=startA; l<endA; l++) {
-              std::size_t r = row_ind_A[l] - i;
-              if (r >= 0 && r < m)
-                Akc += blas::my_conj(M(r,k));
+            for (auto l=startA; l<endA; l++) {
+              auto r = row_ind_A[l];
+              if (r >= i && r < m + i)
+                Akc += blas::my_conj(M(r-i, k));
             }
-            std::size_t startB = col_ptr_B[c],
-              endB = col_ptr_B[c+1];
-            for(std::size_t l=startB; l<endB; l++) {
-              std::size_t r = row_ind_B[l] - i;
-              if (r >= 0 && r < m)
-                Akc -= blas::my_conj(M(r,k));
+            auto startB = col_ptr_B[c], endB = col_ptr_B[c+1];
+            for (auto l=startB; l<endB; l++) {
+              auto r = row_ind_B[l];
+              if (r >= i && r < m + i)
+                Akc -= blas::my_conj(M(r-i, k));
             }
-            A(k,c-j) -= Akc;
+            A(k, c-j) -= Akc;
           }
         }
       } else {
 #pragma omp parallel for
-        for(std::size_t k=0; k<cols; k++) {
+        for (std::size_t k=0; k<cols; k++) {
           //iterate through the columns of A, B
-          for(size_t c=j; c<j+n; c++) {
-            std::size_t startA = col_ptr_A[c],
-              endA = col_ptr_A[c+1];
+          for (auto c=j; c<j+n; c++) {
+            auto startA = col_ptr_A[c], endA = col_ptr_A[c+1];
             scalar_t Akc = 0;
-            for(std::size_t l=startA; l<endA; l++) {
-              std::size_t r = row_ind_A[l] - i;
-              if (r >= 0 && r < m)
-                Akc += blas::my_conj(M(r,k));
+            for (auto l=startA; l<endA; l++) {
+              auto r = row_ind_A[l];
+              if (r >= i && r < m + i)
+                Akc += blas::my_conj(M(r-i, k));
             }
-            std::size_t startB = col_ptr_B[c],
-              endB = col_ptr_B[c+1];
-            for(std::size_t l=startB; l<endB; l++) {
-              std::size_t r = row_ind_B[l] - i;
-              if (r >= 0 && r < m)
-                Akc -= blas::my_conj(M(r,k));
+            auto startB = col_ptr_B[c], endB = col_ptr_B[c+1];
+            for (auto l=startB; l<endB; l++) {
+              auto r = row_ind_B[l];
+              if (r >= i && r < m + i)
+                Akc -= blas::my_conj(M(r-i, k));
             }
-            A(k,c-j) += alpha * Akc;
+            A(k, c-j) += alpha * Akc;
           }
         }
       }

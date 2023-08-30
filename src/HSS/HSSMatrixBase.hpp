@@ -416,7 +416,7 @@ namespace strumpack {
                                  const DenseMatrix<scalar_t>& b,
                                  bool partial) const {}
       virtual void backward_solve(WorkSolve<scalar_t>& w,
-                                  DenseMatrix<scalar_t>& b) const {}
+                                  DenseM_t& b) const {}
       virtual void solve_fwd(const DenseM_t& b,
                              WorkSolve<scalar_t>& w, bool partial,
                              bool isroot, int depth) const {}
@@ -425,8 +425,7 @@ namespace strumpack {
 
       virtual void extract_fwd(WorkExtract<scalar_t>& w,
                                bool odiag, int depth) const {}
-      virtual void extract_bwd(DenseMatrix<scalar_t>& B,
-                               WorkExtract<scalar_t>& w,
+      virtual void extract_bwd(DenseM_t& B, WorkExtract<scalar_t>& w,
                                int depth) const {}
       virtual void extract_bwd(std::vector<Triplet<scalar_t>>& triplets,
                                WorkExtract<scalar_t>& w, int depth) const {}

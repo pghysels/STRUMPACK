@@ -69,7 +69,7 @@ namespace strumpack {
           H->compress(A, hss_opts);
           return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
         }
-      } break;
+      }
       case Type::BLR: {
         BLR::BLROptions<scalar_t> blr_opts(opts);
         auto row_leafs = row_tree ? row_tree->leaf_sizes<std::size_t>() :
@@ -84,7 +84,7 @@ namespace strumpack {
           (new BLR::BLRMatrix<scalar_t>
            (const_cast<DenseMatrix<scalar_t>&>(A),
             row_leafs, col_leafs, blr_opts));
-      } break;
+      }
       case Type::LOSSY: {
 #if defined(STRUMPACK_USE_ZFP)
         return std::unique_ptr<StructuredMatrix<scalar_t>>
@@ -93,7 +93,7 @@ namespace strumpack {
         throw std::runtime_error
           ("Lossy compression requires ZFP to be enabled.");
 #endif
-      } break;
+      }
       case Type::LOSSLESS: {
 #if defined(STRUMPACK_USE_ZFP)
         return std::unique_ptr<StructuredMatrix<scalar_t>>
@@ -102,7 +102,7 @@ namespace strumpack {
         throw std::runtime_error
           ("Lossless compression requires ZFP to be enabled.");
 #endif
-      } break;
+      }
       case Type::HODLR:
         throw std::invalid_argument("Type HODLR requires MPI.");
       case Type::HODBF:
@@ -218,12 +218,12 @@ namespace strumpack {
           new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
         H->compress(sample, A, hss_opts);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
-      } break;
+      }
       case Type::BLR: {
         // TODO
         throw std::logic_error
           ("BLR compression from elements not implemented yet.");
-      } break;
+      }
       case Type::HODLR:
         throw std::invalid_argument("Type HODLR requires MPI.");
       case Type::HODBF:
@@ -389,10 +389,10 @@ namespace strumpack {
           };
         H->compress(sample, Aelem, hss_opts);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
-      } break;
+      }
       case Type::BLR: {
         return construct_from_elements<scalar_t>(rows, cols, Aelem, opts);
-      } break;
+      }
       case Type::HODLR:
         throw std::invalid_argument("Type HODLR requires MPI.");
       case Type::HODBF:
@@ -510,7 +510,7 @@ namespace strumpack {
           (row_tree ?
            new HSS::HSSMatrixMPI<scalar_t>(*row_tree, A, hss_opts) :
            new HSS::HSSMatrixMPI<scalar_t>(A, hss_opts));
-      } break;
+      }
       case Type::BLR:
         throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
@@ -530,7 +530,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::HODBF: {
 #if defined(STRUMPACK_USE_BPACK)
         if (A.rows() != A.cols())
@@ -550,7 +550,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::BUTTERFLY: {
 #if defined(STRUMPACK_USE_BPACK)
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
@@ -570,7 +570,7 @@ namespace strumpack {
         throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::LR: {
 #if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(A.rows()), tc(A.cols());
@@ -662,7 +662,7 @@ namespace strumpack {
         };
         return construct_partially_matrix_free<scalar_t>
           (grid, rows, cols, Amult, A, opts, row_tree, col_tree);
-      } break;
+      }
       case Type::BLR:
         throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
@@ -675,7 +675,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::HODBF:
 #if defined(STRUMPACK_USE_BPACK)
         throw std::logic_error("Not implemented yet.");
@@ -770,7 +770,7 @@ namespace strumpack {
         };
         return construct_from_elements<scalar_t>
           (comm, grid, rows, cols, Ablock, opts, row_tree, col_tree);
-      } break;
+      }
       case Type::BLR:
         throw std::logic_error("Not implemented yet.");
       case Type::HODLR: {
@@ -790,7 +790,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::HODBF: {
 #if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
@@ -809,7 +809,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::BUTTERFLY: {
 #if defined(STRUMPACK_USE_BPACK)
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
@@ -827,7 +827,7 @@ namespace strumpack {
         throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::LR: {
 #if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(rows), tc(cols);
@@ -841,7 +841,7 @@ namespace strumpack {
         throw std::runtime_error
           ("LR compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::LOSSY:
         throw std::invalid_argument
           ("Type LOSSY does not support compression from elements.");
@@ -921,7 +921,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::HODBF: {
 #if defined(STRUMPACK_USE_BPACK)
         if (rows != cols)
@@ -950,7 +950,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::BUTTERFLY: {
 #if defined(STRUMPACK_USE_BPACK)
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
@@ -983,7 +983,7 @@ namespace strumpack {
         throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::LR: {
 #if defined(STRUMPACK_USE_BPACK)
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
@@ -1010,7 +1010,7 @@ namespace strumpack {
         throw std::runtime_error
           ("LR compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::LOSSY:
         throw std::invalid_argument
           ("Type LOSSY does not support matrix-free compression.");
@@ -1084,7 +1084,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODLR compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::HODBF: {
         if (rows != cols)
           throw std::invalid_argument
@@ -1108,7 +1108,7 @@ namespace strumpack {
         throw std::runtime_error
           ("HODBF compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::BUTTERFLY: {
 #if defined(STRUMPACK_USE_BPACK)
         HODLR::HODLROptions<scalar_t> hodbf_opts(opts);
@@ -1135,7 +1135,7 @@ namespace strumpack {
         throw std::runtime_error
           ("BUTTERFLY compression requires ButterflyPACK to be enabled.");
 #endif
-      } break;
+      }
       case Type::LR: {
 #if defined(STRUMPACK_USE_BPACK)
         structured::ClusterTree tr(rows), tc(cols);
@@ -1158,7 +1158,7 @@ namespace strumpack {
           ("LR compression requires ButterflyPACK to be enabled.");
 #endif
 
-      } break;
+      }
       case Type::LOSSY:
         throw std::invalid_argument
           ("Type LOSSY does not support matrix-free compression.");
@@ -1218,11 +1218,11 @@ namespace strumpack {
           };
         H->compress(sample, Aelem, hss_opts);
         return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
-      } break;
+      }
       case Type::BLR: {
         return construct_from_elements<scalar_t>
           (grid->Comm(), grid, rows, cols, Aelem, opts);
-      } break;
+      }
       case Type::HODLR:
         throw std::logic_error("Use construct_from_elements or construct_matrix_free instead.");
       case Type::HODBF:

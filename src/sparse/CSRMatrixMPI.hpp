@@ -97,9 +97,7 @@ namespace strumpack {
     integer_t begin_row() const { return brow_; }
     integer_t end_row() const { return brow_ + lrows_; }
 
-    // TODO return reference???
     const MPIComm& Comm() const { return comm_; }
-    // MPIComm Comm() const { return comm_; }
     MPI_Comm comm() const { return comm_.comm(); }
 
     const std::vector<integer_t>& dist() const { return dist_; }

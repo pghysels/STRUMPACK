@@ -363,6 +363,7 @@ namespace strumpack {
        */
       void forward_solve(WorkSolve<scalar_t>& w, const DenseM_t& b,
                          bool partial) const override;
+      using HSSMatrixBase<scalar_t>::forward_solve;
 
       /**
        * Perform only the backward phase of the ULV linear solve. This
@@ -378,6 +379,7 @@ namespace strumpack {
        * \see factor, partial_factor, backward_solve
        */
       void backward_solve(WorkSolve<scalar_t>& w, DenseM_t& x) const override;
+      using HSSMatrixBase<scalar_t>::backward_solve;
 
       /**
        * Multiply this HSS matrix with a dense matrix (vector), ie,
@@ -540,12 +542,14 @@ namespace strumpack {
                                  const elem_t& Aelem,
                                  const opts_t& opts);
 
+      using HSSMatrixBase<scalar_t>::compress_recursive_original;
       void compress_recursive_original(DenseM_t& Rr, DenseM_t& Rc,
                                        DenseM_t& Sr, DenseM_t& Sc,
                                        const elem_t& Aelem,
                                        const opts_t& opts,
                                        WorkCompress<scalar_t>& w,
                                        int dd, int depth) override;
+      using HSSMatrixBase<scalar_t>::compress_recursive_stable;
       void compress_recursive_stable(DenseM_t& Rr, DenseM_t& Rc,
                                      DenseM_t& Sr, DenseM_t& Sc,
                                      const elem_t& Aelem,
@@ -576,16 +580,19 @@ namespace strumpack {
       void set_U_full_rank(WorkCompress<scalar_t>& w);
       void set_V_full_rank(WorkCompress<scalar_t>& w);
 
+      using HSSMatrixBase<scalar_t>::compress_level_original;
       void compress_level_original(DenseM_t& Rr, DenseM_t& Rc,
                                    DenseM_t& Sr, DenseM_t& Sc,
                                    const opts_t& opts,
                                    WorkCompress<scalar_t>& w,
                                    int dd, int lvl, int depth) override;
+      using HSSMatrixBase<scalar_t>::compress_level_stable;
       void compress_level_stable(DenseM_t& Rr, DenseM_t& Rc,
                                  DenseM_t& Sr, DenseM_t& Sc,
                                  const opts_t& opts,
                                  WorkCompress<scalar_t>& w,
                                  int d, int dd, int lvl, int depth) override;
+
       void get_extraction_indices(std::vector<std::vector<std::size_t>>& I,
                                   std::vector<std::vector<std::size_t>>& J,
                                   const std::pair<std::size_t,std::size_t>& off,
@@ -601,6 +608,7 @@ namespace strumpack {
                        WorkCompress<scalar_t>& w, int lvl) override;
 
       void compress(const kernel::Kernel<real_t>& K, const opts_t& opts);
+
       void compress_recursive_ann(DenseMatrix<std::uint32_t>& ann,
                                   DenseMatrix<real_t>&  scores,
                                   const elem_t& Aelem, const opts_t& opts,
@@ -674,6 +682,23 @@ namespace strumpack {
       friend class HSSMatrixMPI<scalar_t>;
 
       using HSSMatrixBase<scalar_t>::child;
+
+      // suppress warnigns
+      using structured::StructuredMatrix<scalar_t>::mult;
+      using structured::StructuredMatrix<scalar_t>::solve;
+      using HSSMatrixBase<scalar_t>::get_extraction_indices;
+      using HSSMatrixBase<scalar_t>::extract_D_B;
+      using HSSMatrixBase<scalar_t>::compress_recursive_ann;
+      using HSSMatrixBase<scalar_t>::factor_recursive;
+      using HSSMatrixBase<scalar_t>::apply_fwd;
+      using HSSMatrixBase<scalar_t>::apply_bwd;
+      using HSSMatrixBase<scalar_t>::applyT_fwd;
+      using HSSMatrixBase<scalar_t>::applyT_bwd;
+      using HSSMatrixBase<scalar_t>::solve_fwd;
+      using HSSMatrixBase<scalar_t>::solve_bwd;
+      using HSSMatrixBase<scalar_t>::extract_fwd;
+      using HSSMatrixBase<scalar_t>::extract_bwd;
+      using HSSMatrixBase<scalar_t>::apply_UV_big;
     };
 
     /**

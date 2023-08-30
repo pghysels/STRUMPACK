@@ -40,7 +40,7 @@ using namespace strumpack::HSS;
 
 
 int run(int argc, char* argv[]) {
-  int m = 100, n = 1;
+  int m = 100;
 
   HSSOptions<double> hss_opts;
   hss_opts.set_verbose(false);

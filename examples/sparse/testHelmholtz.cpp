@@ -109,12 +109,11 @@ int main(int argc, char* argv[]) {
   using scalart = std::complex<realt>;
 
   int thread_level;
-  //MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level);
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (thread_level != MPI_THREAD_FUNNELED && rank == 0)
-    std::cout << "MPI implementation does not support MPI_THREAD_FUNNELED"
+  if (thread_level != MPI_THREAD_MULTIPLE && rank == 0)
+    std::cout << "MPI implementation does not support MPI_THREAD_MULTIPLE"
               << std::endl;
   {
     std::int64_t nx = 20;

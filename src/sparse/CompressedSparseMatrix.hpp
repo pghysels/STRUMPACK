@@ -329,8 +329,8 @@ namespace strumpack {
      */
     virtual void permute(const integer_t* iorder, const integer_t* order);
 
-    virtual void permute(const std::vector<integer_t>& iorder,
-                         const std::vector<integer_t>& order) {
+    void permute(const std::vector<integer_t>& iorder,
+		 const std::vector<integer_t>& order) {
       permute(iorder.data(), order.data());
     }
 

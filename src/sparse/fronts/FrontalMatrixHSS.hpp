@@ -137,6 +137,12 @@ namespace strumpack {
     using F_t::dim_blk;
     using F_t::sep_begin_;
     using F_t::sep_end_;
+
+    // suppress warnings
+    using F_t::extend_add_to_dense;
+    using F_t::backward_multifrontal_solve;
+    using F_t::forward_multifrontal_solve;
+    using F_t::sample_CB;
   };
 
 } // end namespace strumpack

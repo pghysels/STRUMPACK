@@ -55,6 +55,7 @@ namespace strumpack {
 
     void random_sampling(const SpMat_t& A, const SPOptions<scalar_t>& opts,
                          const DistM_t& R, DistM_t& Sr, DistM_t& Sc);
+
     void sample_CB(const DistM_t& R, DistM_t& Sr,
                    DistM_t& Sc, F_t* pa) const override;
     void sample_children_CB(const SPOptions<scalar_t>& opts, const DistM_t& R,
@@ -111,6 +112,13 @@ namespace strumpack {
     using FMPI_t::visit;
     using FMPI_t::grid;
     using FMPI_t::Comm;
+
+    // suppress warnings
+    using F_t::sample_CB;
+    using F_t::forward_multifrontal_solve;
+    using F_t::backward_multifrontal_solve;
+    using FMPI_t::extract_CB_sub_matrix_2d;
+
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
   };
 

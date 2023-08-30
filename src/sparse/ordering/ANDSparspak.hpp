@@ -65,7 +65,7 @@ namespace strumpack {
       if (e==0)
         if (mpi_root())
           std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-#if defined(STRUMPACK_USE_CUDA)
+#if 0 //defined(STRUMPACK_USE_CUDA)
       auto stree = nd_bfs_cuda(n, xadj.data(), adjncy.data(), iperm, perm);
 #else
       auto stree = gennd(n, xadj.data(), adjncy.data(), iperm.data());

@@ -140,6 +140,12 @@ namespace strumpack {
     using FMPI_t::Comm;
     using FMPI_t::grid;
 
+    // suppress warnings
+    using F_t::sample_CB;
+    using F_t::forward_multifrontal_solve;
+    using F_t::backward_multifrontal_solve;
+    using FMPI_t::extract_CB_sub_matrix_2d;
+
     template<typename _scalar_t,typename _integer_t>
     friend class BLR::BLRExtendAdd;
   };

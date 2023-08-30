@@ -140,7 +140,7 @@ namespace strumpack {
             }
           } else if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
             // LL-Update
-            for (std::size_t j=i+1; j<rb; j++){
+            for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=0; k<i+1; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
                 std::size_t ij = (i+1)+rb*j, ik = (i+1)+rb*k, kj = k+rb*j;

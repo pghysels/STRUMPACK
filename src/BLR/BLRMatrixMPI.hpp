@@ -351,6 +351,9 @@ namespace strumpack {
       gemm(Trans ta, Trans tb, T alpha, const BLRMatrixMPI<T>& a,
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
 
+      // suppress warnings
+      using structured::StructuredMatrix<scalar_t>::factor;
+
       template<typename T,typename I> friend class strumpack::ExtendAdd;
       template<typename T,typename I> friend class BLRExtendAdd;
     };
