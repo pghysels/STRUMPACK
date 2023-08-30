@@ -52,7 +52,7 @@
 %rename("SP_z_struct_from_elements_mpi") SP_z_struct_from_elements_mpi_f;
 
 %inline %{
-typedef void* CSPStructMat;
+  // typedef void* CSPStructMat;
 #include "../StructuredMatrixMPI.h"
 
 #ifdef __cplusplus

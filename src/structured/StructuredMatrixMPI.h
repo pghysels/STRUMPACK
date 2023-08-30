@@ -35,8 +35,6 @@
 
 #include "StructuredMatrix.h"
 
-//typedef void* CSPStructMat;
-
 #define OMPI_SKIP_MPICXX 1
 #include "mpi.h"
 
