@@ -96,7 +96,7 @@ namespace strumpack {
       void dense(DenseM_t& A) const override;
       DenseM_t dense() const override;
 
-      real_t normF() const {
+      real_t normF() const override {
         std::cerr << "WARNING: normF of compressed BLR matrix is not supported."
                   << std::endl;
         assert(false);

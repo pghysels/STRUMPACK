@@ -65,7 +65,7 @@ namespace strumpack {
       void dense(DenseM_t& A) const override { A = D_; }
       DenseM_t dense() const override { return D_; }
 
-      real_t normF() const { return D_.normF(); }
+      real_t normF() const override { return D_.normF(); }
 
       std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 
