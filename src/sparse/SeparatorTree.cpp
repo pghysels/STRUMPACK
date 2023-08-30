@@ -490,7 +490,7 @@ namespace strumpack {
         // in fronts
         if ((erc[i] == -1 && elc[i] == -1) ||
             (erc[i] != -1 && elc[i] != -1)) {
-          auto pid = seps.size();
+          integer_t pid = seps.size();
           seps.emplace_back
             ((seps.empty()) ? 0 : seps.back().sep_end, -1,
              (elc[i] != -1) ? l.top() : -1, (erc[i] != -1) ? pid-1 : -1);
