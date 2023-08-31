@@ -106,7 +106,9 @@ c            ---------------------------------------------
                  do  700  i = istrt, istop
                      enode = adjncy(i)
                      link = - enode
-                     if  ( enode )  400, 800, 500
+c$$$                     if  ( enode )  400, 800, 500
+                     if  ( enode .lt. 0)  go to 400
+                     if  ( enode .eq. 0)  go to 800
 c
   500                continue
                      if  ( qsize(enode) .eq. 0 )  go to 700
@@ -163,7 +165,9 @@ c                        --------------------------------------------
                              node = adjncy(i)
                              link = - node
                              if  ( node .eq. enode )  go to 1400
-                             if  ( node )  1000, 2100, 1100
+c$$$                             if  ( node )  1000, 2100, 1100
+                             if  ( node .lt. 0)  go to 1000
+                             if  ( node .eq. 0)  go to 2100
 c
  1100                        continue
                              if  ( qsize(node) .eq. 0 )  go to 1400
@@ -237,7 +241,9 @@ c                                    -------------------------------
                                      do  1900  j = jstrt, jstop
                                          node = adjncy(j)
                                          link = - node
-                                         if  ( node )  1700, 2000, 1800
+c$$$                                         if  ( node )  1700, 2000, 1800
+                                         if  ( node .lt. 0)  go to 1700
+                                         if  ( node .eq. 0)  go to 2000
 c
  1800                                    continue
                                          if  ( marker(node) .ge. tag )
