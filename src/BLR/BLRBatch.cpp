@@ -273,20 +273,22 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_KBLAS)
       auto B = tile_.size();
       if (!B) return;
-      std::size_t smem_size = 0;
       int maxm = 0, maxn = 0, maxminmn = 0;
       std::vector<int> mn(2*B);
       for (std::size_t i=0; i<B; i++) {
         int m = tile_[i]->get()->D().rows(),
           n = tile_[i]->get()->D().cols();
         auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
-        smem_size += m*minmn + n*minmn;
         maxminmn = std::max(maxminmn, minmn);
         maxm = std::max(maxm, m);
         maxn = std::max(maxn, n);
         mn[i  ] = m;
         mn[i+B] = n;
       }
+      std::size_t smem_size = 0;
+      for (std::size_t i=0; i<B; i++)
+        smem_size += tile_[i]->get()->D().rows()*maxminmn +
+          tile_[i]->get()->D().cols()*maxminmn;
       std::size_t dmem_size =
         gpu::round_up(3*B*sizeof(int)) +
         gpu::round_up(3*B*sizeof(scalar_t*)) +
@@ -302,24 +304,15 @@ namespace strumpack {
       std::vector<scalar_t*> AUV(3*B);
       for (std::size_t i=0; i<B; i++) {
         auto m = mn[i], n = mn[i+B];
-        auto minmn = std::max(std::min(m, n), KBLAS_ARA_BLOCK_SIZE);
         AUV[i    ] = tile_[i]->get()->D().data();
-        AUV[i+  B] = smem;  smem += m*minmn;
-        AUV[i+2*B] = smem;  smem += n*minmn;
+        AUV[i+  B] = smem;  smem += m*maxminmn;
+        AUV[i+2*B] = smem;  smem += n*maxminmn;
       }
       gpu_check(gpu::copy_host_to_device(dm, mn.data(), 2*B));
       gpu_check(gpu::copy_host_to_device(dA, AUV.data(), 3*B));
-#if 0 // TODO figure out why this fails, negative ranks etc
       gpu::kblas::ara
         (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
          tol, maxm, maxn, maxminmn, KBLAS_ARA_BLOCK_SIZE, 10, 1, B);
-#else
-      for (std::size_t i=0; i<B; i++)
-        gpu::kblas::ara
-          (handle, dm+i, dn+i, dA+i, dm+i, dU+i, dm+i, dV+i, dn+i, dr+i,
-           tol, maxm, maxn, maxminmn, KBLAS_ARA_BLOCK_SIZE, 10, 1, 1);
-#endif
-
       std::vector<int> ranks(B);
       gpu_check(gpu::copy_device_to_host(ranks.data(), dr, B));
       for (std::size_t i=0; i<B; i++) {

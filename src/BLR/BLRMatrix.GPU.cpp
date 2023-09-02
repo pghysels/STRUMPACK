@@ -157,7 +157,8 @@ namespace strumpack {
       gpu::SOLVERHandle solve_handle(comp_stream),
         solve_handle2(copy_stream);
 
-      int max_batchcount = std::pow(rb-1+rb2, 2);
+      int max_batchcount = std::pow(rb-1+rb2, 2); // Schur GEMM
+      max_batchcount = std::max(int(2*(rb+rb2-1)), max_batchcount); // ARA, TRSM
       std::size_t max_m1 = B11.maxtilerows();
       std::size_t max_m = std::max(max_m1, B21.maxtilerows());
 
