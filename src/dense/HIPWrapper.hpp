@@ -64,7 +64,10 @@ namespace strumpack {
     }
 
     inline void get_last_error() {
-      hipGetLastError();
+      // this is used to reset the last error. Some MAGMA calls fail
+      // on purpose, then use a different algorithm
+      auto e = hipGetLastError();
+      ((void)e); // silence unused warning
     }
 
     inline void synchronize() {
