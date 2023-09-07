@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
 get_filename_component(STRUMPACK_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 list(INSERT CMAKE_MODULE_PATH 0 ${STRUMPACK_CMAKE_DIR})
-message("Setting CMAKE_MODULE_PATH=" ${CMAKE_MODULE_PATH})
 list(APPEND CMAKE_PREFIX_PATH "@CMAKE_PREFIX_PATH@")
 
 include(CMakeFindDependencyMacro)
