@@ -114,12 +114,10 @@ namespace strumpack {
       msg_size = ranks.back();
 
       if (spopts.use_gpu_aware_mpi()) {
-        // assert(pinned_size >= msg_size);
-        // gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
-        auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
-        //scalar_t *ptr = dpinptr.template as<scalar_t>();
-        scalar_t *ptr = dbytes.template as<scalar_t>();
-        //auto ptr = pinned; // not working correctly
+        gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+        scalar_t *ptr = dpinptr.template as<scalar_t>();
+        //auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
+        //scalar_t *ptr = dbytes.template as<scalar_t>();
         if (grid()->is_local_row(i)) {
           for (std::size_t j=j0; j<j1; j++)
             if (grid()->is_local_col(j)) {
@@ -137,9 +135,8 @@ namespace strumpack {
               }
             }
         }
-        //ptr = dpinptr; //device mem
-        ptr = dbytes.template as<scalar_t>();
-        //ptr = pinned; // not working correctly
+        ptr = dpinptr; //device mem
+        //ptr = dbytes.template as<scalar_t>();
         grid()->col_comm().broadcast_from(ptr, msg_size, src);
         Tij.reserve(nr_tiles);
         auto m = tilerows(i);
@@ -162,7 +159,7 @@ namespace strumpack {
               Tij.emplace_back(new DenseTile<scalar_t>(dD));
             }
           }
-        workspace.restore(dbytes);
+        //workspace.restore(dbytes);
       } else { //NOT gpu_aware_mpi
         auto ptr = pinned;
         if (grid()->is_local_row(i)) {
@@ -206,7 +203,6 @@ namespace strumpack {
             }
           }
       }
-      // stream.synchronize();
       return Tij;
     }
 
@@ -239,13 +235,11 @@ namespace strumpack {
       ranks.push_back(msg_size);
       grid()->row_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
-      // assert(pinned.size() >= msg_size);
       if (spopts.use_gpu_aware_mpi()){
-        //gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
-        //scalar_t *ptr = dpinptr.template as<scalar_t>();
-        auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
-        scalar_t *ptr = dbytes.template as<scalar_t>();
-        //auto ptr = pinned; // not working correctly
+        gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+        scalar_t *ptr = dpinptr.template as<scalar_t>();
+        //auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
+        //scalar_t *ptr = dbytes.template as<scalar_t>();
         if (grid()->is_local_col(j)) {
           for (std::size_t i=i0; i<i1; i++)
             if (grid()->is_local_row(i)) {
@@ -263,9 +257,8 @@ namespace strumpack {
               }
             }
         }
-        //ptr = dpinptr; //device mem
-        ptr = dbytes.template as<scalar_t>();
-        //ptr = pinned; // not working correctly
+        ptr = dpinptr; //device mem
+        //ptr = dbytes.template as<scalar_t>();
         grid()->row_comm().broadcast_from(ptr, msg_size, src);
         Tij.reserve(nr_tiles);
         auto n = tilecols(j); 
@@ -288,7 +281,7 @@ namespace strumpack {
               Tij.emplace_back(new DenseTile<scalar_t>(dD));
             }
           }
-        workspace.restore(dbytes);
+        //workspace.restore(dbytes);
       } else {  //NOT gpu_aware_mpi
         auto ptr = pinned;
         if (grid()->is_local_col(j)) {
@@ -357,6 +350,7 @@ namespace strumpack {
         A11.blocks_.size() + A12.blocks_.size() +
         A21.blocks_.size() + A22.blocks_.size();
       auto max_m1 = A11.maxtilerows();
+      auto max_m2 = A11.maxtilecols();
 
 #if defined(STRUMPACK_USE_KBLAS)
       VBatchedARA<scalar_t>::kblas_wsquery(handle, max_batchcount);
@@ -391,14 +385,9 @@ namespace strumpack {
       auto dA21  = dA12 + A12.lrows() * A12.lcols();
       auto dA22  = dA21 + A21.lrows() * A21.lcols();
 
-      if (spopts.use_gpu_aware_mpi()){ 
-        //--- this part of cuda aware, not working correctly
-        /*std::size_t dpinned_size =
-          std::max(max_m1, A22.maxtilerows()) *
-          std::max(std::max(A11.lcols(), A11.lrows()),
-                  std::max(A22.lcols(), A22.lrows()));*/
-        gpu::DeviceMemory<scalar_t> d_pinned(1);
-        //---
+      if (spopts.use_gpu_aware_mpi()){
+        std::size_t dA11_size = max_m1 * max_m2;
+        gpu::DeviceMemory<scalar_t> d_A11(dA11_size);
         gpu::DeviceMemory<int> dpiv(max_m1+1);
         auto dpiv_ptr = dpiv.template as<int>();
         auto dinfo = dpiv_ptr + max_m1;
@@ -414,7 +403,7 @@ namespace strumpack {
         DenseTile<scalar_t> Tii;
         for (std::size_t i=0; i<rb; i++) {
           auto mi = A11.tilerows(i);
-          Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, dcol1, mi));
+          Tii = DenseTile<scalar_t>(DenseMW_t(mi, mi, d_A11, mi));
           if (g->is_local_row(i)) {
             piv_tile.resize(mi);
             if (g->is_local_col(i)) {
@@ -486,6 +475,7 @@ namespace strumpack {
           trsm_right.run(handle, workspace, false);
           comp_stream.synchronize();
           // Schur complement update
+          gpu::DeviceMemory<scalar_t> d_pinned;
           auto Tij = A11.bcast_row_of_tiles_along_cols_gpu
             (i, i+1, rb, drow1, d_pinned, workspace, spopts);
           auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
