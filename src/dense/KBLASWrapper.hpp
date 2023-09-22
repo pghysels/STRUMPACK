@@ -38,11 +38,10 @@
 #include "DenseMatrix.hpp"
 #include "CUDAWrapper.hpp"
 
-#include "kblas_operators.h"
-#include "batch_geqp.h"
-#include "batch_qr.h"
-#include "batch_ara.h"
 #include "kblas.h"
+#include "kblas_operators.h"
+#include "batch_ara.h"
+#include "kblas_defs.h"
 
 namespace strumpack {
   namespace gpu {
@@ -71,25 +70,27 @@ namespace strumpack {
       void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
                float** M_batch, int* ldm_batch,
                float** A_batch, int* lda_batch,
-               float** B_batch, int* ldb_batch, int* ranks_batch,
-               float tol, int max_rows, int max_cols, int max_rank,
-               int bs, int r, int relative, int num_ops) {
+               float** B_batch, int* ldb_batch,
+               int* ranks_batch, float tol,
+               int max_rows, int max_cols, int* max_rank,
+               int bs, int r, int* info, int relative, int num_ops) {
         kblas_sara_batch
           (handle, rows_batch, cols_batch, M_batch, ldm_batch,
            A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r,
+           tol, max_rows, max_cols, max_rank, bs, r, info,
            handle.kblas_rand_state(), relative, num_ops);
       }
       void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
                double** M_batch, int* ldm_batch,
                double** A_batch, int* lda_batch,
-               double** B_batch, int* ldb_batch, int* ranks_batch,
-               double tol, int max_rows, int max_cols, int max_rank,
-               int bs, int r, int relative, int num_ops) {
+               double** B_batch, int* ldb_batch,
+               int* ranks_batch, double tol,
+               int max_rows, int max_cols, int* max_rank,
+               int bs, int r, int* info, int relative, int num_ops) {
         kblas_dara_batch
           (handle, rows_batch, cols_batch, M_batch, ldm_batch,
            A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r,
+           tol, max_rows, max_cols, max_rank, bs, r, info,
            handle.kblas_rand_state(), relative, num_ops);
       }
       void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
@@ -97,14 +98,14 @@ namespace strumpack {
                std::complex<float>** A_batch, int* lda_batch,
                std::complex<float>** B_batch, int* ldb_batch,
                int* ranks_batch, float tol,
-               int max_rows, int max_cols, int max_rank,
-               int bs, int r, int relative, int num_ops) {
+               int max_rows, int max_cols, int* max_rank,
+               int bs, int r, int* info, int relative, int num_ops) {
         kblas_cara_batch
           (handle, rows_batch, cols_batch,
            (cuComplex**)M_batch, ldm_batch,
            (cuComplex**)A_batch, lda_batch,
            (cuComplex**)B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r,
+           tol, max_rows, max_cols, max_rank, bs, r, info,
            handle.kblas_rand_state(), relative, num_ops);
       }
       void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
@@ -112,14 +113,14 @@ namespace strumpack {
                std::complex<double>** A_batch, int* lda_batch,
                std::complex<double>** B_batch, int* ldb_batch,
                int* ranks_batch, double tol,
-               int max_rows, int max_cols, int max_rank, int bs, int r,
-               int relative, int num_ops) {
+               int max_rows, int max_cols, int* max_rank,
+               int bs, int r, int* info, int relative, int num_ops) {
         kblas_zara_batch
           (handle, rows_batch, cols_batch,
            (cuDoubleComplex**)M_batch, ldm_batch,
            (cuDoubleComplex**)A_batch, lda_batch,
            (cuDoubleComplex**)B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r,
+           tol, max_rows, max_cols, max_rank, bs, r, info,
            handle.kblas_rand_state(), relative, num_ops);
       }
 
