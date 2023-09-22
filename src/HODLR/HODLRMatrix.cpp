@@ -188,14 +188,19 @@ namespace strumpack {
            lrows_, ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
            nullptr, nullptr, nullptr);
       } else {
+        HODLR_set_I_option<scalar_t>(options_, "Nmin_leaf", opts.leaf_size());
+        HODLR_set_I_option<scalar_t>(options_, "xyzsort", 1);
         HODLR_set_I_option<scalar_t>(options_, "nogeo", 0);
         // pass the data points to the HODLR code, let the HODLR code
         // figure out the permutation etc
+        int root_size = rows_;
         HODLR_construct_init<scalar_t,real_t>
-          (rows_, K.d(), K.data().data(), nullptr, lvls_-1, leafs_.data(),
+          (rows_, K.d(), K.data().data(), nullptr, 0, &root_size,
            perm_.data(), lrows_, ho_bf_, options_, stats_, msh_,
            kerquant_, ptree_, nullptr, nullptr, nullptr);
       }
+      if (opts.verbose())
+        HODLR_printoptions<scalar_t>(options_, ptree_);
       perm_init();
       dist_init();
       KernelCommPtrs<real_t> KC{&K, c_};
@@ -203,10 +208,10 @@ namespace strumpack {
         (ho_bf_, options_, stats_, msh_, kerquant_,
          ptree_, &(HODLR_kernel_evaluation<scalar_t>),
          &(HODLR_kernel_block_evaluation<scalar_t>), &KC);
-      if (opts.geo() != 1) {
-        K.permutation() = perm();
-        K.data().lapmr(perm(), true);
-      }
+      // if (opts.geo() != 1) {
+      //   K.permutation() = perm();
+      //   K.permute();
+      // }
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix

@@ -284,7 +284,9 @@ namespace strumpack {
       std::vector<int>& permutation() { return perm_; }
       const std::vector<int>& permutation() const { return perm_; }
 
-      virtual void permute() {}
+      virtual void permute() {
+        data_.lapmr(perm_, true);
+      }
 
     protected:
       DenseM_t& data_;
@@ -502,6 +504,7 @@ namespace strumpack {
       }
 
       void permute() override {
+        Kernel<scalar_t>::permute();
         A_.lapmt(this->perm_, true);
         A_.lapmr(this->perm_, true);
       }
