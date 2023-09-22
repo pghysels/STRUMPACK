@@ -114,10 +114,10 @@ namespace strumpack {
       msg_size = ranks.back();
 
       if (spopts.use_gpu_aware_mpi()) {
-        gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
-        scalar_t *ptr = dpinptr.template as<scalar_t>();
-        //auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
-        //scalar_t *ptr = dbytes.template as<scalar_t>();
+        //gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+        //scalar_t *ptr = dpinptr.template as<scalar_t>();
+        auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
+        scalar_t *ptr = dbytes.template as<scalar_t>();
         if (grid()->is_local_row(i)) {
           for (std::size_t j=j0; j<j1; j++)
             if (grid()->is_local_col(j)) {
@@ -135,8 +135,9 @@ namespace strumpack {
               }
             }
         }
-        ptr = dpinptr; //device mem
-        //ptr = dbytes.template as<scalar_t>();
+        //ptr = dpinptr; //device mem
+        ptr = dbytes.template as<scalar_t>();
+        gpu::synchronize();
         grid()->col_comm().broadcast_from(ptr, msg_size, src);
         Tij.reserve(nr_tiles);
         auto m = tilerows(i);
@@ -159,7 +160,7 @@ namespace strumpack {
               Tij.emplace_back(new DenseTile<scalar_t>(dD));
             }
           }
-        //workspace.restore(dbytes);
+        workspace.restore(dbytes);
       } else { //NOT gpu_aware_mpi
         auto ptr = pinned;
         if (grid()->is_local_row(i)) {
@@ -236,10 +237,10 @@ namespace strumpack {
       grid()->row_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
       if (spopts.use_gpu_aware_mpi()){
-        gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
-        scalar_t *ptr = dpinptr.template as<scalar_t>();
-        //auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
-        //scalar_t *ptr = dbytes.template as<scalar_t>();
+        //gpu::DeviceMemory<scalar_t> dpinptr(msg_size);
+        //scalar_t *ptr = dpinptr.template as<scalar_t>();
+        auto dbytes = workspace.get_device_bytes(msg_size*sizeof(scalar_t));
+        scalar_t *ptr = dbytes.template as<scalar_t>();
         if (grid()->is_local_col(j)) {
           for (std::size_t i=i0; i<i1; i++)
             if (grid()->is_local_row(i)) {
@@ -257,8 +258,9 @@ namespace strumpack {
               }
             }
         }
-        ptr = dpinptr; //device mem
-        //ptr = dbytes.template as<scalar_t>();
+        //ptr = dpinptr; //device mem
+        ptr = dbytes.template as<scalar_t>();
+        gpu::synchronize();
         grid()->row_comm().broadcast_from(ptr, msg_size, src);
         Tij.reserve(nr_tiles);
         auto n = tilecols(j); 
@@ -281,7 +283,7 @@ namespace strumpack {
               Tij.emplace_back(new DenseTile<scalar_t>(dD));
             }
           }
-        //workspace.restore(dbytes);
+        workspace.restore(dbytes);
       } else {  //NOT gpu_aware_mpi
         auto ptr = pinned;
         if (grid()->is_local_col(j)) {
