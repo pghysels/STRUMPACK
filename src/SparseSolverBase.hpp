@@ -369,6 +369,8 @@ namespace strumpack {
 
     ReturnCode subnormals(std::size_t& ns, std::size_t& nz);
 
+    ReturnCode pivot_growth(scalar_t& pg);
+
     /**
      * Create a gnuplot script to draw/plot the sparse factors. Only
      * do this for small matrices! It is very slow!
@@ -436,7 +438,7 @@ namespace strumpack {
     ReturnCode solve_internal(int nrhs, const scalar_t* b, int ldb,
                               scalar_t* x, int ldx,
                               bool use_initial_guess=false);
-    
+
     SPOptions<scalar_t> opts_;
     bool is_root_;
 

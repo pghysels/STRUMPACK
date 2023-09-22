@@ -209,6 +209,12 @@ namespace strumpack {
     return root_->subnormals(ns, nz);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  EliminationTree<scalar_t,integer_t>::pivot_growth
+  (scalar_t& pgL, scalar_t& pgU) const {
+    return root_->pivot_growth(pgL, pgU);
+  }
+
   template<typename scalar_t,typename integer_t> void
   EliminationTree<scalar_t,integer_t>::draw
   (const SpMat_t& A, const std::string& name) const {

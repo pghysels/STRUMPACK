@@ -408,6 +408,17 @@ namespace strumpack {
     return node_subnormals(ns, nz);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrix<scalar_t,integer_t>::pivot_growth(scalar_t& pgL,
+                                                  scalar_t& pgU) const {
+    ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
+    if (lchild_) el = lchild_->pivot_growth(pgL, pgU);
+    if (rchild_) er = rchild_->pivot_growth(pgL, pgU);
+    if (el != ReturnCode::SUCCESS) return el;
+    if (er != ReturnCode::SUCCESS) return er;
+    return node_pivot_growth(pgL, pgU);
+  }
+
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve

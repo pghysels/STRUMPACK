@@ -97,6 +97,15 @@ namespace strumpack {
     return info;
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  EliminationTreeMPI<scalar_t,integer_t>::pivot_growth
+  (scalar_t& pgL, scalar_t& pgU) const {
+    auto info = EliminationTree<scalar_t,integer_t>::pivot_growth(pgL, pgU);
+    pgL = comm_.all_reduce(pgL, MPI_MAX);
+    pgU = comm_.all_reduce(pgU, MPI_MAX);
+    return info;
+  }
+
 
   // explicit template specializations
   template class EliminationTreeMPI<float,int>;

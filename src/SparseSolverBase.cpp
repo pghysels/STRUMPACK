@@ -163,6 +163,20 @@ namespace strumpack {
     return tree()->subnormals(ns, nz);
   }
 
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::pivot_growth
+  (scalar_t& pg) {
+    pg = scalar_t(0.);
+    if (!this->factored_) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    scalar_t pgL(0.), pgU(0.);
+    auto info = tree()->pivot_growth(pgL, pgU);
+    pg = std::max(std::abs(pgL), std::abs(pgU)) / matrix()->norm1();
+    return info;
+  }
+
   template<typename scalar_t,typename integer_t> void
   SparseSolverBase<scalar_t,integer_t>::draw
   (const std::string& name) const {

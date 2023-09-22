@@ -158,6 +158,8 @@ namespace strumpack {
                                     integer_t& pos) const override;
     virtual ReturnCode node_subnormals(std::size_t& ns,
                                        std::size_t& nz) const override;
+    virtual ReturnCode node_pivot_growth(scalar_t& pgL,
+                                         scalar_t& pgU) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;

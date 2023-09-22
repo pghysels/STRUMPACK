@@ -133,6 +133,7 @@ namespace strumpack {
                        integer_t& zero,
                        integer_t& pos) const;
     ReturnCode subnormals(std::size_t& ns, std::size_t& nz) const;
+    ReturnCode pivot_growth(scalar_t& pgL, scalar_t& pgU) const;
 
 
     virtual void
@@ -377,6 +378,10 @@ namespace strumpack {
 
     virtual ReturnCode node_subnormals(std::size_t& ns,
                                        std::size_t& nz) const {
+      return ReturnCode::INACCURATE_INERTIA;
+    }
+    virtual ReturnCode node_pivot_growth(scalar_t& pgL,
+                                         scalar_t& pgU) const {
       return ReturnCode::INACCURATE_INERTIA;
     }
 

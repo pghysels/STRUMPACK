@@ -78,6 +78,8 @@ namespace strumpack {
                                integer_t& pos) const;
     virtual ReturnCode subnormals(std::size_t& ns,
                                   std::size_t& nz) const;
+    virtual ReturnCode pivot_growth(scalar_t& pgL,
+                                    scalar_t& pgU) const;
 
     void print_rank_statistics(std::ostream &out) const;
 
