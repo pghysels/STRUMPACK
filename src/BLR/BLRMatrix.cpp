@@ -37,6 +37,39 @@
 namespace strumpack {
   namespace BLR {
 
+    template<typename scalar_t>
+    BLRMatrix<scalar_t>::BLRMatrix(std::size_t m,
+                                   const std::vector<std::size_t>& rowtiles,
+                                   std::size_t n,
+                                   const std::vector<std::size_t>& coltiles)
+      : m_(m), n_(n) {
+      nbrows_ = rowtiles.size();
+      nbcols_ = coltiles.size();
+      roff_.resize(nbrows_+1);
+      coff_.resize(nbcols_+1);
+      cl2l_.resize(n_);
+      rl2l_.resize(m_);
+      for (std::size_t i=1; i<=nbrows_; i++)
+        roff_[i] = roff_[i-1] + rowtiles[i-1];
+      for (std::size_t j=1; j<=nbcols_; j++)
+        coff_[j] = coff_[j-1] + coltiles[j-1];
+      for (std::size_t b=0, l=0; b<nbcols_; b++) {
+        for (std::size_t i=0; i<coff_[b+1]-coff_[b]; i++) {
+          cl2l_[l] = i;
+          l++;
+        }
+      }
+      for (std::size_t b=0, l=0; b<nbrows_; b++) {
+        for (std::size_t i=0; i<roff_[b+1]-roff_[b]; i++) {
+          rl2l_[l] = i;
+          l++;
+        }
+      }
+      assert(roff_[nbrows_] == m_);
+      assert(coff_[nbcols_] == n_);
+      blocks_.resize(nbrows_ * nbcols_);
+    }
+
     template<typename scalar_t> std::size_t
     BLRMatrix<scalar_t>::subnormals() const {
       std::size_t sn = 0;
@@ -55,20 +88,49 @@ namespace strumpack {
       return nz;
     }
 
-    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
-    (DenseM_t& A, const std::vector<std::size_t>& rowtiles,
-     const std::vector<std::size_t>& coltiles, const Opts_t& opts)
-      : BLRMatrix<scalar_t>(A.rows(), rowtiles, A.cols(), coltiles) {
+//     template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
+//     (DenseM_t& A, const std::vector<std::size_t>& rowtiles,
+//      const std::vector<std::size_t>& coltiles, const Opts_t& opts)
+//       : BLRMatrix<scalar_t>(A.rows(), rowtiles, A.cols(), coltiles) {
+//       for (std::size_t j=0; j<colblocks(); j++)
+//         for (std::size_t i=0; i<rowblocks(); i++)
+//           block(i, j) = std::unique_ptr<BLRTile<scalar_t>>
+//             (new LRTile<scalar_t>(tile(A, i, j), opts));
+//     }
+
+    // template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
+    // (DenseM_t& A, const std::vector<std::size_t>& tiles,
+    //  const adm_t& admissible, const Opts_t& opts)
+    //   : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles) {
+
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress(const DenseM_t& A,
+                                  const adm_t& admissible,
+                                  const Opts_t& opts) {
       for (std::size_t j=0; j<colblocks(); j++)
         for (std::size_t i=0; i<rowblocks(); i++)
-          block(i, j) = std::unique_ptr<BLRTile<scalar_t>>
-            (new LRTile<scalar_t>(tile(A, i, j), opts));
+          if (admissible(i, j))
+            create_LR_tile(i, j, const_cast<DenseM_t&>(A), opts);
+          else create_dense_tile(i, j, const_cast<DenseM_t&>(A));
     }
 
-    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
-    (DenseM_t& A, const std::vector<std::size_t>& tiles,
-     const adm_t& admissible, const Opts_t& opts)
-      : BLRMatrix<scalar_t>(A.rows(), tiles, A.cols(), tiles) {
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress(const extract_t& Aelem,
+                                  const adm_t& admissible,
+                                  const Opts_t& opts) {
+      for (std::size_t j=0; j<colblocks(); j++)
+        for (std::size_t i=0; i<rowblocks(); i++)
+          if (admissible(i, j))
+            create_LR_tile(i, j, Aelem, opts);
+          else create_dense_tile(i, j, Aelem);
+    }
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress_and_factor(const DenseM_t& A_,
+                                             const adm_t& admissible,
+                                             const Opts_t& opts) {
+      auto& A = const_cast<DenseM_t&>(A_);
       assert(rowblocks() == colblocks());
       piv_.resize(rows());
       auto rb = rowblocks();
@@ -98,8 +160,7 @@ namespace strumpack {
   depend(in:B[ii]) depend(inout:B[ij])
 #endif
             {
-              if (admissible(i, j))
-                create_LR_tile(i, j, A, opts);
+              if (admissible(i, j)) create_LR_tile(i, j, A, opts);
               else create_dense_tile(i, j, A);
               // permute and solve with L, blocks right from the
               // diagonal block
@@ -115,8 +176,7 @@ namespace strumpack {
   depend(in:B[ii]) depend(inout:B[ji])
 #endif
             {
-              if (admissible(j, i))
-                create_LR_tile(j, i, A, opts);
+              if (admissible(j, i)) create_LR_tile(j, i, A, opts);
               else create_dense_tile(j, i, A);
               // solve with U, the blocks under the diagonal block
               trsm(Side::R, UpLo::U, Trans::N, Diag::N,
@@ -166,7 +226,7 @@ namespace strumpack {
                 }
               }
             }
-          } else { //Comb or Star
+          } else { // Comb or Star
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
               std::size_t ij = (i+1)+rb*j, i1j=ij-rb*(j-i), ij1=ij-1;
@@ -186,40 +246,55 @@ namespace strumpack {
           }
         }
       }
-      for (std::size_t i=0; i<rowblocks(); i++)
+      for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
           piv_[l] += tileroff(i);
     }
 
-    template<typename scalar_t> BLRMatrix<scalar_t>::BLRMatrix
-    (std::size_t m, const std::vector<std::size_t>& rowtiles,
-     std::size_t n, const std::vector<std::size_t>& coltiles)
-      : m_(m), n_(n) {
-      nbrows_ = rowtiles.size();
-      nbcols_ = coltiles.size();
-      roff_.resize(nbrows_+1);
-      coff_.resize(nbcols_+1);
-      cl2l_.resize(n_);
-      rl2l_.resize(m_);
-      for (std::size_t i=1; i<=nbrows_; i++)
-        roff_[i] = roff_[i-1] + rowtiles[i-1];
-      for (std::size_t j=1; j<=nbcols_; j++)
-        coff_[j] = coff_[j-1] + coltiles[j-1];
-      for (std::size_t b=0, l=0; b<nbcols_; b++) {
-        for (std::size_t i=0; i<coff_[b+1]-coff_[b]; i++) {
-          cl2l_[l] = i;
-          l++;
+
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::compress_and_factor(const extract_t& Aelem,
+                                             const adm_t& admissible,
+                                             const Opts_t& opts) {
+      piv_.resize(rows());
+      auto rb = rowblocks();
+      for (std::size_t i=0; i<rb; i++) {
+        create_dense_tile_left_looking(i, i, Aelem);
+        auto tpiv = tile(i, i).LU();
+
+        // std::copy(tpiv.begin(), tpiv.end(), piv_.begin()+tileroff(i));
+        // for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
+        //   piv_[l] += tileroff(i);
+        int ti = tileroff(i);
+        for (std::size_t l=0; l<tilerows(i); l++)
+          piv_[ti+l] = tpiv[l] + ti;
+
+        for (std::size_t j=i+1; j<rb; j++) {
+          // these blocks have received all updates, compress now
+          if (admissible(i, j))
+            create_LR_tile_left_looking(i, j, Aelem, opts);
+          else create_dense_tile_left_looking(i, j, Aelem);
+          // permute and solve with L, blocks right from the diagonal block
+
+          // remove this??
+          // std::vector<int> tpiv
+          //   (piv_.begin()+tileroff(i),
+          //    piv_.begin()+tileroff(i+1));
+
+          tile(i, j).laswp(tpiv, true);
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+               scalar_t(1.), tile(i, i), tile(i, j));
+          if (admissible(j, i))
+            create_LR_tile_left_looking(j, i, Aelem, opts);
+          else create_dense_tile_left_looking(j, i, Aelem);
+          // solve with U, the blocks under the diagonal block
+          trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+               scalar_t(1.), tile(i, i), tile(j, i));
         }
       }
-      for (std::size_t b=0, l=0; b<nbrows_; b++) {
-        for (std::size_t i=0; i<roff_[b+1]-roff_[b]; i++) {
-          rl2l_[l] = i;
-          l++;
-        }
-      }
-      assert(roff_[nbrows_] == m_);
-      assert(coff_[nbcols_] == n_);
-      blocks_.resize(nbrows_ * nbcols_);
+      // for (std::size_t i=0; i<rb; i++)
+      //   for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
+      //     piv_[l] += tileroff(i);
     }
 
     template<typename scalar_t> std::size_t
@@ -439,14 +514,16 @@ namespace strumpack {
         (blocks_[i+j*rowblocks()].get());
     }
 
-    template<typename scalar_t> void BLRMatrix<scalar_t>::create_dense_tile
-    (std::size_t i, std::size_t j, DenseM_t& A) {
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_dense_tile(std::size_t i, std::size_t j,
+                                           DenseM_t& A) {
       block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
         (new DenseTile<scalar_t>(tile(A, i, j)));
     }
 
-    template<typename scalar_t> void BLRMatrix<scalar_t>::create_dense_tile
-    (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem) {
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_dense_tile(std::size_t i, std::size_t j,
+                                           const extract_t& Aelem) {
       auto m = tilerows(i);
       auto n = tilecols(j);
       block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
@@ -459,7 +536,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::create_dense_tile_left_looking
-    (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem) {
+    (std::size_t i, std::size_t j, const extract_t& Aelem) {
       create_dense_tile(i, j, Aelem);
       for (std::size_t k=0; k<std::min(i, j); k++)
         gemm(Trans::N, Trans::N, scalar_t(-1.), tile(i, k), tile(k, j),
@@ -469,7 +546,7 @@ namespace strumpack {
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::create_dense_tile_left_looking
     (std::size_t i, std::size_t j, std::size_t k,
-     const extract_t<scalar_t>& Aelem, const BLRMatrix<scalar_t>& B21,
+     const extract_t& Aelem, const BLRMatrix<scalar_t>& B21,
      const BLRMatrix<scalar_t>& B12) {
       create_dense_tile(i, j, Aelem);
       for (std::size_t l=0; l<k; l++)
@@ -477,8 +554,9 @@ namespace strumpack {
              B12.tile(l, j), scalar_t(1.), tile(i, j).D());
     }
 
-    template<typename scalar_t> void BLRMatrix<scalar_t>::create_LR_tile
-    (std::size_t i, std::size_t j, DenseM_t& A, const Opts_t& opts) {
+    template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_LR_tile(std::size_t i, std::size_t j,
+                                        DenseM_t& A, const Opts_t& opts) {
       block(i, j) = std::unique_ptr<LRTile<scalar_t>>
         (new LRTile<scalar_t>(tile(A, i, j), opts));
       auto& t = tile(i, j);
@@ -487,8 +565,59 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    BLRMatrix<scalar_t>::create_LR_tile
+    (std::size_t i, std::size_t j, const extract_t& Aelem,
+     const Opts_t& opts) {
+      auto m = tilerows(i);  auto n = tilecols(j);
+      auto dm = tileroff(i); auto dn = tilecoff(j);
+      std::vector<std::size_t> lI(m), lJ(n), idx(1);
+      std::iota(lJ.begin(), lJ.end(), dn);
+      std::iota(lI.begin(), lI.end(), dm);
+      if (opts.low_rank_algorithm() == LowRankAlgorithm::BACA) {
+        auto d = opts.BACA_blocksize();
+        std::vector<std::size_t> idx;
+        idx.reserve(d);
+        auto Arow = [&](const std::vector<std::size_t>& rows,
+                        DenseMatrix<scalar_t>& c) {
+          assert(rows.size() == c.rows() && c.cols() == n);
+          idx.resize(rows.size());
+          std::transform(rows.begin(), rows.end(), idx.begin(),
+                         [&dm](std::size_t rr){ return rr+dm; });
+          Aelem(idx, lJ, c);
+        };
+        auto Acol = [&](const std::vector<std::size_t>& cols,
+                        DenseMatrix<scalar_t>& c) {
+          assert(cols.size() == c.cols() && c.rows() == m);
+          idx.resize(cols.size());
+          std::transform(cols.begin(), cols.end(), idx.begin(),
+                         [&dn](std::size_t cc){ return cc+dn; });
+          Aelem(lI, idx, c);
+        };
+        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(m, n, Arow, Acol, opts));
+      } else {
+        std::vector<std::size_t> idx(1);
+        auto Arow = [&](std::size_t row, scalar_t* c) {
+          idx[0] = dm + row;
+          DenseMW_t cr(1, n, c, 1);
+          Aelem(idx, lJ, cr);
+        };
+        auto Acol = [&](std::size_t col, scalar_t* c) {
+          idx[0] = dn + col;
+          DenseMW_t cc(m, 1, c, m);
+          Aelem(lI, idx, cc);
+        };
+        block(i, j) = std::unique_ptr<LRTile<scalar_t>>
+          (new LRTile<scalar_t>(m, n, Arow, Acol, opts));
+      }
+      if (tile(i, j).rank()*(m + n) > m*n)
+        create_dense_tile(i, j, Aelem);
+    }
+
+
+    template<typename scalar_t> void
     BLRMatrix<scalar_t>::create_LR_tile_left_looking
-    (std::size_t i, std::size_t j, const extract_t<scalar_t>& Aelem,
+    (std::size_t i, std::size_t j, const extract_t& Aelem,
      const Opts_t& opts) {
       create_LR_tile_left_looking
         (i, j, std::min(i,j), Aelem, *this, *this, opts);
@@ -497,7 +626,7 @@ namespace strumpack {
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::create_LR_tile_left_looking
     (std::size_t i, std::size_t j, std::size_t k,
-     const extract_t<scalar_t>& Aelem, const BLRMatrix<scalar_t>& B21,
+     const extract_t& Aelem, const BLRMatrix<scalar_t>& B21,
      const BLRMatrix<scalar_t>& B12, const Opts_t& opts) {
       auto m = tilerows(i);  auto n = tilecols(j);
       auto dm = tileroff(i); auto dn = tilecoff(j);
@@ -1485,8 +1614,8 @@ namespace strumpack {
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor
     (std::size_t n1, std::size_t n2,
-     const extract_t<scalar_t>& A11, const extract_t<scalar_t>& A12,
-     const extract_t<scalar_t>& A21, const extract_t<scalar_t>& A22,
+     const extract_t& A11, const extract_t& A12,
+     const extract_t& A21, const extract_t& A22,
      BLRMatrix<scalar_t>& B11, BLRMatrix<scalar_t>& B12,
      BLRMatrix<scalar_t>& B21, BLRMatrix<scalar_t>& B22,
      const std::vector<std::size_t>& tiles1,

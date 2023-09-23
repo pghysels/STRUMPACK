@@ -151,7 +151,9 @@ int run(int argc, char* argv[]) {
 #endif
   TaskTimer t3("Compression");
   t3.start();
-  BLRMatrix<double> B(A, tiles, adm, blr_opts);
+  // BLRMatrix<double> B(A, tiles, adm, blr_opts);
+  BLRMatrix<double> B(m, tiles, m, tiles);
+  B.compress_and_factor(A, adm, blr_opts);
   t3.stop();
 #if defined(STRUMPACK_COUNT_FLOPS)
   //std::cout << "flop_counter_stop" << std::endl;

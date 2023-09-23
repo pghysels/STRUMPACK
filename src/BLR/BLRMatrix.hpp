@@ -49,13 +49,6 @@ namespace strumpack {
     template<typename scalar_t,typename integer_t> class BLRExtendAdd;
 
 
-    template<typename T>
-    using extract_t =
-      std::function<void(const std::vector<std::size_t>&,
-                         const std::vector<std::size_t>&,
-                         DenseMatrix<T>&)>;
-    using adm_t = DenseMatrix<bool>;
-
     /**
      * \class BLRMatrix
      *
@@ -72,20 +65,26 @@ namespace strumpack {
      */
     template<typename scalar_t> class BLRMatrix
       : public structured::StructuredMatrix<scalar_t> {
+      using BLRM_t = BLRMatrix<scalar_t>;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
+      // template<typename T>
+      using extract_t =
+        std::function<void(const std::vector<std::size_t>&,
+        const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>;
+      using adm_t = DenseMatrix<bool>;
 
     public:
       BLRMatrix() = default;
 
-      BLRMatrix(DenseM_t& A,
-                const std::vector<std::size_t>& rowtiles,
-                const std::vector<std::size_t>& coltiles,
-                const Opts_t& opts);
+      // BLRMatrix(DenseM_t& A,
+      //           const std::vector<std::size_t>& rowtiles,
+      //           const std::vector<std::size_t>& coltiles,
+      //           const Opts_t& opts);
 
-      BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
-                const adm_t& admissible, const Opts_t& opts);
+      // BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
+      //           const adm_t& admissible, const Opts_t& opts);
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
                 std::size_t n, const std::vector<std::size_t>& coltiles);
@@ -105,6 +104,20 @@ namespace strumpack {
 
       DenseM_t dense() const;
       void dense(DenseM_t& A) const;
+
+      void compress(const DenseM_t& A,
+                    const adm_t& admissible,
+                    const Opts_t& opts);
+      void compress(const extract_t& Aelem,
+                    const adm_t& admissible,
+                    const Opts_t& opts);
+
+      void compress_and_factor(const DenseM_t& A,
+                               const adm_t& admissible,
+                               const Opts_t& opts);
+      void compress_and_factor(const extract_t& Aelem,
+                               const adm_t& admissible,
+                               const Opts_t& opts);
 
       void draw(std::ostream& of, std::size_t roff, std::size_t coff) const;
 
@@ -166,29 +179,24 @@ namespace strumpack {
       static void
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
                                    DenseM_t& A21, DenseM_t& A22,
-                                   BLRMatrix<scalar_t>& B11,
-                                   BLRMatrix<scalar_t>& B12,
-                                   BLRMatrix<scalar_t>& B21,
+                                   BLRM_t& B11, BLRM_t& B12,
+                                   BLRM_t& B21,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const Opts_t& opts);
 
       static void
-      construct_and_partial_factor(BLRMatrix<scalar_t>& B11,
-                                   BLRMatrix<scalar_t>& B12,
-                                   BLRMatrix<scalar_t>& B21,
-                                   BLRMatrix<scalar_t>& B22,
+      construct_and_partial_factor(BLRM_t& B11, BLRM_t& B12,
+                                   BLRM_t& B21, BLRM_t& B22,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const Opts_t& opts);
 
       static void
-      construct_and_partial_factor_col(BLRMatrix<scalar_t>& B11,
-                                       BLRMatrix<scalar_t>& B12,
-                                       BLRMatrix<scalar_t>& B21,
-                                       BLRMatrix<scalar_t>& B22,
+      construct_and_partial_factor_col(BLRM_t& B11, BLRM_t& B12,
+                                       BLRM_t& B21, BLRM_t& B22,
                                        const std::vector<std::size_t>& tiles1,
                                        const std::vector<std::size_t>& tiles2,
                                        const adm_t& admissible,
@@ -198,27 +206,23 @@ namespace strumpack {
 
       static void
       construct_and_partial_factor(std::size_t n1, std::size_t n2,
-                                   const extract_t<scalar_t>& A11,
-                                   const extract_t<scalar_t>& A12,
-                                   const extract_t<scalar_t>& A21,
-                                   const extract_t<scalar_t>& A22,
-                                   BLRMatrix<scalar_t>& B11,
-                                   BLRMatrix<scalar_t>& B12,
-                                   BLRMatrix<scalar_t>& B21,
-                                   BLRMatrix<scalar_t>& B22,
+                                   const extract_t& A11, const extract_t& A12,
+                                   const extract_t& A21, const extract_t& A22,
+                                   BLRM_t& B11, BLRM_t& B12,
+                                   BLRM_t& B21, BLRM_t& B22,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const BLROptions<scalar_t>& opts);
 
       static void
-      trsmLNU_gemm(const BLRMatrix<scalar_t>& F1,
-                   const BLRMatrix<scalar_t>& F2,
+      trsmLNU_gemm(const BLRM_t& F1,
+                   const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
       static void
-      gemm_trsmUNN(const BLRMatrix<scalar_t>& F1,
-                   const BLRMatrix<scalar_t>& F2,
+      gemm_trsmUNN(const BLRM_t& F1,
+                   const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
     private:
@@ -229,34 +233,35 @@ namespace strumpack {
 
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile(std::size_t i, std::size_t j,
-                             const extract_t<scalar_t>& Aelem);
+                             const extract_t& Aelem);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
-                                          const extract_t<scalar_t>& Aelem);
+                                          const extract_t& Aelem);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
                                           std::size_t k,
-                                          const extract_t<scalar_t>& Aelem,
-                                          const BLRMatrix<scalar_t>& B21,
-                                          const BLRMatrix<scalar_t>& B12);
+                                          const extract_t& Aelem,
+                                          const BLRM_t& B21,
+                                          const BLRM_t& B12);
       void create_LR_tile(std::size_t i, std::size_t j,
                           DenseM_t& A, const Opts_t& opts);
+      void create_LR_tile(std::size_t i, std::size_t j,
+                          const extract_t& A, const Opts_t& opts);
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
-                                       const extract_t<scalar_t>& Aelem,
+                                       const extract_t& Aelem,
                                        const Opts_t& opts);
 
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        std::size_t k,
-                                       const extract_t<scalar_t>& Aelem,
-                                       const BLRMatrix<scalar_t>& B21,
-                                       const BLRMatrix<scalar_t>& B12,
+                                       const extract_t& Aelem,
+                                       const BLRM_t& B21, const BLRM_t& B12,
                                        const Opts_t& opts);
 
       void LUAR_B11(std::size_t i, std::size_t j, std::size_t kmax,
                     DenseM_t& A11, const Opts_t& opts, int* B);
       void LUAR_B12(std::size_t i, std::size_t j, std::size_t kmax,
-                    BLRMatrix<scalar_t>& B11, DenseM_t& A12,
+                    BLRM_t& B11, DenseM_t& A12,
                     const Opts_t& opts, int* B);
       void LUAR_B21(std::size_t i, std::size_t j, std::size_t kmax,
-                    BLRMatrix<scalar_t>& B11, DenseM_t& A21,
+                    BLRM_t& B11, DenseM_t& A21,
                     const Opts_t& opts, int* B);
 
       template<typename T> friend

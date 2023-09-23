@@ -1280,9 +1280,6 @@ namespace strumpack {
   template void DenseMatrix<std::size_t>::print(std::string, bool, int) const;
   template void DenseMatrix<bool>::print(std::string, bool, int) const;
 
-  // DenseMatrix<long double> only supports a few operations
-
-
 
   template void
   gemm(Trans ta, Trans tb, float alpha, const DenseMatrix<float>& a,
