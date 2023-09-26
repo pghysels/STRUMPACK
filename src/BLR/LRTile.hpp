@@ -84,6 +84,7 @@ namespace strumpack {
       std::size_t rows() const override { return U_.rows(); }
       std::size_t cols() const override { return V_.cols(); }
       std::size_t rank() const override { return U_.cols(); }
+      int rank_1() const override { return rank(); }
       bool is_low_rank() const override { return true; };
 
       std::size_t memory() const override { return U_.memory() + V_.memory(); }
@@ -120,6 +121,8 @@ namespace strumpack {
       const DenseM_t& D() const override { assert(false); return U_; }
       const DenseM_t& U() const override { return U_; }
       const DenseM_t& V() const override { return V_; }
+
+      scalar_t* copy_to(scalar_t* ptr) const override;
 
       LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
       LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;

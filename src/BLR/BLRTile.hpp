@@ -56,6 +56,7 @@ namespace strumpack {
       virtual std::size_t rows() const = 0;
       virtual std::size_t cols() const = 0;
       virtual std::size_t rank() const = 0;
+      virtual int rank_1() const { return -1; };
 
       virtual std::size_t memory() const = 0;
       virtual std::size_t nonzeros() const = 0;
@@ -85,16 +86,18 @@ namespace strumpack {
       virtual const DenseM_t& U() const = 0; //{ assert(false); }
       virtual const DenseM_t& V() const = 0; //{ assert(false); }
 
-      virtual LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const=0;
-      virtual LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const=0;
-      virtual LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const=0;
+      virtual scalar_t* copy_to(scalar_t* ptr) const = 0;
+
+      virtual LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const = 0;
+      virtual LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const = 0;
+      virtual LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const = 0;
 
       virtual void multiply(const BLRTile<scalar_t>& a,
-                            DenseM_t& b, DenseM_t& c) const=0;
+                            DenseM_t& b, DenseM_t& c) const = 0;
       virtual void left_multiply(const LRTile<scalar_t>& a,
-                                 DenseM_t& b, DenseM_t& c) const=0;
+                                 DenseM_t& b, DenseM_t& c) const = 0;
       virtual void left_multiply(const DenseTile<scalar_t>& a,
-                                 DenseM_t& b, DenseM_t& c) const=0;
+                                 DenseM_t& b, DenseM_t& c) const = 0;
 
       virtual scalar_t operator()(std::size_t i, std::size_t j) const = 0;
       virtual void extract(const std::vector<std::size_t>& I,
@@ -132,43 +135,49 @@ namespace strumpack {
                           const DenseM_t& a, scalar_t beta,
                           DenseM_t& c, int task_depth) const = 0;
 
-      virtual void Schur_update_col_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c,
-       scalar_t* work) const = 0;
-      virtual void Schur_update_row_a
-      (std::size_t i, const BLRTile<scalar_t>& b, scalar_t* c,
-       scalar_t* work) const = 0;
-      virtual void Schur_update_col_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const = 0;
-      virtual void Schur_update_col_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const = 0;
-      virtual void Schur_update_row_b
-      (std::size_t i, const LRTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const = 0;
-      virtual void Schur_update_row_b
-      (std::size_t i, const DenseTile<scalar_t>& a, scalar_t* c,
-       scalar_t* work) const = 0;
+      virtual void
+      Schur_update_col_a(std::size_t i, const BLRTile<scalar_t>& b,
+                         scalar_t* c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_row_a(std::size_t i, const BLRTile<scalar_t>& b,
+                         scalar_t* c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_col_b(std::size_t i, const LRTile<scalar_t>& a,
+                         scalar_t* c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_col_b(std::size_t i, const DenseTile<scalar_t>& a,
+                         scalar_t* c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_row_b(std::size_t i, const LRTile<scalar_t>& a,
+                         scalar_t* c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_row_b(std::size_t i, const DenseTile<scalar_t>& a,
+                         scalar_t* c, scalar_t* work) const = 0;
 
-      virtual void Schur_update_cols_a
-      (const std::vector<std::size_t>& cols, const BLRTile<scalar_t>& b,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
-      virtual void Schur_update_rows_a
-      (const std::vector<std::size_t>& rows, const BLRTile<scalar_t>& b,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
-      virtual void Schur_update_cols_b
-      (const std::vector<std::size_t>& cols, const LRTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
-      virtual void Schur_update_cols_b
-      (const std::vector<std::size_t>& cols, const DenseTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
-      virtual void Schur_update_rows_b
-      (const std::vector<std::size_t>& rows, const LRTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
-      virtual void Schur_update_rows_b
-      (const std::vector<std::size_t>& rows, const DenseTile<scalar_t>& a,
-       DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_cols_a(const std::vector<std::size_t>& cols,
+                          const BLRTile<scalar_t>& b,
+                          DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_rows_a(const std::vector<std::size_t>& rows,
+                          const BLRTile<scalar_t>& b,
+                          DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_cols_b(const std::vector<std::size_t>& cols,
+                          const LRTile<scalar_t>& a,
+                          DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_cols_b(const std::vector<std::size_t>& cols,
+                          const DenseTile<scalar_t>& a,
+                          DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_rows_b(const std::vector<std::size_t>& rows,
+                          const LRTile<scalar_t>& a,
+                          DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
+      virtual void
+      Schur_update_rows_b(const std::vector<std::size_t>& rows,
+                          const DenseTile<scalar_t>& a,
+                          DenseMatrix<scalar_t>& c, scalar_t* work) const = 0;
     };
 
   } // end namespace BLR
