@@ -102,6 +102,10 @@ namespace strumpack {
                       std::vector<LInfo_t>& ldata, std::size_t total_dmem);
 
     void multifrontal_solve(DenseM_t& b) const override;
+#if defined(STRUMPACK_USE_MPI)
+    void multifrontal_solve(DenseM_t& bloc,
+                            DistributedMatrix<scalar_t>* bdist) const override;
+#endif
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const;

@@ -789,10 +789,17 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& b) const {
     if (dev_factors_) gpu_solve(b);
-    else
-      // factors are not on the device, so do the solve on the CPU
+    else // factors are not on the device, solve on CPU
       FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
   }
+
+#if defined(STRUMPACK_USE_MPI)
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_solve
+  (DenseM_t& b, DistributedMatrix<scalar_t>* bdist) const {
+    multifrontal_solve(b);
+  }
+#endif
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::fwd_solve_phase2
