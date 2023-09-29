@@ -153,8 +153,8 @@ if(STRUMPACK_USE_SYCL)
   # set(MKL_LINK static)
   # set(MKL_ARCH intel64)
   # set(MKL_INTERFACE lp64)   ## this doesn't work, only ilp64 works
-  set(STRUMPACK_USE_BLAS64 ON)
-  find_package(MKL REQUIRED)
+  # set(STRUMPACK_USE_BLAS64 ON)
+  # find_package(MKL REQUIRED)
 endif()
 
 
@@ -651,7 +651,7 @@ if(BLAS_FOUND)
 endif()
 
 if(MKL_FOUND)
-  target_link_libraries(strumpack PUBLIC MKL::MKL MKL::MKL_SYCL)
+  # target_link_libraries(strumpack PUBLIC MKL::MKL MKL::MKL_SYCL)
 endif()
 
 # the order is important
