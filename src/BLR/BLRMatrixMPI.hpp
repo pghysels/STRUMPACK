@@ -324,6 +324,14 @@ namespace strumpack {
       gather_cols(std::size_t i0, std::size_t i1,
                   std::size_t j0, std::size_t j1) const;
 
+
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      send_row_of_tiles(std::size_t src_row, std::size_t dest_row,
+                        std::size_t j0, std::size_t j1) const;
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      send_col_of_tiles(std::size_t src_col, std::size_t dest_col,
+                        std::size_t i0, std::size_t i1) const;
+
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_row(std::size_t i0, std::size_t k,
                  std::size_t j0, std::size_t j1) const;
