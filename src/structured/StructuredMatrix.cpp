@@ -62,6 +62,9 @@ namespace strumpack {
           throw std::invalid_argument
             ("HSS compression only supported for square matrices.");
         HSS::HSSOptions<scalar_t> hss_opts(opts);
+        std::cerr << "# WARNING: HSS construction uses O(N^2) algorithm based on random projection." << std::endl
+                  << "# Consider passing geometry info in argument p, "
+                  << "or use construct_partially_matrix_free." << std::endl;
         if (!row_tree)
           return std::unique_ptr<StructuredMatrix<scalar_t>>
             (new HSS::HSSMatrix<scalar_t>(A, hss_opts));
@@ -187,55 +190,82 @@ namespace strumpack {
                          const admissibility_t*);
 
 
-    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    template<typename scalar_t, typename real_t>
+    std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_block_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree,
                             const structured::ClusterTree* col_tree,
-                            const admissibility_t* adm) {
+                            const admissibility_t* adm,
+                            const DenseMatrix<real_t>* p) {
       switch (opts.type()) {
       case Type::HSS: {
-        using DenseM_t = DenseMatrix<scalar_t>;
-        using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-        auto sample =
-          [&A, &opts, &rows, &cols]
-          (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
-            DenseM_t Adense(opts.leaf_size(), opts.leaf_size());
-            std::vector<std::size_t> I, J;
-            int B = opts.leaf_size();
-            I.reserve(B);
-            J.reserve(B);
-            Sr.zero();
-            Sc.zero();
-            // TODO threading
-            for (int r=0; r<rows; r+=B) {
-              for (int c=0; c<cols; c+=B) {
-                int m = std::min(B, rows - r),
-                  n = std::min(B, cols - c);
-                DenseMW_t Asub(m, n, Adense, 0, 0);
-                I.resize(m);
-                J.resize(n);
-                std::iota(I.begin(), I.end(), r);
-                std::iota(J.begin(), J.end(), c);
-                A(I, J, Asub);
-                DenseMW_t Rrsub(n, Rr.cols(), Rr, c, 0),
-                  Srsub(m, Sr.cols(), Sr, r, 0),
-                  Rcsub(m, Rc.cols(), Rc, r, 0),
-                  Scsub(n, Sc.cols(), Sc, c, 0);
-                gemm(Trans::N, Trans::N, scalar_t(1.), Asub, Rrsub,
-                     scalar_t(1.), Srsub);
-                gemm(Trans::C, Trans::N, scalar_t(1.), Asub, Rcsub,
-                     scalar_t(1.), Scsub);
+        if (p) {
+          HSS::HSSOptions<scalar_t> hss_opts(opts);
+          auto H = row_tree ?
+            new HSS::HSSMatrix<scalar_t>(*row_tree, hss_opts) :
+            new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
+          H->compress_with_coordinates(*p, A, hss_opts);
+          return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+        } else {
+          using DenseM_t = DenseMatrix<scalar_t>;
+          using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+          auto sample =
+            [&A, &opts, &rows, &cols]
+            (DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+              int B = opts.leaf_size();
+              Sr.zero();
+              Sc.zero();
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+              {
+                for (int c=0; c<cols; c+=B) {
+                  int n = std::min(B, cols - c);
+                  std::vector<std::size_t> J(n);
+                  std::iota(J.begin(), J.end(), c);
+                  DenseMW_t Rrsub(n, Rr.cols(), Rr, c, 0);
+#pragma omp taskloop firstprivate(c)
+                  for (int r=0; r<rows; r+=B) {
+                    int m = std::min(B, rows - r);
+                    DenseM_t Asub(m, n);
+                    std::vector<std::size_t> I(m);
+                    std::iota(I.begin(), I.end(), r);
+                    A(I, J, Asub);
+                    DenseMW_t Srsub(m, Sr.cols(), Sr, r, 0);
+                    gemm(Trans::N, Trans::N, scalar_t(1.), Asub, Rrsub,
+                         scalar_t(1.), Srsub);
+                  }
+                }
+                for (int r=0; r<rows; r+=B) {
+                  int m = std::min(B, rows - r);
+                  std::vector<std::size_t> I(m);
+                  std::iota(I.begin(), I.end(), r);
+                  DenseMW_t Rcsub(m, Rc.cols(), Rc, r, 0);
+#pragma omp taskloop firstprivate(r)
+                  for (int c=0; c<cols; c+=B) {
+                    int n = std::min(B, cols - c);
+                    DenseM_t Asub(m, n);
+                    std::vector<std::size_t> J(n);
+                    std::iota(J.begin(), J.end(), c);
+                    A(I, J, Asub);
+                    DenseMW_t Scsub(n, Sc.cols(), Sc, c, 0);
+                    gemm(Trans::C, Trans::N, scalar_t(1.), Asub, Rcsub,
+                         scalar_t(1.), Scsub);
+                  }
+                }
               }
-            }
-          };
-        HSS::HSSOptions<scalar_t> hss_opts(opts);
-        auto H = row_tree ?
-          new HSS::HSSMatrix<scalar_t>(*row_tree, hss_opts) :
-          new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
-        H->compress(sample, A, hss_opts);
-        return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+            };
+          HSS::HSSOptions<scalar_t> hss_opts(opts);
+          auto H = row_tree ?
+            new HSS::HSSMatrix<scalar_t>(*row_tree, hss_opts) :
+            new HSS::HSSMatrix<scalar_t>(rows, cols, hss_opts);
+          std::cerr << "# WARNING: HSS construction uses O(N^2) algorithm based on random projection." << std::endl
+                    << "# Consider passing geometry info in argument p, "
+                    << "or use construct_partially_matrix_free." << std::endl;
+          H->compress(sample, A, hss_opts);
+          return std::unique_ptr<StructuredMatrix<scalar_t>>(H);
+        }
       }
       case Type::BLR: {
         auto row_leafs = row_tree ? row_tree->leaf_sizes<std::size_t>() :
@@ -284,37 +314,43 @@ namespace strumpack {
                             const StructuredOptions<float>& opts,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<float>*);
     template std::unique_ptr<StructuredMatrix<double>>
     construct_from_elements(int rows, int cols,
                             const extract_block_t<double>& A,
                             const StructuredOptions<double>& opts,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<double>*);
     template std::unique_ptr<StructuredMatrix<std::complex<float>>>
     construct_from_elements(int rows, int cols,
                             const extract_block_t<std::complex<float>>& A,
                             const StructuredOptions<std::complex<float>>& opts,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<float>*);
     template std::unique_ptr<StructuredMatrix<std::complex<double>>>
     construct_from_elements(int rows, int cols,
                             const extract_block_t<std::complex<double>>& A,
                             const StructuredOptions<std::complex<double>>& opts,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<double>*);
 
 
-    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    template<typename scalar_t, typename real_t>
+    std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree,
                             const structured::ClusterTree* col_tree,
-                            const admissibility_t* adm) {
+                            const admissibility_t* adm,
+                            const DenseMatrix<real_t>* p) {
       auto extract_block =
         [&A](const std::vector<std::size_t>& I,
              const std::vector<std::size_t>& J,
@@ -324,7 +360,7 @@ namespace strumpack {
               B(i, j) = A(I[i], J[j]);
         };
       return construct_from_elements<scalar_t>
-        (rows, cols, extract_block, opts, row_tree, col_tree, adm);
+        (rows, cols, extract_block, opts, row_tree, col_tree, adm, p);
     }
 
     // explicit template instantiations
@@ -333,25 +369,29 @@ namespace strumpack {
                             const StructuredOptions<float>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<float>*);
     template std::unique_ptr<StructuredMatrix<double>>
     construct_from_elements(int, int, const extract_t<double>&,
                             const StructuredOptions<double>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<double>*);
     template std::unique_ptr<StructuredMatrix<std::complex<float>>>
     construct_from_elements(int, int, const extract_t<std::complex<float>>&,
                             const StructuredOptions<std::complex<float>>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<float>*);
     template std::unique_ptr<StructuredMatrix<std::complex<double>>>
     construct_from_elements(int, int, const extract_t<std::complex<double>>&,
                             const StructuredOptions<std::complex<double>>&,
                             const structured::ClusterTree*,
                             const structured::ClusterTree*,
-                            const admissibility_t*);
+                            const admissibility_t*,
+                            const DenseMatrix<double>*);
 
 
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
@@ -719,6 +759,9 @@ namespace strumpack {
       switch (opts.type()) {
       case Type::HSS: {
         HSS::HSSOptions<scalar_t> hss_opts(opts);
+        std::cerr << "# WARNING: HSS construction uses O(N^2) algorithm based on random projection." << std::endl
+                  << "# Consider passing geometry info in argument p, "
+                  << "or use construct_partially_matrix_free." << std::endl;
         return std::unique_ptr<StructuredMatrix<scalar_t>>
           (row_tree ?
            new HSS::HSSMatrixMPI<scalar_t>(*row_tree, A, hss_opts) :
@@ -873,6 +916,9 @@ namespace strumpack {
             }
           }
         };
+        std::cerr << "# WARNING: HSS construction uses O(N^2) algorithm based on random projection." << std::endl
+                  << "# Consider passing geometry info in argument p, "
+                  << "or use construct_partially_matrix_free." << std::endl;
         return construct_partially_matrix_free<scalar_t>
           (grid, rows, cols, Amult, A, opts, row_tree, col_tree);
       }
@@ -1516,7 +1562,7 @@ namespace strumpack {
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::factor() {
       throw std::invalid_argument
-        ("Operation factor not supported for this type.");
+        ("Operation factor not supported for this type. (Try construct_and_factor_from_...)");
     }
     template<typename scalar_t> void
     StructuredMatrix<scalar_t>::solve(DenseMatrix<scalar_t>& b) const {

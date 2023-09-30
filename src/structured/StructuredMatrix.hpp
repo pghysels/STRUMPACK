@@ -553,13 +553,16 @@ namespace strumpack {
      * construct_from_elements, construct_matrix_free and
      * construct_partially_matrix_free
      */
-    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,
                             const structured::ClusterTree* col_tree=nullptr,
-                            const admissibility_t* adm=nullptr);
+                            const admissibility_t* adm=nullptr,
+                            const DenseMatrix<real_t>* p=nullptr);
 
 
     /**
@@ -597,13 +600,16 @@ namespace strumpack {
      * construct_from_elements, construct_matrix_free and
      * construct_partially_matrix_free
      */
-    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_block_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,
                             const structured::ClusterTree* col_tree=nullptr,
-                            const admissibility_t* adm=nullptr);
+                            const admissibility_t* adm=nullptr,
+                            const DenseMatrix<real_t>* p=nullptr);
 
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_and_factor_from_dense(const DenseMatrix<scalar_t>& A,
