@@ -60,12 +60,12 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
   MPIComm c;
   std::int64_t rank = c.rank(), P = c.size();
   std::int64_t n_local = std::round(std::floor(float(nx_ex) / P));
-  std::int64_t remaindar = nx_ex%P, low_f, high_f;
-  if (rank+1 <= remaindar) {
+  std::int64_t remainder = nx_ex%P, low_f, high_f;
+  if (rank+1 <= remainder) {
     high_f = (rank+1)*(n_local+1);
     low_f = high_f - (n_local+1) + 1;
   } else {
-    high_f = remaindar*(n_local+1)+(rank+1-remaindar)*n_local;
+    high_f = remainder*(n_local+1)+(rank+1-remainder)*n_local;
     low_f = high_f - (n_local) + 1;
   }
   n_local = high_f - low_f + 1;
