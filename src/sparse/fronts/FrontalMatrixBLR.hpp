@@ -56,8 +56,6 @@ namespace strumpack {
 
     void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
-    void build_front(const SpMat_t& A);
-
     void build_front_cols(const SpMat_t& A, std::size_t i,
                           bool part, std::size_t CP,
                           const std::vector<Triplet<scalar_t>>& e11,
@@ -140,13 +138,16 @@ namespace strumpack {
     FrontalMatrixBLR& operator=(FrontalMatrixBLR const&) = delete;
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
 
     void draw_node(std::ostream& of, bool is_root) const override;
 
     long long node_factor_nonzeros() const override;
+
+    virtual ReturnCode node_subnormals(std::size_t& ns,
+                                       std::size_t& nz) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;
@@ -154,6 +155,12 @@ namespace strumpack {
     using F_t::dim_upd;
     using F_t::sep_begin_;
     using F_t::sep_end_;
+
+    // suppress warnings
+    using F_t::extend_add_to_dense;
+    using F_t::sample_CB;
+    using F_t::forward_multifrontal_solve;
+    using F_t::backward_multifrontal_solve;
   };
 
 } // end namespace strumpack

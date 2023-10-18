@@ -35,10 +35,9 @@
 #include <cassert>
 #include <memory>
 
-#include <hip/hip_runtime_api.h>
-#include <hipblas.h>
-//#include <hipsolver.h>
-#include <rocsolver.h>
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+#include <rocsolver/rocsolver.h>
 
 #include "DenseMatrix.hpp"
 
@@ -59,6 +58,17 @@ namespace strumpack {
                     bool abort=true);
 
     void init();
+
+    inline void peek_at_last_error() {
+      gpu_check(hipPeekAtLastError());
+    }
+
+    inline void get_last_error() {
+      // this is used to reset the last error. Some MAGMA calls fail
+      // on purpose, then use a different algorithm
+      auto e = hipGetLastError();
+      ((void)e); // silence unused warning
+    }
 
     inline void synchronize() {
       gpu_check(hipDeviceSynchronize());

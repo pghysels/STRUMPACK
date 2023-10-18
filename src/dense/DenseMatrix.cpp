@@ -161,10 +161,9 @@ namespace strumpack {
     std::fstream fs(filename, std::fstream::out);
     fs << name << " = [  % " << rows() << "x" << cols()
        << ", ld=" << ld() << ", norm=" << norm() << std::endl;
-    std::setprecision(16);
     for (std::size_t i=0; i<rows(); i++) {
       for (std::size_t j=0; j<cols(); j++)
-        fs << std::setw(width) << operator()(i,j) << "  ";
+        fs << std::setprecision(16) << std::setw(width) << operator()(i,j) << "  ";
       fs << std::endl;
     }
     fs << "];" << std::endl << std::endl;
@@ -327,7 +326,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> B(I.size(), cols());
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
-        assert(I[i] >= 0 && I[i] < rows());
+        assert(I[i] < rows());
         B(i, j) = operator()(I[i], j);
       }
     return B;
@@ -352,7 +351,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> B(rows(), I.size());
     for (std::size_t j=0; j<I.size(); j++)
       for (std::size_t i=0; i<rows(); i++) {
-        assert(I[i] >= 0 && I[j] < cols());
+        assert(I[j] < cols());
         B(i, j) = operator()(i, I[j]);
       }
     return B;
@@ -365,8 +364,7 @@ namespace strumpack {
     DenseMatrix<scalar_t> B(I.size(), J.size());
     for (std::size_t j=0; j<J.size(); j++)
       for (std::size_t i=0; i<I.size(); i++) {
-        assert(I[i] >= 0 && I[i] < rows());
-        assert(J[j] >= 0 && J[j] < cols());
+        assert(I[i] < rows() && J[j] < cols());
         B(i, j) = operator()(I[i], J[j]);
       }
     return B;
@@ -828,8 +826,9 @@ namespace strumpack {
     DenseMatrix tmp(*this);
     auto minmn = std::min(rows(), cols());
     std::vector<scalar_t> S(minmn);
-    int info = blas::gesvd('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
-                           S.data(), NULL, 1, NULL, 1);
+    int info = blas::gesvd
+      ('N', 'N', rows(), cols(), tmp.data(), tmp.ld(),
+       S.data(), NULL, 1, NULL, 1);
     if (info)
       std::cout << "ERROR in gesvd: info = " << info << std::endl;
     return S;
@@ -841,6 +840,28 @@ namespace strumpack {
     lambda.resize(rows());
     return blas::syev
       (char(job), char(ul), rows(), data(), ld(), lambda.data());
+  }
+
+  template<typename scalar_t> std::size_t
+  DenseMatrix<scalar_t>::subnormals() const {
+    if (!data_) return 0;
+    std::size_t ns = 0;
+    for (std::size_t c=0; c<cols(); c++)
+      for (std::size_t r=0; r<rows(); r++)
+        if (!std::isnormal(std::real(operator()(r, c))) &&
+            !std::isnormal(std::imag(operator()(r, c))))
+          ns++;
+    return ns;
+  }
+
+  template<typename scalar_t> std::size_t
+  DenseMatrix<scalar_t>::zeros() const {
+    if (!data_) return 0;
+    std::size_t nz = 0;
+    for (std::size_t c=0; c<cols(); c++)
+      for (std::size_t r=0; r<rows(); r++)
+        if (operator()(r, c) == scalar_t(0.)) nz++;
+    return nz;
   }
 
   template<typename scalar_t> void
@@ -865,7 +886,7 @@ namespace strumpack {
   template<typename scalar_t> std::ofstream&
   operator<<(std::ofstream& os, const DenseMatrix<scalar_t>& D) {
     int v[3];
-    get_version(v[0], v[1], v[2]);
+    get_version(v, v+1, v+2);
     os.write((const char*)v, sizeof(v));
     os.write((const char*)(&D), sizeof(DenseMatrix<scalar_t>));
     os.write((const char*)(D.data()), sizeof(scalar_t)*D.rows()*D.cols());
@@ -879,7 +900,7 @@ namespace strumpack {
   template<typename scalar_t> std::ifstream&
   operator>>(std::ifstream& is, DenseMatrix<scalar_t>& D) {
     int v[3], vf[3];
-    get_version(v[0], v[1], v[2]);
+    get_version(v, v+1, v+2);
     is.read((char*)vf, sizeof(vf));
     if (v[0] != vf[0] || v[1] != vf[1] || v[2] != vf[2]) {
       std::cerr << "Warning, file was created with a different"
@@ -1256,9 +1277,6 @@ namespace strumpack {
   template void DenseMatrix<unsigned int>::print(std::string, bool, int) const;
   template void DenseMatrix<std::size_t>::print(std::string, bool, int) const;
   template void DenseMatrix<bool>::print(std::string, bool, int) const;
-
-  // DenseMatrix<long double> only supports a few operations
-
 
 
   template void

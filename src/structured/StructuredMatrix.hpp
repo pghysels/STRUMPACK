@@ -440,6 +440,9 @@ namespace strumpack {
      * strumpack::binary_tree_clustering
      * \param col_tree optional clustertree for the columns. If the
      * matrix is square, this does not need to be specified.
+     * \param adm optional admissibility info for BLR, should be of
+     * size row_tree->leaf_sizes().size() x
+     * col_tree->leaf_sizes().size()
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -461,7 +464,8 @@ namespace strumpack {
     construct_from_dense(const DenseMatrix<scalar_t>& A,
                          const StructuredOptions<scalar_t>& opts,
                          const structured::ClusterTree* row_tree=nullptr,
-                         const structured::ClusterTree* col_tree=nullptr);
+                         const structured::ClusterTree* col_tree=nullptr,
+                         const admissibility_t* adm=nullptr);
 
     /**
      * Construct a StructuredMatrix from a DenseMatrix<scalar_t>.
@@ -487,6 +491,9 @@ namespace strumpack {
      * strumpack::binary_tree_clustering
      * \param col_tree optional clustertree for the columns. If the
      * matrix is square, this does not need to be specified.
+     * \param adm optional admissibility info for BLR, should be of
+     * size row_tree->leaf_sizes().size() x
+     * col_tree->leaf_sizes().size()
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -508,7 +515,8 @@ namespace strumpack {
     construct_from_dense(int rows, int cols, const scalar_t* A, int ldA,
                          const StructuredOptions<scalar_t>& opts,
                          const structured::ClusterTree* row_tree=nullptr,
-                         const structured::ClusterTree* col_tree=nullptr);
+                         const structured::ClusterTree* col_tree=nullptr,
+                         const admissibility_t* adm=nullptr);
 
     /**
      * Construct a StructuredMatrix using a routine, provided by the
@@ -526,6 +534,9 @@ namespace strumpack {
      * strumpack::binary_tree_clustering
      * \param col_tree optional clustertree for the columns. If the
      * matrix is square, this does not need to be specified.
+     * \param adm optional admissibility info for BLR, should be of
+     * size row_tree->leaf_sizes().size() x
+     * col_tree->leaf_sizes().size()
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -542,12 +553,16 @@ namespace strumpack {
      * construct_from_elements, construct_matrix_free and
      * construct_partially_matrix_free
      */
-    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,
-                            const structured::ClusterTree* col_tree=nullptr);
+                            const structured::ClusterTree* col_tree=nullptr,
+                            const admissibility_t* adm=nullptr,
+                            const DenseMatrix<real_t>* p=nullptr);
 
 
     /**
@@ -566,6 +581,9 @@ namespace strumpack {
      * strumpack::binary_tree_clustering
      * \param col_tree optional clustertree for the columns. If the
      * matrix is square, this does not need to be specified.
+     * \param adm optional admissibility info for BLR, should be of
+     * size row_tree->leaf_sizes().size() x
+     * col_tree->leaf_sizes().size()
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -582,12 +600,38 @@ namespace strumpack {
      * construct_from_elements, construct_matrix_free and
      * construct_partially_matrix_free
      */
-    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    template<typename scalar_t,
+             typename real_t = typename RealType<scalar_t>::value_type>
+    std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_from_elements(int rows, int cols,
                             const extract_block_t<scalar_t>& A,
                             const StructuredOptions<scalar_t>& opts,
                             const structured::ClusterTree* row_tree=nullptr,
-                            const structured::ClusterTree* col_tree=nullptr);
+                            const structured::ClusterTree* col_tree=nullptr,
+                            const admissibility_t* adm=nullptr,
+                            const DenseMatrix<real_t>* p=nullptr);
+
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_and_factor_from_dense(const DenseMatrix<scalar_t>& A,
+                                    const StructuredOptions<scalar_t>& opts,
+                                    const structured::ClusterTree* row_tree=nullptr,
+                                    const structured::ClusterTree* col_tree=nullptr,
+                                    const admissibility_t* adm=nullptr);
+
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_and_factor_from_elements(int rows, int cols,
+                                       const extract_t<scalar_t>& A,
+                                       const StructuredOptions<scalar_t>& opts,
+                                       const structured::ClusterTree* row_tree=nullptr,
+                                       const structured::ClusterTree* col_tree=nullptr,
+                                       const admissibility_t* adm=nullptr);
+    template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
+    construct_and_factor_from_elements(int rows, int cols,
+                                       const extract_block_t<scalar_t>& A,
+                                       const StructuredOptions<scalar_t>& opts,
+                                       const structured::ClusterTree* row_tree=nullptr,
+                                       const structured::ClusterTree* col_tree=nullptr,
+                                       const admissibility_t* adm=nullptr);
 
     /**
      * Construct a StructuredMatrix using only a matrix-vector

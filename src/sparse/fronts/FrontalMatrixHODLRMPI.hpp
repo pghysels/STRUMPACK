@@ -131,6 +131,8 @@ namespace strumpack {
     void compress_flops_F22();
     void compress_flops_Schur(long long int invf11_mult_flops);
 
+    DistM_t get_dense_CB() const;
+
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::sep_begin_;

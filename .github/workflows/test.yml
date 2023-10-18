@@ -22,20 +22,20 @@ jobs:
           export BLUE="\033[34;1m"
           mkdir -p installDir
 
-          printf  "${BLUE} PG; Installing gcc-9 via apt\n"
+          printf  "${BLUE} PG; Installing gcc via apt\n"
           sudo apt-get update
           sudo apt-get install build-essential software-properties-common -y
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update
-          sudo apt-get install gcc-9 g++-9 -y
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
-          export CXX="g++-9"
-          export CC="gcc-9"
-          printf "${BLUE} PG; Done installing gcc-9 via apt\n"
+          sudo apt-get install gcc g++ -y
+          # sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 60 --slave /usr/bin/g++ g++ /usr/bin/g++-10
+          export CXX="g++"
+          export CC="gcc"
+          printf "${BLUE} PG; Done installing gcc via apt\n"
 
           printf "${BLUE} PG; Installing gfortran via apt\n"
-          sudo apt-get install gfortran-9 -y
-          sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 60
+          sudo apt-get install gfortran -y
+          # sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-10 60
           printf "${BLUE} PG; Done installing gfortran via apt\n"
 
           printf "${BLUE} PG; Installing openmpi\n"
@@ -76,6 +76,7 @@ jobs:
           cd $GITHUB_WORKSPACE
           rm -rf build
           mkdir -p build
+          mkdir -p install
           cd build
           export CRAYPE_LINK_TYPE=dynamic
           cmake .. \
@@ -83,7 +84,7 @@ jobs:
             -DCMAKE_C_COMPILER=mpicc \
             -DCMAKE_CXX_COMPILER=mpic++ \
             -DCMAKE_Fortran_COMPILER=mpif90 \
-            -DCMAKE_INSTALL_PREFIX=. \
+            -DCMAKE_INSTALL_PREFIX=../install \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
             -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
@@ -91,9 +92,26 @@ jobs:
           make install
           make examples
           printf "${BLUE} PG; Done installing STRUMPACK from source\n"
+          cd ../
+          export STRUMPACK_DIR=`pwd`/install
+          cd test/build_external/
+          mkdir -p build
+          cd build
+          cmake ../
+          make
 
       - name: Test
         run: |
           cd $GITHUB_WORKSPACE
           export TEST_NUMBER=${{ matrix.test }}
           sh ./.ci_tests.sh
+
+      - name: External build
+        run: |
+          cd $GITHUB_WORKSPACE
+          export STRUMPACK_DIR=`pwd`/install
+          cd test/build_external/
+          mkdir -p build
+          cd build
+          cmake ../
+          make

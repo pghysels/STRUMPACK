@@ -87,7 +87,6 @@ namespace strumpack {
    std::size_t i, std::size_t j) : _rows(m), _cols(n), _i(i), _j(j) {
     assert(!A.active() || m+i <= std::size_t(A.rows()));
     assert(!A.active() || n+j <= std::size_t(A.cols()));
-    assert(m >= 0 && n >= 0 && i >=0 && j >= 0);
     this->data_ = A.data();
     std::copy(A.desc(), A.desc()+9, this->desc_);
     this->lrows_ = A.lrows();   this->lcols_ = A.lcols();
@@ -1080,6 +1079,30 @@ namespace strumpack {
     copy(rank, cols()-rank, *this, 0, rank, X, 0, 0, grid()->ctxt());
     trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), R1, X);
   }
+
+
+  template<typename scalar_t> std::size_t
+  DistributedMatrix<scalar_t>::subnormals() const {
+    if (!data_) return 0;
+    std::size_t ns = 0;
+    for (int c=0; c<lcols_; c++)
+      for (int r=0; r<lrows_; r++)
+        if (!std::isnormal(std::real(operator()(r, c))) &&
+            !std::isnormal(std::imag(operator()(r, c))))
+          ns++;
+    return ns;
+  }
+  template<typename scalar_t> std::size_t
+  DistributedMatrix<scalar_t>::zeros() const {
+    if (!data_) return 0;
+    std::size_t nz = 0;
+    for (int c=0; c<lcols_; c++)
+      for (int r=0; r<lrows_; r++)
+        if (operator()(r, c) == scalar_t(0.))
+          nz++;
+    return nz;
+  }
+
 
   template<typename scalar_t> void gemm
   (Trans ta, Trans tb, scalar_t alpha, const DistributedMatrix<scalar_t>& A,

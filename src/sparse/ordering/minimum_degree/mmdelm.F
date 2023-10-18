@@ -110,7 +110,9 @@ c            -----------------------------------------------------
                      do  800  j = jstrt, jstop
                          node = adjncy(j)
                          link = - node
-                         if  ( node )  400, 900, 500
+c$$$                         if  ( node )  400, 900, 500
+                         if  ( node .lt. 0)  go to 400
+                         if  ( node .eq. 0)  go to 900
   500                    continue
                          if  ( marker(node) .ge. tag  .or.
      1                         dforw(node) .lt. 0 )  go to 800
@@ -144,7 +146,9 @@ c        --------------------------------------------------------
              do  1700  i = istrt, istop
                  rnode = adjncy(i)
                  link = - rnode
-                 if  ( rnode )  1100, 1800, 1200
+c$$$                 if  ( rnode )  1100, 1800, 1200
+                 if  ( rnode .lt. 0)  go to 1100
+                 if  ( rnode .eq. 0)  go to 1800
  1200            continue
 c                --------------------------------------------
 c                if rnode is in the degree list structure ...

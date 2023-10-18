@@ -1,4 +1,4 @@
-/*
+/*1
  * STRUMPACK -- STRUctured Matrices PACKage, Copyright (c) 2014, The
  * Regents of the University of California, through Lawrence Berkeley
  * National Laboratory (subject to receipt of any required approvals
@@ -33,6 +33,7 @@
 #include "CSRMatrixMPI.hpp"
 #include "PropMapSparseMatrix.hpp"
 #include "ordering/MatrixReorderingMPI.hpp"
+#include "fronts/FrontFactory.hpp"
 #include "fronts/FrontalMatrix.hpp"
 #include "fronts/FrontalMatrixMPI.hpp"
 

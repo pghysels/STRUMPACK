@@ -57,6 +57,7 @@ namespace strumpack {
      */
     template<typename scalar_t> class LRTile
       : public BLRTile<scalar_t> {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
@@ -94,21 +95,31 @@ namespace strumpack {
              const Opts_t& opts);
 
       LRTile(const DenseM_t& U, const DenseM_t& V);
-
       LRTile(DenseMW_t& dU, DenseMW_t& dV);
       LRTile(DenseMW_t&& dU, DenseMW_t&& dV);
 
       std::size_t rows() const override { return U_->rows(); }
       std::size_t cols() const override { return V_->cols(); }
       std::size_t rank() const override { return U_->cols(); }
+      int rank_1() const override { return rank(); }
       bool is_low_rank() const override { return true; };
 
       std::size_t memory() const override { return U_->memory() + V_->memory(); }
       std::size_t nonzeros() const override { return (rows()+cols())*rank(); }
       std::size_t maximum_rank() const override { return U_->cols(); }
 
+      std::size_t subnormals() const override { return U_.subnormals() + V_.subnormals(); }
+      std::size_t zeros() const override { return U_.zeros() + V_.zeros(); }
+
       void dense(DenseM_t& A) const override;
       DenseM_t dense() const override;
+
+      real_t normF() const override {
+        std::cerr << "WARNING: normF of compressed BLR matrix is not supported."
+                  << std::endl;
+        assert(false);
+        return 0.;
+      }
 
       std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 
@@ -127,6 +138,8 @@ namespace strumpack {
       const DenseM_t& D() const override { return *U_; }
       const DenseM_t& U() const override { return *U_; }
       const DenseM_t& V() const override { return *V_; }
+
+      scalar_t* copy_to(scalar_t* ptr) const override;
 
       LRTile<scalar_t>
       multiply(const BLRTile<scalar_t>& a) const override;

@@ -65,13 +65,6 @@ namespace strumpack {
     template<typename scalar_t,typename integer_t> class BLRExtendAdd;
 
 
-    template<typename T>
-    using extract_t =
-      std::function<void(const std::vector<std::size_t>&,
-                         const std::vector<std::size_t>&,
-                         DenseMatrix<T>&)>;
-    using adm_t = DenseMatrix<bool>;
-
     /**
      * \class BLRMatrix
      *
@@ -88,27 +81,26 @@ namespace strumpack {
      */
     template<typename scalar_t> class BLRMatrix
       : public structured::StructuredMatrix<scalar_t> {
+      using BLRM_t = BLRMatrix<scalar_t>;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
       using real_t = typename RealType<scalar_t>::value_type;
+      using extract_t =
+        std::function<void(const std::vector<std::size_t>&,
+        const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>;
+      using adm_t = DenseMatrix<bool>;
 
     public:
       BLRMatrix() = default;
 
-      BLRMatrix(DenseM_t& A,
-                const std::vector<std::size_t>& rowtiles,
-                const std::vector<std::size_t>& coltiles,
-                const Opts_t& opts);
+      // BLRMatrix(DenseM_t& A,
+      //           const std::vector<std::size_t>& rowtiles,
+      //           const std::vector<std::size_t>& coltiles,
+      //           const Opts_t& opts);
 
-      // implement and test, separate from factorization
-      // BLRMatrix(std::size_t n, const std::vector<std::size_t>& tiles,
-      //           const adm_t& admissible, const elem_t& Aelem,
-      //           std::vector<int>& piv, const Opts_t& opts);
-
-      BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
-                const adm_t& admissible, std::vector<int>& piv,
-                const Opts_t& opts);
+      // BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
+      //           const adm_t& admissible, const Opts_t& opts);
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
                 std::size_t n, const std::vector<std::size_t>& coltiles);
@@ -120,8 +112,28 @@ namespace strumpack {
       std::size_t nonzeros() const override;
       std::size_t rank() const override;
 
+      /**
+       * Return number of subnormal elements in the matrix.
+       */
+      std::size_t subnormals() const;
+      std::size_t zeros() const;
+
       DenseM_t dense() const;
       void dense(DenseM_t& A) const;
+
+      void compress(const DenseM_t& A,
+                    const adm_t& admissible,
+                    const Opts_t& opts);
+      void compress(const extract_t& Aelem,
+                    const adm_t& admissible,
+                    const Opts_t& opts);
+
+      void compress_and_factor(const DenseM_t& A,
+                               const adm_t& admissible,
+                               const Opts_t& opts);
+      void compress_and_factor(const extract_t& Aelem,
+                               const adm_t& admissible,
+                               const Opts_t& opts);
 
       void draw(std::ostream& of, std::size_t roff, std::size_t coff) const;
 
@@ -129,11 +141,13 @@ namespace strumpack {
 
       void clear();
 
-      void solve(const std::vector<int>& P, DenseM_t& x) const {
-        x.laswp(P, true);
+      void solve(DenseM_t& x) const override {
+        x.laswp(piv_, true);
         trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), *this, x, 0);
         trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), *this, x, 0);
       }
+
+      const std::vector<int>& piv() const { return piv_; }
 
       /**
        * Multiply this BLR matrix with a dense matrix (vector), ie,
@@ -183,10 +197,8 @@ namespace strumpack {
       static void
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
                                    DenseM_t& A21, DenseM_t& A22,
-                                   BLRMatrix<scalar_t>& B11,
-                                   std::vector<int>& piv,
-                                   BLRMatrix<scalar_t>& B12,
-                                   BLRMatrix<scalar_t>& B21,
+                                   BLRM_t& B11, BLRM_t& B12,
+                                   BLRM_t& B21,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
@@ -208,22 +220,16 @@ namespace strumpack {
 #endif
 
       static void
-      construct_and_partial_factor(BLRMatrix<scalar_t>& B11,
-                                   BLRMatrix<scalar_t>& B12,
-                                   BLRMatrix<scalar_t>& B21,
-                                   BLRMatrix<scalar_t>& B22,
-                                   std::vector<int>& piv,
+      construct_and_partial_factor(BLRM_t& B11, BLRM_t& B12,
+                                   BLRM_t& B21, BLRM_t& B22,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const Opts_t& opts);
 
       static void
-      construct_and_partial_factor_col(BLRMatrix<scalar_t>& B11,
-                                       BLRMatrix<scalar_t>& B12,
-                                       BLRMatrix<scalar_t>& B21,
-                                       BLRMatrix<scalar_t>& B22,
-                                       std::vector<int>& piv,
+      construct_and_partial_factor_col(BLRM_t& B11, BLRM_t& B12,
+                                       BLRM_t& B21, BLRM_t& B22,
                                        const std::vector<std::size_t>& tiles1,
                                        const std::vector<std::size_t>& tiles2,
                                        const adm_t& admissible,
@@ -233,47 +239,45 @@ namespace strumpack {
 
       static void
       construct_and_partial_factor(std::size_t n1, std::size_t n2,
-                                   const extract_t<scalar_t>& A11,
-                                   const extract_t<scalar_t>& A12,
-                                   const extract_t<scalar_t>& A21,
-                                   const extract_t<scalar_t>& A22,
-                                   BLRMatrix<scalar_t>& B11,
-                                   std::vector<int>& piv,
-                                   BLRMatrix<scalar_t>& B12,
-                                   BLRMatrix<scalar_t>& B21,
-                                   BLRMatrix<scalar_t>& B22,
+                                   const extract_t& A11, const extract_t& A12,
+                                   const extract_t& A21, const extract_t& A22,
+                                   BLRM_t& B11, BLRM_t& B12,
+                                   BLRM_t& B21, BLRM_t& B22,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const BLROptions<scalar_t>& opts);
 
       static void
-      trsmLNU_gemm(const BLRMatrix<scalar_t>& F1,
-                   const BLRMatrix<scalar_t>& F2,
+      trsmLNU_gemm(const BLRM_t& F1,
+                   const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
       static void
-      gemm_trsmUNN(const BLRMatrix<scalar_t>& F1,
-                   const BLRMatrix<scalar_t>& F2,
+      gemm_trsmUNN(const BLRM_t& F1,
+                   const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
     private:
       std::size_t m_ = 0, n_ = 0, nbrows_ = 0, nbcols_ = 0;
       std::vector<std::size_t> roff_, coff_, cl2l_, rl2l_;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>> blocks_;
+      std::vector<int> piv_;
 
       void create_dense_tile(std::size_t i, std::size_t j, DenseM_t& A);
       void create_dense_tile(std::size_t i, std::size_t j,
-                             const extract_t<scalar_t>& Aelem);
+                             const extract_t& Aelem);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
-                                          const extract_t<scalar_t>& Aelem);
+                                          const extract_t& Aelem);
       void create_dense_tile_left_looking(std::size_t i, std::size_t j,
                                           std::size_t k,
-                                          const extract_t<scalar_t>& Aelem,
-                                          const BLRMatrix<scalar_t>& B21,
-                                          const BLRMatrix<scalar_t>& B12);
+                                          const extract_t& Aelem,
+                                          const BLRM_t& B21,
+                                          const BLRM_t& B12);
       void create_LR_tile(std::size_t i, std::size_t j,
                           DenseM_t& A, const Opts_t& opts);
+      void create_LR_tile(std::size_t i, std::size_t j,
+                          const extract_t& A, const Opts_t& opts);
 
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
       void create_from_column_major_gpu(DenseM_t& A, scalar_t* work);
@@ -286,27 +290,30 @@ namespace strumpack {
 #endif
 
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
-                                       const extract_t<scalar_t>& Aelem,
+                                       const extract_t& Aelem,
                                        const Opts_t& opts);
 
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        std::size_t k,
-                                       const extract_t<scalar_t>& Aelem,
-                                       const BLRMatrix<scalar_t>& B21,
-                                       const BLRMatrix<scalar_t>& B12,
+                                       const extract_t& Aelem,
+                                       const BLRM_t& B21, const BLRM_t& B12,
                                        const Opts_t& opts);
       void LUAR_B11(std::size_t i, std::size_t j, std::size_t kmax,
                     DenseM_t& A11, const Opts_t& opts, int* B);
       void LUAR_B12(std::size_t i, std::size_t j, std::size_t kmax,
-                    BLRMatrix<scalar_t>& B11, DenseM_t& A12,
+                    BLRM_t& B11, DenseM_t& A12,
                     const Opts_t& opts, int* B);
       void LUAR_B21(std::size_t i, std::size_t j, std::size_t kmax,
-                    BLRMatrix<scalar_t>& B11, DenseM_t& A21,
+                    BLRM_t& B11, DenseM_t& A21,
                     const Opts_t& opts, int* B);
 
       template<typename T> friend
       void draw(const BLRMatrix<T>& H, const std::string& name);
       template<typename T,typename I> friend class BLRExtendAdd;
+
+      // suppress warnings
+      using structured::StructuredMatrix<scalar_t>::mult;
+      using structured::StructuredMatrix<scalar_t>::solve;
     };
 
     template<typename scalar_t> void

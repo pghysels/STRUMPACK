@@ -75,6 +75,13 @@ test(int argc, char* argv[], CSRMatrix<scalar,integer>& A) {
   }
   spss.solve(b.data(), x.data());
 
+  std::size_t subs = 0, zeros = 0;
+  auto err0 = spss.subnormals(subs, zeros);
+  if (!rank)
+    std::cout << "# SUBNORMALS = " << subs
+              << "   ZEROS = " << zeros
+              << " (" << err0 << ")" << std::endl;
+
   integer neg, zero, pos;
   auto err = spss.inertia(neg, zero, pos);
   if (!rank)
@@ -123,13 +130,16 @@ int main(int argc, char* argv[]) {
 
   bool is_complex = false;
   if (rank == 0) {
-    if (A.read_matrix_market(f)) {
-      is_complex = true;
-      if (Acomplex.read_matrix_market(f)) {
-        std::cerr << "Could not read matrix from file." << std::endl;
-        return 1;
+    if (A.read_binary(f)) {
+      if (A.read_matrix_market(f)) {
+        is_complex = true;
+        if (Acomplex.read_matrix_market(f)) {
+          std::cerr << "Could not read matrix from file." << std::endl;
+          return 1;
+        }
       }
     }
+
   }
   MPI_Bcast(&is_complex, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (!is_complex)

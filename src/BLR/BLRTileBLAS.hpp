@@ -40,6 +40,22 @@
 namespace strumpack {
   namespace BLR {
 
+    template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
+    create_tile_from_ptr(std::size_t m, std::size_t n,
+                         int r, scalar_t*& ptr) {
+      std::unique_ptr<BLRTile<scalar_t>> t;
+      if (r == -1) {
+        t.reset(new DenseTile<scalar_t>(m, n));
+        std::copy(ptr, ptr+m*n, t->D().data());
+        ptr += m*n;
+      } else {
+        t.reset(new LRTile<scalar_t>(m, n, r));
+        std::copy(ptr, ptr+m*r, t->U().data());  ptr += m*r;
+        std::copy(ptr, ptr+r*n, t->V().data());  ptr += r*n;
+      }
+      return t;
+    }
+
     template<typename scalar_t> void
     gemm(Trans ta, Trans tb, scalar_t alpha, const BLRTile<scalar_t>& a,
          const BLRTile<scalar_t>& b, scalar_t beta,

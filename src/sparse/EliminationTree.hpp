@@ -34,14 +34,13 @@
 
 #include "dense/DenseMatrix.hpp"
 #include "CompressedSparseMatrix.hpp"
-#include "fronts/FrontFactory.hpp"
-#include "fronts/FrontalMatrix.hpp"
 #include "StrumpackOptions.hpp"
-#include "SeparatorTree.hpp"
+#include "fronts/FrontFactory.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontalMatrix;
+  template<typename integer_t> class SeparatorTree;
 
   // TODO rename this to SuperNodalTree?
   template<typename scalar_t,typename integer_t>
@@ -77,6 +76,10 @@ namespace strumpack {
     virtual ReturnCode inertia(integer_t& neg,
                                integer_t& zero,
                                integer_t& pos) const;
+    virtual ReturnCode subnormals(std::size_t& ns,
+                                  std::size_t& nz) const;
+    virtual ReturnCode pivot_growth(scalar_t& pgL,
+                                    scalar_t& pgU) const;
 
     void print_rank_statistics(std::ostream &out) const;
 

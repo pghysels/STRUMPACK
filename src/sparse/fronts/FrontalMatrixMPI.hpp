@@ -66,14 +66,15 @@ namespace strumpack {
 
     virtual void sample_CB(const DistM_t& R, DistM_t& Sr,
                            DistM_t& Sc, F_t* pa) const {}
+    virtual void sample_CB(Trans op, const DistM_t& R,
+                           DistM_t& Sr, F_t* pa) const {};
+
     void sample_CB(const Opts_t& opts, const DistM_t& R,
                    DistM_t& Sr, DistM_t& Sc,
                    const DenseM_t& seqR, DenseM_t& seqSr,
                    DenseM_t& seqSc, F_t* pa) override {
       sample_CB(R, Sr, Sc, pa);
     }
-    virtual void sample_CB(Trans op, const DistM_t& R,
-                           DistM_t& Sr, F_t* pa) const {};
     void sample_CB(Trans op, const DistM_t& R, DistM_t& S,
                    const DenseM_t& Rseq, DenseM_t& Sseq,
                    FrontalMatrix<scalar_t,integer_t>* pa) const override {
@@ -150,9 +151,8 @@ namespace strumpack {
     virtual std::string type() const override { return "FrontalMatrixMPI"; }
     virtual bool isMPI() const override { return true; }
 
-    void partition_fronts
-    (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
-     bool is_root=true, int task_depth=0) override;
+    void partition_fronts(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+                          bool is_root=true, int task_depth=0) override;
 
   protected:
     BLACSGrid blacs_grid_;     // 2D processor grid
@@ -161,6 +161,11 @@ namespace strumpack {
 
     using F_t::lchild_;
     using F_t::rchild_;
+
+    // suppress warnings
+    using F_t::sample_CB;
+    using F_t::get_submatrix_2d;
+
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
   };
 

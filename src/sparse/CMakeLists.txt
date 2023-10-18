@@ -17,6 +17,7 @@ install(FILES
   CompressedSparseMatrix.hpp
   CSRMatrix.hpp
   CSRGraph.hpp
+  EliminationTree.hpp
   DESTINATION include/sparse)
 
 
@@ -36,6 +37,9 @@ if(STRUMPACK_USE_MPI)
 
   install(FILES
     CSRMatrixMPI.hpp
+    EliminationTreeMPI.hpp
+    EliminationTreeMPIDist.hpp
+    PropMapSparseMatrix.hpp
     DESTINATION include/sparse)
 endif()
 

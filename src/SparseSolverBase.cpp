@@ -76,18 +76,14 @@ namespace strumpack {
 #else
       std::cout << "# running serially, no OpenMP support!" << std::endl;
 #endif
-      // a heuristic to set the recursion task cutoff level based on
-      // the number of threads
-      if (params::num_threads == 1)
-        params::task_recursion_cutoff_level = 0;
-      else {
-        params::task_recursion_cutoff_level =
-          std::log2(params::num_threads) + 3;
-        std::cout << "# number of tasking levels = "
-                  << params::task_recursion_cutoff_level
-                  << " = log_2(#threads) + 3"<< std::endl;
-      }
     }
+    // a heuristic to set the recursion task cutoff level based on
+    // the number of threads
+    if (params::num_threads == 1)
+      params::task_recursion_cutoff_level = 0;
+    else
+      params::task_recursion_cutoff_level =
+        std::log2(params::num_threads) + 3;
     opts_.HSS_options().set_synchronized_compression(true);
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     if (opts_.use_gpu()) gpu::init();
@@ -154,6 +150,31 @@ namespace strumpack {
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
     return tree()->inertia(neg, zero, pos);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::subnormals
+  (std::size_t& ns, std::size_t& nz) {
+    ns = nz = 0;
+    if (!this->factored_) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    return tree()->subnormals(ns, nz);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::pivot_growth
+  (scalar_t& pg) {
+    pg = scalar_t(0.);
+    if (!this->factored_) {
+      ReturnCode ierr = this->factor();
+      if (ierr != ReturnCode::SUCCESS) return ierr;
+    }
+    scalar_t pgL(0.), pgU(0.);
+    auto info = tree()->pivot_growth(pgL, pgU);
+    pg = std::max(std::abs(pgL), std::abs(pgU)) / matrix()->norm1();
+    return info;
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -312,10 +333,10 @@ namespace strumpack {
     if (reordered_) return ReturnCode::SUCCESS;
     TaskTimer t1("permute-scale");
     int ierr;
+    if (opts_.verbose() && is_root_)
+      std::cout << "# matching job: " << get_description(opts_.matching())
+                << std::endl;
     if (opts_.matching() != MatchingJob::NONE) {
-      if (opts_.verbose() && is_root_)
-        std::cout << "# matching job: " << get_description(opts_.matching())
-                  << std::endl;
       try {
         t1.time([&](){ matching_ = matrix()->matching(opts_.matching()); });
       } catch (std::exception& e) {

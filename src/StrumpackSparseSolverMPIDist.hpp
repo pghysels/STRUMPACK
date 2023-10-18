@@ -36,11 +36,11 @@
 #include "dense/ScaLAPACKWrapper.hpp"
 #include "dense/DistributedVector.hpp"
 #include "sparse/CSRMatrixMPI.hpp"
+#include "sparse/EliminationTreeMPIDist.hpp"
 
 namespace strumpack {
 
   // forward declarations
-  template<typename scalar_t,typename integer_t> class EliminationTreeMPIDist;
   template<typename scalar_t,typename integer_t> class MatrixReorderingMPI;
 
   /**

@@ -137,12 +137,6 @@ namespace strumpack {
         gpu_check(hipSetDevice(rank % devs));
       }
 #endif
-      gpu_check(hipFree(0));
-      gpu::BLASHandle hb;
-      gpu::SOLVERHandle hs;
-#if defined(STRUMPACK_USE_MAGMA)
-      gpu::magma::MAGMAQueue mq;
-#endif
     }
 
     void gemm(BLASHandle& handle, hipblasOperation_t transa,

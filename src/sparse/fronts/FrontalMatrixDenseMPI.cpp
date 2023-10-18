@@ -310,14 +310,21 @@ namespace strumpack {
     if (this->dim_sep()) {
       auto sbloc = slate_matrix(b);
       auto slateF11 = slate_matrix(F11);
-      slate::getrs(slateF11, const_cast<slate::Pivots&>(slate_piv_),
-                   sbloc, slate_opts_);
+      // there is a bug in SLATE's gemmA (when the A matrix is large
+      // and the C matrix is small) for SLATE <= 20220700
+#if SLATE_VERSION > 20220700
+      auto& slopts = slate_opts_;
+#else // run on host
+      std::map<slate::Option, slate::Value> slopts;
+#endif
+      slate::getrs
+        (slateF11, const_cast<slate::Pivots&>(slate_piv_), sbloc, slopts);
       // TODO count flops
       if (this->dim_upd()) {
         auto sbupd = slate_matrix(bupd);
         auto slateF21 = slate_matrix(F21);
         slate::gemm
-          (scalar_t(-1.), slateF21, sbloc, scalar_t(1.), sbupd, slate_opts_);
+          (scalar_t(-1.), slateF21, sbloc, scalar_t(1.), sbupd, slopts);
         // TODO count flops
       }
     }
@@ -371,15 +378,20 @@ namespace strumpack {
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& y, DistM_t& yupd) const {
     if (!grid()->active()) return;
-#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK) // && (SLATE_VERSION > 20220700)
     if (this->dim_sep()) {
       if (this->dim_upd()) {
+#if SLATE_VERSION > 20220700
+        auto& slopts = slate_opts_;
+#else // run on host
+        std::map<slate::Option, slate::Value> slopts;
+#endif
         TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
         auto sy = slate_matrix(y);
         auto syupd = slate_matrix(yupd);
         auto slateF12 = slate_matrix(F12);
         slate::gemm
-          (scalar_t(-1.), slateF12, syupd, scalar_t(1.), sy, slate_opts_);
+          (scalar_t(-1.), slateF12, syupd, scalar_t(1.), sy, slopts);
         // TODO count flops
       }
     }
@@ -537,6 +549,39 @@ namespace strumpack {
     }
 #endif
     return matrix_inertia(F11_, neg, zero, pos);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_subnormals
+  (std::size_t& ns, std::size_t& nz) const {
+    const auto dsep = this->dim_sep();
+    if (!dsep || !grid()->active())
+      return ReturnCode::SUCCESS;
+#if defined(STRUMPACK_USE_ZFP)
+    if (compressed_) {
+      if (dsep) {
+        DistM_t F11(grid(), dsep, dsep);
+        auto wF11 = F11.dense_wrapper();
+        F11c_.decompress(wF11);
+        ns += wF11.subnormals();
+        nz += wF11.zeros();
+        const auto dupd = this->dim_upd();
+        if (dupd) {
+          DistM_t F12(grid(), dsep, dupd), F21(grid(), dupd, dsep);
+          auto wF12 = F12.dense_wrapper();
+          auto wF21 = F21.dense_wrapper();
+          F12c_.decompress(wF12);
+          F21c_.decompress(wF21);
+          ns += wF12.subnormals() + wF21.subnormals();
+          nz += wF12.zeros() + wF21.zeros();
+        }
+      }
+      return ReturnCode::SUCCESS;
+    }
+#endif
+    ns += F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
+    nz += F11_.zeros() + F12_.zeros() + F21_.zeros();
+    return ReturnCode::SUCCESS;
   }
 
   // explicit template instantiations

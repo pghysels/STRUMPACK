@@ -1,5 +1,6 @@
 target_sources(strumpack
   PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip
   ${CMAKE_CURRENT_LIST_DIR}/FrontFactory.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrix.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDense.cpp
@@ -11,6 +12,9 @@ target_sources(strumpack
   ${CMAKE_CURRENT_LIST_DIR}/FrontFactory.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrix.hpp)
 
+install(FILES
+  FrontFactory.hpp
+  DESTINATION include/sparse/fronts)
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack

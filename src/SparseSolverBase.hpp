@@ -367,6 +367,10 @@ namespace strumpack {
      */
     ReturnCode inertia(integer_t& neg, integer_t& zero, integer_t& pos);
 
+    ReturnCode subnormals(std::size_t& ns, std::size_t& nz);
+
+    ReturnCode pivot_growth(scalar_t& pg);
+
     /**
      * Create a gnuplot script to draw/plot the sparse factors. Only
      * do this for small matrices! It is very slow!
@@ -423,6 +427,18 @@ namespace strumpack {
 
     void print_wrong_sparsity_error();
 
+    // TODO do these all need to be virtual, can some be private?
+    virtual
+    ReturnCode solve_internal(const scalar_t* b, scalar_t* x,
+                              bool use_initial_guess=false) = 0;
+    virtual
+    ReturnCode solve_internal(const DenseM_t& b, DenseM_t& x,
+                              bool use_initial_guess=false) = 0;
+    virtual
+    ReturnCode solve_internal(int nrhs, const scalar_t* b, int ldb,
+                              scalar_t* x, int ldx,
+                              bool use_initial_guess=false);
+
     SPOptions<scalar_t> opts_;
     bool is_root_;
 
@@ -452,18 +468,6 @@ namespace strumpack {
     ReturnCode reorder_internal(const int* p, int base,
                                 int nx, int ny, int nz,
                                 int components, int width);
-
-    virtual
-    ReturnCode solve_internal(const scalar_t* b, scalar_t* x,
-                              bool use_initial_guess=false) = 0;
-    virtual
-    ReturnCode solve_internal(const DenseM_t& b, DenseM_t& x,
-                              bool use_initial_guess=false) = 0;
-
-    virtual
-    ReturnCode solve_internal(int nrhs, const scalar_t* b, int ldb,
-                              scalar_t* x, int ldx,
-                              bool use_initial_guess=false);
 
     virtual void delete_factors_internal() = 0;
   };

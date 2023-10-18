@@ -1,5 +1,6 @@
 target_sources(strumpack
   PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/HIPWrapper.hip
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKWrapper.cpp
   ${CMAKE_CURRENT_LIST_DIR}/BLASLAPACKOpenMPTask.cpp
   ${CMAKE_CURRENT_LIST_DIR}/ACA.hpp

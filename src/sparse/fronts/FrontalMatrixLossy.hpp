@@ -44,6 +44,9 @@ namespace strumpack {
       decompress(F);
       return F;
     }
+    virtual ~LossyMatrix() {
+      STRUMPACK_SUB_MEMORY(buffer_.size()*sizeof(unsigned char));
+    }
     void decompress(DenseMatrix<T>& F) const;
     std::size_t compressed_size() const { return buffer_.size(); }
     std::size_t memory() const override { return compressed_size(); }

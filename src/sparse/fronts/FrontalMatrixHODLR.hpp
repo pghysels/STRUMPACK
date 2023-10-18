@@ -86,7 +86,6 @@ namespace strumpack {
                                    const Opts_t& opts)
       const override;
 
-
     void sample_CB(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,
                    int task_depth=0) const override;
     void sample_CB_to_F11(Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa,

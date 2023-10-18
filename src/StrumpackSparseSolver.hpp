@@ -230,6 +230,10 @@ namespace strumpack {
 
     void delete_factors_internal() override;
 
+    void transform_x0(DenseM_t& x, DenseM_t& xtmp);
+    void transform_b(const DenseM_t& b, DenseM_t& bloc);
+    void transform_x(DenseM_t& x, DenseM_t& xtmp);
+
     std::unique_ptr<CSRMatrix<scalar_t,integer_t>> mat_;
     std::unique_ptr<MatrixReordering<scalar_t,integer_t>> nd_;
     std::unique_ptr<EliminationTree<scalar_t,integer_t>> tree_;
@@ -242,6 +246,7 @@ namespace strumpack {
     using SPBase_t::factored_;
     using SPBase_t::reordered_;
     using SPBase_t::Krylov_its_;
+    using SPBase_t::solve_internal;
   };
 
   template<typename scalar_t,typename integer_t>

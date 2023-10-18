@@ -552,7 +552,6 @@ namespace strumpack {
                                      const opts_t& opts,
                                      WorkCompress<scalar_t>& w,
                                      int d, int dd, int depth) override;
-      // SJLT_Matrix<scalar_t,int>* S=nullptr
       void compute_local_samples(DenseM_t& Rr, DenseM_t& Rc,
                                  DenseM_t& Sr, DenseM_t& Sc,
                                  WorkCompress<scalar_t>& w,
@@ -586,6 +585,7 @@ namespace strumpack {
                                  const opts_t& opts,
                                  WorkCompress<scalar_t>& w,
                                  int d, int dd, int lvl, int depth) override;
+
       void get_extraction_indices(std::vector<std::vector<std::size_t>>& I,
                                   std::vector<std::vector<std::size_t>>& J,
                                   const std::pair<std::size_t,std::size_t>& off,
@@ -674,6 +674,29 @@ namespace strumpack {
       friend class HSSMatrixMPI<scalar_t>;
 
       using HSSMatrixBase<scalar_t>::child;
+
+      // suppress warnigns
+      using structured::StructuredMatrix<scalar_t>::mult;
+      using structured::StructuredMatrix<scalar_t>::solve;
+      using HSSMatrixBase<scalar_t>::get_extraction_indices;
+      using HSSMatrixBase<scalar_t>::extract_D_B;
+      using HSSMatrixBase<scalar_t>::compress_recursive_ann;
+      using HSSMatrixBase<scalar_t>::compress_recursive_original;
+      using HSSMatrixBase<scalar_t>::compress_recursive_stable;
+      using HSSMatrixBase<scalar_t>::compress_level_original;
+      using HSSMatrixBase<scalar_t>::compress_level_stable;
+      using HSSMatrixBase<scalar_t>::factor_recursive;
+      using HSSMatrixBase<scalar_t>::forward_solve;
+      using HSSMatrixBase<scalar_t>::backward_solve;
+      using HSSMatrixBase<scalar_t>::apply_fwd;
+      using HSSMatrixBase<scalar_t>::apply_bwd;
+      using HSSMatrixBase<scalar_t>::applyT_fwd;
+      using HSSMatrixBase<scalar_t>::applyT_bwd;
+      using HSSMatrixBase<scalar_t>::solve_fwd;
+      using HSSMatrixBase<scalar_t>::solve_bwd;
+      using HSSMatrixBase<scalar_t>::extract_fwd;
+      using HSSMatrixBase<scalar_t>::extract_bwd;
+      using HSSMatrixBase<scalar_t>::apply_UV_big;
     };
 
     /**

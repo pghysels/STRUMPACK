@@ -57,6 +57,8 @@ namespace strumpack {
     //const unsigned int MAX_BLOCKS_X = 4294967295; // 2^31-1
     const unsigned int MAX_BLOCKS_Y = 65535;
     const unsigned int MAX_BLOCKS_Z = 65535;
+    // const unsigned int MAX_BLOCKS_Y = 8; // for debugging large cases
+    // const unsigned int MAX_BLOCKS_Z = 8;
 
 #define gpu_check(err) {                                               \
       strumpack::gpu::cuda_assert((err), __FILE__, __LINE__);          \
@@ -69,6 +71,14 @@ namespace strumpack {
                      bool abort=true);
 
     void init();
+
+    inline void peek_at_last_error() {
+      gpu_check(cudaPeekAtLastError());
+    }
+
+    inline void get_last_error() {
+      cudaGetLastError();
+    }
 
     inline void synchronize() {
       gpu_check(cudaDeviceSynchronize());

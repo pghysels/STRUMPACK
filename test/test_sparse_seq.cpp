@@ -75,9 +75,11 @@ test_sparse_solver(int argc, const char* const argv[],
   auto nrm_x_exact = blas::nrm2(N, x_exact.data(), 1);
   cout << "# RELATIVE ERROR = " << (nrm_error/nrm_x_exact) << endl;
 
-  if (comp_scal_res > ERROR_TOLERANCE*spss.options().rel_tol())
+  if (comp_scal_res > ERROR_TOLERANCE*spss.options().rel_tol()) {
+    cout << "RESIDUAL TOO LARGE!" << endl;
     return 1;
-  else return 0;
+  }
+  return 0;
 }
 
 

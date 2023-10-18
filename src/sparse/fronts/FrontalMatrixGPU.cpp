@@ -36,9 +36,6 @@
 #include "FrontalMatrixMPI.hpp"
 #include "FrontalMatrixBLRMPI.hpp"
 #endif
-#if defined(STRUMPACK_USE_MAGMA)
-#include "dense/MAGMAWrapper.hpp"
-#endif
 
 namespace strumpack {
 
@@ -140,8 +137,9 @@ namespace strumpack {
 
     void flops(long long& level_flops, long long& small_flops) {
       level_flops = small_flops = 0;
+      auto N = f.size();
 #pragma omp parallel for reduction(+: level_flops, small_flops)
-      for (std::size_t i=0; i<f.size(); i++) {
+      for (std::size_t i=0; i<N; i++) {
         auto F = f[i];
         auto flops = LU_flops(F->F11_) +
           gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
@@ -437,8 +435,8 @@ namespace strumpack {
 #pragma omp single
       rchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
     }
-    TaskTimer tl("");
-    tl.start();
+    // TaskTimer tl("");
+    // tl.start();
     if (dsep) {
       gpu::SOLVERHandle sh;
       gpu::DeviceMemory<scalar_t> dm11
@@ -447,6 +445,9 @@ namespace strumpack {
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
       gpu_check(gpu::copy_host_to_device(dF11, F11_));
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
+      if (opts.replace_tiny_pivots())
+        gpu::replace_pivots
+          (F11_.rows(), dF11.data(), opts.pivot_threshold());
       int info;
       gpu_check(gpu::copy_device_to_host(&info, dpiv+dsep, 1));
       if (info) err_code = ReturnCode::ZERO_PIVOT;
@@ -454,9 +455,6 @@ namespace strumpack {
       piv_ = pivot_mem_.data();
       gpu_check(gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep));
       gpu_check(gpu::copy_device_to_host(F11_, dF11));
-      if (opts.replace_tiny_pivots())
-        gpu::replace_pivots
-          (F11_.rows(), dF11.data(), opts.pivot_threshold());
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
@@ -481,14 +479,14 @@ namespace strumpack {
       trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
       trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
     STRUMPACK_FULL_RANK_FLOPS(level_flops);
-    if (opts.verbose()) {
-      auto level_time = tl.elapsed();
-      std::cout << "#   GPU Factorization complete, took: "
-                << level_time << " seconds, "
-                << level_flops / 1.e9 << " GFLOPS, "
-                << (float(level_flops) / level_time) / 1.e9
-                << " GFLOP/s" << std::endl;
-    }
+    // if (opts.verbose()) {
+    //   auto level_time = tl.elapsed();
+    //   std::cout << "#   GPU Factorization complete, took: "
+    //             << level_time << " seconds, "
+    //             << level_flops / 1.e9 << " GFLOPS, "
+    //             << (float(level_flops) / level_time) / 1.e9
+    //             << " GFLOP/s" << std::endl;
+    // }
     return err_code;
   }
 
@@ -497,10 +495,6 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
-#if defined(STRUMPACK_USE_MAGMA)
-    if (opts.replace_tiny_pivots())
-      magma_init();
-#endif
     const int max_streams = opts.gpu_streams();
     std::vector<gpu::SOLVERHandle> solver_handles(max_streams);
     const int lvls = this->levels();
@@ -543,10 +537,10 @@ namespace strumpack {
     gpu::DeviceMemory<char> all_dmem(peak_dmem);
     char* old_work = nullptr;
     for (int l=lvls-1; l>=0; l--) {
-      TaskTimer tl("");
-      tl.start();
+      // TaskTimer tl("");
+      // tl.start();
       auto& L = ldata[l];
-      if (opts.verbose()) L.print_info(l, lvls);
+      // if (opts.verbose()) L.print_info(l, lvls);
       try {
         char *work_mem = nullptr, *dea_mem = nullptr;
         scalar_t* dev_factors = nullptr;
@@ -630,7 +624,9 @@ namespace strumpack {
                 {
                   copy_stream.synchronize();
                   auto fc = factors_chunk[c-1];
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop //num_tasks(omp_get_num_threads()-1)
+#endif
                   for (std::size_t i=0; i<fc; i++)
                     host_factors[i] = pin[(c-1) % 2][i];
                   host_factors += fc;
@@ -696,14 +692,14 @@ namespace strumpack {
       L.flops(level_flops, small_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
-      if (opts.verbose()) {
-        auto level_time = tl.elapsed();
-        std::cout << "#   GPU Factorization complete, took: "
-                  << level_time << " seconds, "
-                  << level_flops / 1.e9 << " GFLOPS, "
-                  << (float(level_flops) / level_time) / 1.e9
-                  << " GFLOP/s" << std::endl;
-      }
+      // if (opts.verbose()) {
+      //   auto level_time = tl.elapsed();
+      //   std::cout << "#   GPU Factorization complete, took: "
+      //             << level_time << " seconds, "
+      //             << level_flops / 1.e9 << " GFLOPS, "
+      //             << (float(level_flops) / level_time) / 1.e9
+      //             << " GFLOP/s" << std::endl;
+      // }
     }
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
@@ -713,10 +709,6 @@ namespace strumpack {
                  reinterpret_cast<scalar_t*>(old_work), dupd*dupd));
       F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
     }
-#if defined(STRUMPACK_USE_MAGMA)
-    if (opts.replace_tiny_pivots())
-      magma_finalize();
-#endif
     return err_code;
   }
 

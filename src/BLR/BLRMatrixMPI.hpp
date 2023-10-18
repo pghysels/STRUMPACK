@@ -122,6 +122,7 @@ namespace strumpack {
      */
     template<typename scalar_t> class BLRMatrixMPI
       : public structured::StructuredMatrix<scalar_t> {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using DistM_t = DistributedMatrix<scalar_t>;
@@ -145,6 +146,8 @@ namespace strumpack {
       std::size_t total_memory() const;
       std::size_t total_nonzeros() const;
       std::size_t max_rank() const;
+
+      real_t normF() const;
 
       const MPIComm& Comm() const { return grid_->Comm(); }
 
@@ -178,8 +181,7 @@ namespace strumpack {
       static std::vector<int>
       partial_factor_col(BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21,
                          BLRMPI_t& F22, const adm_t& adm, const Opts_t& opts,
-                         const std::function
-                         <void(int, bool, std::size_t)>& blockcol);
+                         const std::function<void(int, bool, std::size_t)>& blockcol);
 
       void compress(const Opts_t& opts);
 
@@ -344,6 +346,14 @@ namespace strumpack {
       gather_cols(std::size_t i0, std::size_t i1,
                   std::size_t j0, std::size_t j1) const;
 
+
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      send_row_of_tiles(std::size_t src_row, std::size_t dest_row,
+                        std::size_t j0, std::size_t j1) const;
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      send_col_of_tiles(std::size_t src_col, std::size_t dest_col,
+                        std::size_t i0, std::size_t i1) const;
+
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_row(std::size_t i0, std::size_t k,
                  std::size_t j0, std::size_t j1) const;
@@ -375,6 +385,9 @@ namespace strumpack {
       void move_to_gpu(gpu::Stream& s, scalar_t* dptr, scalar_t* pinned);
       void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
 #endif
+
+      // suppress warnings
+      using structured::StructuredMatrix<scalar_t>::factor;
 
       template<typename T,typename I> friend class strumpack::ExtendAdd;
       template<typename T,typename I> friend class BLRExtendAdd;

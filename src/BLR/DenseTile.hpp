@@ -50,6 +50,7 @@ namespace strumpack {
 
     template<typename scalar_t> class DenseTile
       : public BLRTile<scalar_t> {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using BLRT_t = BLRTile<scalar_t>;
@@ -75,6 +76,12 @@ namespace strumpack {
       void dense(DenseM_t& A) const override { A = *D_; }
       DenseM_t dense() const override { return *D_; }
 
+      std::size_t subnormals() const override { return D_.subnormals(); }
+      std::size_t zeros() const override { return D_.zeros(); }
+
+
+      real_t normF() const override { return D_.normF(); }
+
       std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 
       std::unique_ptr<LRTile<scalar_t>>
@@ -90,6 +97,8 @@ namespace strumpack {
       DenseM_t& V() override { return *D_; }
       const DenseM_t& U() const override { return *D_; }
       const DenseM_t& V() const override { return *D_; }
+
+      scalar_t* copy_to(scalar_t* ptr) const override;
 
       LRTile<scalar_t>
       multiply(const BLRTile<scalar_t>& a) const override;

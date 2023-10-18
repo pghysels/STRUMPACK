@@ -67,6 +67,15 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> DistributedMatrix<scalar_t>
+  FrontalMatrixHODLRMPI<scalar_t,integer_t>::get_dense_CB() const {
+    auto dupd = dim_upd();
+    DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
+    eye.eye();
+    F22_->mult(Trans::N, eye, dF22);
+    return dF22;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {

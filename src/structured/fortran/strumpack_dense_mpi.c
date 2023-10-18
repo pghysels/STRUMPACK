@@ -187,7 +187,7 @@
 #define SWIG_ccomplex_construct(REAL, IMAG) ((REAL) + I * (IMAG))
 
 
-typedef void* CSPStructMat;
+// typedef void* CSPStructMat;
 #include "../StructuredMatrixMPI.h"
 
 #ifdef __cplusplus

@@ -37,12 +37,12 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
 #endif
+#include "sparse/SeparatorTree.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class CSRMatrix;
   template<typename scalar_t,typename integer_t> class FrontalMatrix;
-  template<typename integer_t> class SeparatorTree;
 
   template<typename scalar_t,typename integer_t> class MatrixReordering {
     using Opts_t = SPOptions<scalar_t>;

@@ -455,14 +455,14 @@ int main(int argc, char* argv[]) {
           // Define a routine to compute sub-block of the
           // matrix. Often this could be implemented more efficiently
           // than computing element per element.
-          auto Toeplitz_block =
-            [&Toeplitz](const std::vector<std::size_t>& I,
-                        const std::vector<std::size_t>& J,
-                        DenseMatrix<double>& B) {
-              for (std::size_t j=0; j<J.size(); j++)
-                for (std::size_t i=0; i<I.size(); i++)
-                  B(i, j) = Toeplitz(I[i], J[j]);
-            };
+          // auto Toeplitz_block =
+          //   [&Toeplitz](const std::vector<std::size_t>& I,
+          //               const std::vector<std::size_t>& J,
+          //               DenseMatrix<double>& B) {
+          //     for (std::size_t j=0; j<J.size(); j++)
+          //       for (std::size_t i=0; i<I.size(); i++)
+          //         B(i, j) = Toeplitz(I[i], J[j]);
+          //   };
           // TODO construction using a sub-block instead of individual
           // elements.
         }

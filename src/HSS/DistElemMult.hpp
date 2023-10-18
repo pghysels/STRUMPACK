@@ -80,8 +80,7 @@ namespace strumpack {
         assert(int(I.size()) == B.rows() && int(J.size()) == B.cols());
         for (std::size_t j=0; j<J.size(); j++)
           for (std::size_t i=0; i<I.size(); i++) {
-            assert(I[i] >= 0 && int(I[i]) < A_.rows() &&
-                   J[j] >= 0 && int(J[j]) < A_.cols());
+            assert(int(I[i]) < A_.rows() && int(J[j]) < A_.cols());
             B.global(i, j, Ag_(I[i], J[j]));
           }
       }

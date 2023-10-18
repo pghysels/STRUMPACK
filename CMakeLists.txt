@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.17)
-project(STRUMPACK VERSION 7.0.1 LANGUAGES CXX C Fortran)
+cmake_minimum_required(VERSION 3.21)
+project(STRUMPACK VERSION 7.1.4 LANGUAGES CXX C Fortran)
 cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
@@ -32,6 +32,29 @@ include(CheckCXXSourceCompiles)
 include(GNUInstallDirs)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
+
+##############################################################
+## settings for RPATH,
+## see https://gitlab.kitware.com/cmake/community/-/wikis/doc/cmake/RPATH-handling
+# use, i.e. don't skip the full RPATH for the build tree
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+
+# when building, don't use the install RPATH already
+# (but later on when installing)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_LIBDIR}")
+
+# add the automatically determined parts of the RPATH
+# which point to directories outside the build tree to the install RPATH
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# the RPATH to be used when installing, but only if it's not a system directory
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_LIBDIR}" isSystemDir)
+if("${isSystemDir}" STREQUAL "-1")
+    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_LIBDIR}")
+endif("${isSystemDir}" STREQUAL "-1")
+##############################################################
 
 # figure out Fortran/C name mangling
 include(FortranCInterface)
@@ -119,20 +142,14 @@ if(STRUMPACK_USE_HIP)
       " proceeding with CUDA support instead of HIP.")
     set(STRUMPACK_USE_HIP OFF)
   else()
-    find_package(HIP MODULE)
-    if(HIP_FOUND)
-      set(STRUMPACK_HIP_PLATFORM_HCC ON)
-      find_package(hipblas REQUIRED)
-      find_package(hipsparse REQUIRED)
-      find_package(rocsolver REQUIRED)
-      find_package(rocblas REQUIRED)
-      # find_package(rocthrust REQUIRED)
-      # find_package(rocprim REQUIRED)
-    else()
-      message(WARNING "HIP compiler not found,"
-        " proceeding without HIP support.")
-      set(STRUMPACK_USE_HIP OFF)
-    endif()
+    enable_language(HIP)
+    find_package(hip REQUIRED)
+    find_package(hipblas REQUIRED)
+    find_package(hipsparse REQUIRED)
+    find_package(rocsolver REQUIRED)
+    find_package(rocblas REQUIRED)
+    find_package(rocprim REQUIRED)
+    find_package(rocthrust REQUIRED)
   endif()
 endif()
 
@@ -143,8 +160,8 @@ if(STRUMPACK_USE_SYCL)
   # set(MKL_LINK static)
   # set(MKL_ARCH intel64)
   # set(MKL_INTERFACE lp64)   ## this doesn't work, only ilp64 works
-  set(STRUMPACK_USE_BLAS64 ON)
-  find_package(MKL REQUIRED)
+  # set(STRUMPACK_USE_BLAS64 ON)
+  # find_package(MKL REQUIRED)
 endif()
 
 
@@ -535,28 +552,33 @@ if(TPL_ENABLE_COMBBLAS)
   endif()
 endif()
 
-if(STRUMPACK_USE_HIP)
-  set_source_files_properties(
-    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-    src/dense/HIPWrapper.hip.cpp
-    PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
-  if(BUILD_SHARED_LIBS)
-    set(STATIC_OR_SHARED SHARED)
-  else()
-    set(STATIC_OR_SHARED STATIC)
-  endif()
-  hip_add_library(
-    strumpack
-    src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-    src/dense/HIPWrapper.hip.cpp
-    ${STATIC_OR_SHARED})
-else()
-  add_library(strumpack "")
-endif()
+# if(STRUMPACK_USE_HIP)
+#   set_source_files_properties(
+#     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+#     src/dense/HIPWrapper.hip.cpp
+#     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
+#   if(BUILD_SHARED_LIBS)
+#     set(STATIC_OR_SHARED SHARED)
+#   else()
+#     set(STATIC_OR_SHARED STATIC)
+#   endif()
+#   hip_add_library(
+#     strumpack
+#     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
+#     src/dense/HIPWrapper.hip.cpp
+#     ${STATIC_OR_SHARED})
+# else()
+#   add_library(strumpack "")
+# endif()
+
+add_library(strumpack "")
 
 # this is to fix a link issue for the fortran example when compiling
 # with clang
-set_property(TARGET strumpack PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_target_properties(strumpack PROPERTIES
+  VERSION "${PROJECT_VERSION}"
+  SOVERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+  POSITION_INDEPENDENT_CODE ON)
 
 
 # see https://github.com/pghysels/STRUMPACK/issues/82
@@ -618,7 +640,9 @@ if(OpenMP_FOUND)
   # if(OpenMP_Fortran_FOUND)
   #   target_link_libraries(strumpack PRIVATE OpenMP::OpenMP_Fortran)
   # endif()
-else()
+endif()
+
+if(NOT STRUMPACK_USE_OPENMP)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag(-Wno-unknown-pragmas
     COMPILER_SUPPORTS_NOPRAGMA_WARNING)
@@ -642,8 +666,7 @@ if(BLAS_FOUND)
 endif()
 
 if(MKL_FOUND)
-  target_link_libraries(strumpack PUBLIC MKL::MKL)
-  # target_link_libraries(strumpack PUBLIC MKL::MKL_DPCPP)
+  # target_link_libraries(strumpack PUBLIC MKL::MKL MKL::MKL_SYCL)
 endif()
 
 # the order is important
@@ -696,7 +719,7 @@ endif()
 
 if(hipblas_FOUND)
   target_link_libraries(strumpack PUBLIC
-    roc::hipblas roc::rocblas roc::rocsolver roc::hipsparse)
+    roc::hipblas roc::rocblas roc::rocsolver roc::hipsparse roc::rocthrust)
 endif()
 
 if(CombBLAS_FOUND)

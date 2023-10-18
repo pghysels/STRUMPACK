@@ -138,6 +138,9 @@ namespace strumpack {
     ReturnCode inertia(integer_t& neg,
                        integer_t& zero,
                        integer_t& pos) const;
+    ReturnCode subnormals(std::size_t& ns, std::size_t& nz) const;
+    ReturnCode pivot_growth(scalar_t& pgL, scalar_t& pgU) const;
+
 
     virtual std::size_t get_device_F22_worksize() {
       return dim_upd()*dim_upd();
@@ -262,8 +265,9 @@ namespace strumpack {
     void get_level_fronts(std::vector<F_t*>& ldata, int elvl, int l=0);
 
 #if defined(STRUMPACK_USE_MPI)
-    virtual
-    void multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
+    virtual void
+    multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
+
     virtual void
     forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,
                                DistM_t& bupd, DenseM_t& seqbupd,
@@ -388,6 +392,15 @@ namespace strumpack {
     virtual ReturnCode node_inertia(integer_t& neg,
                                     integer_t& zero,
                                     integer_t& pos) const {
+      return ReturnCode::INACCURATE_INERTIA;
+    }
+
+    virtual ReturnCode node_subnormals(std::size_t& ns,
+                                       std::size_t& nz) const {
+      return ReturnCode::INACCURATE_INERTIA;
+    }
+    virtual ReturnCode node_pivot_growth(scalar_t& pgL,
+                                         scalar_t& pgU) const {
       return ReturnCode::INACCURATE_INERTIA;
     }
 

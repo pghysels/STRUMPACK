@@ -60,8 +60,9 @@ namespace strumpack {
     return opts.use_gpu() &&
       (opts.compression() == CompressionType::NONE ||
        opts.compression() == CompressionType::BLR);
-#endif
+#else
     return false;
+#endif
   }
   template<typename scalar_t> bool is_HSS
   (int dsep, int dupd, bool compressed_parent,

@@ -146,10 +146,10 @@ namespace strumpack {
 
     virtual void
     fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd, int etree_level,
-                     int task_depth) const;
+                     int task_depth) const override;
     virtual void
     bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd, int etree_level,
-                     int task_depth) const;
+                     int task_depth) const override;
 
     ReturnCode matrix_inertia(const DenseM_t& F,
                               integer_t& neg,
@@ -158,11 +158,18 @@ namespace strumpack {
     virtual ReturnCode node_inertia(integer_t& neg,
                                     integer_t& zero,
                                     integer_t& pos) const override;
+    virtual ReturnCode node_subnormals(std::size_t& ns,
+                                       std::size_t& nz) const override;
+    virtual ReturnCode node_pivot_growth(scalar_t& pgL,
+                                         scalar_t& pgU) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+
+    // suppress warnings
+    using F_t::sample_CB;
   };
 
 } // end namespace strumpack

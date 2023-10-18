@@ -96,6 +96,10 @@ namespace strumpack {
                         integer_t* iorder, integer_t lo, integer_t sep_begin,
                         integer_t sep_end) const;
 
+    std::vector<std::size_t>
+    partition_K_way(int K, integer_t* order, integer_t* iorder, integer_t lo,
+                    integer_t sep_begin, integer_t sep_end) const;
+
     template<typename int_t> DenseMatrix<bool>
     admissibility(const std::vector<int_t>& tiles) const;
 

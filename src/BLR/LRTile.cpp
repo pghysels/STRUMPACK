@@ -97,6 +97,14 @@ namespace strumpack {
       V_.reset(new DenseMW_t(std::move(dV)));
     }
 
+    template<typename scalar_t> scalar_t*
+    LRTile<scalar_t>::copy_to(scalar_t* ptr) const {
+      std::copy(U().data(), U().end(), ptr);
+      ptr += U().rows()*U().cols();
+      std::copy(V().data(), V().end(), ptr);
+      return ptr + V().rows()*V().cols();
+    }
+
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
       return a.left_multiply(*this);

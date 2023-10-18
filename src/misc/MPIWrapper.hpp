@@ -84,27 +84,6 @@ namespace strumpack {
   /** return MPI datatype for C++ std::pair<int,int> */
   template<> inline MPI_Datatype mpi_type<std::pair<int,int>>() { return MPI_2INT; }
 
-  /** return MPI datatype for C++ std::pair<long int,long int> */
-  template<> inline MPI_Datatype mpi_type<std::pair<long int,long int>>() {
-    static MPI_Datatype l_l_mpi_type = MPI_DATATYPE_NULL;
-    if (l_l_mpi_type == MPI_DATATYPE_NULL) {
-      MPI_Type_contiguous
-        (2, strumpack::mpi_type<long int>(), &l_l_mpi_type);
-      MPI_Type_commit(&l_l_mpi_type);
-    }
-    return l_l_mpi_type;
-  }
-  /** return MPI datatype for C++ std::pair<long long int,long long int> */
-  template<> inline MPI_Datatype mpi_type<std::pair<long long int,long long int>>() {
-    static MPI_Datatype ll_ll_mpi_type = MPI_DATATYPE_NULL;
-    if (ll_ll_mpi_type == MPI_DATATYPE_NULL) {
-      MPI_Type_contiguous
-        (2, strumpack::mpi_type<long long int>(), &ll_ll_mpi_type);
-      MPI_Type_commit(&ll_ll_mpi_type);
-    }
-    return ll_ll_mpi_type;
-  }
-
   /**
    * \class MPIRequest
    * \brief Wrapper around an MPI_Request object.
@@ -334,6 +313,26 @@ namespace strumpack {
         (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
          buf, rsize, mpi_type<T>(), comm_);
     }
+    void all_gather(std::pair<long int,long int>* buf,
+                    std::size_t rsize) const {
+      MPI_Datatype l_l_mpi_type;
+      MPI_Type_contiguous(2, mpi_type<long int>(), &l_l_mpi_type);
+      MPI_Type_commit(&l_l_mpi_type);
+      MPI_Allgather
+        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+         buf, rsize, l_l_mpi_type, comm_);
+      MPI_Type_free(&l_l_mpi_type);
+    }
+    void all_gather(std::pair<long long int,long long int>* buf,
+                    std::size_t rsize) const {
+      MPI_Datatype ll_ll_mpi_type;
+      MPI_Type_contiguous(2, mpi_type<long long int>(), &ll_ll_mpi_type);
+      MPI_Type_commit(&ll_ll_mpi_type);
+      MPI_Allgather
+        (MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+         buf, rsize, ll_ll_mpi_type, comm_);
+      MPI_Type_free(&ll_ll_mpi_type);
+    }
 
     template<typename T>
     void all_gather_v(T* buf, const int* rcnts, const int* displs) const {
@@ -532,9 +531,8 @@ namespace strumpack {
      * only on the root process.
      */
     template<typename T> T reduce(T t, MPI_Op op) const {
-      if (is_root())
-        MPI_Reduce(MPI_IN_PLACE, &t, 1, mpi_type<T>(), op, 0, comm_);
-      else MPI_Reduce(&t, &t, 1, mpi_type<T>(), op, 0, comm_);
+      MPI_Reduce(is_root() ? MPI_IN_PLACE : &t, &t, 1,
+                 mpi_type<T>(), op, 0, comm_);
       return t;
     }
 
@@ -579,9 +577,8 @@ namespace strumpack {
      */
     template<typename T> void
     reduce(T* t, int ssize, MPI_Op op, int dest=0) const {
-      if (rank() == dest)
-        MPI_Reduce(MPI_IN_PLACE, t, ssize, mpi_type<T>(), op, dest, comm_);
-      else MPI_Reduce(t, t, ssize, mpi_type<T>(), op, dest, comm_);
+      MPI_Reduce(rank() == dest ? MPI_IN_PLACE : t, t, ssize,
+                 mpi_type<T>(), op, dest, comm_);
     }
 
     template<typename T>

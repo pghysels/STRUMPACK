@@ -291,6 +291,8 @@ namespace strumpack {
           for (std::size_t i=0; i<nloc; i++)
             C[i] /= this->matching_.C[i + mat_mpi_->begin_row()];
         x.scale_rows_real(C);
+
+        // TODO this needs to apply the (inverse) matching permutation!!
       }
     }
 
@@ -361,14 +363,14 @@ namespace strumpack {
     }; break;
     }
 
+    if (this->equil_.type == EquilibrationType::COLUMN ||
+        this->equil_.type == EquilibrationType::BOTH)
+      x.scale_rows_real(this->equil_.C.data() + mat_mpi_->begin_row());
     if (opts_.matching() != MatchingJob::NONE) {
       permute_vector(x, this->matching_.Q, mat_mpi_->dist(), comm_);
       if (opts_.matching() == MatchingJob::MAX_DIAGONAL_PRODUCT_SCALING)
         x.scale_rows_real(this->matching_.C.data() + mat_mpi_->begin_row());
     }
-    if (this->equil_.type == EquilibrationType::COLUMN ||
-        this->equil_.type == EquilibrationType::BOTH)
-      x.scale_rows_real(this->equil_.C.data() + mat_mpi_->begin_row());
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");

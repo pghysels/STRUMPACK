@@ -143,6 +143,12 @@ namespace strumpack {
     factors_on_device(const SpMat_t& A, const Opts_t& opts,
                       std::vector<LInfo_t>& ldata, std::size_t total_dmem);
 
+    void multifrontal_solve(DenseM_t& b) const override;
+#if defined(STRUMPACK_USE_MPI)
+    void multifrontal_solve(DenseM_t& bloc,
+                            DistributedMatrix<scalar_t>* bdist) const override;
+#endif
+
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const override;
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
@@ -154,6 +160,9 @@ namespace strumpack {
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+
+    // suppress warnings
+    using F_t::extend_add_to_dense;
 
     template<typename T,typename I> friend class LevelInfoMAGMA;
   };

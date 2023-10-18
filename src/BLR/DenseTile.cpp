@@ -47,6 +47,12 @@ namespace strumpack {
         (new LRTile<scalar_t>(D(), opts));
     }
 
+    template<typename scalar_t> scalar_t*
+    DenseTile<scalar_t>::copy_to(scalar_t* ptr) const {
+      std::copy(D().data(), D().end(), ptr);
+      return ptr + rows()*cols();
+    }
+
     template<typename scalar_t> LRTile<scalar_t>
     DenseTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
       return a.left_multiply(*this);

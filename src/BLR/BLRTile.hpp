@@ -56,6 +56,7 @@ namespace strumpack {
     template<typename scalar_t> class DenseTile;
 
     template<typename scalar_t> class BLRTile {
+      using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
       using DMW_t = DenseMatrixWrapper<scalar_t>;
@@ -66,13 +67,20 @@ namespace strumpack {
       virtual std::size_t rows() const = 0;
       virtual std::size_t cols() const = 0;
       virtual std::size_t rank() const = 0;
+      virtual int rank_1() const { return -1; };
 
       virtual std::size_t memory() const = 0;
       virtual std::size_t nonzeros() const = 0;
       virtual std::size_t maximum_rank() const = 0;
+
+      virtual std::size_t subnormals() const = 0;
+      virtual std::size_t zeros() const = 0;
+
       virtual bool is_low_rank() const = 0;
       virtual void dense(DenseM_t& A) const = 0;
       virtual DenseM_t dense() const = 0;
+
+      virtual real_t normF() const = 0;
 
       virtual std::unique_ptr<BLRTile<scalar_t>> clone() const = 0;
 
@@ -89,6 +97,8 @@ namespace strumpack {
       virtual const DenseM_t& D() const = 0; //{ assert(false); }
       virtual const DenseM_t& U() const = 0; //{ assert(false); }
       virtual const DenseM_t& V() const = 0; //{ assert(false); }
+
+      virtual scalar_t* copy_to(scalar_t* ptr) const = 0;
 
       virtual
       LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const = 0;

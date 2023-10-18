@@ -158,12 +158,23 @@ namespace strumpack {
     ReturnCode node_inertia(integer_t& neg,
                             integer_t& zero,
                             integer_t& pos) const override;
+    ReturnCode node_subnormals(std::size_t& ns,
+                               std::size_t& nz) const override;
 
     using F_t::lchild_;
     using F_t::rchild_;
     using FMPI_t::visit;
     using FMPI_t::grid;
     using FMPI_t::Comm;
+
+    // suppress warnings
+    using F_t::sample_CB;
+    using F_t::fwd_solve_phase2;
+    using F_t::bwd_solve_phase1; 
+    using F_t::forward_multifrontal_solve;
+    using F_t::backward_multifrontal_solve;
+    using FMPI_t::extract_CB_sub_matrix_2d;
+
     template<typename _scalar_t,typename _integer_t> friend class ExtendAdd;
   };
 

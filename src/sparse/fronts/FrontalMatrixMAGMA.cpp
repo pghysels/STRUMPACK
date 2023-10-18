@@ -53,9 +53,9 @@ namespace strumpack {
                    const SpMat_t* A=nullptr) {
       auto N = fronts.size();
       f.reserve(N);
-      std::size_t max_dsep = 0;
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FM_t*>(F));
+      std::size_t max_dsep = 0;
 #pragma omp parallel for                                                \
   reduction(max:max_dsep)                                               \
   reduction(+:factor_size,Schur_size,piv_size)                          \
@@ -157,8 +157,9 @@ namespace strumpack {
 
     void flops(long long& level_flops, long long& small_flops) {
       level_flops = small_flops = 0;
+      auto N = f.size();
 #pragma omp parallel for reduction(+: level_flops, small_flops)
-      for (std::size_t i=0; i<f.size(); i++) {
+      for (std::size_t i=0; i<N; i++) {
         auto F = f[i];
         auto flops = LU_flops(F->F11_) +
           gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
@@ -230,7 +231,7 @@ namespace strumpack {
     }
 
     // static const int FRONT_SMALL = 10000000;
-    static const int MIN_BATCH_COUNT = 8;
+    static const int MIN_BATCH_COUNT = 0;
     std::vector<FM_t*> f;
     std::size_t factor_size = 0, Schur_size = 0, piv_size = 0,
       total_upd_size = 0, work_bytes, ea_bytes,
@@ -435,10 +436,10 @@ namespace strumpack {
     dev_factors_.reset(new gpu::DeviceMemory<char>(total_factor_dmem));
     char* factors_dptr = dev_factors_->as<char>();
     for (int l=lvls-1; l>=0; l--) {
-      TaskTimer tl("");
-      tl.start();
+      // TaskTimer tl("");
+      // tl.start();
       auto& L = ldata[l];
-      if (opts.verbose()) L.print_info(l, lvls);
+      // if (opts.verbose()) L.print_info(l, lvls);
       try {
         char *work_dptr = nullptr, *ea_dptr = nullptr;
         if (l % 2) {
@@ -472,14 +473,16 @@ namespace strumpack {
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
              L.f[i]->piv_, L.dev_getrf_err+i);
-
         // TODO check error code
-        // TODO
-        // if (opts.replace_tiny_pivots())
-        //   gpu::replace_pivots
-        //     (f.dim_sep(), f.F11_.data(),
-        //      opts.pivot_threshold(), comp_stream);
-
+        if (opts.replace_tiny_pivots()) {
+          gpu::replace_pivots_vbatched
+            (blas_handle, d1, L.max_d1_small, F11, ld1,
+             opts.pivot_threshold(), Nsmall);
+          for (std::size_t i=Nsmall; i<N; i++)
+            gpu::replace_pivots
+              (L.f[i]->F11_.rows(), L.f[i]->F11_.data(),
+               opts.pivot_threshold());
+        }
         gpu::laswp_fwd_vbatched
           (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
@@ -511,14 +514,14 @@ namespace strumpack {
       L.flops(level_flops, small_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
-      if (opts.verbose()) {
-        auto level_time = tl.elapsed();
-        std::cout << "#   GPU Factorization complete, took: "
-                  << level_time << " seconds, "
-                  << level_flops / 1.e9 << " GFLOPS, "
-                  << (float(level_flops) / level_time) / 1.e9
-                  << " GFLOP/s" << std::endl;
-      }
+      // if (opts.verbose()) {
+      //   auto level_time = tl.elapsed();
+      //   std::cout << "#   GPU Factorization complete, took: "
+      //             << level_time << " seconds, "
+      //             << level_flops / 1.e9 << " GFLOPS, "
+      //             << (float(level_flops) / level_time) / 1.e9
+      //             << " GFLOP/s" << std::endl;
+      // }
     }
     return err_code;
   }
@@ -569,8 +572,8 @@ namespace strumpack {
 #pragma omp single
       rchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
     }
-    TaskTimer tl("");
-    tl.start();
+    // TaskTimer tl("");
+    // tl.start();
     if (dsep) {
       gpu::SOLVERHandle sh;
       gpu::DeviceMemory<scalar_t> dm11
@@ -580,16 +583,13 @@ namespace strumpack {
       gpu_check(gpu::copy_host_to_device(dF11, F11_));
       gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
       // TODO check return code!
+      if (opts.replace_tiny_pivots())
+        gpu::replace_pivots
+          (F11_.rows(), dF11.data(), opts.pivot_threshold());
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
       gpu_check(gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep));
       gpu_check(gpu::copy_device_to_host(F11_, dF11));
-      if (opts.replace_tiny_pivots()) {
-        auto thresh = opts.pivot_threshold();
-        for (std::size_t i=0; i<F11_.rows(); i++)
-          if (std::abs(F11_(i,i)) < thresh)
-            F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
-      }
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
@@ -614,14 +614,14 @@ namespace strumpack {
       trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
       trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
     STRUMPACK_FULL_RANK_FLOPS(level_flops);
-    if (opts.verbose()) {
-      auto level_time = tl.elapsed();
-      std::cout << "#   GPU Factorization complete, took: "
-                << level_time << " seconds, "
-                << level_flops / 1.e9 << " GFLOPS, "
-                << (float(level_flops) / level_time) / 1.e9
-                << " GFLOP/s" << std::endl;
-    }
+    // if (opts.verbose()) {
+    //   auto level_time = tl.elapsed();
+    //   std::cout << "#   GPU Factorization complete, took: "
+    //             << level_time << " seconds, "
+    //             << level_flops / 1.e9 << " GFLOPS, "
+    //             << (float(level_flops) / level_time) / 1.e9
+    //             << " GFLOP/s" << std::endl;
+    // }
     return err_code;
   }
 
@@ -711,10 +711,10 @@ namespace strumpack {
     char* old_work = nullptr;
 
     for (int l=lvls-1; l>=0; l--) {
-      TaskTimer tl("");
-      tl.start();
+      // TaskTimer tl("");
+      // tl.start();
       auto& L = ldata[l];
-      if (etree_level == 0 && opts.verbose()) L.print_info(l, lvls);
+      // if (opts.verbose()) L.print_info(l, lvls);
       try {
         char *work_mem = nullptr, *dea_mem = nullptr;
         scalar_t* dev_factors = nullptr;
@@ -751,14 +751,16 @@ namespace strumpack {
           gpu::getrf
             (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
              L.f[i]->piv_, L.dev_getrf_err+i);
-
         // TODO check error code
-        // TODO
-        // if (opts.replace_tiny_pivots())
-        //   gpu::replace_pivots
-        //     (f.dim_sep(), f.F11_.data(),
-        //      opts.pivot_threshold(), comp_stream);
-
+        if (opts.replace_tiny_pivots()) {
+          gpu::replace_pivots_vbatched
+            (blas_handle, d1, L.max_d1_small, F11, ld1,
+             opts.pivot_threshold(), Nsmall);
+          for (std::size_t i=Nsmall; i<N; i++)
+            gpu::replace_pivots
+              (L.f[i]->F11_.rows(), L.f[i]->F11_.data(),
+               opts.pivot_threshold());
+        }
         gpu::laswp_fwd_vbatched
           (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
@@ -811,14 +813,14 @@ namespace strumpack {
       L.flops(level_flops, small_flops);
       STRUMPACK_FULL_RANK_FLOPS(level_flops);
       STRUMPACK_FLOPS(small_flops);
-      if (etree_level == 0 && opts.verbose()) {
-        auto level_time = tl.elapsed();
-        std::cout << "#   GPU Factorization complete, took: "
-                  << level_time << " seconds, "
-                  << level_flops / 1.e9 << " GFLOPS, "
-                  << (float(level_flops) / level_time) / 1.e9
-                  << " GFLOP/s" << std::endl;
-      }
+      // if (opts.verbose()) {
+      //   auto level_time = tl.elapsed();
+      //   std::cout << "#   GPU Factorization complete, took: "
+      //             << level_time << " seconds, "
+      //             << level_flops / 1.e9 << " GFLOPS, "
+      //             << (float(level_flops) / level_time) / 1.e9
+      //             << " GFLOP/s" << std::endl;
+      // }
     }
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
@@ -844,10 +846,17 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& b) const {
     if (dev_factors_) gpu_solve(b);
-    else
-      // factors are not on the device, so do the solve on the CPU
+    else // factors are not on the device, solve on CPU
       FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
   }
+
+#if defined(STRUMPACK_USE_MPI)
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_solve
+  (DenseM_t& b, DistributedMatrix<scalar_t>* bdist) const {
+    multifrontal_solve(b);
+  }
+#endif
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::fwd_solve_phase2

@@ -76,9 +76,11 @@ namespace strumpack {
             (Ampi, r, indj, r_perm, c_perm, duplicate_fronts);
           auto& d = dest[j];
           auto hip = std::get<0>(d) + std::get<1>(d);
-          for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d))
-#pragma omp atomic
-            scnts[p]++;
+          for (int p=std::get<0>(d); p<hip; p+=std::get<2>(d)) {
+            auto ps = scnts.data() + p;
+#pragma omp atomic update
+            (*ps)++;
+          }
         }
       }
     }

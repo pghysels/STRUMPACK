@@ -138,6 +138,7 @@ namespace strumpack {
       void factor() override;
       void partial_factor();
       void solve(DistM_t& b) const override;
+
       void forward_solve(WorkSolveMPI<scalar_t>& w, const DistM_t& b,
                          bool partial) const override;
       void backward_solve(WorkSolveMPI<scalar_t>& w,
@@ -205,6 +206,8 @@ namespace strumpack {
 
       void delete_trailing_block() override;
       void reset() override;
+
+      const HSSFactorsMPI<scalar_t>& ULV() { return this->ULV_mpi_; }
 
     private:
       using delemw_t = typename std::function
@@ -328,6 +331,7 @@ namespace strumpack {
                          WorkCompressMPI<scalar_t>& w, int lvl);
       void extract_level(const delem_blocks_t& Aelem, const opts_t& opts,
                          WorkCompressMPI<scalar_t>& w, int lvl);
+
       void get_extraction_indices(std::vector<std::vector<std::size_t>>& I,
                                   std::vector<std::vector<std::size_t>>& J,
                                   WorkCompressMPI<scalar_t>& w,
@@ -343,6 +347,7 @@ namespace strumpack {
                                         std::vector<std::vector<std::size_t>>& I,
                                         std::vector<std::vector<std::size_t>>& J,
                                         int& before, int self, int& after);
+
       void extract_D_B(const delemw_t& Aelem,
                        const BLACSGrid* lg, const opts_t& opts,
                        WorkCompressMPI<scalar_t>& w, int lvl) override;
@@ -423,6 +428,29 @@ namespace strumpack {
       friend class DistSamples<scalar_t>;
 
       using HSSMatrixBase<scalar_t>::child;
+
+      // suppress warnings
+      using structured::StructuredMatrix<scalar_t>::mult;
+      using structured::StructuredMatrix<scalar_t>::solve;
+      using HSSMatrixBase<scalar_t>::forward_solve;
+      using HSSMatrixBase<scalar_t>::backward_solve;
+      using HSSMatrixBase<scalar_t>::compress_recursive_ann;
+      using HSSMatrixBase<scalar_t>::compress_recursive_original;
+      using HSSMatrixBase<scalar_t>::compress_recursive_stable;
+      using HSSMatrixBase<scalar_t>::compress_level_original;
+      using HSSMatrixBase<scalar_t>::compress_level_stable;
+      using HSSMatrixBase<scalar_t>::get_extraction_indices;
+      using HSSMatrixBase<scalar_t>::extract_D_B;
+      using HSSMatrixBase<scalar_t>::factor_recursive;
+      using HSSMatrixBase<scalar_t>::solve_fwd;
+      using HSSMatrixBase<scalar_t>::solve_bwd;
+      using HSSMatrixBase<scalar_t>::apply_fwd;
+      using HSSMatrixBase<scalar_t>::apply_bwd;
+      using HSSMatrixBase<scalar_t>::applyT_fwd;
+      using HSSMatrixBase<scalar_t>::applyT_bwd;
+      using HSSMatrixBase<scalar_t>::extract_fwd;
+      using HSSMatrixBase<scalar_t>::extract_bwd;
+      using HSSMatrixBase<scalar_t>::apply_UV_big;
     };
 
   } // end namespace HSS
