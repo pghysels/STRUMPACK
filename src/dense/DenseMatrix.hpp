@@ -1069,7 +1069,7 @@ namespace strumpack {
       this->ld_ = D.ld();
     }
 
-    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>& D) = delete;
+    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>& D) = default;
 
     /**
      * Constructing a DenseMatrixWrapper from a const DenseMatrix is

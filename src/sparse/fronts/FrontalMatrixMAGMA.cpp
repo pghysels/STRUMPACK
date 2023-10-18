@@ -850,14 +850,6 @@ namespace strumpack {
       FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
   }
 
-#if defined(STRUMPACK_USE_MPI)
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& b, DistributedMatrix<scalar_t>* bdist) const {
-    multifrontal_solve(b);
-  }
-#endif
-
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {

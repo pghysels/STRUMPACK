@@ -423,13 +423,6 @@ namespace strumpack {
         } else
 #endif
           {
-            auto nF11 = F11.normF();
-            auto nF12 = F12.normF();
-            auto nF21 = F21.normF();
-            auto nF = std::sqrt(nF11*nF11 + nF12*nF12 + nF21*nF21);
-            auto lopts = blr_opts;
-            lopts.set_abs_tol(lopts.abs_tol() * nF);
-#if 1
             DenseM_t F11(dsep, dsep), F12(dsep, dupd), F21(dupd, dsep);
             F11.zero(); F12.zero(); F21.zero();
             A.extract_front
@@ -445,30 +438,17 @@ namespace strumpack {
             if (rchild_)
               rchild_->extend_add_to_dense
                 (F11, F12, F21, F22_, this, task_depth);
-            if (dsep)
+            if (dsep) {
+              auto nF11 = F11.normF();
+              auto nF12 = F12.normF();
+              auto nF21 = F21.normF();
+              auto nF = std::sqrt(nF11*nF11 + nF12*nF12 + nF21*nF21);
+              auto lopts = blr_opts;
+              lopts.set_abs_tol(lopts.abs_tol() * nF);
               BLRM_t::construct_and_partial_factor
-                (F11, F12, F21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+                (F11, F12, F21, F22_, F11blr_, F12blr_, F21blr_,
                  sep_tiles_, upd_tiles_, admissibility_, lopts);
-#else
-            F11blr_ = BLRM_t
-              (F11, sep_tiles_, admissibility_, piv_, lopts);
-            F11.clear();
-            if (dupd) {
-              F12.laswp(piv_, true);
-              trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                   scalar_t(1.), F11blr_, F12, task_depth);
-              F12blr_ = BLRM_t
-                (F12, sep_tiles_, upd_tiles_, lopts);
-              F12.clear();
-              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                   scalar_t(1.), F11blr_, F21, task_depth);
-              F21blr_ = BLRM_t
-                (F21, upd_tiles_, sep_tiles_, lopts);
-              F21.clear();
-              gemm(Trans::N, Trans::N, scalar_t(-1.), F21blr_, F12blr_,
-                   scalar_t(1.), F22_, task_depth);
             }
-#endif
           }
       }
     } else { // ACA or BACA

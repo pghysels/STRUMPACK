@@ -320,7 +320,7 @@ namespace strumpack {
         else
 #endif
           piv_ = BLRMPI_t::partial_factor
-            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, lopts));
+            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, lopts);
       }
     }
     if (opts.print_compressed_front_stats()) {

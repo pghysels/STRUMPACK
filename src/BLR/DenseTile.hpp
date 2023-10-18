@@ -76,11 +76,11 @@ namespace strumpack {
       void dense(DenseM_t& A) const override { A = *D_; }
       DenseM_t dense() const override { return *D_; }
 
-      std::size_t subnormals() const override { return D_.subnormals(); }
-      std::size_t zeros() const override { return D_.zeros(); }
+      std::size_t subnormals() const override { return D_->subnormals(); }
+      std::size_t zeros() const override { return D_->zeros(); }
 
 
-      real_t normF() const override { return D_.normF(); }
+      real_t normF() const override { return D_->normF(); }
 
       std::unique_ptr<BLRTile<scalar_t>> clone() const override;
 

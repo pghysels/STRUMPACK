@@ -108,8 +108,8 @@ namespace strumpack {
       std::size_t nonzeros() const override { return (rows()+cols())*rank(); }
       std::size_t maximum_rank() const override { return U_->cols(); }
 
-      std::size_t subnormals() const override { return U_.subnormals() + V_.subnormals(); }
-      std::size_t zeros() const override { return U_.zeros() + V_.zeros(); }
+      std::size_t subnormals() const override { return U_->subnormals() + V_->subnormals(); }
+      std::size_t zeros() const override { return U_->zeros() + V_->zeros(); }
 
       void dense(DenseM_t& A) const override;
       DenseM_t dense() const override;

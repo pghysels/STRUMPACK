@@ -94,14 +94,6 @@ namespace strumpack {
     public:
       BLRMatrix() = default;
 
-      // BLRMatrix(DenseM_t& A,
-      //           const std::vector<std::size_t>& rowtiles,
-      //           const std::vector<std::size_t>& coltiles,
-      //           const Opts_t& opts);
-
-      // BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
-      //           const adm_t& admissible, const Opts_t& opts);
-
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
                 std::size_t n, const std::vector<std::size_t>& coltiles);
 
