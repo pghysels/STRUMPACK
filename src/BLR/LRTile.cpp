@@ -66,16 +66,17 @@ namespace strumpack {
           U_.reset(new DenseM_t(T.rows(), 0));
           V_.reset(new DenseM_t(0, T.cols()));
         } else {
-          T.low_rank(U(), V(), opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
-                     params::task_recursion_cutoff_level);
+          T.low_rank
+            (U(), V(), opts.rel_tol(), opts.abs_tol(), opts.max_rank(),
+             params::task_recursion_cutoff_level);
         }
       } else if (opts.low_rank_algorithm() == LowRankAlgorithm::ACA) {
         adaptive_cross_approximation<scalar_t>
           (U(), V(), T.rows(), T.cols(),
            [&](std::size_t i, std::size_t j) -> scalar_t {
-             assert(i < T.rows());
-             assert(j < T.cols());
-             return T(i, j); },
+             assert(i < T.rows() && j < T.cols());
+             return T(i, j);
+           },
            opts.rel_tol(), opts.abs_tol(), opts.max_rank());
       }
     }
@@ -84,17 +85,6 @@ namespace strumpack {
     (const DenseM_t& U, const DenseM_t& V) {
       U_.reset(new DenseM_t(U));
       V_.reset(new DenseM_t(V));
-    }
-
-    template<typename scalar_t> LRTile<scalar_t>::LRTile
-    (DenseMW_t& dU, DenseMW_t& dV) {
-      U_.reset(new DenseMW_t(dU));
-      V_.reset(new DenseMW_t(dV));
-    }
-    template<typename scalar_t> LRTile<scalar_t>::LRTile
-    (DenseMW_t&& dU, DenseMW_t&& dV) {
-      U_.reset(new DenseMW_t(std::move(dU)));
-      V_.reset(new DenseMW_t(std::move(dV)));
     }
 
     template<typename scalar_t> scalar_t*
@@ -218,8 +208,7 @@ namespace strumpack {
 
     template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
     LRTile<scalar_t>::clone() const {
-      //return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(*this));
-      return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(U(),V()));
+      return std::unique_ptr<BLRTile<scalar_t>>(new LRTile(U(), V()));
     }
 
     template<typename scalar_t> void LRTile<scalar_t>::draw

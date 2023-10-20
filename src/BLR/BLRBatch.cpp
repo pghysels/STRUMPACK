@@ -326,7 +326,7 @@ namespace strumpack {
           auto dA = AUV[i];
           DenseMW_t tU(m, rank, dA, m),
             tV(rank, n, dA+m*rank, rank);
-          tile_[i]->reset(new LRTile<scalar_t>(tU, tV));
+          *tile_[i] = LRTile<scalar_t>::create_as_wrapper(tU, tV);
           DenseMW_t dUtmp(m, rank, AUV[i+B], m),
             dVtmp(n, rank, AUV[i+2*B], n);
           gpu_check(gpu::copy_device_to_device(tU, dUtmp));

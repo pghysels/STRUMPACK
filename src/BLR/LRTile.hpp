@@ -63,12 +63,12 @@ namespace strumpack {
       using Opts_t = BLROptions<scalar_t>;
 
     public:
-      // TODO where is this used?
       LRTile();
 
       LRTile(std::size_t m, std::size_t n, std::size_t r);
 
       LRTile(const DenseM_t& T, const Opts_t& opts);
+
       /**
        * .. by extracting individual elements
        */
@@ -95,8 +95,16 @@ namespace strumpack {
              const Opts_t& opts);
 
       LRTile(const DenseM_t& U, const DenseM_t& V);
-      LRTile(DenseMW_t& dU, DenseMW_t& dV);
-      LRTile(DenseMW_t&& dU, DenseMW_t&& dV);
+
+      // LRTile(DenseMW_t& dU, DenseMW_t& dV);
+      // LRTile(DenseMW_t&& dU, DenseMW_t&& dV);
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_wrapper(DenseMW_t& U, DenseMW_t& V) {
+        auto t = std::make_unique<LRTile<scalar_t>>();
+        t->U_.reset(new DenseMW_t(U));
+        t->V_.reset(new DenseMW_t(V));
+        return t;
+      }
 
       std::size_t rows() const override { return U_->rows(); }
       std::size_t cols() const override { return V_->cols(); }

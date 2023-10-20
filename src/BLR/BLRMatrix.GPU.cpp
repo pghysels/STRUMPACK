@@ -67,8 +67,7 @@ namespace strumpack {
           auto m = tilerows(i);
           DenseMW_t Aij(m, n, dA, m), Aijtmp(m, n, Ajtmp, tileroff(i), 0);
           gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
-          block(i, j) = std::unique_ptr<DenseTile<scalar_t>>
-            (new DenseTile<scalar_t>(Aij));
+          block(i, j) = DenseTile<scalar_t>::create_as_wrapper(Aij);
           dA += m * n;
         }
       }
@@ -120,8 +119,7 @@ namespace strumpack {
         if (rank*(m+n) < m*n) {
           auto dA = tile(i, j).D().data();
           DenseMW_t tU(m, rank, dA, m), tV(rank, n, dA+m*rank, rank);
-          block(i, j) = std::unique_ptr<LRTile<scalar_t>>
-            (new LRTile<scalar_t>(tU, tV));
+          block(i, j) = LRTile<scalar_t>::create_as_wrapper(tU, tV);
           DenseMW_t dU_tmp(m, rank, dU, 0, 0), dV_tmp(n, rank, dV, 0, 0);
           gpu_check(gpu::copy_device_to_device(tU, dU_tmp));
           gpu::geam<scalar_t>

@@ -60,9 +60,13 @@ namespace strumpack {
       DenseTile() {}
       DenseTile(std::size_t m, std::size_t n) { D_.reset(new DenseM_t(m, n)); }
       DenseTile(const DenseM_t& D) { D_.reset(new DenseM_t(D)); }
-      DenseTile(const DenseMW_t& D) = delete;
-      DenseTile(DenseMW_t& D) { D_.reset(new DenseMW_t(D)); }
-      DenseTile(DenseMW_t&& D) { D_.reset(new DenseMW_t(std::move(D))); }
+
+      static std::unique_ptr<DenseTile<scalar_t>>
+      create_as_wrapper(DenseMW_t& D) {
+        auto t = std::make_unique<DenseTile<scalar_t>>();
+        t->D_.reset(new DenseMW_t(D));
+        return t;
+      }
 
       std::size_t rows() const override { return D_->rows(); }
       std::size_t cols() const override { return D_->cols(); }

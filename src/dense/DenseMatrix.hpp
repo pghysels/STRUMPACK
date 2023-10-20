@@ -1069,14 +1069,6 @@ namespace strumpack {
       this->ld_ = D.ld();
     }
 
-    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>& D) = default;
-
-    /**
-     * Constructing a DenseMatrixWrapper from a const DenseMatrix is
-     * not allowed due to const-ness.
-     */
-    DenseMatrixWrapper(const DenseMatrix<scalar_t>&) = delete;
-
     /**
      * Default move constructor.
      */
@@ -1086,6 +1078,13 @@ namespace strumpack {
       this->cols_ = D.cols();
       this->ld_ = D.ld();
     }
+
+    /**
+     * Constructing a DenseMatrixWrapper from a const DenseMatrix is
+     * not allowed due to const-ness.
+     */
+    DenseMatrixWrapper(const DenseMatrix<scalar_t>&) = delete;
+    DenseMatrixWrapper(const DenseMatrixWrapper<scalar_t>& D) = delete;
 
     /**
      * Moving from a DenseMatrix is not allowed.
