@@ -38,9 +38,6 @@
 #include "BLROptions.hpp"
 
 #include "dense/GPUWrapper.hpp"
-#if defined(STRUMPACK_USE_MAGMA)
-#include "dense/MAGMAWrapper.hpp"
-#endif
 
 namespace strumpack {
   namespace BLR {
