@@ -41,21 +41,7 @@
 #include "BLRTileBLAS.hpp" // TODO remove
 #include "structured/StructuredMatrix.hpp"
 #include "misc/Tools.hpp"
-
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#else
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#endif
-
-#if defined(STRUMPACK_USE_MAGMA)
-#include "dense/MAGMAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_KBLAS)
-#include "kblas.h"
-#endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
   namespace BLR {
@@ -113,18 +99,14 @@ namespace strumpack {
       DenseM_t dense() const;
       void dense(DenseM_t& A) const;
 
-      void compress(const DenseM_t& A,
-                    const adm_t& admissible,
+      void compress(const DenseM_t& A, const adm_t& admissible,
                     const Opts_t& opts);
-      void compress(const extract_t& Aelem,
-                    const adm_t& admissible,
+      void compress(const extract_t& Aelem, const adm_t& admissible,
                     const Opts_t& opts);
 
-      void compress_and_factor(const DenseM_t& A,
-                               const adm_t& admissible,
+      void compress_and_factor(const DenseM_t& A, const adm_t& admissible,
                                const Opts_t& opts);
-      void compress_and_factor(const extract_t& Aelem,
-                               const adm_t& admissible,
+      void compress_and_factor(const extract_t& Aelem, const adm_t& admissible,
                                const Opts_t& opts);
 
       void draw(std::ostream& of, std::size_t roff, std::size_t coff) const;
@@ -189,21 +171,17 @@ namespace strumpack {
       static void
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
                                    DenseM_t& A21, DenseM_t& A22,
-                                   BLRM_t& B11, BLRM_t& B12,
-                                   BLRM_t& B21,
+                                   BLRM_t& B11, BLRM_t& B12, BLRM_t& B21,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const Opts_t& opts);
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
       static void
       construct_and_partial_factor_gpu(DenseM_t& A11, DenseM_t& A12,
                                        DenseM_t& A21, DenseM_t& A22,
-                                       BLRMatrix<scalar_t>& B11,
-                                       std::vector<int>& piv,
-                                       BLRMatrix<scalar_t>& B12,
-                                       BLRMatrix<scalar_t>& B21,
+                                       BLRM_t& B11, BLRM_t& B12, BLRM_t& B21,
                                        const std::vector<std::size_t>& tiles1,
                                        const std::vector<std::size_t>& tiles2,
                                        const adm_t& admissible,
@@ -241,13 +219,11 @@ namespace strumpack {
                                    const BLROptions<scalar_t>& opts);
 
       static void
-      trsmLNU_gemm(const BLRM_t& F1,
-                   const BLRM_t& F2,
+      trsmLNU_gemm(const BLRM_t& F1, const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
       static void
-      gemm_trsmUNN(const BLRM_t& F1,
-                   const BLRM_t& F2,
+      gemm_trsmUNN(const BLRM_t& F1, const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
     private:
@@ -271,13 +247,11 @@ namespace strumpack {
       void create_LR_tile(std::size_t i, std::size_t j,
                           const extract_t& A, const Opts_t& opts);
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
       void create_from_column_major_gpu(DenseM_t& A, scalar_t* work);
       void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
       void move_column_to_cpu(int j, gpu::Stream& s, scalar_t* pinned);
-      void compress_tile_gpu(gpu::SOLVERHandle& handle,
-                             gpu::BLASHandle& blashandle,
-                             std::size_t i, std::size_t j,
+      void compress_tile_gpu(gpu::Handle& handle, std::size_t i, std::size_t j,
                              int* dinfo, scalar_t* work, const Opts_t& opts);
 #endif
 

@@ -36,14 +36,7 @@
 #include "StrumpackParameters.hpp"
 #include "dense/ACA.hpp"
 #include "dense/BACA.hpp"
-
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#else
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
   namespace BLR {
@@ -94,6 +87,23 @@ namespace strumpack {
       std::copy(V().data(), V().end(), ptr);
       return ptr + V().rows()*V().cols();
     }
+
+#if defined(STRUMPACK_USE_GPU)
+    template<typename scalar_t> scalar_t*
+    LRTile<scalar_t>::copy_device_to_host(scalar_t* ptr) const {
+      gpu::copy_device_to_host(ptr, U());
+      ptr += rows() * rank();
+      gpu::copy_device_to_host(ptr, V());
+      return ptr + rank() * cols();
+    }
+    template<typename scalar_t> scalar_t*
+    LRTile<scalar_t>::copy_device_to_device(scalar_t* ptr) const {
+      gpu::copy_device_to_device(ptr, U());
+      ptr += rows() * rank();
+      gpu::copy_device_to_device(ptr, V());
+      return ptr + rank() * cols();
+    }
+#endif
 
     template<typename scalar_t> LRTile<scalar_t>
     LRTile<scalar_t>::multiply(const BLRTile<scalar_t>& a) const {
@@ -245,9 +255,9 @@ namespace strumpack {
     LRTile<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
       U().laswp(piv, fwd);
     }
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     template<typename scalar_t> void
-    LRTile<scalar_t>::laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) {
+    LRTile<scalar_t>::laswp(gpu::Handle& h, int* dpiv, bool fwd) {
       gpu::laswp(h, U(), 1, U().rows(), dpiv, fwd ? 1 : -1);
     }
 
@@ -256,12 +266,12 @@ namespace strumpack {
       auto m = rows(), n = cols(), r = rank();
       DenseM_t hU(m, r), hV(r, n);
       if (!pinned) {
-        gpu_check(gpu::copy_device_to_host(hU, U()));
-        gpu_check(gpu::copy_device_to_host(hV, V()));
+        gpu::copy_device_to_host(hU, U());
+        gpu::copy_device_to_host(hV, V());
       } else {
         DenseMW_t pU(m, r, pinned, m), pV(r, n, pinned+m*r, r);
-        gpu_check(gpu::copy_device_to_host_async(pU, U(), s));
-        gpu_check(gpu::copy_device_to_host_async(pV, V(), s));
+        gpu::copy_device_to_host_async(pU, U(), s);
+        gpu::copy_device_to_host_async(pV, V(), s);
         s.synchronize();
         hU.copy(pU);
         hV.copy(pV);
@@ -277,14 +287,14 @@ namespace strumpack {
       DenseMW_t dU(m, r, dptr, m); dptr += m*r;
       DenseMW_t dV(r, n, dptr, r); dptr += r*n;
       if (!pinned) {
-        gpu_check(gpu::copy_host_to_device(dU, U()));
-        gpu_check(gpu::copy_host_to_device(dV, V()));
+        gpu::copy_host_to_device(dU, U());
+        gpu::copy_host_to_device(dV, V());
       } else {
         DenseMW_t pU(m, r, pinned, m), pV(r, n, pinned+m*r, r);
         pU.copy(U());
         pV.copy(V());
-        gpu_check(gpu::copy_host_to_device_async(dU, pU, s));
-        gpu_check(gpu::copy_host_to_device_async(dV, pV, s));
+        gpu::copy_host_to_device_async(dU, pU, s);
+        gpu::copy_host_to_device_async(dV, pV, s);
         s.synchronize();
       }
       U_.reset(new DenseMW_t(std::move(dU)));
@@ -299,9 +309,9 @@ namespace strumpack {
         (s, ul, ta, d, alpha, a, (s == Side::L) ? U() : V(),
          params::task_recursion_cutoff_level);
     }
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     template<typename scalar_t> void
-    LRTile<scalar_t>::trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul,
+    LRTile<scalar_t>::trsm_b(gpu::Handle& handle, Side s, UpLo ul,
                              Trans ta, Diag d, scalar_t alpha,
                              DenseM_t& a) {
       strumpack::gpu::trsm

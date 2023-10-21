@@ -51,8 +51,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> scalar_t*
   FrontalMatrixDense<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-    gpu_check(gpu::copy_host_to_device(dF22, F22_));
+#if defined(STRUMPACK_USE_GPU)
+    gpu::copy_host_to_device(dF22, F22_);
 #endif
     return dF22;
   }

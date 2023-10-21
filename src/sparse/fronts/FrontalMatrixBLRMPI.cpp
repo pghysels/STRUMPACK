@@ -313,7 +313,7 @@ namespace strumpack {
         auto nF = std::sqrt(nF11*nF11 + nF12*nF12 + nF21*nF21);
         auto lopts = opts.BLR_options();
         lopts.set_abs_tol(lopts.abs_tol() * nF);
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
         if (opts.use_gpu())
           piv_ = BLRMPI_t::partial_factor_gpu
             (F11blr_, F12blr_, F21blr_, F22blr_, adm_, lopts);

@@ -38,13 +38,7 @@
 #include "BLROptions.hpp"
 #include "dense/DenseMatrix.hpp"
 
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#else
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#endif
+#include "dense/GPUWrapper.hpp"
 #if defined(STRUMPACK_USE_MAGMA)
 #include "dense/MAGMAWrapper.hpp"
 #endif
@@ -96,8 +90,6 @@ namespace strumpack {
 
       LRTile(const DenseM_t& U, const DenseM_t& V);
 
-      // LRTile(DenseMW_t& dU, DenseMW_t& dV);
-      // LRTile(DenseMW_t&& dU, DenseMW_t&& dV);
       static std::unique_ptr<LRTile<scalar_t>>
       create_as_wrapper(DenseMW_t& U, DenseMW_t& V) {
         auto t = std::make_unique<LRTile<scalar_t>>();
@@ -105,6 +97,29 @@ namespace strumpack {
         t->V_.reset(new DenseMW_t(V));
         return t;
       }
+
+#if defined(STRUMPACK_USE_GPU)
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_device_wrapper_from_device_ptr
+      (scalar_t*& dptr, scalar_t*& ptr, int m, int n, int r) {
+        DenseMW_t dU(m, r, dptr, m);   dptr += m*r;
+        DenseMW_t dV(r, n, dptr, r);   dptr += n*r;
+        auto t = create_as_wrapper(dU, dV);
+        gpu::copy_device_to_device(t->U(), ptr);  ptr += m*r;
+        gpu::copy_device_to_device(t->V(), ptr);  ptr += r*n;
+        return t;
+      }
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_device_wrapper_from_host_ptr
+      (scalar_t*& dptr, scalar_t*& ptr, int m, int n, int r) {
+        DenseMW_t dU(m, r, dptr, m);   dptr += m*r;
+        DenseMW_t dV(r, n, dptr, r);   dptr += n*r;
+        auto t = create_as_wrapper(dU, dV);
+        gpu::copy_host_to_device(t->U(), ptr);  ptr += m*r;
+        gpu::copy_host_to_device(t->V(), ptr);  ptr += r*n;
+        return t;
+      }
+#endif
 
       std::size_t rows() const override { return U_->rows(); }
       std::size_t cols() const override { return V_->cols(); }
@@ -170,18 +185,21 @@ namespace strumpack {
                    DenseM_t& B) const override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) override;
+#if defined(STRUMPACK_USE_GPU)
+      void laswp(gpu::Handle& h, int* dpiv, bool fwd) override;
 
       void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) override;
       void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
                        scalar_t* pinned=nullptr) override;
+
+      scalar_t* copy_device_to_host(scalar_t* ptr) const override;
+      scalar_t* copy_device_to_device(scalar_t* ptr) const override;
 #endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul,
+#if defined(STRUMPACK_USE_GPU)
+      void trsm_b(gpu::Handle& handle, Side s, UpLo ul,
                   Trans ta, Diag d, scalar_t alpha,
                   DenseM_t& a) override;
 #endif

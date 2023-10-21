@@ -166,7 +166,7 @@ namespace strumpack {
 
       void laswp(const std::vector<int>& piv, bool fwd);
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
       static std::vector<int>
       partial_factor_gpu(BLRMPI_t& A11, BLRMPI_t& A12,
                          BLRMPI_t& A21, BLRMPI_t& A22,
@@ -325,7 +325,7 @@ namespace strumpack {
       bcast_col_of_tiles_along_rows(std::size_t i0, std::size_t i1,
                                     std::size_t j) const;
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols_gpu(std::size_t i,
                                         std::size_t j0, std::size_t j1,
@@ -381,7 +381,7 @@ namespace strumpack {
       gemm(Trans ta, Trans tb, T alpha, const BLRMatrixMPI<T>& a,
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
       void move_to_gpu(gpu::Stream& s, scalar_t* dptr, scalar_t* pinned);
       void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
 #endif

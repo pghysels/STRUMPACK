@@ -37,13 +37,7 @@
 #include "BLRTileBLAS.hpp"
 #include "BLRBatch.hpp"
 
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-
+#include "dense/GPUWrapper.hpp"
 #include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
 
 namespace strumpack {
@@ -62,11 +56,11 @@ namespace strumpack {
         auto n = tilecols(j);
         DenseMW_t Aj(rows(), n, A, 0, tilecoff(j)),
           Ajtmp(rows(), n, work, rows());
-        gpu_check(gpu::copy_device_to_device(Ajtmp, Aj));
+        gpu::copy_device_to_device(Ajtmp, Aj);
         for (std::size_t i=0; i<rowblocks(); i++) {
           auto m = tilerows(i);
           DenseMW_t Aij(m, n, dA, m), Aijtmp(m, n, Ajtmp, tileroff(i), 0);
-          gpu_check(gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp));
+          gpu::copy_device_to_device<scalar_t>(Aij, Aijtmp);
           block(i, j) = DenseTile<scalar_t>::create_as_wrapper(Aij);
           dA += m * n;
         }
@@ -89,8 +83,7 @@ namespace strumpack {
      */
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::compress_tile_gpu
-    (gpu::SOLVERHandle& handle, gpu::BLASHandle& blashandle,
-     std::size_t i, std::size_t j, int* info,
+    (gpu::Handle& handle, std::size_t i, std::size_t j, int* info,
      scalar_t* work, const Opts_t& opts) {
       auto m = tilerows(i), n = tilecols(j);
       if (m != 0 && n != 0) {
@@ -103,7 +96,7 @@ namespace strumpack {
         auto dAmem = dVmem + n*minmn;
         auto svd_work = dAmem + m*n;
         DenseMW_t Atmp(m, n, dAmem, m);
-        gpu_check(gpu::copy_device_to_device(Atmp, A));
+        gpu::copy_device_to_device(Atmp, A);
         DenseMW_t dU(m, minmn, dUmem, m), dV(n, minmn, dVmem, n);
         std::vector<real_t> h_sval_real(minmn);
         const double tol = opts.rel_tol();
@@ -112,8 +105,7 @@ namespace strumpack {
         gpu::gesvdj<scalar_t>
           (handle, Jobz::V, Atmp, d_sval_real, dU, dV, info,
            svd_work, lwork, tol);
-        gpu_check(gpu::copy_device_to_host
-                  (h_sval_real.data(), d_sval_real, minmn));
+        gpu::copy_device_to_host(h_sval_real.data(), d_sval_real, minmn);
         std::size_t rank = 0;
         while (rank < minmn && h_sval_real[rank] >= tol) rank++;
         if (rank*(m+n) < m*n) {
@@ -121,39 +113,34 @@ namespace strumpack {
           DenseMW_t tU(m, rank, dA, m), tV(rank, n, dA+m*rank, rank);
           block(i, j) = LRTile<scalar_t>::create_as_wrapper(tU, tV);
           DenseMW_t dU_tmp(m, rank, dU, 0, 0), dV_tmp(n, rank, dV, 0, 0);
-          gpu_check(gpu::copy_device_to_device(tU, dU_tmp));
+          gpu::copy_device_to_device(tU, dU_tmp);
           gpu::geam<scalar_t>
-            (blashandle, Trans::C, Trans::N, 1., dV_tmp, 0., dV_tmp, tV);
-          gpu_check(gpu::copy_real_to_scalar<scalar_t>
-                    (d_sval_scalar, d_sval_real, rank));
-          gpu::dgmm(blashandle, Side::L, tV, d_sval_scalar, tV);
+            (handle, Trans::C, Trans::N, 1., dV_tmp, 0., dV_tmp, tV);
+          gpu::copy_real_to_scalar<scalar_t>(d_sval_scalar, d_sval_real, rank);
+          gpu::dgmm(handle, Side::L, tV, d_sval_scalar, tV);
         }
       }
     }
 
     template<typename scalar_t> void
     BLRMatrix<scalar_t>::construct_and_partial_factor_gpu
-    (DenseMatrix<scalar_t>& A11, DenseMatrix<scalar_t>& A12,
-     DenseMatrix<scalar_t>& A21, DenseMatrix<scalar_t>& A22,
-     BLRMatrix<scalar_t>& B11, std::vector<int>& piv,
-     BLRMatrix<scalar_t>& B12, BLRMatrix<scalar_t>& B21,
+    (DenseM_t& A11, DenseM_t& A12, DenseM_t& A21, DenseM_t& A22,
+     BLRM_t& B11, BLRM_t& B12, BLRM_t& B21,
      const std::vector<std::size_t>& tiles1,
      const std::vector<std::size_t>& tiles2,
      const DenseMatrix<bool>& admissible,
      VectorPool<scalar_t>& workspace, const Opts_t& opts) {
-      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
+      // using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       auto dsep = A11.rows();
       auto dupd = A12.cols();
-      B11 = BLRMatrix<scalar_t>(dsep, tiles1, dsep, tiles1);
-      B12 = BLRMatrix<scalar_t>(dsep, tiles1, dupd, tiles2);
-      B21 = BLRMatrix<scalar_t>(dupd, tiles2, dsep, tiles1);
-      piv.resize(dsep);
+      B11 = BLRM_t(dsep, tiles1, dsep, tiles1);
+      B12 = BLRM_t(dsep, tiles1, dupd, tiles2);
+      B21 = BLRM_t(dupd, tiles2, dsep, tiles1);
+      B11.piv_.resize(dsep);
       auto rb = B11.rowblocks();
       auto rb2 = B21.rowblocks();
       gpu::Stream copy_stream, comp_stream;
-      gpu::BLASHandle handle(comp_stream);
-      gpu::SOLVERHandle solve_handle(comp_stream),
-        solve_handle2(copy_stream);
+      gpu::Handle handle(comp_stream), handle2(copy_stream);
 
       int max_batchcount = std::pow(rb-1+rb2, 2); // Schur GEMM
       max_batchcount = std::max(int(2*(rb+rb2-1)), max_batchcount); // ARA, TRSM
@@ -175,14 +162,14 @@ namespace strumpack {
         for (std::size_t j=0; j<rb; j++)
           compress_lwork =
             std::max(compress_lwork, gpu::gesvdj_buffersize<scalar_t>
-                     (solve_handle, Jobz::V, B11.tilerows(i), B11.tilecols(j)));
+                     (handle, Jobz::V, B11.tilerows(i), B11.tilecols(j)));
         for (std::size_t j=0; j<rb2; j++) {
           compress_lwork =
             std::max(compress_lwork, gpu::gesvdj_buffersize<scalar_t>
-                     (solve_handle, Jobz::V, B11.tilerows(i), B12.tilecols(j)));
+                     (handle, Jobz::V, B11.tilerows(i), B12.tilecols(j)));
           compress_lwork =
             std::max(compress_lwork, gpu::gesvdj_buffersize<scalar_t>
-                     (solve_handle, Jobz::V, B21.tilerows(j), B11.tilecols(i)));
+                     (handle, Jobz::V, B21.tilerows(j), B11.tilecols(i)));
         }
       }
       // not needed when doing batched ARA
@@ -191,7 +178,7 @@ namespace strumpack {
 #endif
 
       int getrf_work_size =
-        gpu::getrf_buffersize<scalar_t>(solve_handle, max_m1);
+        gpu::getrf_buffersize<scalar_t>(handle, max_m1);
       auto d_batch_meta = VBatchedGEMM<scalar_t>::dwork_bytes(max_batchcount);
 
       // TODO KBLAS
@@ -216,7 +203,8 @@ namespace strumpack {
       B21.create_from_column_major_gpu(A21, temp_col);
 
       for (std::size_t i=0; i<rb; i++) {
-        gpu::getrf(solve_handle2, B11.tile(i, i).D(),
+        // TODO why handle2?
+        gpu::getrf(handle2, B11.tile(i, i).D(),
                    d_work_mem, dpiv+B11.tileroff(i), dinfo);
 
 #if defined(STRUMPACK_USE_KBLAS)
@@ -233,17 +221,13 @@ namespace strumpack {
 #else
         for (std::size_t j=i+1; j<rb; j++) {
           if (admissible(i, j))
-            B11.compress_tile_gpu
-              (solve_handle, handle, i, j, dinfo, d_work_mem, opts);
+            B11.compress_tile_gpu(handle, i, j, dinfo, d_work_mem, opts);
           if (admissible(j, i))
-            B11.compress_tile_gpu
-              (solve_handle, handle, j, i, dinfo, d_work_mem, opts);
+            B11.compress_tile_gpu(handle, j, i, dinfo, d_work_mem, opts);
         }
         for (std::size_t j=0; j<rb2; j++) {
-          B12.compress_tile_gpu
-            (solve_handle, handle, i, j, dinfo, d_work_mem, opts);
-          B21.compress_tile_gpu
-            (solve_handle, handle, j, i, dinfo, d_work_mem, opts);
+          B12.compress_tile_gpu(handle, i, j, dinfo, d_work_mem, opts);
+          B21.compress_tile_gpu(handle, j, i, dinfo, d_work_mem, opts);
         }
 #endif
         copy_stream.synchronize(); // stream used for getrf
@@ -351,10 +335,10 @@ namespace strumpack {
           B21.tile(j, rb-1).move_to_cpu
             (copy_stream, pinned+B21.tileroff(j)*B21.tilerows(rb-1));
       }
-      gpu::copy_device_to_host(piv.data(), dpiv, dsep);
+      gpu::copy_device_to_host(B11.piv_.data(), dpiv, dsep);
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
-          piv[l] += B11.tileroff(i);
+          B11.piv_[l] += B11.tileroff(i);
       workspace.restore(pinned);
       workspace.restore(d_batch_matrix_mem);
       workspace.restore(dmem);

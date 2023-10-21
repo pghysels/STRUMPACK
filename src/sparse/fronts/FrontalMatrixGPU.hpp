@@ -30,16 +30,7 @@
 #define FRONTAL_MATRIX_GPU_HPP
 
 #include "FrontalMatrixDense.hpp"
-
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-#include "dense/DPCPPWrapper.hpp"
-#endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 

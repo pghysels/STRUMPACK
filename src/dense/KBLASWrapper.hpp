@@ -29,100 +29,29 @@
 #ifndef STRUMPACK_KBLAS_WRAPPER_HPP
 #define STRUMPACK_KBLAS_WRAPPER_HPP
 
-#include <cmath>
-#include <complex>
-#include <iostream>
-#include <cassert>
-#include <memory>
-
-#include "DenseMatrix.hpp"
-#include "CUDAWrapper.hpp"
-
-#include "kblas.h"
-#include "kblas_operators.h"
-#include "batch_ara.h"
-#include "kblas_defs.h"
+#include "GPUWrapper.hpp"
+#if defined(STRUMPACK_USE_CUDA)
+#include "CUDAWrapper.hpp" // for get_kblas_handle and get_kblas_rand_state
+#endif
+#if defined(STRUMPACK_USE_HIP)
+#include "HIPWrapper.hpp"
+#endif
 
 namespace strumpack {
   namespace gpu {
     namespace kblas {
 
       template<typename scalar_t> void
-      ara_workspace(BLASHandle& handle,
-                    int blocksize, int batchcount) {
-        kblas_ara_batch_wsquery<scalar_t>(handle, blocksize, batchcount);
-        kblasAllocateWorkspace(handle);
-      }
-      template<> void
-      ara_workspace<std::complex<float>>(BLASHandle& handle,
-                                         int blocksize, int batchcount) {
-        kblas_ara_batch_wsquery<cuComplex>(handle, blocksize, batchcount);
-        kblasAllocateWorkspace(handle);
-      }
-      template<> void
-      ara_workspace<std::complex<double>>(BLASHandle& handle,
-                                          int blocksize, int batchcount) {
-        kblas_ara_batch_wsquery<cuDoubleComplex>
-          (handle, blocksize, batchcount);
-        kblasAllocateWorkspace(handle);
-      }
+      ara_workspace(Handle& handle, int blocksize, int batchcount);
 
-      void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
-               float** M_batch, int* ldm_batch,
-               float** A_batch, int* lda_batch,
-               float** B_batch, int* ldb_batch,
-               int* ranks_batch, float tol,
-               int max_rows, int max_cols, int* max_rank,
-               int bs, int r, int* info, int relative, int num_ops) {
-        kblas_sara_batch
-          (handle, rows_batch, cols_batch, M_batch, ldm_batch,
-           A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r, info,
-           handle.kblas_rand_state(), relative, num_ops);
-      }
-      void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
-               double** M_batch, int* ldm_batch,
-               double** A_batch, int* lda_batch,
-               double** B_batch, int* ldb_batch,
-               int* ranks_batch, double tol,
-               int max_rows, int max_cols, int* max_rank,
-               int bs, int r, int* info, int relative, int num_ops) {
-        kblas_dara_batch
-          (handle, rows_batch, cols_batch, M_batch, ldm_batch,
-           A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r, info,
-           handle.kblas_rand_state(), relative, num_ops);
-      }
-      void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
-               std::complex<float>** M_batch, int* ldm_batch,
-               std::complex<float>** A_batch, int* lda_batch,
-               std::complex<float>** B_batch, int* ldb_batch,
-               int* ranks_batch, float tol,
-               int max_rows, int max_cols, int* max_rank,
-               int bs, int r, int* info, int relative, int num_ops) {
-        kblas_cara_batch
-          (handle, rows_batch, cols_batch,
-           (cuComplex**)M_batch, ldm_batch,
-           (cuComplex**)A_batch, lda_batch,
-           (cuComplex**)B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r, info,
-           handle.kblas_rand_state(), relative, num_ops);
-      }
-      void ara(BLASHandle& handle, int* rows_batch, int* cols_batch,
-               std::complex<double>** M_batch, int* ldm_batch,
-               std::complex<double>** A_batch, int* lda_batch,
-               std::complex<double>** B_batch, int* ldb_batch,
-               int* ranks_batch, double tol,
-               int max_rows, int max_cols, int* max_rank,
-               int bs, int r, int* info, int relative, int num_ops) {
-        kblas_zara_batch
-          (handle, rows_batch, cols_batch,
-           (cuDoubleComplex**)M_batch, ldm_batch,
-           (cuDoubleComplex**)A_batch, lda_batch,
-           (cuDoubleComplex**)B_batch, ldb_batch, ranks_batch,
-           tol, max_rows, max_cols, max_rank, bs, r, info,
-           handle.kblas_rand_state(), relative, num_ops);
-      }
+      template<typename scalar_t,
+               typename real_t=typename RealType<scalar_t>::value_type>
+      void ara(Handle& handle, int* rows_batch, int* cols_batch,
+               scalar_t** M_batch, int* ldm_batch,
+               scalar_t** A_batch, int* lda_batch,
+               scalar_t** B_batch, int* ldb_batch, int* ranks_batch,
+               real_t tol, int max_rows, int max_cols, int* max_rank,
+               int bs, int r, int* info, int relative, int num_ops);
 
     } // end namespace kblas
   } // end namespace gpu

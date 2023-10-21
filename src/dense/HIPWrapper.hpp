@@ -39,8 +39,6 @@
 #include <hipblas/hipblas.h>
 #include <rocsolver/rocsolver.h>
 
-#include "DenseMatrix.hpp"
-
 namespace strumpack {
   namespace gpu {
 
@@ -153,60 +151,60 @@ namespace strumpack {
                             hipMemcpyHostToDevice, s);
     }
 
-    template<typename T> hipError_t
-    copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
-      assert(d.rows() == h.rows() && d.cols() == h.cols());
-      assert(d.rows() == d.ld() && h.rows() == h.ld());
-      return copy_device_to_host
-        (h.data(), d.data(), std::size_t(d.rows())*d.cols());
-    }
-    template<typename T> hipError_t
-    copy_device_to_host(DenseMatrix<T>& h, const T* d) {
-      assert(h.rows() == h.ld());
-      return copy_device_to_host
-        (h.data(), d, std::size_t(h.rows())*h.cols());
-    }
-    template<typename T> hipError_t
-    copy_device_to_host(T* h, const DenseMatrix<T>& d) {
-      assert(d.rows() == d.ld());
-      return copy_device_to_host
-        (h, d.data(), std::size_t(d.rows())*d.cols());
-    }
-    template<typename T> hipError_t
-    copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
-      assert(d.rows() == h.rows() && d.cols() == h.cols());
-      assert(d.rows() == d.ld() && h.rows() == h.ld());
-      return copy_host_to_device
-        (d.data(), h.data(), std::size_t(d.rows())*d.cols());
-    }
-    template<typename T> hipError_t
-    copy_host_to_device(DenseMatrix<T>& d, const T* h) {
-      assert(d.rows() == d.ld());
-      return copy_host_to_device
-        (d.data(), h, std::size_t(d.rows())*d.cols());
-    }
-    template<typename T> hipError_t
-    copy_host_to_device(T* d, const DenseMatrix<T>& h) {
-      assert(h.rows() == h.ld());
-      return copy_host_to_device
-        (d, h.data(), std::size_t(h.rows())*h.cols());
-    }
-    template<typename T> hipError_t
-    copy_host_to_device_async(T* d, const DenseMatrix<T>& h,
-                              const Stream& s) {
-      if (!h.rows() || !h.cols()) return hipSuccess;
-      assert(h.rows() == h.ld());
-      return copy_host_to_device_async
-        (d, h.data(), h.rows()*h.cols(), s);
-    }
-    template<typename T> hipError_t
-    copy_host_to_device_async(DenseMatrix<T>& d, const T* h,
-                              const Stream& s) {
-      if (!d.rows() || !d.cols()) return hipSuccess;
-      assert(d.rows() == d.ld());
-      return copy_host_to_device_async
-        (d.data(), h, d.rows()*d.cols(), s);
-    }
+    // template<typename T> hipError_t
+    // copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
+    //   assert(d.rows() == h.rows() && d.cols() == h.cols());
+    //   assert(d.rows() == d.ld() && h.rows() == h.ld());
+    //   return copy_device_to_host
+    //     (h.data(), d.data(), std::size_t(d.rows())*d.cols());
+    // }
+    // template<typename T> hipError_t
+    // copy_device_to_host(DenseMatrix<T>& h, const T* d) {
+    //   assert(h.rows() == h.ld());
+    //   return copy_device_to_host
+    //     (h.data(), d, std::size_t(h.rows())*h.cols());
+    // }
+    // template<typename T> hipError_t
+    // copy_device_to_host(T* h, const DenseMatrix<T>& d) {
+    //   assert(d.rows() == d.ld());
+    //   return copy_device_to_host
+    //     (h, d.data(), std::size_t(d.rows())*d.cols());
+    // }
+    // template<typename T> hipError_t
+    // copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
+    //   assert(d.rows() == h.rows() && d.cols() == h.cols());
+    //   assert(d.rows() == d.ld() && h.rows() == h.ld());
+    //   return copy_host_to_device
+    //     (d.data(), h.data(), std::size_t(d.rows())*d.cols());
+    // }
+    // template<typename T> hipError_t
+    // copy_host_to_device(DenseMatrix<T>& d, const T* h) {
+    //   assert(d.rows() == d.ld());
+    //   return copy_host_to_device
+    //     (d.data(), h, std::size_t(d.rows())*d.cols());
+    // }
+    // template<typename T> hipError_t
+    // copy_host_to_device(T* d, const DenseMatrix<T>& h) {
+    //   assert(h.rows() == h.ld());
+    //   return copy_host_to_device
+    //     (d, h.data(), std::size_t(h.rows())*h.cols());
+    // }
+    // template<typename T> hipError_t
+    // copy_host_to_device_async(T* d, const DenseMatrix<T>& h,
+    //                           const Stream& s) {
+    //   if (!h.rows() || !h.cols()) return hipSuccess;
+    //   assert(h.rows() == h.ld());
+    //   return copy_host_to_device_async
+    //     (d, h.data(), h.rows()*h.cols(), s);
+    // }
+    // template<typename T> hipError_t
+    // copy_host_to_device_async(DenseMatrix<T>& d, const T* h,
+    //                           const Stream& s) {
+    //   if (!d.rows() || !d.cols()) return hipSuccess;
+    //   assert(d.rows() == d.ld());
+    //   return copy_host_to_device_async
+    //     (d.data(), h, d.rows()*d.cols(), s);
+    // }
 
     template<typename T> hipError_t
     copy_device_to_device(T* d1ptr, const T* d2ptr, std::size_t count) {
@@ -216,7 +214,7 @@ namespace strumpack {
     template<typename T> hipError_t
     copy_device_to_device(DenseMatrix<T>& d1,
                           const DenseMatrix<T>& d2) {
-      if (!d1.rows() || !d1.cols()) return;
+      if (!d1.rows() || !d1.cols()) return hipSuccess;
       assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
       if (d1.rows() != d1.ld() || d2.rows() != d2.ld()) {
         return hipMemcpy2D
@@ -381,22 +379,22 @@ namespace strumpack {
       bool is_managed_ = false;
     };
 
-    template<typename scalar_t>
-    int getrf_buffersize(SOLVERHandle& handle, int n);
+    // template<typename scalar_t>
+    // int getrf_buffersize(SOLVERHandle& handle, int n);
 
-    template<typename scalar_t> void
-    getrf(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
-          scalar_t* Workspace, int* devIpiv, int* devInfo);
+    // template<typename scalar_t> void
+    // getrf(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
+    //       scalar_t* Workspace, int* devIpiv, int* devInfo);
 
-    template<typename scalar_t> void
-    getrs(SOLVERHandle& handle, Trans trans,
-          const DenseMatrix<scalar_t>& A, const int* devIpiv,
-          DenseMatrix<scalar_t>& B, int *devInfo);
+    // template<typename scalar_t> void
+    // getrs(SOLVERHandle& handle, Trans trans,
+    //       const DenseMatrix<scalar_t>& A, const int* devIpiv,
+    //       DenseMatrix<scalar_t>& B, int *devInfo);
 
-    template<typename scalar_t> void
-    trsm(BLASHandle& handle, Side side, UpLo uplo,
-         Trans trans, Diag diag, const scalar_t alpha,
-         DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
+    // template<typename scalar_t> void
+    // trsm(BLASHandle& handle, Side side, UpLo uplo,
+    //      Trans trans, Diag diag, const scalar_t alpha,
+    //      DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
 
     /*template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> int
@@ -410,11 +408,11 @@ namespace strumpack {
            DenseMatrix<scalar_t>& V, scalar_t* Workspace,
            int Lwork, int* devInfo, hipsolverGesvdjInfo_t params);*/
 
-    template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type> void
-    gesvd(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, real_t* d_S,
-          DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
-          real_t* E, int* devInfo);
+    // template<typename scalar_t,
+    //          typename real_t=typename RealType<scalar_t>::value_type> void
+    // gesvd(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, real_t* d_S,
+    //       DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
+    //       real_t* E, int* devInfo);
 
     template<typename scalar_t,
              typename real_t=typename RealType<scalar_t>::value_type> void
@@ -422,36 +420,36 @@ namespace strumpack {
               DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
               int* devInfo);
 
-    template<typename scalar_t> void
-    geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
-         const DenseMatrix<scalar_t>& A, const scalar_t beta,
-         const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C);
+    // template<typename scalar_t> void
+    // geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
+    //      const DenseMatrix<scalar_t>& A, const scalar_t beta,
+    //      const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C);
 
-    template<typename scalar_t> void
-    dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
-         const scalar_t* x, DenseMatrix<scalar_t>& C);
+    // template<typename scalar_t> void
+    // dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
+    //      const scalar_t* x, DenseMatrix<scalar_t>& C);
 
-    template<typename scalar_t> void
-    gemm(BLASHandle& handle, Trans ta, Trans tb,
-         scalar_t alpha, const DenseMatrix<scalar_t>& a,
-         const DenseMatrix<scalar_t>& b, scalar_t beta,
-         DenseMatrix<scalar_t>& c);
+    // template<typename scalar_t> void
+    // gemm(BLASHandle& handle, Trans ta, Trans tb,
+    //      scalar_t alpha, const DenseMatrix<scalar_t>& a,
+    //      const DenseMatrix<scalar_t>& b, scalar_t beta,
+    //      DenseMatrix<scalar_t>& c);
 
-    template<typename scalar_t> void
-    gemv(BLASHandle& handle, Trans ta,
-         scalar_t alpha, const DenseMatrix<scalar_t>& a,
-         const DenseMatrix<scalar_t>& x, scalar_t beta,
-         DenseMatrix<scalar_t>& y);
+    // template<typename scalar_t> void
+    // gemv(BLASHandle& handle, Trans ta,
+    //      scalar_t alpha, const DenseMatrix<scalar_t>& a,
+    //      const DenseMatrix<scalar_t>& x, scalar_t beta,
+    //      DenseMatrix<scalar_t>& y);
 
-    template<typename scalar_t> void
-    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
-          int k1, int k2, int* ipiv, int inc);
+    // template<typename scalar_t> void
+    // laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
+    //       int k1, int k2, int* ipiv, int inc);
 
-    // assume inc = 1
-    template<typename scalar_t> void
-    laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
-                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
-                       unsigned int batchCount);
+    // // assume inc = 1
+    // template<typename scalar_t> void
+    // laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
+    //                    scalar_t** dA, int* lddA, int** dipiv, int* npivots,
+    //                    unsigned int batchCount);
 
   } // end namespace gpu
 } // end namespace strumpack

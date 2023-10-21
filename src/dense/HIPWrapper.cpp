@@ -26,14 +26,15 @@
  *             Division).
  *
  */
-#include <hip/hip_runtime.h>
-#include "HIPWrapper.hpp"
+#include "GPUWrapper.hpp"
 #if defined(STRUMPACK_USE_MAGMA)
 #include "MAGMAWrapper.hpp"
 #endif
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
 #endif
+
+#include <hip/hip_runtime.h>
 
 namespace strumpack {
   namespace gpu {
@@ -781,27 +782,27 @@ namespace strumpack {
                       reinterpret_cast<const hipblasDoubleComplex*>(x), incx,
                       reinterpret_cast<hipblasDoubleComplex*>(C), ldc));
     }
-    
+
     template<typename scalar_t> void
     dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
          const scalar_t* x, DenseMatrix<scalar_t>& C){
-      int incx = 1;
-      dgmm(handle, S2hipOp(side), A.rows(), A.cols(), A.data(), A.ld(), x, incx,
-           C.data(), C.ld());
+      dgmm(handle, S2hipOp(side), A.rows(), A.cols(),
+           A.data(), A.ld(), x, 1, C.data(), C.ld());
     }
 
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<float>&, 
-                       const float*, DenseMatrix<float>&);
+    template void
+    dgmm(BLASHandle&, Side, const DenseMatrix<float>&,
+         const float*, DenseMatrix<float>&);
+    template void
+    dgmm(BLASHandle&, Side, const DenseMatrix<double>&,
+         const double*, DenseMatrix<double>&);
+    template void
+    dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<float>>&,
+         const std::complex<float>*, DenseMatrix<std::complex<float>>&);
+    template void
+    dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<double>>&,
+         const std::complex<double>*, DenseMatrix<std::complex<double>>&);
 
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<double>&, 
-                       const double*, DenseMatrix<double>&);
-
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<float>>&, 
-                       const std::complex<float>*, DenseMatrix<std::complex<float>>&);
-
-    template void dgmm(BLASHandle&, Side, const DenseMatrix<std::complex<double>>&, 
-                       const std::complex<double>*, DenseMatrix<std::complex<double>>&);
-    
     void gemv(BLASHandle& handle, hipblasOperation_t transa,
               int m, int n, float alpha,
               const float* A, int lda, const float* B, int incb,

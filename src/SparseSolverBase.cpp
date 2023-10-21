@@ -37,16 +37,7 @@
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
 #include "iterative/IterativeSolvers.hpp"
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-#include "dense/DPCPPWrapper.hpp"
-#endif
-
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
@@ -85,11 +76,8 @@ namespace strumpack {
       params::task_recursion_cutoff_level =
         std::log2(params::num_threads) + 3;
     opts_.HSS_options().set_synchronized_compression(true);
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     if (opts_.use_gpu()) gpu::init();
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-    if (opts_.use_gpu()) dpcpp::init();
 #endif
   }
 

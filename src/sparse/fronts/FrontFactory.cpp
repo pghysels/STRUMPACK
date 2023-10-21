@@ -49,7 +49,7 @@
 #if defined(STRUMPACK_USE_MAGMA)
 #include "FrontalMatrixMAGMA.hpp"
 #endif
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
 #include "FrontalMatrixGPU.hpp"
 #endif
 #if defined(STRUMPACK_USE_SYCL)
@@ -160,7 +160,7 @@ namespace strumpack {
         front.reset
           (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
 #else
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
         front.reset
           (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
 #endif

@@ -126,11 +126,10 @@ namespace strumpack {
   private:
     BLRM_t F11blr_, F12blr_, F21blr_, F22blr_;
     DenseMW_t F22_;
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     gpu::DeviceMemory<char> CBdev_;
 #endif
     std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
-    std::vector<int> piv_;
     std::vector<std::size_t> sep_tiles_, upd_tiles_;
     DenseMatrix<bool> admissibility_;
 

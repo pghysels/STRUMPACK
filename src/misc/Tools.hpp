@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef TOOLS_H
-#define TOOLS_H
+#ifndef STRUMPACK_TOOLS_HPP
+#define STRUMPACK_TOOLS_HPP
 
 #include <vector>
 #include <iomanip>
@@ -37,14 +37,7 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "MPIWrapper.hpp"
 #endif
-
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#else
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
@@ -119,7 +112,7 @@ namespace strumpack {
       data_.push_back(std::move(v));
     }
 
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     gpu::HostMemory<scalar_t> get_pinned(std::size_t s=0) {
       if (pinned_data_.empty() || s == 0)
         return gpu::HostMemory<scalar_t>(s);
@@ -218,7 +211,7 @@ namespace strumpack {
 
   private:
     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     // std::vector<gpu::DeviceMemory<scalar_t>> device_data_;
     std::vector<gpu::DeviceMemory<char>> device_bytes_;
     std::vector<gpu::HostMemory<scalar_t>> pinned_data_;
@@ -255,7 +248,7 @@ namespace strumpack {
   }
 
   template<class T> std::string number_format_with_commas(T value) {
-    struct Numpunct: public std::numpunct<char>{
+    struct Numpunct : public std::numpunct<char>{
     protected:
       virtual char do_thousands_sep() const{return ',';}
       virtual std::string do_grouping() const{return "\03";}
@@ -268,4 +261,4 @@ namespace strumpack {
 
 } // end namespace strumpack
 
-#endif // TOOLS_H
+#endif // STRUMPACK_TOOLS_HPP

@@ -87,7 +87,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     VBatchedGEMM<scalar_t>::run(scalar_t alpha, scalar_t beta,
-                                gpu::Stream& s, gpu::BLASHandle& h) {
+                                gpu::Stream& s, gpu::Handle& h) {
 #if defined(STRUMPACK_USE_MAGMA)
       magma_int_t batchcount = m_.size();
       if (!batchcount) return;
@@ -104,16 +104,14 @@ namespace strumpack {
       std::copy(ldA_.begin(), ldA_.end(), iptr);   iptr += batchcount+1;
       std::copy(ldB_.begin(), ldB_.end(), iptr);   iptr += batchcount+1;
       std::copy(ldC_.begin(), ldC_.end(), iptr);   iptr += batchcount+1;
-      gpu_check(gpu::copy_host_to_device_async
-                (dimem, imem.data(), (batchcount+1)*6, s));
+      gpu::copy_host_to_device_async(dimem, imem.data(), (batchcount+1)*6, s);
 
       std::vector<scalar_t*> smem(batchcount*3);
       auto sptr = smem.begin();
       std::copy(A_.begin(), A_.end(), sptr);   sptr += batchcount;
       std::copy(B_.begin(), B_.end(), sptr);   sptr += batchcount;
       std::copy(C_.begin(), C_.end(), sptr);   sptr += batchcount;
-      gpu_check(gpu::copy_host_to_device_async
-                (dsmem, smem.data(), batchcount*3, s));
+      gpu::copy_host_to_device_async(dsmem, smem.data(), batchcount*3, s);
 
       for (magma_int_t i=0; i<batchcount; i++) {
         STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*
@@ -159,7 +157,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    VBatchedTRSMLeftRight<scalar_t>::run(gpu::BLASHandle& h,
+    VBatchedTRSMLeftRight<scalar_t>::run(gpu::Handle& h,
                                          VectorPool<scalar_t>& workspace) {
 #if defined(STRUMPACK_USE_MAGMA)
       auto B = A_.size();
@@ -188,8 +186,8 @@ namespace strumpack {
       auto dA = gpu::aligned_ptr<scalar_t*>(dnr+B);
       auto dBl = dA + B;
       auto dBr = dBl + B;
-      gpu_check(gpu::copy_host_to_device(dm, mn.data(), 3*B));
-      gpu_check(gpu::copy_host_to_device(dA, AB.data(), 3*B));
+      gpu::copy_host_to_device(dm, mn.data(), 3*B);
+      gpu::copy_host_to_device(dA, AB.data(), 3*B);
       gpu::magma::trsm_vbatched_max_nocheck
         (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
          maxm, maxnl, dm, dnl, scalar_t(1.),
@@ -212,7 +210,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    VBatchedTRSM<scalar_t>::run(gpu::BLASHandle& h,
+    VBatchedTRSM<scalar_t>::run(gpu::Handle& h,
                                 VectorPool<scalar_t>& workspace,
                                 bool left) {
 #if defined(STRUMPACK_USE_MAGMA)
@@ -237,8 +235,8 @@ namespace strumpack {
       auto dn = dm + B;
       auto dA = gpu::aligned_ptr<scalar_t*>(dn+B);
       auto dB = dA + B;
-      gpu_check(gpu::copy_host_to_device(dm, mn.data(), 2*B));
-      gpu_check(gpu::copy_host_to_device(dA, AB.data(), 2*B));
+      gpu::copy_host_to_device(dm, mn.data(), 2*B);
+      gpu::copy_host_to_device(dA, AB.data(), 2*B);
       if (left)
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
@@ -267,7 +265,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    VBatchedARA<scalar_t>::run(gpu::BLASHandle& handle,
+    VBatchedARA<scalar_t>::run(gpu::Handle& handle,
                                VectorPool<scalar_t>& workspace,
                                real_t tol) {
 #if defined(STRUMPACK_USE_KBLAS)
@@ -311,14 +309,14 @@ namespace strumpack {
         AUV[i+  B] = smem;  smem += m*maxminmn;
         AUV[i+2*B] = smem;  smem += n*maxminmn;
       }
-      gpu_check(gpu::copy_host_to_device(dm, m_n_maxr.data(), 3*B));
-      gpu_check(gpu::copy_host_to_device(dA, AUV.data(), 3*B));
+      gpu::copy_host_to_device(dm, m_n_maxr.data(), 3*B);
+      gpu::copy_host_to_device(dA, AUV.data(), 3*B);
       gpu::kblas::ara
         (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
          tol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, 1, B);
       std::vector<int> ranks(B), info(B);
-      gpu_check(gpu::copy_device_to_host(ranks.data(), dr, B));
-      gpu_check(gpu::copy_device_to_host(info.data(), dinfo, B));
+      gpu::copy_device_to_host(ranks.data(), dr, B);
+      gpu::copy_device_to_host(info.data(), dinfo, B);
       for (std::size_t i=0; i<B; i++) {
         auto rank = ranks[i], m = m_n_maxr[i], n = m_n_maxr[i+B];
         STRUMPACK_FLOPS(blas::ara_flops(m, n, rank, 10));
@@ -329,7 +327,7 @@ namespace strumpack {
           *tile_[i] = LRTile<scalar_t>::create_as_wrapper(tU, tV);
           DenseMW_t dUtmp(m, rank, AUV[i+B], m),
             dVtmp(n, rank, AUV[i+2*B], n);
-          gpu_check(gpu::copy_device_to_device(tU, dUtmp));
+          gpu::copy_device_to_device(tU, dUtmp);
           gpu::geam<scalar_t>
             (handle, Trans::C, Trans::N, 1., dVtmp, 0., dVtmp, tV);
         }
@@ -341,7 +339,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    VBatchedARA<scalar_t>::kblas_wsquery(gpu::BLASHandle& handle,
+    VBatchedARA<scalar_t>::kblas_wsquery(gpu::Handle& handle,
                                          int batchcount) {
 #if defined(STRUMPACK_USE_KBLAS)
       gpu::kblas::ara_workspace<scalar_t>

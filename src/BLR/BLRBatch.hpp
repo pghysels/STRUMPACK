@@ -52,8 +52,7 @@ namespace strumpack {
 
       static std::size_t dwork_bytes(int batchcount);
 
-      void run(scalar_t alpha, scalar_t beta,
-               gpu::Stream& s, gpu::BLASHandle& h);
+      void run(scalar_t alpha, scalar_t beta, gpu::Stream& s, gpu::Handle& h);
 
     private:
 #if defined(STRUMPACK_USE_MAGMA)
@@ -119,7 +118,7 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
       void add(DenseM_t& A, DenseM_t& Bl, DenseM_t& Br);
-      void run(gpu::BLASHandle& h, VectorPool<scalar_t>& workspace);
+      void run(gpu::Handle& h, VectorPool<scalar_t>& workspace);
 
     private:
       std::vector<DenseM_t*> A_, Bl_, Br_;
@@ -129,7 +128,7 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
       void add(DenseM_t& A, DenseM_t& B);
-      void run(gpu::BLASHandle& h, VectorPool<scalar_t>& workspace,
+      void run(gpu::Handle& h, VectorPool<scalar_t>& workspace,
                bool left);
 
     private:
@@ -142,12 +141,10 @@ namespace strumpack {
 
     public:
       void add(std::unique_ptr<BLRTile<scalar_t>>& tile);
-      void run(gpu::BLASHandle& handle,
-               VectorPool<scalar_t>& workspace, real_t tol);
+      void run(gpu::Handle& handle, VectorPool<scalar_t>& workspace, real_t tol);
 
       static const int KBLAS_ARA_BLOCK_SIZE;
-      static void kblas_wsquery(gpu::BLASHandle& handle,
-                                int batchcount);
+      static void kblas_wsquery(gpu::Handle& handle, int batchcount);
 
     private:
       std::vector<std::unique_ptr<BLRTile<scalar_t>>*> tile_;

@@ -30,12 +30,7 @@
 #define FRONTAL_MATRIX_GPU_KERNELS_HPP
 
 #include "misc/Triplet.hpp"
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
   namespace gpu {
@@ -98,7 +93,7 @@ namespace strumpack {
 
     template<typename T,
              typename real_t = typename RealType<T>::value_type>
-    void replace_pivots_vbatched(BLASHandle& handle, int* dn, int max_n,
+    void replace_pivots_vbatched(Handle& handle, int* dn, int max_n,
                                  T** dA, int* lddA, real_t thresh,
                                  unsigned int batchCount);
 

@@ -37,13 +37,7 @@
 #include "dense/DenseMatrix.hpp"
 #include "BLROptions.hpp"
 
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#else
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#endif
+#include "dense/GPUWrapper.hpp"
 #if defined(STRUMPACK_USE_MAGMA)
 #include "dense/MAGMAWrapper.hpp"
 #endif
@@ -132,18 +126,21 @@ namespace strumpack {
       };
 
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      virtual void laswp(gpu::BLASHandle& h, int* dpiv, bool fwd) = 0;
+#if defined(STRUMPACK_USE_GPU)
+      virtual void laswp(gpu::Handle& h, int* dpiv, bool fwd) = 0;
 
       virtual void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) = 0;
       virtual void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
                                scalar_t* pinned=nullptr) = 0;
+
+      virtual scalar_t* copy_device_to_host(scalar_t* ptr) const = 0;
+      virtual scalar_t* copy_device_to_device(scalar_t* ptr) const = 0;
 #endif
 
       virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                           scalar_t alpha, const DenseM_t& a) = 0;
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-      virtual void trsm_b(gpu::BLASHandle& handle, Side s, UpLo ul,
+#if defined(STRUMPACK_USE_GPU)
+      virtual void trsm_b(gpu::Handle& handle, Side s, UpLo ul,
                           Trans ta, Diag d, scalar_t alpha, DenseM_t& a) = 0;
 #endif
       virtual void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,

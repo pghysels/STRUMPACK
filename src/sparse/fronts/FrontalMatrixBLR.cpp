@@ -38,7 +38,7 @@
 #include "ExtendAdd.hpp"
 #include "BLR/BLRExtendAdd.hpp"
 #endif
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
 #include "FrontalMatrixGPUKernels.hpp"
 #endif
 
@@ -53,7 +53,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixBLR<scalar_t,integer_t>::release_work_memory
   (VectorPool<scalar_t>& workspace) {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     // CBdev_.release();
     workspace.restore(CBdev_);
 #endif
@@ -353,7 +353,7 @@ namespace strumpack {
              });
         }
       } else {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
         if (opts.use_gpu()) {
           using Trip_t = Triplet<scalar_t>;
           std::vector<Trip_t> e11, e12, e21;
@@ -374,7 +374,7 @@ namespace strumpack {
             gpu::round_up(sizeof(gpu::AssembleData<scalar_t>));
           auto d_mem = workspace.get_device_bytes(d_mem_bytes);
           auto smem = d_mem.template as<scalar_t>();
-          gpu_check(gpu::memset<scalar_t>(smem, 0, dsep*(dsep+2*dupd)));
+          gpu::memset<scalar_t>(smem, 0, dsep*(dsep+2*dupd));
           DenseMW_t dF11(dsep, dsep, smem, dsep);  smem += dsep*dsep;
           DenseMW_t dF12(dsep, dupd, smem, dsep);  smem += dsep*dupd;
           DenseMW_t dF21(dupd, dsep, smem, dupd);  smem += dsep*dupd;
@@ -391,16 +391,16 @@ namespace strumpack {
 
           // TODO replace push_front_elements with set_front_elements
           // to pinned memory, then do a single copy here
-          gpu_check(gpu::copy_host_to_device(de11, e11.data(), e11.size()));
-          gpu_check(gpu::copy_host_to_device(de12, e12.data(), e12.size()));
-          gpu_check(gpu::copy_host_to_device(de21, e21.data(), e21.size()));
+          gpu::copy_host_to_device(de11, e11.data(), e11.size());
+          gpu::copy_host_to_device(de12, e12.data(), e12.size());
+          gpu::copy_host_to_device(de21, e21.data(), e21.size());
           // TODO can combine this to a single copy?
-          gpu_check(gpu::copy_host_to_device(dIl, Il.data(), Il.size()));
-          gpu_check(gpu::copy_host_to_device(dIr, Ir.data(), Ir.size()));
+          gpu::copy_host_to_device(dIl, Il.data(), Il.size());
+          gpu::copy_host_to_device(dIr, Ir.data(), Ir.size());
 
           CBdev_ = workspace.get_device_bytes(dupd*dupd*sizeof(scalar_t));
           scalar_t* dCB = CBdev_.template as<scalar_t>();
-          gpu_check(gpu::memset<scalar_t>(dCB, 0, dupd*dupd));
+          gpu::memset<scalar_t>(dCB, 0, dupd*dupd);
           F22_ = DenseMW_t(dupd, dupd, dCB, dupd);
 
           gpu::AssembleData<scalar_t> hasmbl
@@ -412,11 +412,11 @@ namespace strumpack {
           if (rchild_)
             hasmbl.set_ext_add_right
               (rchild_->dim_upd(), rchild_->get_device_F22(CBr), dIr);
-          gpu_check(gpu::copy_host_to_device(dasmbl, &hasmbl, 1));
+          gpu::copy_host_to_device(dasmbl, &hasmbl, 1);
           gpu::assemble<scalar_t>(1, &hasmbl, dasmbl);
           if (dsep)
             BLRM_t::construct_and_partial_factor_gpu
-              (dF11, dF12, dF21, F22_, F11blr_, piv_, F12blr_, F21blr_,
+              (dF11, dF12, dF21, F22_, F11blr_, F12blr_, F21blr_,
                sep_tiles_, upd_tiles_, admissibility_, workspace,
                opts.BLR_options());
           workspace.restore(d_mem);
@@ -705,11 +705,10 @@ namespace strumpack {
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         seq_copy_to_buffers(F22, sbuf, pa, this);
     } else {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
       if (CBdev_.size()) {
         DenseM_t F22(dim_upd(), dim_upd());
-        gpu_check(gpu::copy_device_to_host
-                  (F22, CBdev_.template as<scalar_t>()));
+        gpu::copy_device_to_host(F22, CBdev_.template as<scalar_t>());
         BLR::BLRExtendAdd<scalar_t,integer_t>::
           seq_copy_to_buffers(F22, sbuf, pa, this);
       } else
