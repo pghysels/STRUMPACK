@@ -28,6 +28,7 @@
  */
 #define STRUMPACK_NO_TRIPLET_MPI
 #include "FrontalMatrixGPUKernels.hpp"
+#include "dense/HIPWrapper.hpp"
 
 #include <hip/hip_runtime.h>
 
@@ -337,7 +338,7 @@ namespace strumpack {
       if (s)
         hipLaunchKernelGGL
           (HIP_KERNEL_NAME(replace_pivots_kernel<T_,real_t>),
-           (n+NT)/NT, NT, 0, *s, n, (T_*)(A), thresh);
+           (n+NT)/NT, NT, 0, get_hip_stream(*s), n, (T_*)(A), thresh);
       else
         hipLaunchKernelGGL
           (HIP_KERNEL_NAME(replace_pivots_kernel<T_,real_t>),
@@ -359,7 +360,7 @@ namespace strumpack {
     }
 
     template<typename T, typename real_t>
-    void replace_pivots_vbatched(BLASHandle& handle, int* dn, int max_n,
+    void replace_pivots_vbatched(Handle& handle, int* dn, int max_n,
                                  T** dA, int* lddA, real_t thresh,
                                  unsigned int batchCount) {
       if (max_n <= 0 || !batchCount) return;
@@ -376,7 +377,7 @@ namespace strumpack {
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
         dim3 grid(nbx, std::min(nbf-f, MAX_BLOCKS_Y));
         hipStream_t streamId;
-        hipblasGetStream(handle, &streamId);
+        hipblasGetStream(get_hipblas_handle(handle), &streamId);
         auto f0 = f * ops;
         hipLaunchKernelGGL
           (HIP_KERNEL_NAME(replace_pivots_vbatch_kernel<T_,real_t>),
@@ -683,10 +684,10 @@ namespace strumpack {
     template void replace_pivots(int, std::complex<float>*, float, gpu::Stream*);
     template void replace_pivots(int, std::complex<double>*, double, gpu::Stream*);
 
-    template void replace_pivots_vbatched(BLASHandle&, int*, int, float**, int*, float, unsigned int);
-    template void replace_pivots_vbatched(BLASHandle&, int*, int, double**, int*, double, unsigned int);
-    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<float>**, int*, float, unsigned int);
-    template void replace_pivots_vbatched(BLASHandle&, int*, int, std::complex<double>**, int*, double, unsigned int);
+    template void replace_pivots_vbatched(Handle&, int*, int, float**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(Handle&, int*, int, double**, int*, double, unsigned int);
+    template void replace_pivots_vbatched(Handle&, int*, int, std::complex<float>**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(Handle&, int*, int, std::complex<double>**, int*, double, unsigned int);
 
   } // end namespace gpu
 } // end namespace strumpack

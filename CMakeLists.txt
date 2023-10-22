@@ -605,7 +605,7 @@ add_subdirectory(src)
 target_sources(strumpack
   PRIVATE ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h)
 
-target_compile_features(strumpack PUBLIC cxx_std_14)
+target_compile_features(strumpack PUBLIC cxx_std_17)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 target_compile_options(strumpack PRIVATE

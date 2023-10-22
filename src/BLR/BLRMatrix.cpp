@@ -128,7 +128,7 @@ namespace strumpack {
       {
         for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-          std::size_t ii = i+rb*i;
+          [[maybe_unused]] std::size_t ii = i+rb*i;
 #pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
 #endif
           {
@@ -139,7 +139,7 @@ namespace strumpack {
           // COMPRESS and SOLVE
           for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ij = i+rb*j;
+            [[maybe_unused]] std::size_t ij = i+rb*j;
 #pragma omp task default(shared) firstprivate(i,j,ii,ij)        \
   depend(in:B[ii]) depend(inout:B[ij])
 #endif
@@ -155,7 +155,7 @@ namespace strumpack {
                    scalar_t(1.), tile(i, i), tile(i, j));
             }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ji = j+rb*i;
+            [[maybe_unused]] std::size_t ji = j+rb*i;
 #pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
   depend(in:B[ii]) depend(inout:B[ji])
 #endif
@@ -171,7 +171,8 @@ namespace strumpack {
             for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=i+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ij = i+rb*j, ki = k+rb*i, kj = k+rb*j;
+                [[maybe_unused]] std::size_t ij = i+rb*j,
+                  ki = k+rb*i, kj = k+rb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
   depend(in:B[ij],B[ki]) depend(inout:B[kj])
 #endif
@@ -187,7 +188,8 @@ namespace strumpack {
             for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=0; k<i+1; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ij = (i+1)+rb*j, ik = (i+1)+rb*k, kj = k+rb*j;
+                [[maybe_unused]] std::size_t ij = (i+1)+rb*j,
+                  ik = (i+1)+rb*k, kj = k+rb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ik,kj)   \
   depend(in:B[ik],B[kj]) depend(inout:B[ij]) priority(rb-j)
 #endif
@@ -198,7 +200,8 @@ namespace strumpack {
                 }
                 if (j != i+1) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ji = j+rb*(i+1), jk = j+rb*k, ki = k+rb*(i+1);
+                  [[maybe_unused]] std::size_t ji = j+rb*(i+1),
+                    jk = j+rb*k, ki = k+rb*(i+1);
 #pragma omp task default(shared) firstprivate(i,j,k,ji,jk,ki)   \
   depend(in:B[jk],B[ki]) depend(inout:B[ji]) priority(rb-j)
 #endif
@@ -213,14 +216,16 @@ namespace strumpack {
           } else { // Comb or Star
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = (i+1)+rb*j, i1j=ij-rb*(j-i), ij1=ij-1;
+              [[maybe_unused]] std::size_t ij = (i+1)+rb*j,
+                i1j=ij-rb*(j-i), ij1=ij-1;
 #pragma omp task default(shared) firstprivate(i,j,ij,i1j,ij1)   \
   depend(in:B[i1j],B[ij1]) depend(inout:B[ij])
 #endif
               LUAR_B11(i+1, j, i+1, A, opts, B);
               if (j != i+1) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ji = j+rb*(i+1), i1j=ji-rb, ij1=ji-j+i;
+                [[maybe_unused]] std::size_t ji = j+rb*(i+1),
+                  i1j=ji-rb, ij1=ji-j+i;
 #pragma omp task default(shared) firstprivate(i,j,ji,i1j,ij1)   \
   depend(in:B[i1j],B[ij1]) depend(inout:B[ji])
 #endif
@@ -746,7 +751,7 @@ namespace strumpack {
         {
           for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ii = i+lrb*i;
+            [[maybe_unused]] std::size_t ii = i+lrb*i;
 #pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
 #endif
             {
@@ -757,7 +762,7 @@ namespace strumpack {
             }
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = i+lrb*j;
+              [[maybe_unused]] std::size_t ij = i+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,ij,ii)        \
   depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
 #endif
@@ -774,7 +779,7 @@ namespace strumpack {
                      scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
               }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ji = j+lrb*i;
+              [[maybe_unused]] std::size_t ji = j+lrb*i;
 #pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
   depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
 #endif
@@ -788,7 +793,7 @@ namespace strumpack {
             }
             for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij2 = i+lrb*(rb+j);
+              [[maybe_unused]] std::size_t ij2 = i+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,j,ij2,ii)       \
   depend(in:B[ii]) depend(inout:B[ij2])
 #endif
@@ -804,7 +809,7 @@ namespace strumpack {
                      scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
               }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t j2i = (rb+j)+lrb*i;
+              [[maybe_unused]] std::size_t j2i = (rb+j)+lrb*i;
 #pragma omp task default(shared) firstprivate(i,j,j2i,ii)       \
   depend(in:B[ii]) depend(inout:B[j2i])
 #endif
@@ -819,7 +824,8 @@ namespace strumpack {
               for (std::size_t j=i+1; j<rb; j++) {
                 for (std::size_t k=i+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ij = i+lrb*j, ki = k+lrb*i, kj = k+lrb*j;
+                  [[maybe_unused]] std::size_t ij = i+lrb*j,
+                    ki = k+lrb*i, kj = k+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
   depend(in:B[ij],B[ki]) depend(inout:B[kj]) priority(rb-j)
 #endif
@@ -833,8 +839,8 @@ namespace strumpack {
               for (std::size_t k=i+1; k<rb; k++) {
                 for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ki = k+lrb*i, ij2 = i+lrb*(rb+j),
-                    kj2 = k+lrb*(rb+j);
+                  [[maybe_unused]] std::size_t ki = k+lrb*i,
+                    ij2 = i+lrb*(rb+j), kj2 = k+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,k,j,ki,ij2,kj2) \
   depend(in:B[ki],B[ij2]) depend(inout:B[kj2])
 #endif
@@ -844,8 +850,8 @@ namespace strumpack {
                          B11.tile(k, i), B12.tile(i, j), scalar_t(1.), Akj);
                   }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ik = i+lrb*k, j2i = (j+rb)+lrb*i,
-                    j2k = (rb+j)+lrb*k;
+                  [[maybe_unused]] std::size_t ik = i+lrb*k,
+                                     j2i = (j+rb)+lrb*i, j2k = (rb+j)+lrb*k;
 #pragma omp task default(shared) firstprivate(i,k,j,ik,j2i,j2k) \
   depend(in:B[ik],B[j2i]) depend(inout:B[j2k])
 #endif
@@ -859,8 +865,8 @@ namespace strumpack {
               for (std::size_t j=0; j<rb2; j++) {
                 for (std::size_t k=0; k<rb2; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ij2 = i+lrb*(rb+j), k2i = (rb+k)+lrb*i,
-                    k2j2 = (rb+k)+lrb*(rb+j);
+                  [[maybe_unused]] std::size_t ij2 = i+lrb*(rb+j),
+                    k2i = (rb+k)+lrb*i, k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,j,k,ij2,k2i,k2j2)       \
   depend(in:B[ij2],B[k2i]) depend(inout:B[k2j2])
 #endif
@@ -878,8 +884,8 @@ namespace strumpack {
               for (std::size_t j=i+1; j<rb; j++) {
                 for (std::size_t k=0; k<i+1; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ij = (i+1)+lrb*j, ik = (i+1)+lrb*k,
-                    kj = k+lrb*j;
+                  [[maybe_unused]] std::size_t ij = (i+1)+lrb*j,
+                    ik = (i+1)+lrb*k, kj = k+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ik,kj)   \
   depend(in:B[ik],B[kj]) depend(inout:B[ij]) priority(rb-j)
 #endif
@@ -890,8 +896,8 @@ namespace strumpack {
                   }
                   if (j != i+1) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                    std::size_t ji = j+lrb*(i+1), jk = j+lrb*k,
-                      ki = k+lrb*(i+1);
+                    [[maybe_unused]] std::size_t ji = j+lrb*(i+1),
+                      jk = j+lrb*k, ki = k+lrb*(i+1);
 #pragma omp task default(shared) firstprivate(i,j,k,ji,jk,ki)   \
   depend(in:B[jk],B[ki]) depend(inout:B[ji]) priority(rb-j)
 #endif
@@ -908,8 +914,8 @@ namespace strumpack {
                 for (std::size_t j=0; j<rb2; j++) {
                   for (std::size_t k=0; k<i+1; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                    std::size_t ik = (i+1)+lrb*k, ij2 = (i+1)+lrb*(rb+j),
-                      kj2 = k+lrb*(rb+j);
+                    [[maybe_unused]] std::size_t ik = (i+1)+lrb*k,
+                      ij2 = (i+1)+lrb*(rb+j), kj2 = k+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,k,j,ik,ij2,kj2) \
   depend(in:B[ik],B[kj2]) depend(inout:B[ij2])
 #endif
@@ -920,8 +926,9 @@ namespace strumpack {
                            scalar_t(1.), Aij);
                     }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                    std::size_t ki = k+lrb*(i+1), j2i = (j+rb)+lrb*(i+1),
-                      j2k = (rb+j)+lrb*k;
+                    [[maybe_unused]] std::size_t ki = k+lrb*(i+1),
+                                       j2i = (j+rb)+lrb*(i+1),
+                                       j2k = (rb+j)+lrb*k;
 #pragma omp task default(shared) firstprivate(i,k,j,ki,j2i,j2k) \
   depend(in:B[j2k],B[ki]) depend(inout:B[j2i])
 #endif
@@ -937,14 +944,16 @@ namespace strumpack {
             } else { // Comb or Star (LUAR)
               for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ij = (i+1)+lrb*j, i1j=ij-lrb*(j-i), ij1=ij-1;
+                [[maybe_unused]] std::size_t ij = (i+1)+lrb*j,
+                  i1j=ij-lrb*(j-i), ij1=ij-1;
 #pragma omp task default(shared) firstprivate(i,j,ij,i1j,ij1)   \
   depend(in:B[i1j],B[ij1]) depend(inout:B[ij])
 #endif
                 B11.LUAR_B11(i+1, j, i+1, A11, opts, B);
                 if (j != i+1) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ji = j+lrb*(i+1), i1j = ji-lrb, ij1 = ji-j+i;
+                  [[maybe_unused]] std::size_t ji = j+lrb*(i+1),
+                    i1j = ji-lrb, ij1 = ji-j+i;
 #pragma omp task default(shared) firstprivate(i,j,ji,i1j,ij1)   \
   depend(in:B[i1j],B[ij1]) depend(inout:B[ji])
 #endif
@@ -954,15 +963,15 @@ namespace strumpack {
               if (i+1 < rb) {
                 for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t ij2 = (i+1)+lrb*(rb+j), i1j = ij2-lrb*(rb+j-i),
-                    ij1 = ij2-1;
+                  [[maybe_unused]] std::size_t ij2 = (i+1)+lrb*(rb+j),
+                    i1j = ij2-lrb*(rb+j-i), ij1 = ij2-1;
 #pragma omp task default(shared) firstprivate(i,j,ij2,i1j,ij1)  \
   depend(in:B[i1j],B[ij1]) depend(inout:B[ij2])
 #endif
                   B12.LUAR_B12(i+1, j, i+1, B11, A12, opts, B);
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t j2i = (rb+j)+lrb*(i+1), ji1 = j2i-lrb,
-                    j1i = j2i-(rb-i)-j;
+                  [[maybe_unused]] std::size_t j2i = (rb+j)+lrb*(i+1),
+                                     ji1 = j2i-lrb, j1i = j2i-(rb-i)-j;
 #pragma omp task default(shared) firstprivate(i,j,j2i,ji1,j1i)  \
   depend(in:B[ji1],B[j1i]) depend(inout:B[j2i])
 #endif
@@ -977,8 +986,8 @@ namespace strumpack {
                 if (opts.BLR_factor_algorithm() == BLRFactorAlgorithm::LL) {
                   for (std::size_t k=0; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                    std::size_t i2j2 = (rb+i)+lrb*(rb+j), i2k = (rb+i)+lrb*k,
-                      kj2 = k+lrb*(rb+j);
+                    [[maybe_unused]] std::size_t i2j2 = (rb+i)+lrb*(rb+j),
+                      i2k = (rb+i)+lrb*k, kj2 = k+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,j,k,i2k,kj2,i2j2)       \
   depend(in:B[i2k],B[kj2]) depend(inout:B[i2j2])
 #endif
@@ -992,8 +1001,8 @@ namespace strumpack {
                   }
                 } else { //Comb or Star (LUAR-Update)
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t i2j2 = (rb+i)+lrb*(rb+j), i1j = rb*lrb-(rb2-i),
-                    ij1 = i2j2-(i+1);
+                  [[maybe_unused]] std::size_t i2j2 = (rb+i)+lrb*(rb+j),
+                    i1j = rb*lrb-(rb2-i), ij1 = i2j2-(i+1);
 #pragma omp task default(shared) firstprivate(i,j,i2j2,i1j,ij1) \
   depend(in:B[i1j],B[ij1]) depend(inout:B[i2j2])
 #endif
@@ -1235,13 +1244,14 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
         // dummy for task synchronization
-        std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
+        std::unique_ptr<int[]> B_(new int[lrb*lrb]());
+        [[maybe_unused]] auto B = B_.get();
 #pragma omp taskgroup
 #endif
         {
           for (std::size_t i=0; i<rb; i++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ii = i+lrb*i;
+            [[maybe_unused]] std::size_t ii = i+lrb*i;
 #pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
 #endif
             {
@@ -1251,7 +1261,7 @@ namespace strumpack {
             }
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij = i+lrb*j;
+              [[maybe_unused]] std::size_t ij = i+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,ij,ii)        \
   depend(in:B[ii]) depend(inout:B[ij]) priority(rb-j)
 #endif
@@ -1265,7 +1275,7 @@ namespace strumpack {
                     scalar_t(1.), B11.tile(i, i), B11.tile(i, j));
               }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ji = j+lrb*i;
+              [[maybe_unused]] std::size_t ji = j+lrb*i;
 #pragma omp task default(shared) firstprivate(i,j,ji,ii)        \
   depend(in:B[ii]) depend(inout:B[ji]) priority(rb-j)
 #endif
@@ -1277,7 +1287,7 @@ namespace strumpack {
             }
             for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t ij2 = i+lrb*(rb+j);
+              [[maybe_unused]] std::size_t ij2 = i+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,j,ij2,ii)       \
   depend(in:B[ii]) depend(inout:B[ij2])
 #endif
@@ -1291,7 +1301,7 @@ namespace strumpack {
                     scalar_t(1.), B11.tile(i, i), B12.tile(i, j));
               }
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t j2i = (rb+j)+lrb*i;
+              [[maybe_unused]] std::size_t j2i = (rb+j)+lrb*i;
 #pragma omp task default(shared) firstprivate(i,j,j2i,ii)       \
   depend(in:B[ii]) depend(inout:B[j2i])
 #endif
@@ -1302,7 +1312,8 @@ namespace strumpack {
             for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=i+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ij = i+lrb*j, ki = k+lrb*i, kj = k+lrb*j;
+                [[maybe_unused]] std::size_t ij = i+lrb*j,
+                  ki = k+lrb*i, kj = k+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,ij,ki,kj)   \
   depend(in:B[ij],B[ki]) depend(inout:B[kj]) priority(rb-j)
 #endif
@@ -1314,7 +1325,8 @@ namespace strumpack {
             for (std::size_t k=i+1; k<rb; k++) {
               for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ki = k+lrb*i, ij2 = i+lrb*(rb+j), kj2 = k+lrb*(rb+j);
+                [[maybe_unused]] std::size_t ki = k+lrb*i,
+                  ij2 = i+lrb*(rb+j), kj2 = k+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,k,j,ki,ij2,kj2) \
   depend(in:B[ki],B[ij2]) depend(inout:B[kj2])
 #endif
@@ -1322,7 +1334,8 @@ namespace strumpack {
                      B11.tile(k, i), B12.tile(i, j), scalar_t(1.),
                      B12.tile_dense(k,j).D());
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ik = i+lrb*k, j2i = (j+rb)+lrb*i, j2k = (rb+j)+lrb*k;
+                [[maybe_unused]] std::size_t ik = i+lrb*k,
+                                   j2i = (j+rb)+lrb*i, j2k = (rb+j)+lrb*k;
 #pragma omp task default(shared) firstprivate(i,k,j,ik,j2i,j2k) \
   depend(in:B[ik],B[j2i]) depend(inout:B[j2k])
 #endif
@@ -1334,8 +1347,8 @@ namespace strumpack {
             for (std::size_t j=0; j<rb2; j++) {
               for (std::size_t k=0; k<rb2; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t ij2 = i+lrb*(rb+j), k2i = (rb+k)+lrb*i,
-                  k2j2 = (rb+k)+lrb*(rb+j);
+                [[maybe_unused]] std::size_t ij2 = i+lrb*(rb+j),
+                  k2i = (rb+k)+lrb*i, k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,j,k,ij2,k2i,k2j2)       \
   depend(in:B[ij2],B[k2i]) depend(inout:B[k2j2])
 #endif
@@ -1349,7 +1362,7 @@ namespace strumpack {
             for (std::size_t k=0; k<rb2; k++) {
               if(j!=k){
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+                [[maybe_unused]] std::size_t k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(j,k,k2j2) \
   depend(inout:B[k2j2])
 #endif
@@ -1382,14 +1395,15 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
         // dummy for task synchronization
-        std::unique_ptr<int[]> B_(new int[lrb*lrb]()); auto B = B_.get();
+        std::unique_ptr<int[]> B_(new int[lrb*lrb]());
+        [[maybe_unused]] auto B = B_.get();
 #pragma omp taskgroup
 #endif
         {
           for (std::size_t i=0; i<rb; i+=CP) { // F11 and F21
 #pragma omp taskwait
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ifirst = lrb*i;
+            [[maybe_unused]] std::size_t ifirst = lrb*i;
 #pragma omp task default(shared) firstprivate(i,ifirst) \
   depend(out:B[ifirst:lrb])
 #endif
@@ -1401,7 +1415,7 @@ namespace strumpack {
             for (std::size_t k=0; k<i; k++) {
               for (std::size_t j=i; j<std::min(i+CP, rb); j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t kj = k+lrb*j;
+                [[maybe_unused]] std::size_t kj = k+lrb*j;
 #pragma omp task default(shared) firstprivate(i,j,k,kj) \
   depend(inout:B[kj]) priority(rb-k)
 #endif
@@ -1418,7 +1432,7 @@ namespace strumpack {
               for (std::size_t lk=k+1; lk<rb; lk++) {
                 for (std::size_t lj=i; lj<std::min(i+CP, rb); lj++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t klj = k+lrb*lj, lkk = lk+lrb*k,
+                  [[maybe_unused]] std::size_t klj = k+lrb*lj, lkk = lk+lrb*k,
                     lklj = lk+lrb*lj;
 #pragma omp task default(shared) firstprivate(i,k,lk,lj,klj,lkk,lklj)   \
   depend(in:B[klj],B[lkk]) depend(inout:B[lklj])
@@ -1431,8 +1445,8 @@ namespace strumpack {
               for (std::size_t lk=0; lk<rb2; lk++) {
                 for (std::size_t lj=i; lj<std::min(i+CP,rb); lj++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t klj = k+lrb*lj, lk2k = (lk+rb)+lrb*k,
-                    lk2lj = (lk+rb)+lrb*lj;
+                  [[maybe_unused]] std::size_t klj = k+lrb*lj,
+                    lk2k = (lk+rb)+lrb*k, lk2lj = (lk+rb)+lrb*lj;
 #pragma omp task default(shared) firstprivate(i,k,lk,lj,klj,lk2k,lk2lj) \
   depend(in:B[klj],B[lk2k]) depend(inout:B[lk2lj])
 #endif
@@ -1444,7 +1458,7 @@ namespace strumpack {
             }
             for (std::size_t c=i; c<std::min(i+CP,rb); c++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t cc = c+lrb*c;
+              [[maybe_unused]] std::size_t cc = c+lrb*c;
 #pragma omp task default(shared) firstprivate(i,c,cc)   \
   depend(inout:B[cc])
 #endif
@@ -1455,7 +1469,7 @@ namespace strumpack {
               }
               for (std::size_t j=c+1; j<std::min(i+CP,rb); j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t cj = c+lrb*j;
+                [[maybe_unused]] std::size_t cj = c+lrb*j;
 #pragma omp task default(shared) firstprivate(i,c,j,cj,cc)      \
   depend(in:B[cc]) depend(inout:B[cj]) priority(rb-j)
 #endif
@@ -1471,7 +1485,7 @@ namespace strumpack {
               }
               for (std::size_t j=c+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t jc = j+lrb*c;
+                [[maybe_unused]] std::size_t jc = j+lrb*c;
 #pragma omp task default(shared) firstprivate(i,c,j,jc,cc)      \
   depend(in:B[cc]) depend(inout:B[jc]) priority(rb-j)
 #endif
@@ -1483,7 +1497,7 @@ namespace strumpack {
               }
               for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t j2c = (rb+j)+lrb*c;
+                [[maybe_unused]] std::size_t j2c = (rb+j)+lrb*c;
 #pragma omp task default(shared) firstprivate(i,c,j,j2c,cc)     \
   depend(in:B[cc]) depend(inout:B[j2c])
 #endif
@@ -1496,7 +1510,8 @@ namespace strumpack {
               for (std::size_t j=c+1; j<std::min(i+CP,rb); j++) {
                 for (std::size_t k=c+1; k<rb; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t kc = k+lrb*c, cj = c+lrb*j, kj = k+lrb*j;
+                  [[maybe_unused]] std::size_t kc = k+lrb*c,
+                    cj = c+lrb*j, kj = k+lrb*j;
 #pragma omp task default(shared) firstprivate(i,c,j,k,kc,cj,kj) \
   depend(in:B[kc],B[cj]) depend(inout:B[kj])
 #endif
@@ -1508,8 +1523,8 @@ namespace strumpack {
               for (std::size_t j=c+1; j<std::min(i+CP,rb); j++) {
                 for (std::size_t k=0; k<rb2; k++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t k2c = (k+rb)+lrb*c, cj = c+lrb*j,
-                    k2j = (k+rb)+lrb*j;
+                  [[maybe_unused]] std::size_t k2c = (k+rb)+lrb*c,
+                    cj = c+lrb*j, k2j = (k+rb)+lrb*j;
 #pragma omp task default(shared) firstprivate(i,c,j,k,k2c,cj,k2j)       \
   depend(in:B[k2c],B[cj]) depend(inout:B[k2j])
 #endif
@@ -1523,7 +1538,7 @@ namespace strumpack {
           for (std::size_t i=0; i<rb2; i+=CP) { // F12 and F22
 #pragma omp taskwait
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-            std::size_t ifirst = lrb*(i+rb);
+            [[maybe_unused]] std::size_t ifirst = lrb*(i+rb);
 #pragma omp task default(shared) firstprivate(i,ifirst) \
   depend(out:B[ifirst:lrb])
 #endif
@@ -1535,7 +1550,7 @@ namespace strumpack {
             for (std::size_t k=0; k<rb; k++) {
               for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                std::size_t kj2 = k+lrb*(j+rb);
+                [[maybe_unused]] std::size_t kj2 = k+lrb*(j+rb);
 #pragma omp task default(shared) firstprivate(i,k,j,kj2)        \
   depend(inout:B[kj2]) priority(rb-k)
 #endif
@@ -1552,8 +1567,8 @@ namespace strumpack {
               for (std::size_t lk=k+1; lk<rb; lk++) {
                 for (std::size_t lj=i; lj<std::min(i+CP, rb2); lj++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t klj2 = k+lrb*(lj+rb), lkk = lk+lrb*k,
-                    lklj2 = lk+lrb*(lj+rb);
+                  [[maybe_unused]] std::size_t klj2 = k+lrb*(lj+rb),
+                    lkk = lk+lrb*k, lklj2 = lk+lrb*(lj+rb);
 #pragma omp task default(shared) firstprivate(i,k,lk,lj,klj2,lkk,lklj2) \
   depend(in:B[klj2],B[lkk]) depend(inout:B[lklj2])
 #endif
@@ -1565,8 +1580,8 @@ namespace strumpack {
               for (std::size_t lk=0; lk<rb2; lk++) {
                 for (std::size_t lj=i; lj<std::min(i+CP,rb2); lj++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t klj2 = k+lrb*(lj+rb), lk2k = (lk+rb)+lrb*k,
-                    lk2lj2 = (lk+rb)+lrb*(lj+rb);
+                  [[maybe_unused]] std::size_t klj2 = k+lrb*(lj+rb),
+                    lk2k = (lk+rb)+lrb*k, lk2lj2 = (lk+rb)+lrb*(lj+rb);
 #pragma omp task default(shared) firstprivate(i,k,lk,lj,klj2,lk2k,lk2lj2) \
   depend(in:B[klj2],B[lk2k]) depend(inout:B[lk2lj2])
 #endif
@@ -1580,7 +1595,7 @@ namespace strumpack {
               for (std::size_t j=i; j<std::min(i+CP, rb2); j++) {
                 if (j != k) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-                  std::size_t k2j2 = (rb+k)+lrb*(rb+j);
+                  [[maybe_unused]] std::size_t k2j2 = (rb+k)+lrb*(rb+j);
 #pragma omp task default(shared) firstprivate(i,k,j,k2j2)       \
   depend(inout:B[k2j2])
 #endif
@@ -1673,7 +1688,8 @@ namespace strumpack {
         auto rb2 = F2.rowblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
-        std::unique_ptr<int[]> B_(new int[lrb]()); auto B = B_.get();
+        std::unique_ptr<int[]> B_(new int[lrb]());
+        [[maybe_unused]] auto B = B_.get();
 #pragma omp taskgroup
 #endif
         {
@@ -1699,7 +1715,7 @@ namespace strumpack {
             }
             for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t j2 = rb+j;
+              [[maybe_unused]] std::size_t j2 = rb+j;
 #pragma omp task default(shared) firstprivate(i,j,j2)   \
   depend(in:B[i]) depend(inout:B[j2]) priority(0)
 #endif
@@ -1729,7 +1745,8 @@ namespace strumpack {
         auto rb2 = F2.colblocks();
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
         auto lrb = rb+rb2;
-        std::unique_ptr<int[]> B_(new int[lrb]()); auto B = B_.get();
+        std::unique_ptr<int[]> B_(new int[lrb]());
+        [[maybe_unused]] auto B = B_.get();
 #pragma omp taskgroup
 #endif
         {
@@ -1737,7 +1754,7 @@ namespace strumpack {
             assert(i < rb);
             for (std::size_t j=0; j<rb2; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
-              std::size_t j2 = rb+j;
+              [[maybe_unused]] std::size_t j2 = rb+j;
 #pragma omp task default(shared) firstprivate(i,j,j2)   \
   depend(in:B[j2]) depend(inout:B[i]) priority(1)
 #endif

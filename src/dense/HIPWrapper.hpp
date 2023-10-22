@@ -29,11 +29,18 @@
 #ifndef STRUMPACK_HIP_WRAPPER_HPP
 #define STRUMPACK_HIP_WRAPPER_HPP
 
+#include "GPUWrapper.hpp"
+#if defined(STRUMPACK_USE_MAGMA)
+#include <magma_v2.h>
+#endif
+#if defined(STRUMPACK_USE_KBLAS)
+#include "kblas.h"
+#endif
+
 #include <cmath>
 #include <complex>
 #include <iostream>
 #include <cassert>
-#include <memory>
 
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
@@ -55,401 +62,27 @@ namespace strumpack {
     void hip_assert(hipblasStatus_t code, const char *file, int line,
                     bool abort=true);
 
-    void init();
+    const hipStream_t& get_hip_stream(const Stream& s);
+    hipStream_t& get_hip_stream(Stream& s);
 
-    inline void peek_at_last_error() {
-      gpu_check(hipPeekAtLastError());
-    }
+    const hipblasHandle_t& get_hipblas_handle(const Handle& h);
+    hipblasHandle_t& get_hipblas_handle(Handle& s);
 
-    inline void get_last_error() {
-      // this is used to reset the last error. Some MAGMA calls fail
-      // on purpose, then use a different algorithm
-      auto e = hipGetLastError();
-      ((void)e); // silence unused warning
-    }
+    const rocblas_handle& get_rocblas_handle(const Handle& h);
+    rocblas_handle& get_rocblas_handle(Handle& s);
 
-    inline void synchronize() {
-      gpu_check(hipDeviceSynchronize());
-    }
-
-    class Stream {
-    public:
-      Stream() {
-       gpu_check(hipStreamCreate(&s_));
-       //gpu_check(hipStreamCreateWithFlags(&s_, hipStreamNonBlocking));
-      }
-      ~Stream() { gpu_check(hipStreamDestroy(s_)); }
-      operator hipStream_t&() { return s_; }
-      operator const hipStream_t&() const { return s_; }
-      void synchronize() { gpu_check(hipStreamSynchronize(s_)); }
-    private:
-      hipStream_t s_;
-    };
-
-    class BLASHandle {
-    public:
-      BLASHandle() { gpu_check(hipblasCreate(&h_)); }
-      BLASHandle(Stream& s) : BLASHandle() { set_stream(s); }
-      ~BLASHandle() { gpu_check(hipblasDestroy(h_)); }
-      void set_stream(Stream& s) { gpu_check(hipblasSetStream(h_, s)); }
-      operator hipblasHandle_t&() { return h_; }
-      operator const hipblasHandle_t&() const { return h_; }
-    private:
-      hipblasHandle_t h_;
-    };
-
-    // TODO there is no such thing as hipSOLVER yet :(
-    class SOLVERHandle {
-    public:
-      SOLVERHandle() { gpu_check(rocblas_create_handle(&h_)); }
-      SOLVERHandle(Stream& s) : SOLVERHandle() { set_stream(s); }
-      ~SOLVERHandle() { gpu_check(rocblas_destroy_handle(h_)); }
-      void set_stream(Stream& s) { rocblas_set_stream(h_, s); }
-      operator rocblas_handle&() { return h_; }
-      operator const rocblas_handle&() const { return h_; }
-    private:
-      rocblas_handle h_;
-    };
-
-    class Event {
-    public:
-      Event() { gpu_check(hipEventCreateWithFlags
-                          (&e_, hipEventDisableTiming)); }
-      ~Event() { gpu_check(hipEventDestroy(e_)); }
-      void record() { gpu_check(hipEventRecord(e_)); }
-      void record(Stream& s) { gpu_check(hipEventRecord(e_, s)); }
-      void wait(Stream& s) { gpu_check(hipStreamWaitEvent(s, e_, 0)); }
-    private:
-      hipEvent_t e_;
-    };
-
-    template<typename T> hipError_t
-    memset(void* dptr, int value, std::size_t count) {
-      return hipMemset(dptr, value, count*sizeof(T));
-    }
-
-    template<typename T> hipError_t
-    copy_device_to_host(T* hptr, const T* dptr, std::size_t count) {
-      return hipMemcpy(hptr, dptr, count*sizeof(T),
-                       hipMemcpyDeviceToHost);
-    }
-    template<typename T> hipError_t
-    copy_device_to_host_async(T* hptr, const T* dptr,
-                              std::size_t count, const Stream& s) {
-      return hipMemcpyAsync(hptr, dptr, count*sizeof(T),
-                            hipMemcpyDeviceToHost, s);
-    }
-    template<typename T> hipError_t
-    copy_host_to_device(T* dptr, const T* hptr, std::size_t count) {
-      return hipMemcpy(dptr, hptr, count*sizeof(T),
-                       hipMemcpyHostToDevice);
-    }
-    template<typename T> hipError_t
-    copy_host_to_device_async(T* dptr, const T* hptr,
-                              std::size_t count, const Stream& s) {
-      return hipMemcpyAsync(dptr, hptr, count*sizeof(T),
-                            hipMemcpyHostToDevice, s);
-    }
-
-    // template<typename T> hipError_t
-    // copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
-    //   assert(d.rows() == h.rows() && d.cols() == h.cols());
-    //   assert(d.rows() == d.ld() && h.rows() == h.ld());
-    //   return copy_device_to_host
-    //     (h.data(), d.data(), std::size_t(d.rows())*d.cols());
-    // }
-    // template<typename T> hipError_t
-    // copy_device_to_host(DenseMatrix<T>& h, const T* d) {
-    //   assert(h.rows() == h.ld());
-    //   return copy_device_to_host
-    //     (h.data(), d, std::size_t(h.rows())*h.cols());
-    // }
-    // template<typename T> hipError_t
-    // copy_device_to_host(T* h, const DenseMatrix<T>& d) {
-    //   assert(d.rows() == d.ld());
-    //   return copy_device_to_host
-    //     (h, d.data(), std::size_t(d.rows())*d.cols());
-    // }
-    // template<typename T> hipError_t
-    // copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
-    //   assert(d.rows() == h.rows() && d.cols() == h.cols());
-    //   assert(d.rows() == d.ld() && h.rows() == h.ld());
-    //   return copy_host_to_device
-    //     (d.data(), h.data(), std::size_t(d.rows())*d.cols());
-    // }
-    // template<typename T> hipError_t
-    // copy_host_to_device(DenseMatrix<T>& d, const T* h) {
-    //   assert(d.rows() == d.ld());
-    //   return copy_host_to_device
-    //     (d.data(), h, std::size_t(d.rows())*d.cols());
-    // }
-    // template<typename T> hipError_t
-    // copy_host_to_device(T* d, const DenseMatrix<T>& h) {
-    //   assert(h.rows() == h.ld());
-    //   return copy_host_to_device
-    //     (d, h.data(), std::size_t(h.rows())*h.cols());
-    // }
-    // template<typename T> hipError_t
-    // copy_host_to_device_async(T* d, const DenseMatrix<T>& h,
-    //                           const Stream& s) {
-    //   if (!h.rows() || !h.cols()) return hipSuccess;
-    //   assert(h.rows() == h.ld());
-    //   return copy_host_to_device_async
-    //     (d, h.data(), h.rows()*h.cols(), s);
-    // }
-    // template<typename T> hipError_t
-    // copy_host_to_device_async(DenseMatrix<T>& d, const T* h,
-    //                           const Stream& s) {
-    //   if (!d.rows() || !d.cols()) return hipSuccess;
-    //   assert(d.rows() == d.ld());
-    //   return copy_host_to_device_async
-    //     (d.data(), h, d.rows()*d.cols(), s);
-    // }
-
-    template<typename T> hipError_t
-    copy_device_to_device(T* d1ptr, const T* d2ptr, std::size_t count) {
-      return hipMemcpy(d1ptr, d2ptr, count*sizeof(T),
-                       hipMemcpyDeviceToDevice);
-    }
-    template<typename T> hipError_t
-    copy_device_to_device(DenseMatrix<T>& d1,
-                          const DenseMatrix<T>& d2) {
-      if (!d1.rows() || !d1.cols()) return hipSuccess;
-      assert(d1.rows() == d2.rows() && d1.cols() == d2.cols());
-      if (d1.rows() != d1.ld() || d2.rows() != d2.ld()) {
-        return hipMemcpy2D
-          (d1.data(), d1.ld()*sizeof(T), d2.data(), d2.ld()*sizeof(T),
-           d2.rows()*sizeof(T), d2.cols(), hipMemcpyDeviceToDevice);
-      } else
-        return copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
-    }
-
-    template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type>
-    hipError_t
-    copy_real_to_scalar(scalar_t* dest, const real_t* src,
-                        std::size_t size) {
-      hipMemset(dest, 0, size*sizeof(scalar_t));
-      return hipMemcpy2D(dest, sizeof(scalar_t), src, sizeof(real_t),
-                         sizeof(real_t), size, hipMemcpyDeviceToDevice);
-    }
-
-    inline std::size_t available_memory() {
-      std::size_t free_device_mem, total_device_mem;
-      gpu_check(hipMemGetInfo(&free_device_mem, &total_device_mem));
-      return free_device_mem;
-    }
-
-    template<typename T> class DeviceMemory {
-    public:
-      DeviceMemory() {}
-      DeviceMemory(std::size_t size) {
-        if (size) {
-          size_ = size;
-#if 0
-          if (hipMalloc(&data_, size*sizeof(T)) != hipSuccess) {
-            std::cerr << "Failed to allocate " << size << " "
-                      << typeid(T).name() << " objects" << std::endl;
-            throw std::bad_alloc();
-          }
-          STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
-          is_managed_ = false;
-#else
-          auto e = hipMalloc(&data_, size*sizeof(T));
-          if (e == hipSuccess) {
-            STRUMPACK_ADD_DEVICE_MEMORY(size*sizeof(T));
-            is_managed_ = false;
-          } else {
-            STRUMPACK_ADD_MEMORY(size*sizeof(T));
-            std::cerr << "#  hipMalloc failed: "
-                      << hipGetErrorString(e) << std::endl;
-            std::cerr << "#  Trying hipMallocManaged instead ..."
-                      << std::endl;
-            gpu_check(hipGetLastError()); // reset to hipSuccess
-            gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
-            is_managed_ = true;
-          }
+#if defined(STRUMPACK_USE_MAGMA)
+    const magma_queue_t& get_magma_queue(const Handle& h);
+    magma_queue_t& get_magma_queue(Handle& s);
 #endif
-        }
-      }
-      DeviceMemory(const DeviceMemory&) = delete;
-      DeviceMemory(DeviceMemory<T>&& d) {
-        *this = std::forward<DeviceMemory<T>>(d);
-      }
-      DeviceMemory<T>& operator=(const DeviceMemory<T>&) = delete;
-      DeviceMemory<T>& operator=(DeviceMemory<T>&& d) {
-        if (this != &d) {
-          release();
-          data_ = d.data_;
-          size_ = d.size_;
-          is_managed_ = d.is_managed_;
-          d.data_ = nullptr;
-          d.release();
-        }
-        return *this;
-      }
-      ~DeviceMemory() { release(); }
-      std::size_t size() const { return size_; }
-      operator T*() { return data_; }
-      operator const T*() const { return data_; }
-      template<typename S> S* as() {
-        return reinterpret_cast<S*>(data_);
-      }
-      template<typename S> const S* as() const {
-        return reinterpret_cast<S*>(data_);
-      }
-      void release() {
-        if (data_) {
-          if (is_managed_) {
-            STRUMPACK_SUB_MEMORY(size_*sizeof(T));
-          } else {
-            STRUMPACK_SUB_DEVICE_MEMORY(size_*sizeof(T));
-          }
-          gpu_check(hipFree(data_));
-        }
-        data_ = nullptr;
-        size_ = 0;
-        is_managed_ = false;
-      }
-    private:
-      T* data_ = nullptr;
-      std::size_t size_ = 0;
-      bool is_managed_ = false;
-    };
 
-    template<typename T> class HostMemory {
-    public:
-      HostMemory() {}
-      HostMemory(std::size_t size) {
-        if (size) {
-          STRUMPACK_ADD_MEMORY(size*sizeof(T));
-          auto e = hipHostMalloc(&data_, size*sizeof(T));
-          is_managed_ = false;
-          size_ = size;
-          if (e != hipSuccess) {
-            std::cerr << "#  hipMalloc failed: "
-                      << hipGetErrorString(e) << std::endl;
-            std::cerr << "#  Trying hipMallocManaged instead ..."
-                      << std::endl;
-            gpu_check(hipGetLastError()); // reset to hipSuccess
-            gpu_check(hipMallocManaged(&data_, size*sizeof(T)));
-            is_managed_ = true;
-          }
-        }
-      }
-      HostMemory(const HostMemory&) = delete;
-      HostMemory(HostMemory<T>&& d) {
-        *this = std::forward<HostMemory<T>>(d);
-      }
-      HostMemory<T>& operator=(const HostMemory<T>&) = delete;
-      HostMemory<T>& operator=(HostMemory<T>&& d) {
-        if (this != & d) {
-          release();
-          data_ = d.data_;
-          size_ = d.size_;
-          is_managed_ = d.is_managed_;
-          d.data_ = nullptr;
-          d.release();
-        }
-        return *this;
-      }
-      ~HostMemory() { release(); }
-      std::size_t size() const { return size_; }
-      T* data() { return data_; }
-      const T* data() const { return data_; }
-      operator T*() { return data_; }
-      operator const T*() const { return data_; }
-      template<typename S> S* as() { return reinterpret_cast<S*>(data_); }
-      void release() {
-        if (data_) {
-          STRUMPACK_SUB_MEMORY(size_*sizeof(T));
-          if (!is_managed_) {
-            gpu_check(hipHostFree(data_));
-          } else {
-            gpu_check(hipFree(data_));
-          }
-        }
-        data_ = nullptr;
-        size_ = 0;
-        is_managed_ = false;
-      }
-    private:
-      T* data_ = nullptr;
-      std::size_t size_ = 0;
-      bool is_managed_ = false;
-    };
+#if defined(STRUMPACK_USE_KBLAS)
+    const kblasHandle_t& get_kblas_handle(const Handle& h);
+    kblasHandle_t& get_kblas_handle(Handle& h);
 
-    // template<typename scalar_t>
-    // int getrf_buffersize(SOLVERHandle& handle, int n);
-
-    // template<typename scalar_t> void
-    // getrf(SOLVERHandle& handle, DenseMatrix<scalar_t>& A,
-    //       scalar_t* Workspace, int* devIpiv, int* devInfo);
-
-    // template<typename scalar_t> void
-    // getrs(SOLVERHandle& handle, Trans trans,
-    //       const DenseMatrix<scalar_t>& A, const int* devIpiv,
-    //       DenseMatrix<scalar_t>& B, int *devInfo);
-
-    // template<typename scalar_t> void
-    // trsm(BLASHandle& handle, Side side, UpLo uplo,
-    //      Trans trans, Diag diag, const scalar_t alpha,
-    //      DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
-
-    /*template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type> int
-    gesvdj_buffersize(SOLVERHandle& handle, Jobz jobz, int m, int n,
-                      real_t* S, hipsolverGesvdjInfo_t params);
-
-    template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type> void
-    gesvdj(SOLVERHandle& handle, Jobz jobz, DenseMatrix<scalar_t>& A,
-           real_t* d_S, DenseMatrix<scalar_t>& U,
-           DenseMatrix<scalar_t>& V, scalar_t* Workspace,
-           int Lwork, int* devInfo, hipsolverGesvdjInfo_t params);*/
-
-    // template<typename scalar_t,
-    //          typename real_t=typename RealType<scalar_t>::value_type> void
-    // gesvd(SOLVERHandle& handle, DenseMatrix<scalar_t>& A, real_t* d_S,
-    //       DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
-    //       real_t* E, int* devInfo);
-
-    template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type> void
-    gesvd_hip(SOLVERHandle& handle, real_t* S, DenseMatrix<scalar_t>& A,
-              DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
-              int* devInfo);
-
-    // template<typename scalar_t> void
-    // geam(BLASHandle& handle, Trans transa, Trans transb, const scalar_t alpha,
-    //      const DenseMatrix<scalar_t>& A, const scalar_t beta,
-    //      const DenseMatrix<scalar_t>& B, DenseMatrix<scalar_t>& C);
-
-    // template<typename scalar_t> void
-    // dgmm(BLASHandle& handle, Side side, const DenseMatrix<scalar_t>& A,
-    //      const scalar_t* x, DenseMatrix<scalar_t>& C);
-
-    // template<typename scalar_t> void
-    // gemm(BLASHandle& handle, Trans ta, Trans tb,
-    //      scalar_t alpha, const DenseMatrix<scalar_t>& a,
-    //      const DenseMatrix<scalar_t>& b, scalar_t beta,
-    //      DenseMatrix<scalar_t>& c);
-
-    // template<typename scalar_t> void
-    // gemv(BLASHandle& handle, Trans ta,
-    //      scalar_t alpha, const DenseMatrix<scalar_t>& a,
-    //      const DenseMatrix<scalar_t>& x, scalar_t beta,
-    //      DenseMatrix<scalar_t>& y);
-
-    // template<typename scalar_t> void
-    // laswp(BLASHandle& handle, DenseMatrix<scalar_t>& A,
-    //       int k1, int k2, int* ipiv, int inc);
-
-    // // assume inc = 1
-    // template<typename scalar_t> void
-    // laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
-    //                    scalar_t** dA, int* lddA, int** dipiv, int* npivots,
-    //                    unsigned int batchCount);
+    const kblasRandState_t& get_kblas_rand_state(const Handle& h);
+    kblasRandState_t& get_kblas_rand_state(Handle& h);
+#endif
 
   } // end namespace gpu
 } // end namespace strumpack

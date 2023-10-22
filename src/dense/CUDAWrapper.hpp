@@ -32,11 +32,9 @@
 #include "GPUWrapper.hpp"
 #if defined(STRUMPACK_USE_MAGMA)
 #include <magma_v2.h>
-// #include "MAGMAWrapper.hpp"
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
 #include "kblas.h"
-// #include "KBLASWrapper.hpp"
 #endif
 
 #include <cmath>
