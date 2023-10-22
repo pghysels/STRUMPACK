@@ -101,7 +101,7 @@ if(NOT (STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP))
     set(TPL_ENABLE_MAGMA OFF)
   endif()
 endif()
-if(NOT (STRUMPACK_USE_CUDA AND STRUMPACK_USE_MAGMA))
+if(NOT (STRUMPACK_USE_CUDA AND TPL_ENABLE_MAGMA))
   if(TPL_ENABLE_KBLAS)
     message(STATUS "Disabling KBLAS, it requires CUDA and MAGMA to be enabled.")
     set(TPL_ENABLE_KBLAS OFF)
@@ -197,10 +197,13 @@ endif()
 
 
 if(TPL_ENABLE_KBLAS)
-  # TODO check for KBLAS
-  message(WARNING "To use KBLAS, set TPL_KBLAS_INCLUDE_DIR and "
-    " TPL_KBLAS_LIBRARIES.")
-  option(STRUMPACK_USE_KBLAS "" ON)
+  if(MAGMA_FOUND)
+    # TODO check for KBLAS
+    message(WARNING "To use KBLAS, set TPL_KBLAS_INCLUDE_DIR and TPL_KBLAS_LIBRARIES.")
+    option(STRUMPACK_USE_KBLAS "" ON)
+  else()
+    message(STATUS "Disabling KBLAS, MAGMA not found.")
+  endif()
 endif()
 
 
