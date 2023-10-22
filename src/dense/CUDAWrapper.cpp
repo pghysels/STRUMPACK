@@ -326,27 +326,30 @@ namespace strumpack {
 
 
     void device_memset(void* dptr, int value, std::size_t count) {
-      cudaMemset(dptr, value, count);
+      gpu_check(cudaMemset(dptr, value, count));
     }
 
-    void device_copy(void* dest, const void* src, std::size_t count, CopyDir dir) {
-      cudaMemcpy(dest, src, count, CD2cuMK(dir));
+    void device_copy(void* dest, const void* src,
+                     std::size_t count, CopyDir dir) {
+      gpu_check(cudaMemcpy(dest, src, count, CD2cuMK(dir)));
     }
     void device_copy_async(void* dest, const void* src, std::size_t count,
                            CopyDir dir, const Stream& s) {
-      cudaMemcpyAsync(dest, src, count, CD2cuMK(dir), get_cuda_stream(s));
+      gpu_check(cudaMemcpyAsync(dest, src, count, CD2cuMK(dir),
+                                get_cuda_stream(s)));
     }
     void device_copy_2D(void* dest, std::size_t dpitch,
                         const void* src, std::size_t spitch,
                         std::size_t width, std::size_t height, CopyDir dir) {
-      cudaMemcpy2D(dest, dpitch, src, spitch, width , height, CD2cuMK(dir));
+      gpu_check(cudaMemcpy2D(dest, dpitch, src, spitch,
+                             width , height, CD2cuMK(dir)));
     }
     void device_copy_2D_async(void* dest, std::size_t dpitch,
                               const void* src, std::size_t spitch,
                               std::size_t width, std::size_t height,
                               CopyDir dir, const Stream& s) {
-      cudaMemcpy2DAsync(dest, dpitch, src, spitch, width , height,
-                        CD2cuMK(dir), get_cuda_stream(s));
+      gpu_check(cudaMemcpy2DAsync(dest, dpitch, src, spitch, width, height,
+                                  CD2cuMK(dir), get_cuda_stream(s)));
     }
 
     std::size_t available_memory() {

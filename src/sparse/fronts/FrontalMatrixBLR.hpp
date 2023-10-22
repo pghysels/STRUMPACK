@@ -63,7 +63,7 @@ namespace strumpack {
                           const std::vector<Triplet<scalar_t>>& e21,
                           int task_depth, const Opts_t& opts);
 
-    std::size_t get_device_F22_worksize() { return 0; };
+    std::size_t get_device_F22_worksize() override { return 0; };
     scalar_t* get_device_F22(scalar_t*) override;
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
