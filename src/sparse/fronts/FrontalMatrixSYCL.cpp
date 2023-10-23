@@ -27,7 +27,6 @@
  *
  */
 #include <sycl/sycl.hpp>
-// #include <dpct/dpct.hpp>
 #include <complex>
 #include <iostream>
 #include <complex>
@@ -46,41 +45,7 @@ namespace strumpack {
      * to compute norms or absolute value.
      */
     template<class T> struct real_type { typedef T value_type; };
-    // template <class T> struct real_type<std::complex<T>> { typedef T value_type; };
     template<class T> struct real_type<std::complex<T>> { typedef T value_type; };
-
-    /**
-     * The types float2 and double2 are binary the same as
-     * std::complex or thrust::complex, but they can be used as
-     * __shared__ variables, whereas thrust::complex cannot because it
-     * doesn't have a no-argument default constructor.
-     */
-    // template<class T> struct primitive_type { typedef T value_type; };
-    // template <>
-    // struct primitive_type<std::complex<float>> {
-    //   typedef sycl::float2 value_type;
-    // };
-    // template <>
-    // struct primitive_type<std::complex<double>> {
-    //   typedef sycl::double2 value_type;
-    // };
-    // template <>
-    // struct primitive_type<std::complex<float>> {
-    //   typedef sycl::float2 value_type;
-    // };
-    // template <>
-    // struct primitive_type<std::complex<double>> {
-    //   typedef sycl::double2 value_type;
-    // };
-
-    /**
-     * Get the corresponding thrust::complex for std::complex
-     */
-    // template<class T> struct cuda_type { typedef T value_type; };
-    // template <class T>
-    // struct cuda_type<std::complex<T>> {
-    //   typedef std::complex<T> value_type;
-    // };
 
     float real_part(float& a) { return a; }
     double real_part(double& a) { return a; }
@@ -104,10 +69,8 @@ namespace strumpack {
     template<typename T, int unroll> void
     assemble_kernel(unsigned int nf, AssembleData<T>* dat,
                     const sycl::nd_item<3> &item_ct1) {
-      int idx = item_ct1.get_group(2) * item_ct1.get_local_range(2) * unroll +
-	item_ct1.get_local_id(2),
-	op = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
-	item_ct1.get_local_id(1);
+      int idx = item_ct1.get_group(2) * item_ct1.get_local_range(2) * unroll + item_ct1.get_local_id(2),
+        op = item_ct1.get_group(1) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
       if (op >= nf) return;
       auto& F = dat[op];
       for (int i = 0, j = idx; i < unroll; i++, j += item_ct1.get_local_range(2)) {
@@ -136,11 +99,9 @@ namespace strumpack {
     void extend_add_kernel
     (unsigned int by0, unsigned int nf, AssembleData<T>* dat, bool left,
      const sycl::nd_item<3> &item_ct1) {
-      int y = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
-	item_ct1.get_local_id(2),
-	x0 = (item_ct1.get_group(1) + by0) * unroll,
-	z = item_ct1.get_group(0) * item_ct1.get_local_range(0) +
-	item_ct1.get_local_id(0);
+      int y = item_ct1.get_group(2) * item_ct1.get_local_range(2) + item_ct1.get_local_id(2),
+        x0 = (item_ct1.get_group(1) + by0) * unroll,
+        z = item_ct1.get_group(0) * item_ct1.get_local_range(0) + item_ct1.get_local_id(0);
       if (z >= nf) return;
       auto& f = dat[z];
       auto CB = left ? f.CB1 : f.CB2;
@@ -194,17 +155,17 @@ namespace strumpack {
           for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
             sycl::range<3> grid(1, nb, std::min(nbf - f, MAX_BLOCKS_Y));
             /*
-	      DPCT1049:0: The work-group size passed to the SYCL kernel may exceed
-	      the limit. To get the device limit, query
-	      info::device::max_work_group_size. Adjust the work-group size if
-	      needed.
+              DPCT1049:0: The work-group size passed to the SYCL kernel may exceed
+              the limit. To get the device limit, query
+              info::device::max_work_group_size. Adjust the work-group size if
+              needed.
             */
-	    q_ct1.parallel_for(sycl::nd_range<3>(grid * block, block),
-			       [=](sycl::nd_item<3> item_ct1) {
-				 assemble_kernel<T, unroll>(
-							    nf - f * ops, ddat + f * ops,
-							    item_ct1);
-			       });
+            q_ct1.parallel_for
+              (sycl::nd_range<3>(grid * block, block),
+               [=](sycl::nd_item<3> item_ct1) {
+                 assemble_kernel<T, unroll>
+                   (nf - f * ops, ddat + f * ops, item_ct1);
+               });
           }
         }
       }
@@ -224,35 +185,33 @@ namespace strumpack {
             nby = (du + unroll - 1) / unroll,
             nbf = (nf + ops - 1) / ops;
           sycl::range<3> block(ops, 1, nt);
-          //using T_ = typename cuda_type<T>::value_type;
-          //auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
           for (unsigned int y=0; y<nby; y+=MAX_BLOCKS_Y) {
             unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
             for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
               sycl::range<3> grid(nbx, ny, std::min(nbf - f, MAX_BLOCKS_Z));
               /*
-		DPCT1049:1: The work-group size passed to the SYCL kernel may
-		exceed the limit. To get the device limit, query
-		info::device::max_work_group_size. Adjust the work-group size if
-		needed.
+                DPCT1049:1: The work-group size passed to the SYCL kernel may
+                exceed the limit. To get the device limit, query
+                info::device::max_work_group_size. Adjust the work-group size if
+                needed.
               */
-	      q_ct1.parallel_for
-		(sycl::nd_range<3>(grid * block, block),
-		 [=](sycl::nd_item<3> item_ct1) {
-		  extend_add_kernel<T, unroll>(y, nf - f * ops, ddat + f * ops, true, item_ct1);
-		});
+              q_ct1.parallel_for
+                (sycl::nd_range<3>(grid * block, block),
+                 [=](sycl::nd_item<3> item_ct1) {
+                  extend_add_kernel<T, unroll>(y, nf - f * ops, ddat + f * ops, true, item_ct1);
+                });
               /*
-		DPCT1049:2: The work-group size passed to the SYCL kernel may
-		exceed the limit. To get the device limit, query
-		info::device::max_work_group_size. Adjust the work-group size if
-		needed.
+                DPCT1049:2: The work-group size passed to the SYCL kernel may
+                exceed the limit. To get the device limit, query
+                info::device::max_work_group_size. Adjust the work-group size if
+                needed.
               */
-	      q_ct1.parallel_for
-		(sycl::nd_range<3>(grid * block, block),
-		 [=](sycl::nd_item<3> item_ct1) {
-		  extend_add_kernel<T, unroll>(y, nf - f * ops, ddat + f * ops,
-					       false, item_ct1);
-		});
+              q_ct1.parallel_for
+                (sycl::nd_range<3>(grid * block, block),
+                 [=](sycl::nd_item<3> item_ct1) {
+                  extend_add_kernel<T, unroll>(y, nf - f * ops, ddat + f * ops,
+                                               false, item_ct1);
+                });
             }
           }
         }
@@ -288,10 +247,6 @@ namespace strumpack {
     LU_block_kernel(int n, T* F, int* piv, int* info,
                     const sycl::nd_item<3> &item_ct1, int &p,
                     T* M, real_t &Mmax, real_t *cabs) {
-      // using cuda_primitive_t = typename primitive_type<T>::value_type;
-      // using real_t = typename real_type<T>::value_type;
-      // T* M = reinterpret_cast<T*>(M_);
-
       int j = item_ct1.get_local_id(2), i = item_ct1.get_local_id(1);
       if (i == 0 && j == 0)
         *info = 0;
@@ -300,9 +255,9 @@ namespace strumpack {
       if (i < n && j < n)
         M[i+j*NT] = F[i+j*n];
       /*
-	DPCT1065:3: Consider replacing sycl::nd_item::barrier() with
-	sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
-	performance if there is no access to global memory.
+        DPCT1065:3: Consider replacing sycl::nd_item::barrier() with
+        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
+        performance if there is no access to global memory.
       */
       item_ct1.barrier();
 
@@ -312,9 +267,9 @@ namespace strumpack {
         if (j == k && i >= k)
           cabs[i] = absolute_value(M[i+j*NT]);
         /*
-	  DPCT1065:4: Consider replacing sycl::nd_item::barrier() with
-	  sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	  better performance if there is no access to global memory.
+          DPCT1065:4: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
         */
         item_ct1.barrier();
         if (j == k && i == k) {
@@ -330,9 +285,9 @@ namespace strumpack {
           piv[k] = p + 1;
         }
         /*
-	  DPCT1065:5: Consider replacing sycl::nd_item::barrier() with
-	  sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	  better performance if there is no access to global memory.
+          DPCT1065:5: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
         */
         item_ct1.barrier();
         if (Mmax == T(0.)) {
@@ -346,27 +301,27 @@ namespace strumpack {
             M[p+j*NT] = tmp;
           }
           /*
-	    DPCT1065:6: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:6: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier();
           // divide by the pivot element
           if (j == k && i > k && i < n)
             M[i+k*NT] /= M[k+k*NT];
           /*
-	    DPCT1065:7: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:7: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier();
           // Schur update
           if (j > k && i > k && j < n && i < n)
             M[i+j*NT] -= M[i+k*NT] * M[k+j*NT];
           /*
-	    DPCT1065:8: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:8: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier();
         }
@@ -398,7 +353,7 @@ namespace strumpack {
     replace_pivots_kernel(int n, T* A, real_t thresh,
                           const sycl::nd_item<3> &item_ct1) {
       int i = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
-	item_ct1.get_local_id(2);
+        item_ct1.get_local_id(2);
       if (i < n) {
         std::size_t k = i + i*n;
         if (absolute_value(A[k]) < thresh)
@@ -409,33 +364,32 @@ namespace strumpack {
     template<typename T, typename real_t>
     void replace_pivots(int n, T* A, real_t thresh, gpu::Stream* s) {
       if (!n) return;
-      //using T_ = typename cuda_type<T>::value_type;
       int NT = 128;
       if (s)
         /*
-	  DPCT1049:9: The work-group size passed to the SYCL kernel may exceed the
-	  limit. To get the device limit, query info::device::max_work_group_size.
-	  Adjust the work-group size if needed.
+          DPCT1049:9: The work-group size passed to the SYCL kernel may exceed the
+          limit. To get the device limit, query info::device::max_work_group_size.
+          Adjust the work-group size if needed.
         */
         get_sycl_queue(*s).parallel_for
-	  (sycl::nd_range<3>((n + NT - 1) / NT * sycl::range<3>(1, 1, NT),
-			     sycl::range<3>(1, 1, NT)),
-	   [=](sycl::nd_item<3> item_ct1) {
-	    replace_pivots_kernel<T, real_t>(n, A, thresh, item_ct1);
-	  });
+          (sycl::nd_range<3>((n + NT - 1) / NT * sycl::range<3>(1, 1, NT),
+                             sycl::range<3>(1, 1, NT)),
+           [=](sycl::nd_item<3> item_ct1) {
+            replace_pivots_kernel<T, real_t>(n, A, thresh, item_ct1);
+          });
       else
         /*
-	  DPCT1049:10: The work-group size passed to the SYCL kernel may exceed
-	  the limit. To get the device limit, query
-	  info::device::max_work_group_size. Adjust the work-group size if needed.
+          DPCT1049:10: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
         */
         get_sycl_queue().parallel_for
-	  (sycl::nd_range<3>(sycl::range<3>(1, 1, (n + NT - 1) / NT) *
-			     sycl::range<3>(1, 1, NT),
-			     sycl::range<3>(1, 1, NT)),
-	   [=](sycl::nd_item<3> item_ct1) {
-	    replace_pivots_kernel<T, real_t>(n, A, thresh, item_ct1);
-	  });
+          (sycl::nd_range<3>(sycl::range<3>(1, 1, (n + NT - 1) / NT) *
+                             sycl::range<3>(1, 1, NT),
+                             sycl::range<3>(1, 1, NT)),
+           [=](sycl::nd_item<3> item_ct1) {
+            replace_pivots_kernel<T, real_t>(n, A, thresh, item_ct1);
+          });
     }
 
     template<typename T, typename real_t> void
@@ -443,9 +397,9 @@ namespace strumpack {
                                  unsigned int batchCount,
                                  const sycl::nd_item<3> &item_ct1) {
       int i = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
-	item_ct1.get_local_id(2),
-	f = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
-	item_ct1.get_local_id(1);
+        item_ct1.get_local_id(2),
+        f = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
       if (f >= batchCount) return;
       if (i >= dn[f]) return;
       auto A = dA[f];
@@ -469,21 +423,20 @@ namespace strumpack {
       unsigned int nbx = (max_n + nt - 1) / nt,
         nbf = (batchCount + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
-      // using T_ = typename cuda_type<T>::value_type;
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
         sycl::range<3> grid(1, nbx, std::min(nbf - f, MAX_BLOCKS_Y));
         auto f0 = f * ops;
         /*
-	  DPCT1049:11: The work-group size passed to the SYCL kernel may exceed
-	  the limit. To get the device limit, query
-	  info::device::max_work_group_size. Adjust the work-group size if needed.
+          DPCT1049:11: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
         */
         get_sycl_queue(handle).parallel_for
-	  (sycl::nd_range<3>(grid * block, block),
-	   [=](sycl::nd_item<3> item_ct1) {
-	    replace_pivots_vbatch_kernel(dn + f0, dA + f0, lddA + f0,
-					 thresh, batchCount - f0, item_ct1);
-	  });
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            replace_pivots_vbatch_kernel(dn + f0, dA + f0, lddA + f0,
+                                         thresh, batchCount - f0, item_ct1);
+          });
       }
     }
 
@@ -500,15 +453,13 @@ namespace strumpack {
     template<typename T, int NT> void
     solve_block_kernel(int n, int m, T* F, T* X, int* piv,
                        const sycl::nd_item<3> &item_ct1, int *P, T* A, T* B) {
-      // using primitive_t = typename primitive_type<T>::value_type;
-      // T *B = reinterpret_cast<T*>(B_), *A = reinterpret_cast<T*>(A_);
       int j = item_ct1.get_local_id(2), i = item_ct1.get_local_id(1);
       if (j == 0)
         P[i] = i;
       /*
-	DPCT1065:12: Consider replacing sycl::nd_item::barrier() with
-	sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
-	performance if there is no access to global memory.
+        DPCT1065:12: Consider replacing sycl::nd_item::barrier() with
+        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
+        performance if there is no access to global memory.
       */
       item_ct1.barrier();
       if (i == 0 && j == 0)
@@ -522,9 +473,9 @@ namespace strumpack {
       if (i < n && j < n)
         A[j+i*NT] = F[i+j*n];
       /*
-	DPCT1065:13: Consider replacing sycl::nd_item::barrier() with
-	sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
-	performance if there is no access to global memory.
+        DPCT1065:13: Consider replacing sycl::nd_item::barrier() with
+        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
+        performance if there is no access to global memory.
       */
       item_ct1.barrier();
 
@@ -536,9 +487,9 @@ namespace strumpack {
         if (i < n && c < m)
           B[j+i*NT] = X[P[i]+c*n];
         /*
-	  DPCT1065:14: Consider replacing sycl::nd_item::barrier() with
-	  sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	  better performance if there is no access to global memory.
+          DPCT1065:14: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
         */
         item_ct1.barrier();
 
@@ -547,9 +498,9 @@ namespace strumpack {
           if (i > k && i < n && c < m)
             B[j+i*NT] -= A[k+i*NT] * B[j+k*NT];
           /*
-	    DPCT1065:15: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:15: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier();
         }
@@ -559,17 +510,17 @@ namespace strumpack {
           if (i == k && c < m)
             B[j+i*NT] /= A[i+i*NT];
           /*
-	    DPCT1065:16: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:16: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier();
           if (i < k && c < m)
             B[j+i*NT] -= A[k+i*NT] * B[j+k*NT];
           /*
-	    DPCT1065:17: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:17: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier();
         }
@@ -605,9 +556,9 @@ namespace strumpack {
         if (i < d1 && c < d2)
           B[j+i*NT] = F12[i+c*d1];
         /*
-	  DPCT1065:18: Consider replacing sycl::nd_item::barrier() with
-	  sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	  better performance if there is no access to global memory.
+          DPCT1065:18: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
         */
         item_ct1.barrier();
         for (int rb=0; rb<d2; rb+=NT) {
@@ -616,9 +567,9 @@ namespace strumpack {
           if (r < d2 && j < d1)
             A[j+i*NT] = F21[r+j*d2];
           /*
-	    DPCT1065:19: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:19: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier(); // wait for A and B
           if (c < d2 && r < d2) {
@@ -629,9 +580,9 @@ namespace strumpack {
             F22[r+c*d2] -= tmp;
           }
           /*
-	    DPCT1065:20: Consider replacing sycl::nd_item::barrier() with
-	    sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
-	    better performance if there is no access to global memory.
+            DPCT1065:20: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
           */
           item_ct1.barrier(); // sync before reading new A/B
         }
@@ -651,61 +602,59 @@ namespace strumpack {
                             real_t thresh, int *dinfo) {
       sycl::queue &q_ct1 = get_sycl_queue();
       if (!count) return;
-      // using T_ = typename cuda_type<T>::value_type;
-      // auto dat_ = reinterpret_cast<FrontData<T_>*>(dat);
       sycl::range<3> block(1, NT, NT); //, grid(count, 1, 1);
       /*
-	DPCT1049:21: The work-group size passed to the SYCL kernel may exceed the
-	limit. To get the device limit, query info::device::max_work_group_size.
-	Adjust the work-group size if needed.
+        DPCT1049:21: The work-group size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the work-group size if needed.
       */
       q_ct1.submit([&](sycl::handler &cgh) {
-	  sycl::local_accessor<int, 0> p_acc_ct1(cgh);
-	  sycl::local_accessor<T, 1> M__acc_ct1(sycl::range<1>(NT * NT), cgh);
-	  sycl::local_accessor<real_t, 0> Mmax_acc_ct1(cgh);
-	  sycl::local_accessor<real_t, 1> cabs_acc_ct1(sycl::range<1>(NT), cgh);
-	  cgh.parallel_for
-	    (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
-	     [=](sycl::nd_item<3> item_ct1) {
-	      LU_block_kernel_batched<T, NT, real_t>
-		(dat, replace, thresh, dinfo, item_ct1, p_acc_ct1,
-		 M__acc_ct1.get_pointer(), Mmax_acc_ct1,
-		 cabs_acc_ct1.get_pointer());
-	    });
-	});
+          sycl::local_accessor<int, 0> p_acc_ct1(cgh);
+          sycl::local_accessor<T, 1> M__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          sycl::local_accessor<real_t, 0> Mmax_acc_ct1(cgh);
+          sycl::local_accessor<real_t, 1> cabs_acc_ct1(sycl::range<1>(NT), cgh);
+          cgh.parallel_for
+            (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
+             [=](sycl::nd_item<3> item_ct1) {
+              LU_block_kernel_batched<T, NT, real_t>
+                (dat, replace, thresh, dinfo, item_ct1, p_acc_ct1,
+                 M__acc_ct1.get_pointer(), Mmax_acc_ct1,
+                 cabs_acc_ct1.get_pointer());
+            });
+        });
       /*
-	DPCT1049:22: The work-group size passed to the SYCL kernel may exceed the
-	limit. To get the device limit, query info::device::max_work_group_size.
-	Adjust the work-group size if needed.
+        DPCT1049:22: The work-group size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the work-group size if needed.
       */
       q_ct1.submit([&](sycl::handler &cgh) {
-	  sycl::local_accessor<int, 1> P_acc_ct1(sycl::range<1>(NT), cgh);
-	  sycl::local_accessor<T, 1> A__acc_ct1(sycl::range<1>(NT * NT), cgh);
-	  sycl::local_accessor<T, 1> B__acc_ct1(sycl::range<1>(NT * NT), cgh);
-	  cgh.parallel_for
-	    (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
-	     [=](sycl::nd_item<3> item_ct1) {
-	      solve_block_kernel_batched<T, NT>
-		(dat, item_ct1, P_acc_ct1.get_pointer(),
-		 A__acc_ct1.get_pointer(), B__acc_ct1.get_pointer());
-	    });
-	});
+          sycl::local_accessor<int, 1> P_acc_ct1(sycl::range<1>(NT), cgh);
+          sycl::local_accessor<T, 1> A__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          sycl::local_accessor<T, 1> B__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          cgh.parallel_for
+            (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
+             [=](sycl::nd_item<3> item_ct1) {
+              solve_block_kernel_batched<T, NT>
+                (dat, item_ct1, P_acc_ct1.get_pointer(),
+                 A__acc_ct1.get_pointer(), B__acc_ct1.get_pointer());
+            });
+        });
       /*
-	DPCT1049:23: The work-group size passed to the SYCL kernel may exceed the
-	limit. To get the device limit, query info::device::max_work_group_size.
-	Adjust the work-group size if needed.
+        DPCT1049:23: The work-group size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the work-group size if needed.
       */
       q_ct1.submit([&](sycl::handler &cgh) {
-	  sycl::local_accessor<T, 1> B__acc_ct1(sycl::range<1>(NT * NT), cgh);
-	  sycl::local_accessor<T, 1> A__acc_ct1(sycl::range<1>(NT * NT), cgh);
-	  cgh.parallel_for
-	    (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
-	     [=](sycl::nd_item<3> item_ct1) {
-	      Schur_block_kernel_batched<T, NT>
-		(dat, item_ct1, B__acc_ct1.get_pointer(),
-		 A__acc_ct1.get_pointer());
-	    });
-	});
+          sycl::local_accessor<T, 1> B__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          sycl::local_accessor<T, 1> A__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          cgh.parallel_for
+            (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
+             [=](sycl::nd_item<3> item_ct1) {
+              Schur_block_kernel_batched<T, NT>
+                (dat, item_ct1, B__acc_ct1.get_pointer(),
+                 A__acc_ct1.get_pointer());
+            });
+        });
     }
 
 
@@ -738,9 +687,9 @@ namespace strumpack {
     (int N, int nrhs, unsigned int nf, AssembleData<T>* dat,
      const sycl::nd_item<3> &item_ct1) {
       int r = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
-	item_ct1.get_local_id(2),
-	i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
-	item_ct1.get_local_id(1);
+        item_ct1.get_local_id(2),
+        i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
       if (i >= nf) return;
       auto& f = dat[i];
       if (f.CB1)
@@ -752,9 +701,9 @@ namespace strumpack {
     (int N, int nrhs, unsigned int nf, AssembleData<T>* dat,
      const sycl::nd_item<3> &item_ct1) {
       int r = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
-	item_ct1.get_local_id(2),
-	i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
-	item_ct1.get_local_id(1);
+        item_ct1.get_local_id(2),
+        i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
       if (i >= nf) return;
       auto& f = dat[i];
       if (f.CB2)
@@ -778,30 +727,28 @@ namespace strumpack {
       ops = std::min(ops, nf);
       unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
-      // using T_ = typename cuda_type<T>::value_type;
-      // auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
         sycl::range<3> grid(1, nb, std::min(nbf - f, MAX_BLOCKS_Z));
         /*
-	  DPCT1049:24: The work-group size passed to the SYCL kernel may exceed
-	  the limit. To get the device limit, query
-	  info::device::max_work_group_size. Adjust the work-group size if needed.
+          DPCT1049:24: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
         */
         q_ct1.parallel_for
-	  (sycl::nd_range<3>(grid * block, block),
-	   [=](sycl::nd_item<3> item_ct1) {
-	    extend_add_rhs_kernel_left(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
-	  });
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            extend_add_rhs_kernel_left(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
+          });
         /*
-	  DPCT1049:25: The work-group size passed to the SYCL kernel may exceed
-	  the limit. To get the device limit, query
-	  info::device::max_work_group_size. Adjust the work-group size if needed.
+          DPCT1049:25: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
         */
         q_ct1.parallel_for
-	  (sycl::nd_range<3>(grid * block, block),
-	   [=](sycl::nd_item<3> item_ct1) {
-	    extend_add_rhs_kernel_right(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
-	  });
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            extend_add_rhs_kernel_right(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
+          });
       }
     }
 
@@ -826,9 +773,9 @@ namespace strumpack {
     extract_rhs_kernel(int N, int nrhs, unsigned int nf,
                        AssembleData<T>* dat, const sycl::nd_item<3> &item_ct1) {
       int r = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
-	item_ct1.get_local_id(2),
-	i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
-	item_ct1.get_local_id(1);
+        item_ct1.get_local_id(2),
+        i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
       if (i >= nf) return;
       auto& f = dat[i];
       if (f.CB1)
@@ -857,15 +804,15 @@ namespace strumpack {
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
         sycl::range<3> grid(1, nb, std::min(nbf - f, MAX_BLOCKS_Z));
         /*
-	  DPCT1049:26: The work-group size passed to the SYCL kernel may exceed
-	  the limit. To get the device limit, query
-	  info::device::max_work_group_size. Adjust the work-group size if needed.
+          DPCT1049:26: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
         */
         get_sycl_queue().parallel_for
-	  (sycl::nd_range<3>(grid * block, block),
-	   [=](sycl::nd_item<3> item_ct1) {
-	    extract_rhs_kernel(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
-	  });
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            extract_rhs_kernel(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
+          });
       }
     }
 
