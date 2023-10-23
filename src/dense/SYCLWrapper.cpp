@@ -448,5 +448,126 @@ namespace strumpack {
          const DenseMatrix<std::complex<double>>&, std::complex<double>,
          DenseMatrix<std::complex<double>>&);
 
+
+    /// code below was created from
+    /// dpct --cuda-include-path=/soft/libraries/cuda-headers/12.0.0/targets/x86_64-linux/include/ CUDAWrapper.cu
+
+    template<typename scalar_t> void
+    laswp_kernel(int n, scalar_t* dA, int lddA,
+                 int npivots, int* dipiv, int inci,
+                 const sycl::nd_item<3> &item_ct1) {
+      int tid = item_ct1.get_local_id(2) +
+                item_ct1.get_local_range(2) * item_ct1.get_group(2);
+      if (tid < n) {
+        dA += tid * lddA;
+        auto A1 = dA;
+        for (int i1=0; i1<npivots; i1++) {
+          int i2 = dipiv[i1*inci] - 1;
+          auto A2 = dA + i2;
+          auto temp = *A1;
+          *A1 = *A2;
+          *A2 = temp;
+          A1++;
+        }
+      }
+    }
+
+    template<typename scalar_t> void
+    laswp(Handle& handle, DenseMatrix<scalar_t>& dA,
+          int k1, int k2, int* dipiv, int inci) {
+      if (!dA.rows() || !dA.cols()) return;
+      int n = dA.cols(), nt = 256;
+      int grid = (n + nt - 1) / nt;
+      /*
+	DPCT1049:0: The work-group size passed to the SYCL kernel may exceed the
+	limit. To get the device limit, query info::device::max_work_group_size.
+	Adjust the work-group size if needed.
+      */
+      get_sycl_queue(handle).submit([&](sycl::handler &cgh) {
+	  auto dA_data_ct1 = dA.data();
+	  auto dA_ld_ct2 = dA.ld();
+	  cgh.parallel_for
+	    (sycl::nd_range<3>(sycl::range<3>(1, 1, grid) *
+			       sycl::range<3>(1, 1, nt),
+			       sycl::range<3>(1, 1, nt)),
+	     [=](sycl::nd_item<3> item_ct1) {
+	      laswp_kernel<scalar_t>(n, dA_data_ct1, dA_ld_ct2,
+				     k2 - k1 + 1, dipiv + k1 - 1,
+				     inci, item_ct1);
+	    });
+	});
+    }
+
+    template<typename T>  void
+    laswp_vbatch_kernel(int* dn, T** dA, int* lddA, int** dipiv,
+                        int* npivots, unsigned int batchCount,
+                        const sycl::nd_item<3> &item_ct1) {
+      // assume dn = cols, inc = 1
+      int x = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
+	item_ct1.get_local_id(2),
+	f = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+	item_ct1.get_local_id(1);
+      if (f >= batchCount) return;
+      if (x >= dn[f]) return;
+      auto A = dA[f];
+      auto P = dipiv[f];
+      auto ldA = lddA[f];
+      auto npiv = npivots[f];
+      A += x * ldA;
+      auto A1 = A;
+      for (int i=0; i<npiv; i++) {
+        auto p = P[i] - 1;
+        if (p != i) {
+          auto A2 = A + p;
+          auto temp = *A1;
+          *A1 = *A2;
+          *A2 = temp;
+        }
+        A1++;
+      }
+    }
+
+    template<typename scalar_t> void
+    laswp_fwd_vbatched(Handle& handle, int* dn, int max_n,
+                       scalar_t** dA, int* lddA, int** dipiv, int* npivots,
+                       unsigned int batchCount) {
+      if (max_n <= 0 || !batchCount) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > max_n) {
+        nt /= 2;
+        ops *= 2;
+      }
+      ops = std::min(ops, batchCount);
+      unsigned int nbx = (max_n + nt - 1) / nt,
+        nbf = (batchCount + ops - 1) / ops;
+      sycl::range<3> block(1, ops, nt);
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+        sycl::range<3> grid(nbx, std::min(nbf - f, MAX_BLOCKS_Y), 1);
+        auto f0 = f * ops;
+        /*
+	  DPCT1049:1: The work-group size passed to the SYCL kernel may exceed the
+	  limit. To get the device limit, query info::device::max_work_group_size.
+	  Adjust the work-group size if needed.
+        */
+        get_sycl_queue(handle).parallel_for
+	  (sycl::nd_range<3>(grid * block, block),
+	   [=](sycl::nd_item<3> item_ct1) {
+	    laswp_vbatch_kernel(dn + f0, dA + f0, lddA + f0, dipiv + f0,
+				npivots + f0, batchCount - f0, item_ct1);
+	  });
+      }
+    }
+
+    // explicit template instantiations
+    template void laswp(Handle&, DenseMatrix<float>&, int, int, int*, int);
+    template void laswp(Handle&, DenseMatrix<double>&, int, int, int*, int);
+    template void laswp(Handle&, DenseMatrix<std::complex<float>>&, int, int, int*, int);
+    template void laswp(Handle&, DenseMatrix<std::complex<double>>&, int, int, int*, int);
+
+    template void laswp_fwd_vbatched(Handle&, int*, int, float**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(Handle&, int*, int, double**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(Handle&, int*, int, std::complex<float>**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(Handle&, int*, int, std::complex<double>**, int*, int**, int*, unsigned int);
+
   } // end namespace gpu
 } // end namespace strumpack

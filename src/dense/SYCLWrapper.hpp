@@ -52,6 +52,10 @@
 namespace strumpack {
   namespace gpu {
 
+    // TODO get SYCL limits?
+    const unsigned int MAX_BLOCKS_Y = 65535;
+    const unsigned int MAX_BLOCKS_Z = 65535;
+
     auto async_handler = [](sycl::exception_list exceptions) {
       for (std::exception_ptr const &e : exceptions) {
         try {
@@ -121,8 +125,7 @@ namespace strumpack {
 
       DeviceManager() {
         std::cout << "TODO what is sycl::gpu_selector_v" << std::endl;
-        // sycl::device dev(sycl::gpu_selector_v);
-        sycl::device dev(sycl::gpu_selector);
+        sycl::device dev(sycl::gpu_selector_v);
         _queues.push_back
           (new sycl::queue
            (dev, async_handler,
@@ -158,6 +161,9 @@ namespace strumpack {
 
     const sycl::queue& get_sycl_queue(const Stream& s);
     sycl::queue& get_sycl_queue(Stream& s);
+
+    const sycl::queue& get_sycl_queue(const Handle& s);
+    sycl::queue& get_sycl_queue(Handle& s);
 
   } // end namespace sycl
 } // end namespace strumpack
