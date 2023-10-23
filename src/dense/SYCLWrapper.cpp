@@ -36,19 +36,10 @@
 namespace strumpack {
   namespace gpu {
 
-    void peek_at_last_error() {
-      std::cout << "TODO SYCL peek_at_last_error" << std::endl;
-      // gpu_check(cudaPeekAtLastError());
-    }
+    void peek_at_last_error() {}
+    void get_last_error() {}
 
-    void get_last_error() {
-      std::cout << "TODO SYCL get_last_error" << std::endl;
-      // cudaGetLastError();
-    }
-
-    void synchronize() {
-      get_sycl_queue().wait();
-    }
+    void synchronize() { get_sycl_queue().wait(); }
 
     struct Stream::StreamImpl {
       StreamImpl() {
@@ -94,18 +85,10 @@ namespace strumpack {
     struct Event::EventImpl {
       // EventImpl() = default;
       // ~EventImpl() = default;
-      void record() {
-        std::cout << "TODO EventImpl::record" << std::endl;
-      }
-      void record(Stream& s) {
-        e_ = get_sycl_queue(s).ext_oneapi_submit_barrier();
-      }
-      void wait(Stream& s) {
-        std::cout << "TODO EventImpl::wait(Stream)" << std::endl;
-      }
-      void synchronize() {
-        std::cout << "TODO EventImpl::synchronize" << std::endl;
-      }
+      void record() { e_ = get_sycl_queue().ext_oneapi_submit_barrier(); }
+      void record(Stream& s) { e_ = get_sycl_queue(s).ext_oneapi_submit_barrier(); }
+      void wait(Stream& s) { get_sycl_queue(s).ext_oneapi_submit_barrier({e_}).wait(); }
+      void synchronize() { e_.wait(); }
 
       sycl::event e_;
     };
@@ -206,29 +189,24 @@ namespace strumpack {
 
     void device_copy(void* dest, const void* src,
                      std::size_t count, CopyDir) {
-      // gpu_check(cudaMemcpy(dest, src, count, CD2cuMK(dir)));
       get_sycl_queue().memcpy(dest, src, count).wait();
     }
     void device_copy_async(void* dest, const void* src, std::size_t count,
                            CopyDir dir, Stream& s) {
-      // gpu_check(cudaMemcpyAsync(dest, src, count, CD2cuMK(dir),
-      //                           get_cuda_stream(s)));
       get_sycl_queue(s).memcpy(dest, src, count);
     }
     void device_copy_2D(void* dest, std::size_t dpitch,
                         const void* src, std::size_t spitch,
                         std::size_t width, std::size_t height, CopyDir dir) {
-      // gpu_check(cudaMemcpy2D(dest, dpitch, src, spitch,
-      //                        width , height, CD2cuMK(dir)));
-      std::cout << "TODO SYCL device_copy_2D" << std::endl;
+      get_sycl_queue().ext_oneapi_memcpy2d
+        (dest, dpitch, src, spitch, width, height).wait();
     }
     void device_copy_2D_async(void* dest, std::size_t dpitch,
                               const void* src, std::size_t spitch,
                               std::size_t width, std::size_t height,
                               CopyDir dir, Stream& s) {
-      // gpu_check(cudaMemcpy2DAsync(dest, dpitch, src, spitch, width, height,
-      //                             CD2cuMK(dir), get_cuda_stream(s)));
-      std::cout << "TODO SYCL device_copy_2D_async" << std::endl;
+      get_sycl_queue().ext_oneapi_memcpy2d
+        (dest, dpitch, src, spitch, width, height);
     }
 
     std::size_t available_memory() {
@@ -265,7 +243,6 @@ namespace strumpack {
                        std::complex<double>, DenseMatrix<std::complex<double>>&);
 
 
-    // TODO make return value std::int64_t in GPUWrapper
     template<typename scalar_t> std::int64_t
     getrf_buffersize(Handle& h, int n) {
       return oneapi::mkl::lapack::getrf_scratchpad_size<scalar_t>
@@ -479,23 +456,23 @@ namespace strumpack {
       int n = dA.cols(), nt = 256;
       int grid = (n + nt - 1) / nt;
       /*
-	DPCT1049:0: The work-group size passed to the SYCL kernel may exceed the
-	limit. To get the device limit, query info::device::max_work_group_size.
-	Adjust the work-group size if needed.
+        DPCT1049:0: The work-group size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the work-group size if needed.
       */
       get_sycl_queue(handle).submit([&](sycl::handler &cgh) {
-	  auto dA_data_ct1 = dA.data();
-	  auto dA_ld_ct2 = dA.ld();
-	  cgh.parallel_for
-	    (sycl::nd_range<3>(sycl::range<3>(1, 1, grid) *
-			       sycl::range<3>(1, 1, nt),
-			       sycl::range<3>(1, 1, nt)),
-	     [=](sycl::nd_item<3> item_ct1) {
-	      laswp_kernel<scalar_t>(n, dA_data_ct1, dA_ld_ct2,
-				     k2 - k1 + 1, dipiv + k1 - 1,
-				     inci, item_ct1);
-	    });
-	});
+          auto dA_data_ct1 = dA.data();
+          auto dA_ld_ct2 = dA.ld();
+          cgh.parallel_for
+            (sycl::nd_range<3>(sycl::range<3>(1, 1, grid) *
+                               sycl::range<3>(1, 1, nt),
+                               sycl::range<3>(1, 1, nt)),
+             [=](sycl::nd_item<3> item_ct1) {
+              laswp_kernel<scalar_t>(n, dA_data_ct1, dA_ld_ct2,
+                                     k2 - k1 + 1, dipiv + k1 - 1,
+                                     inci, item_ct1);
+            });
+        });
     }
 
     template<typename T>  void
@@ -504,9 +481,9 @@ namespace strumpack {
                         const sycl::nd_item<3> &item_ct1) {
       // assume dn = cols, inc = 1
       int x = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
-	item_ct1.get_local_id(2),
-	f = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
-	item_ct1.get_local_id(1);
+        item_ct1.get_local_id(2),
+        f = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
       if (f >= batchCount) return;
       if (x >= dn[f]) return;
       auto A = dA[f];
@@ -545,16 +522,16 @@ namespace strumpack {
         sycl::range<3> grid(nbx, std::min(nbf - f, MAX_BLOCKS_Y), 1);
         auto f0 = f * ops;
         /*
-	  DPCT1049:1: The work-group size passed to the SYCL kernel may exceed the
-	  limit. To get the device limit, query info::device::max_work_group_size.
-	  Adjust the work-group size if needed.
+          DPCT1049:1: The work-group size passed to the SYCL kernel may exceed the
+          limit. To get the device limit, query info::device::max_work_group_size.
+          Adjust the work-group size if needed.
         */
         get_sycl_queue(handle).parallel_for
-	  (sycl::nd_range<3>(grid * block, block),
-	   [=](sycl::nd_item<3> item_ct1) {
-	    laswp_vbatch_kernel(dn + f0, dA + f0, lddA + f0, dipiv + f0,
-				npivots + f0, batchCount - f0, item_ct1);
-	  });
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            laswp_vbatch_kernel(dn + f0, dA + f0, lddA + f0, dipiv + f0,
+                                npivots + f0, batchCount - f0, item_ct1);
+          });
       }
     }
 
