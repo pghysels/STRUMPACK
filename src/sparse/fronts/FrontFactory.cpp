@@ -52,9 +52,9 @@
 #if defined(STRUMPACK_USE_GPU)
 #include "FrontalMatrixGPU.hpp"
 #endif
-#if defined(STRUMPACK_USE_SYCL)
-#include "FrontSYCL.hpp"
-#endif
+// #if defined(STRUMPACK_USE_SYCL)
+// #include "FrontSYCL.hpp"
+// #endif
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"
 #endif
@@ -165,10 +165,10 @@ namespace strumpack {
           (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
 #endif
 #endif
-#if defined(STRUMPACK_USE_SYCL)
-        front.reset
-          (new FrontSYCL<scalar_t,integer_t>(s, sbegin, send, upd));
-#endif
+// #if defined(STRUMPACK_USE_SYCL)
+//         front.reset
+//           (new FrontSYCL<scalar_t,integer_t>(s, sbegin, send, upd));
+// #endif
         if (root) fc.dense++;
       }
     }

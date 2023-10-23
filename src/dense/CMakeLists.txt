@@ -61,7 +61,8 @@ endif()
 
 if(STRUMPACK_USE_SYCL)
   target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/DPCPPWrapper.hpp)
+    ${CMAKE_CURRENT_LIST_DIR}/SYCLWrapper.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/SYCLWrapper.cpp)
  # install(FILES DPCPPWrapper.hpp DESTINATION include/dense)
 endif()
 

@@ -334,7 +334,7 @@ namespace strumpack {
       gpu_check(cudaMemcpy(dest, src, count, CD2cuMK(dir)));
     }
     void device_copy_async(void* dest, const void* src, std::size_t count,
-                           CopyDir dir, const Stream& s) {
+                           CopyDir dir, Stream& s) {
       gpu_check(cudaMemcpyAsync(dest, src, count, CD2cuMK(dir),
                                 get_cuda_stream(s)));
     }
@@ -347,7 +347,7 @@ namespace strumpack {
     void device_copy_2D_async(void* dest, std::size_t dpitch,
                               const void* src, std::size_t spitch,
                               std::size_t width, std::size_t height,
-                              CopyDir dir, const Stream& s) {
+                              CopyDir dir, Stream& s) {
       gpu_check(cudaMemcpy2DAsync(dest, dpitch, src, spitch, width, height,
                                   CD2cuMK(dir), get_cuda_stream(s)));
     }
@@ -456,15 +456,15 @@ namespace strumpack {
       gpu_check(cusolverDnZgetrf_bufferSize(handle, m, n, reinterpret_cast<cuDoubleComplex*>(A), lda, Lwork));
     }
 
-    template<typename scalar_t> int getrf_buffersize(Handle& handle, int n) {
+    template<typename scalar_t> std::int64_t getrf_buffersize(Handle& handle, int n) {
       int Lwork;
       getrf_buffersize(get_cusolver_handle(handle), n, n, static_cast<scalar_t*>(nullptr), n, &Lwork);
       return Lwork;
     }
-    template int getrf_buffersize<float>(Handle&, int);
-    template int getrf_buffersize<double>(Handle&, int);
-    template int getrf_buffersize<std::complex<float>>(Handle&, int);
-    template int getrf_buffersize<std::complex<double>>(Handle&, int);
+    template std::int64_t getrf_buffersize<float>(Handle&, int);
+    template std::int64_t getrf_buffersize<double>(Handle&, int);
+    template std::int64_t getrf_buffersize<std::complex<float>>(Handle&, int);
+    template std::int64_t getrf_buffersize<std::complex<double>>(Handle&, int);
 
 
     void getrf(cusolverDnHandle_t& handle, int m, int n, float* A, int lda,

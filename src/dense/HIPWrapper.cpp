@@ -413,14 +413,12 @@ namespace strumpack {
                        std::complex<double>, DenseMatrix<std::complex<double>>&);
 
     // it seems like rocsolver doesn't need work memory?
-    template<typename scalar_t> int
-    getrf_buffersize(Handle& handle, int n) {
-      return 0;
-    }
-    template int getrf_buffersize<float>(Handle&, int);
-    template int getrf_buffersize<double>(Handle&, int);
-    template int getrf_buffersize<std::complex<float>>(Handle&, int);
-    template int getrf_buffersize<std::complex<double>>(Handle&, int);
+    template<typename scalar_t> std::int64_t
+    getrf_buffersize(Handle& handle, int n) { return 0; }
+    template std::int64_t getrf_buffersize<float>(Handle&, int);
+    template std::int64_t getrf_buffersize<double>(Handle&, int);
+    template std::int64_t getrf_buffersize<std::complex<float>>(Handle&, int);
+    template std::int64_t getrf_buffersize<std::complex<double>>(Handle&, int);
 
     void getrf(rocblas_handle& handle, int m, int n, float* A, int lda,
                float* Workspace, int* devIpiv, int* devInfo) {

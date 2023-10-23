@@ -57,9 +57,9 @@ if(STRUMPACK_USE_HIP)
 endif()
 
 if(STRUMPACK_USE_SYCL)
-  target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp)
+  # target_sources(strumpack PRIVATE
+  #   ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp
+  #   ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp)
 endif()
 
 if(STRUMPACK_USE_ZFP)

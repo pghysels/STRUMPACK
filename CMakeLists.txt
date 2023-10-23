@@ -156,12 +156,7 @@ endif()
 if(STRUMPACK_USE_SYCL)
   message(STATUS "SYCL/DPC++ enabled, looking for MKL")
   list(APPEND CMAKE_PREFIX_PATH $ENV{MKLROOT} $ENV{TBBROOT})
-  # set(MKL_LINK dynamic)
-  # set(MKL_LINK static)
-  # set(MKL_ARCH intel64)
-  # set(MKL_INTERFACE lp64)   ## this doesn't work, only ilp64 works
-  # set(STRUMPACK_USE_BLAS64 ON)
-  # find_package(MKL REQUIRED)
+  find_package(MKL REQUIRED)
 endif()
 
 
@@ -670,6 +665,13 @@ endif()
 
 if(MKL_FOUND)
   # target_link_libraries(strumpack PUBLIC MKL::MKL MKL::MKL_SYCL)
+  target_link_libraries(strumpack PUBLIC MKL::MKL)
+  # target_include_directories(strumpack INTERFACE "${MKL_ROOT}/include")
+  target_link_libraries(strumpack INTERFACE "${MKL_ROOT}/lib/intel64/libmkl_sycl.so")
+  target_link_libraries(strumpack INTERFACE "${MKL_ROOT}/lib/intel64/libmkl_sequential.so")
+  target_link_libraries(strumpack INTERFACE "${MKL_ROOT}/lib/intel64/libmkl_core.so")
+  target_link_libraries(strumpack INTERFACE "${MKL_ROOT}/lib/intel64/libmkl_intel_lp64.so")
+  target_link_libraries(strumpack INTERFACE "-lsycl -lpthread -lm -ldl")
 endif()
 
 # the order is important

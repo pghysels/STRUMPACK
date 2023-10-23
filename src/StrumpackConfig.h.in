@@ -39,8 +39,8 @@
 #cmakedefine STRUMPACK_HIP_PLATFORM_NVCC
 #cmakedefine STRUMPACK_USE_SYCL
 
-// #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
+//#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
 #define STRUMPACK_USE_GPU
 #endif
 
