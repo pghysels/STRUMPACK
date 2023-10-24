@@ -582,8 +582,14 @@ namespace strumpack {
       sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
 #else
       int K = std::round((1.* dim_sep()) / opts.BLR_options().leaf_size());
-      sep_tiles_ = g.partition_K_way
-        (std::max(K, 1), sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      if (K > 1)
+	sep_tiles_ = g.partition_K_way
+	  (K, sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      else {
+	sep_tiles_ = {std::size_t(dim_sep())};
+	for (integer_t i=sep_begin_; i<sep_end_; i++)
+	  sorder[i] = i - sep_begin_;
+      }
 #endif
       std::vector<integer_t> siorder(dim_sep());
       for (integer_t i=sep_begin_; i<sep_end_; i++)
