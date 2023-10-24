@@ -131,7 +131,9 @@ namespace strumpack {
       void set_type(Type a) {
         type_ = a;
       }
-      void set_verbose(bool verbose) { verbose_ = verbose; }
+      void set_verbose(bool verbose) {
+	verbose_ = verbose;
+      }
 
       real_t rel_tol() const { return rel_tol_; }
       real_t abs_tol() const { return abs_tol_; }
@@ -139,7 +141,7 @@ namespace strumpack {
       int max_rank() const { return max_rank_; }
       Type type() const { return type_; }
       bool verbose() const { return verbose_; }
-
+      bool use_gpu_aware_mpi() const { return use_gpu_aware_mpi_; }
       virtual void set_from_command_line(int argc, const char* const* cargv);
 
       virtual void describe_options() const;
@@ -151,6 +153,7 @@ namespace strumpack {
       int leaf_size_ = 128;
       int max_rank_ = 5000;
       bool verbose_ = true;
+      bool use_gpu_aware_mpi_ = std::getenv("STRUMPACK_GPU_AWARE_MPI");
     };
 
   } // end namespace structured

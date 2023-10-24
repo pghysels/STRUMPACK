@@ -44,9 +44,6 @@ namespace strumpack {
 
   namespace BLR {
 
-    // forward declaration
-    //template<typename scalar_t,typename integer_t> class BLRExtendAdd;
-
     /**
      * \class ProcessorGrid2D
      *
@@ -158,6 +155,7 @@ namespace strumpack {
       void fill(scalar_t v);
       void fill_col(scalar_t v, std::size_t k, std::size_t CP);
 
+      // TODO store piv in BLRMatrixMPI class
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
       std::vector<int> factor_col(const adm_t& adm, const Opts_t& opts,
@@ -328,14 +326,14 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_GPU)
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols_gpu(std::size_t i,
-                                        std::size_t j0, std::size_t j1,
-                                        scalar_t* dptr, scalar_t* pinned)
-        const;
+					std::size_t j0, std::size_t j1,
+                                        scalar_t* dptr, scalar_t* pinned,
+					bool gpu_aware) const;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
                                         std::size_t j,
-                                        scalar_t* dptr, scalar_t* pinned)
-        const;
+                                        scalar_t* dptr, scalar_t* pinned,
+					bool gpu_aware) const;
 #endif
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>

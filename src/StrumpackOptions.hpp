@@ -33,6 +33,7 @@
 #define SPOPTIONS_HPP
 
 #include <limits>
+#include <cstdlib>
 
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "HSS/HSSOptions.hpp"
@@ -1137,6 +1138,11 @@ namespace strumpack {
     int gpu_streams() const { return gpu_streams_; }
 
     /**
+     * Check wheter or not to use GPU-aware MPI
+     */
+    bool use_gpu_aware_mpi() const { return use_gpu_aware_mpi_; }
+
+    /**
      * Returns the precision for lossy compression.
      */
     int lossy_precision() const {
@@ -1261,11 +1267,12 @@ namespace strumpack {
     bool use_openmp_tree_ = true;
 
     /** GPU options */
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
+#if defined(STRUMPACK_USE_GPU)
     bool use_gpu_ = true;
 #else
     bool use_gpu_ = false;
 #endif
+    bool use_gpu_aware_mpi_ = std::getenv("STRUMPACK_GPU_AWARE_MPI");
     int gpu_streams_ = default_gpu_streams();
 
     /** compression options */
