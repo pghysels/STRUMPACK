@@ -58,6 +58,13 @@ namespace strumpack {
         return t;
       }
 
+      static std::unique_ptr<DenseTile<scalar_t>>
+      create_as_wrapper(scalar_t* D, int m, int n) {
+        auto t = std::make_unique<DenseTile<scalar_t>>();
+        t->D_.reset(new DenseMW_t(m, n, D, m));
+        return t;
+      }
+
 #if defined(STRUMPACK_USE_GPU)
       static std::unique_ptr<DenseTile<scalar_t>>
       create_as_device_wrapper_from_device_ptr

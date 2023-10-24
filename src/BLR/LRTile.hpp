@@ -96,10 +96,10 @@ namespace strumpack {
       }
 
       static std::unique_ptr<LRTile<scalar_t>>
-      create_as_wrapper(scalar_t*& ptr, int m, int n, int r) {
+      create_as_wrapper(scalar_t* ptr, int m, int n, int r) {
         auto t = std::make_unique<LRTile<scalar_t>>();
-        DenseMW_t dU(m, r, ptr, m);   ptr += m*r;
-        DenseMW_t dV(r, n, ptr, r);   ptr += n*r;
+        DenseMW_t dU(m, r, ptr,     m);
+        DenseMW_t dV(r, n, ptr+m*r, r);
         return create_as_wrapper(dU, dV);
       }
 
@@ -108,6 +108,7 @@ namespace strumpack {
       create_as_device_wrapper_from_device_ptr
       (scalar_t*& dptr, scalar_t*& ptr, int m, int n, int r) {
         auto t = create_as_wrapper(dptr, m, n, r);
+        dptr += r * (m + n);
         gpu::copy_device_to_device(t->U(), ptr);  ptr += m*r;
         gpu::copy_device_to_device(t->V(), ptr);  ptr += r*n;
         return t;
@@ -116,6 +117,7 @@ namespace strumpack {
       create_as_device_wrapper_from_host_ptr
       (scalar_t*& dptr, scalar_t*& ptr, int m, int n, int r) {
         auto t = create_as_wrapper(dptr, m, n, r);
+        dptr += r * (m + n);
         gpu::copy_host_to_device(t->U(), ptr);  ptr += m*r;
         gpu::copy_host_to_device(t->V(), ptr);  ptr += r*n;
         return t;
