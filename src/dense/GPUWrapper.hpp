@@ -349,6 +349,9 @@ namespace strumpack {
     getrf(Handle& handle, DenseMatrix<scalar_t>& A,
           scalar_t* Workspace, int* devIpiv, int* devInfo);
 
+    template<typename scalar_t> std::int64_t
+    getrs_buffersize(Handle& handle, Trans t, int n, int nrhs, int lda, int ldb);
+
     template<typename scalar_t> void
     getrs(Handle& handle, Trans trans,
           const DenseMatrix<scalar_t>& A, const int* devIpiv,

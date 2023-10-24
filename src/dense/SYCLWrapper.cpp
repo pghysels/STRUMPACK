@@ -28,6 +28,10 @@
  */
 #include <stdlib.h>
 
+// TODO is this portable?
+#include <sys/syscall.h>
+#include <unistd.h>
+
 #include "SYCLWrapper.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "misc/MPIWrapper.hpp"
@@ -35,6 +39,92 @@
 
 namespace strumpack {
   namespace gpu {
+
+    auto async_handler = [](sycl::exception_list exceptions) {
+      for (std::exception_ptr const &e : exceptions) {
+        try {
+          std::rethrow_exception(e);
+        } catch (sycl::exception const &e) {
+          std::cerr << "Caught asynchronous SYCL exception:" << std::endl
+                    << e.what() << std::endl
+                    << "Exception caught at file:" << __FILE__
+                    << ", line:" << __LINE__ << std::endl;
+        }
+      }
+    };
+
+    // TODO is this portable?
+    int get_tid() { return syscall(SYS_gettid); }
+
+    class DeviceManager {
+    public:
+      int current_device() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        auto it = _thread2dev_map.find(get_tid());
+        if (it != _thread2dev_map.end()) {
+          check_id(it->second);
+          return it->second;
+        }
+        std::cerr
+          << "WARNING: no SYCL device found in the map, returning DEFAULT_DEVICE_ID"
+          << std::endl;
+        return DEFAULT_DEVICE_ID;
+      }
+      sycl::queue* current_queue() {
+        return _queues[current_device()];
+      }
+
+      void select_device(int id) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        check_id(id);
+        _thread2dev_map[get_tid()] = id;
+      }
+      int device_count() { return _queues.size(); }
+
+      /// Returns the instance of device manager singleton.
+      static DeviceManager& instance() {
+        static DeviceManager d_m;
+        return d_m;
+      }
+      DeviceManager(const DeviceManager&)            = delete;
+      DeviceManager& operator=(const DeviceManager&) = delete;
+      DeviceManager(DeviceManager&&)                 = delete;
+      DeviceManager& operator=(DeviceManager&&)      = delete;
+
+    private:
+      mutable std::mutex m_mutex;
+
+      DeviceManager() {
+        sycl::device dev(sycl::gpu_selector_v);
+        _queues.push_back
+          (new sycl::queue
+           (dev, async_handler,
+            sycl::property_list{sycl::property::queue::in_order{}}));
+      }
+
+      void check_id(int id) const {
+        if (id >= _queues.size())
+          throw std::runtime_error("invalid device id");
+      }
+
+      // Note: only 1 out-of-order SYCL queue is created per device
+      std::vector<sycl::queue*> _queues;
+
+      /// DEFAULT_DEVICE_ID is used, if current_device() can not find
+      /// current thread id in _thread2dev_map, which means default
+      /// device should be used for the current thread.
+      const int DEFAULT_DEVICE_ID = 0;
+      /// thread-id to device-id map.
+      std::map<int, int> _thread2dev_map;
+    };
+
+    int get_sycl_device() {
+      return DeviceManager::instance().current_device();
+    }
+
+    sycl::queue& get_sycl_queue() {
+      return *(DeviceManager::instance().current_queue());
+    }
 
     void peek_at_last_error() {}
     void get_last_error() {}
@@ -113,16 +203,6 @@ namespace strumpack {
       sycl::free(ptr, get_sycl_queue().get_context());
     }
 
-    // cudaMemcpyKind CD2cuMK(CopyDir d) {
-    //   switch (d) {
-    //   case CopyDir::H2H: return cudaMemcpyHostToHost;
-    //   case CopyDir::H2D: return cudaMemcpyHostToDevice;
-    //   case CopyDir::D2H: return cudaMemcpyDeviceToHost;
-    //   case CopyDir::D2D: return cudaMemcpyDeviceToDevice;
-    //   case CopyDir::DEF: return cudaMemcpyDefault;
-    //   default: assert(false); return cudaMemcpyDefault;
-    //   }
-    // }
 
     oneapi::mkl::transpose T2MKLOp(Trans op) {
       switch (op) {
@@ -135,52 +215,42 @@ namespace strumpack {
       }
     }
 
-    // cublasSideMode_t S2cuOp(Side op) {
-    //   switch (op) {
-    //   case Side::L: return CUBLAS_SIDE_LEFT;
-    //   case Side::R: return CUBLAS_SIDE_RIGHT;
-    //   default: assert(false); return CUBLAS_SIDE_LEFT;
-    //   }
-    // }
+    oneapi::mkl::side S2MKLOp(Side op) {
+      switch (op) {
+      case Side::L: return oneapi::mkl::side::L;
+      case Side::R: return oneapi::mkl::side::R;
+      default: assert(false); return oneapi::mkl::side::L;
+      }
+    }
 
-    // cublasFillMode_t U2cuOp(UpLo op) {
-    //   switch (op) {
-    //   case UpLo::L: return CUBLAS_FILL_MODE_LOWER;
-    //   case UpLo::U: return CUBLAS_FILL_MODE_UPPER;
-    //   default: assert(false); return CUBLAS_FILL_MODE_LOWER;
-    //   }
-    // }
+    oneapi::mkl::uplo U2MKLOp(UpLo op) {
+      switch (op) {
+      case UpLo::L: return oneapi::mkl::uplo::L;
+      case UpLo::U: return oneapi::mkl::uplo::U;
+      default: assert(false); return oneapi::mkl::uplo::L;
+      }
+    }
 
-    // cublasDiagType_t D2cuOp(Diag op) {
-    //   switch (op) {
-    //   case Diag::N: return CUBLAS_DIAG_NON_UNIT;
-    //   case Diag::U: return CUBLAS_DIAG_UNIT;
-    //   default: assert(false); return CUBLAS_DIAG_UNIT;
-    //   }
-    // }
-
-    // cusolverEigMode_t E2cuOp(Jobz op) {
-    //   switch (op) {
-    //   case Jobz::N: return CUSOLVER_EIG_MODE_NOVECTOR;
-    //   case Jobz::V: return CUSOLVER_EIG_MODE_VECTOR;
-    //   default: assert(false); return CUSOLVER_EIG_MODE_VECTOR;
-    //   }
-    // }
+    oneapi::mkl::diag D2MKLOp(Diag op) {
+      switch (op) {
+      case Diag::N: return oneapi::mkl::diag::N;
+      case Diag::U: return oneapi::mkl::diag::U;
+      default: assert(false); return oneapi::mkl::diag::N;
+      }
+    }
 
 
     void init() {
+      int rank = 0, devs = DeviceManager::instance().device_count();
 #if defined(STRUMPACK_USE_MPI)
-      int devs = DeviceManager::instance().device_count();
-      if (devs > 1) {
-        int flag, rank = 0;
-        MPI_Initialized(&flag);
-        if (flag) {
-          MPIComm c;
-          rank = c.rank();
-        }
-        DeviceManager::instance().select_device(rank % devs);
+      int flag = 0;
+      MPI_Initialized(&flag);
+      if (flag) {
+	MPIComm c;
+	rank = c.rank();
       }
 #endif
+      DeviceManager::instance().select_device(rank % devs);
     }
 
     void device_memset(void* dptr, int value, std::size_t count) {
@@ -226,7 +296,7 @@ namespace strumpack {
              (ta!=Trans::N && tb==Trans::N && a.rows()==b.rows()) ||
              (ta==Trans::N && tb!=Trans::N && a.cols()==b.cols()) ||
              (ta!=Trans::N && tb!=Trans::N && a.rows()==b.cols()));
-      oneapi::mkl::blas::gemm
+      oneapi::mkl::blas::column_major::gemm
         (get_sycl_queue(handle), T2MKLOp(ta), T2MKLOp(tb), c.rows(), c.cols(),
          (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
          b.data(), b.ld(), beta, c.data(), c.ld());
@@ -242,69 +312,86 @@ namespace strumpack {
                        const DenseMatrix<std::complex<double>>&, const DenseMatrix<std::complex<double>>&,
                        std::complex<double>, DenseMatrix<std::complex<double>>&);
 
+    template<typename scalar_t> std::size_t scalars_for_int64(std::size_t n) {
+      // == ceil(n * sizeof(std::int64_t) / sizeof(scalar_t))
+      return (n * sizeof(std::int64_t) + sizeof(scalar_t) - 1) / sizeof(scalar_t);
+    }
 
     template<typename scalar_t> std::int64_t
     getrf_buffersize(Handle& h, int n) {
       return oneapi::mkl::lapack::getrf_scratchpad_size<scalar_t>
-        (get_sycl_queue(h), n, n, n);
+        (get_sycl_queue(h), n, n, n)
+	// add some extra space to convert pivot data int/int64_t
+	+ scalars_for_int64<scalar_t>(n);
     }
     template std::int64_t getrf_buffersize<float>(Handle&, int);
     template std::int64_t getrf_buffersize<double>(Handle&, int);
     template std::int64_t getrf_buffersize<std::complex<float>>(Handle&, int);
     template std::int64_t getrf_buffersize<std::complex<double>>(Handle&, int);
 
-    // TODO add this in GPUWrapper, use when needed
-    // template<typename scalar_t> std::int64_t
-    // getrs_buffersize(Handle& h, Trans t, int n, int nrhs, int lda, int ldb) {
-    //   return oneapi::mkl::lapack::getrs_scratchpad_size<scalar_t>
-    //     (get_sycl_queue(h), T2MKLOp(t), n, nrhs, lda, ldb);
-    // }
-
 
     template<typename scalar_t> void
     getrf(Handle& h, DenseMatrix<scalar_t>& A,
-          scalar_t* workspace, int* devIpiv, int* devInfo) {
+          scalar_t* workspace, int* dev_piv, int* dev_info) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrf_flops(A.rows(),A.cols()));
+      std::int64_t scratchpad_size = getrf_buffersize<scalar_t>(h, A.rows());
+      DeviceMemory<scalar_t> scratchpad(scratchpad_size);
+      DeviceMemory<std::int64_t> dpiv_(A.rows());
+      std::int64_t* dpiv = dpiv_;
       try {
-        // TODO scratchpad_size??
-        std::int64_t scratchpad_size = 0;
-        std::cout << "TODO SYCL getrf scratchpad_size" << std::endl;
-        std::cout << "TODO SYCL getrf piv 64!" << std::endl;
-        std::int64_t* dpiv = nullptr;
-        oneapi::mkl::lapack::getrf
-          (get_sycl_queue(h), A.rows(), A.cols(), A.data(), A.ld(),
-           // devIpiv,
-           dpiv, workspace, scratchpad_size);
+	oneapi::mkl::lapack::getrf
+	  (get_sycl_queue(h), A.rows(), A.cols(), A.data(), A.ld(),
+           dpiv, scratchpad, scratchpad_size);
       } catch (oneapi::mkl::lapack::exception e) {
         std::cerr << "Exception in oneapi::mkl::lapack::getrf, info = "
                   << e.info() << std::endl;
       }
+      get_sycl_queue(h).parallel_for
+	(sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
+	  dev_piv[i[0]] = dpiv[i[0]];
+	});
     }
     template void getrf(Handle&, DenseMatrix<float>&,float*, int*, int*);
     template void getrf(Handle&, DenseMatrix<double>&, double*, int*, int*);
     template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, int*, int*);
     template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, int*, int*);
 
+    template<typename scalar_t> std::int64_t
+    getrs_buffersize(Handle& h, Trans t, int n, int nrhs, int lda, int ldb) {
+      return oneapi::mkl::lapack::getrs_scratchpad_size<scalar_t>
+        (get_sycl_queue(h), T2MKLOp(t), n, nrhs, lda, ldb)
+	// add some extra space to convert pivot data int/int64_t
+	+ scalars_for_int64<scalar_t>(n);
+    }
+    template std::int64_t getrs_buffersize<float>(Handle&, Trans, int, int, int, int);
+    template std::int64_t getrs_buffersize<double>(Handle&, Trans, int, int, int, int);
+    template std::int64_t getrs_buffersize<std::complex<float>>(Handle&, Trans, int, int, int, int);
+    template std::int64_t getrs_buffersize<std::complex<double>>(Handle&, Trans, int, int, int, int);
+
     template<typename scalar_t> void
     getrs(Handle& handle, Trans trans, const DenseMatrix<scalar_t>& A,
           const int* ipiv, DenseMatrix<scalar_t>& B, int *devinfo) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrs_flops(A.rows(),B.cols()));
+      std::int64_t scratchpad_size = getrs_buffersize<scalar_t>
+	(handle, trans, A.rows(), B.cols(), A.ld(), B.ld());
+      DeviceMemory<scalar_t> scratchpad(scratchpad_size);
+      DeviceMemory<std::int64_t> dpiv_(A.rows());
+      std::int64_t* dpiv = dpiv_;
+      get_sycl_queue(handle).parallel_for
+	(sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
+	  dpiv[i[0]] = ipiv[i[0]];
+	});
       try {
-        std::cout << "TODO SYCL getrs scratchpad_size" << std::endl;
-        std::cout << "TODO SYCL getrs piv 64!" << std::endl;
-        std::int64_t* dpiv = nullptr;
-        scalar_t* scratchpad = nullptr;
-        std::int64_t scratchpad_size = 0;
-        oneapi::mkl::lapack::getrs
+	oneapi::mkl::lapack::getrs
           (get_sycl_queue(handle), T2MKLOp(trans), A.rows(), B.cols(),
            const_cast<scalar_t*>(A.data()), A.ld(),
-           // const_cast<std::int64_t*>(ipiv),
            dpiv, B.data(), B.ld(), scratchpad, scratchpad_size);
       } catch (oneapi::mkl::lapack::exception e) {
         std::cerr << "Exception in oneapi::mkl::lapack::getrs, info = "
                   << e.info() << std::endl;
       }
     }
+
     template void getrs(Handle&, Trans, const DenseMatrix<float>&,
                         const int*, DenseMatrix<float>&, int*);
     template void getrs(Handle&, Trans, const DenseMatrix<double>&,
@@ -318,7 +405,10 @@ namespace strumpack {
     trsm(Handle& handle, Side side, UpLo uplo,
          Trans trans, Diag diag, const scalar_t alpha,
          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B) {
-      std::cout << "TODO SYCL trsm" << std::endl;
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::trsm_flops(A.rows(),B.cols(),alpha,char(side)));
+      oneapi::mkl::blas::column_major::trsm
+	(get_sycl_queue(handle), S2MKLOp(side), U2MKLOp(uplo), T2MKLOp(trans), D2MKLOp(diag),
+	 B.rows(), B.cols(), alpha, A.data(), A.ld(), B.data(), B.ld());
     }
     template void trsm(Handle&, Side, UpLo, Trans, Diag, const float,
                        DenseMatrix<float>&, DenseMatrix<float>&);

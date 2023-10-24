@@ -506,6 +506,15 @@ namespace strumpack {
     template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, int*, int*);
     template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, int*, int*);
 
+    template<typename scalar_t> std::int64_t
+    getrs_buffersize(Handle& handle, Trans, int, int, int, int) {
+      return 0;
+    }
+    template std::int64_t getrs_buffersize<float>(Handle&, Trans, int, int, int, int);
+    template std::int64_t getrs_buffersize<double>(Handle&, Trans, int, int, int, int);
+    template std::int64_t getrs_buffersize<std::complex<float>>(Handle&, Trans, int, int, int, int);
+    template std::int64_t getrs_buffersize<std::complex<double>>(Handle&, Trans, int, int, int, int);
+
     void getrs(cusolverDnHandle_t& handle, cublasOperation_t trans,
                int n, int nrhs, const float* A, int lda,
                const int* devIpiv, float* B, int ldb, int* devInfo) {
