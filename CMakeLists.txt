@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(STRUMPACK VERSION 7.1.4 LANGUAGES CXX C Fortran)
+project(STRUMPACK VERSION 7.2.0 LANGUAGES CXX C Fortran)
 cmake_policy(SET CMP0074 NEW)
 
 option(STRUMPACK_USE_MPI     "Build with MPI support" ON)
@@ -531,25 +531,6 @@ if(TPL_ENABLE_COMBBLAS)
     message(STATUS "CombBLAS not found")
   endif()
 endif()
-
-# if(STRUMPACK_USE_HIP)
-#   set_source_files_properties(
-#     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-#     src/dense/HIPWrapper.hip.cpp
-#     PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 1)
-#   if(BUILD_SHARED_LIBS)
-#     set(STATIC_OR_SHARED SHARED)
-#   else()
-#     set(STATIC_OR_SHARED STATIC)
-#   endif()
-#   hip_add_library(
-#     strumpack
-#     src/sparse/fronts/FrontalMatrixHIP.hip.cpp
-#     src/dense/HIPWrapper.hip.cpp
-#     ${STATIC_OR_SHARED})
-# else()
-#   add_library(strumpack "")
-# endif()
 
 add_library(strumpack "")
 
