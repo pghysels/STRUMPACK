@@ -66,155 +66,123 @@ namespace strumpack {
      * assumed to be initialized to zero.
      *
      */
-    template<typename T, int unroll> void
-    assemble_kernel(unsigned int nf, AssembleData<T>* dat,
-                    const sycl::nd_item<3> &item_ct1) {
-      int idx = item_ct1.get_group(2) * item_ct1.get_local_range(2) * unroll + item_ct1.get_local_id(2),
-        op = item_ct1.get_group(1) * item_ct1.get_local_range(1) + item_ct1.get_local_id(1);
-      if (op >= nf) return;
-      auto& F = dat[op];
-      for (int i = 0, j = idx; i < unroll; i++, j += item_ct1.get_local_range(2)) {
-        if (j >= F.n11) break;
-        auto& t = F.e11[j];
-        F.F11[t.r + t.c*F.d1] = t.v;
+    template<typename T> struct Assemble {
+      AssembleData<T>* dat;
+      std::size_t nf;
+      Assemble(AssembleData<T>* d, std::size_t N) : dat(d), nf(N) {}
+      void operator()(cl::sycl::nd_item<2> it) const {
+	std::size_t op = it.get_global_id(0);
+	if (op >= nf) return;
+	auto& F = dat[op];
+	auto idx = it.get_global_id(1);
+	if (idx < F.n11) {
+	  auto& t = F.e11[idx];
+	  F.F11[t.r + t.c*F.d1] = t.v;
+	}
+	if (idx < F.n12) {
+	  auto& t = F.e12[idx];
+	  F.F12[t.r + t.c*F.d1] = t.v;
+	}
+	if (idx < F.n21) {
+	  auto& t = F.e21[idx];
+	  F.F21[t.r + t.c*F.d2] = t.v;
+	}
       }
-      for (int i = 0, j = idx; i < unroll; i++, j += item_ct1.get_local_range(2)) {
-        if (j >= F.n12) break;
-        auto& t = F.e12[j];
-        F.F12[t.r + t.c*F.d1] = t.v;
-      }
-      for (int i = 0, j = idx; i < unroll; i++, j += item_ct1.get_local_range(2)) {
-        if (j >= F.n21) break;
-        auto& t = F.e21[j];
-        F.F21[t.r + t.c*F.d2] = t.v;
-      }
-    }
+    };
 
 
     /**
      * Single extend-add operation from one contribution block into
      * the parent front. d1 is the size of F11, d2 is the size of F22.
      */
-    template<typename T, unsigned int unroll>
-    void extend_add_kernel
-    (unsigned int by0, unsigned int nf, AssembleData<T>* dat, bool left,
-     const sycl::nd_item<3> &item_ct1) {
-      int y = item_ct1.get_group(2) * item_ct1.get_local_range(2) + item_ct1.get_local_id(2),
-        x0 = (item_ct1.get_group(1) + by0) * unroll,
-        z = item_ct1.get_group(0) * item_ct1.get_local_range(0) + item_ct1.get_local_id(0);
-      if (z >= nf) return;
-      auto& f = dat[z];
-      auto CB = left ? f.CB1 : f.CB2;
-      if (!CB) return;
-      auto dCB = left ? f.dCB1 : f.dCB2;
-      if (y >= dCB) return;
-      auto I = left ? f.I1 : f.I2;
-      auto Iy = I[y];
-      CB += y + x0*dCB;
-      int d1 = f.d1, d2 = f.d2;
-      int ld;
-      T* F[2];
-      if (Iy < d1) {
-        ld = d1;
-        F[0] = f.F11+Iy;
-        F[1] = f.F12+Iy-d1*d1;
-      } else {
-        ld = d2;
-        F[0] = f.F21+Iy-d1;
-        F[1] = f.F22+Iy-d1-d1*d2;
-      }
+    template<typename T, unsigned int unroll> struct EA {
+      AssembleData<T>* dat;
+      bool left;
+      std::size_t nf;
+      EA(AssembleData<T>* d, std::size_t N, bool l)
+	: dat(d), nf(N), left(l) {}
+      void operator()(cl::sycl::nd_item<3> it) const {
+	int y = it.get_global_id(2),
+	  x0 = it.get_group(1) * unroll,
+	  z = it.get_global_id(0);
+	if (z >= nf) return;
+	auto& f = dat[z];
+	auto CB = left ? f.CB1 : f.CB2;
+	if (!CB) return;
+	auto dCB = left ? f.dCB1 : f.dCB2;
+	if (y >= dCB) return;
+	auto I = left ? f.I1 : f.I2;
+	auto Iy = I[y];
+	CB += y + x0*dCB;
+	int d1 = f.d1, d2 = f.d2;
+	int ld;
+	T* F[2];
+	if (Iy < d1) {
+	  ld = d1;
+	  F[0] = f.F11+Iy;
+	  F[1] = f.F12+Iy-d1*d1;
+	} else {
+	  ld = d2;
+	  F[0] = f.F21+Iy-d1;
+	  F[1] = f.F22+Iy-d1-d1*d2;
+	}
 #pragma unroll
-      for (int i=0; i<unroll; i++) {
-        int x = x0 + i;
-        if (x >= dCB) break;
-        auto Ix = I[x];
-        F[Ix >= d1][Ix*ld] += CB[i*dCB];
+	for (int i=0; i<unroll; i++) {
+	  int x = x0 + i;
+	  if (x >= dCB) break;
+	  auto Ix = I[x];
+	  F[Ix >= d1][Ix*ld] += CB[i*dCB];
+	}
       }
-    }
+    };
+
+    template<typename T> T rnd(T a, T b) { return ((a + b - 1) / b) * b; }
 
     template <typename T>
-    void assemble(unsigned int nf, AssembleData<T> *dat,
+    void assemble(unsigned int N, AssembleData<T> *dat,
                   AssembleData<T> *ddat) {
-      sycl::queue &q_ct1 = get_sycl_queue();
+      sycl::queue &q = get_sycl_queue();
       { // front assembly from sparse matrix
-        std::size_t nnz = 0;
-        for (unsigned int f=0; f<nf; f++)
-          nnz = std::max
-            (nnz, std::max(dat[f].n11, std::max(dat[f].n12, dat[f].n21)));
-        if (nnz) {
-          unsigned int nt = 512, ops = 1;
-          const int unroll = 8;
-          while (nt*unroll > nnz && nt > 8 && ops < 64) {
-            nt /= 2;
-            ops *= 2;
-          }
-          ops = std::min(ops, nf);
-          unsigned int nb = (nnz + nt*unroll - 1) / (nt*unroll),
-            nbf = (nf + ops - 1) / ops;
-          sycl::range<3> block(1, ops, nt);
-          for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
-            sycl::range<3> grid(1, nb, std::min(nbf - f, MAX_BLOCKS_Y));
-            /*
-              DPCT1049:0: The work-group size passed to the SYCL kernel may exceed
-              the limit. To get the device limit, query
-              info::device::max_work_group_size. Adjust the work-group size if
-              needed.
-            */
-            q_ct1.parallel_for
-              (sycl::nd_range<3>(grid * block, block),
-               [=](sycl::nd_item<3> item_ct1) {
-                 assemble_kernel<T, unroll>
-                   (nf - f * ops, ddat + f * ops, item_ct1);
-               });
-          }
-        }
+	std::size_t nnz = 0;
+	for (std::size_t f=0; f<N; f++)
+	  nnz = std::max
+	    (nnz, std::size_t(std::max(dat[f].n11,
+				       std::max(dat[f].n12, dat[f].n21))));
+	if (nnz) {
+	  // TODO unroll
+	  std::size_t nt = 512, ops = 1;
+	  while (nt > nnz && ops < 64) {
+	    nt /= 2;
+	    ops *= 2;
+	  }
+	  // assert(rnd(std::size_t(N),ops) * rnd(nnz,nt) < std::numeric_limits<int>::max());
+	  sycl::range<2> global{rnd(std::size_t(N),ops),
+	      rnd(nnz,nt)}, local{ops, nt};
+	  q.parallel_for(sycl::nd_range<2>{global, local},
+			 Assemble<T>(ddat, N));
+	}
       }
       { // extend-add
-        int du = 0;
-        for (unsigned int f=0; f<nf; f++)
-          du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
-        if (du) {
-          const unsigned int unroll = 16;
-          unsigned int nt = 512, ops = 1;
-          while (nt > du && ops < 64) {
-            nt /= 2;
-            ops *= 2;
-          }
-          ops = std::min(ops, nf);
-          unsigned int nbx = (du + nt - 1) / nt,
-            nby = (du + unroll - 1) / unroll,
-            nbf = (nf + ops - 1) / ops;
-          sycl::range<3> block(ops, 1, nt);
-          for (unsigned int y=0; y<nby; y+=MAX_BLOCKS_Y) {
-            unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
-            for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
-              sycl::range<3> grid(nbx, ny, std::min(nbf - f, MAX_BLOCKS_Z));
-              /*
-                DPCT1049:1: The work-group size passed to the SYCL kernel may
-                exceed the limit. To get the device limit, query
-                info::device::max_work_group_size. Adjust the work-group size if
-                needed.
-              */
-              q_ct1.parallel_for
-                (sycl::nd_range<3>(grid * block, block),
-                 [=](sycl::nd_item<3> item_ct1) {
-                  extend_add_kernel<T, unroll>(y, nf - f * ops, ddat + f * ops, true, item_ct1);
-                });
-              /*
-                DPCT1049:2: The work-group size passed to the SYCL kernel may
-                exceed the limit. To get the device limit, query
-                info::device::max_work_group_size. Adjust the work-group size if
-                needed.
-              */
-              q_ct1.parallel_for
-                (sycl::nd_range<3>(grid * block, block),
-                 [=](sycl::nd_item<3> item_ct1) {
-                  extend_add_kernel<T, unroll>(y, nf - f * ops, ddat + f * ops,
-                                               false, item_ct1);
-                });
-            }
-          }
-        }
+	std::size_t gCB = 0;
+	for (std::size_t f=0; f<N; f++)
+	  gCB = std::max(gCB, std::size_t(std::max(dat[f].dCB1, dat[f].dCB2)));
+	if (gCB) {
+	  std::size_t nt = 256, ops = 1;
+	  const std::size_t unroll = 16;
+	  while (nt > gCB && ops < 64) {
+	    nt /= 2;
+	    ops *= 2;
+	  }
+	  std::size_t gx = (gCB + unroll - 1) / unroll;
+	  gCB = rnd(gCB, nt);
+	  // assert(gCB * gx * rnd(N,ops) < std::numeric_limits<int>::max());
+	  sycl::range<3> global{rnd(std::size_t(N), ops), gx, gCB},
+	    local{ops, 1, nt};
+	  q.parallel_for(sycl::nd_range<3>{global, local},
+			 EA<T,unroll>(ddat, N, true));
+	  q.parallel_for(sycl::nd_range<3>{global, local},
+			 EA<T,unroll>(ddat, N, false));
+	}
       }
     }
 
@@ -424,7 +392,8 @@ namespace strumpack {
         nbf = (batchCount + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
-        sycl::range<3> grid(1, nbx, std::min(nbf - f, MAX_BLOCKS_Y));
+	std::cout << "TODO fix" << std::endl;
+        sycl::range<3> grid(nbx, std::min(nbf - f, MAX_BLOCKS_Y), 1);
         auto f0 = f * ops;
         /*
           DPCT1049:11: The work-group size passed to the SYCL kernel may exceed
@@ -728,7 +697,8 @@ namespace strumpack {
       unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
-        sycl::range<3> grid(1, nb, std::min(nbf - f, MAX_BLOCKS_Z));
+	std::cout << "TODO fix" << std::endl;
+        sycl::range<3> grid(nb, std::min(nbf - f, MAX_BLOCKS_Z), 1);
         /*
           DPCT1049:24: The work-group size passed to the SYCL kernel may exceed
           the limit. To get the device limit, query
@@ -802,7 +772,8 @@ namespace strumpack {
       unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
-        sycl::range<3> grid(1, nb, std::min(nbf - f, MAX_BLOCKS_Z));
+	std::cout << "TODO fix" << std::endl;
+        sycl::range<3> grid(nb, std::min(nbf - f, MAX_BLOCKS_Z), 1);
         /*
           DPCT1049:26: The work-group size passed to the SYCL kernel may exceed
           the limit. To get the device limit, query

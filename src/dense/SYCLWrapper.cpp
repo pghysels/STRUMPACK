@@ -335,6 +335,7 @@ namespace strumpack {
           scalar_t* workspace, int* dev_piv, int* dev_info) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrf_flops(A.rows(),A.cols()));
       std::int64_t scratchpad_size = getrf_buffersize<scalar_t>(h, A.rows());
+      // TODO
       DeviceMemory<scalar_t> scratchpad(scratchpad_size);
       DeviceMemory<std::int64_t> dpiv_(A.rows());
       std::int64_t* dpiv = dpiv_;
@@ -374,6 +375,7 @@ namespace strumpack {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrs_flops(A.rows(),B.cols()));
       std::int64_t scratchpad_size = getrs_buffersize<scalar_t>
 	(handle, trans, A.rows(), B.cols(), A.ld(), B.ld());
+      // TODO
       DeviceMemory<scalar_t> scratchpad(scratchpad_size);
       DeviceMemory<std::int64_t> dpiv_(A.rows());
       std::int64_t* dpiv = dpiv_;
