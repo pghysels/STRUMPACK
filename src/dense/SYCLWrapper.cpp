@@ -337,23 +337,24 @@ namespace strumpack {
           scalar_t* work, std::int64_t lwork, int* dpiv, int*) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrf_flops(A.rows(),A.cols()));
       auto np = scalars_for_int64<scalar_t>(A.rows());
+      auto dpiv64 = reinterpret_cast<std::int64_t*>(work);
       try {
         oneapi::mkl::lapack::getrf
           (get_sycl_queue(h), A.rows(), A.cols(), A.data(), A.ld(),
-           work, work+np, lwork-np);
+           dpiv64, work+np, lwork-np);
       } catch (oneapi::mkl::lapack::exception e) {
         std::cerr << "Exception in oneapi::mkl::lapack::getrf, info = "
                   << e.info() << std::endl;
       }
       get_sycl_queue(h).parallel_for
         (sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
-          dpiv[i[0]] = work[i[0]];
+          dpiv[i[0]] = dpiv64[i[0]];
         });
     }
-    template void getrf(Handle&, DenseMatrix<float>&,float*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<double>&, double*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, int*, int*);
+    template void getrf(Handle&, DenseMatrix<float>&, float*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<double>&, double*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, std::int64_t, int*, int*);
 
     template<typename scalar_t> std::int64_t
     getrs_buffersize(Handle& h, Trans t, int n, int nrhs, int lda, int ldb) {
