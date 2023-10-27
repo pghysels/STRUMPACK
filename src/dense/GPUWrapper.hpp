@@ -169,7 +169,7 @@ namespace strumpack {
     void init();
     void peek_at_last_error();
     void get_last_error();
-    void synchronize();
+    void synchronize_default_stream();
     std::size_t available_memory();
 
     void device_memset(void* dptr, int value, std::size_t count);
@@ -347,7 +347,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     getrf(Handle& handle, DenseMatrix<scalar_t>& A,
-          scalar_t* Workspace, int* devIpiv, int* devInfo);
+          scalar_t* work, std::int64_t lwork, int* dpiv, int* dinfo);
 
     template<typename scalar_t> std::int64_t
     getrs_buffersize(Handle& handle, Trans t, int n, int nrhs, int lda, int ldb);

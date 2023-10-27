@@ -47,8 +47,8 @@ namespace strumpack {
       ((void)e); // silence unused warning
     }
 
-    void synchronize() {
-      gpu_check(hipDeviceSynchronize());
+    void synchronize_default_stream() {
+      gpu_check(hipStreamSynchronize(0));
     }
 
     struct Stream::StreamImpl {
@@ -421,40 +421,40 @@ namespace strumpack {
     template std::int64_t getrf_buffersize<std::complex<double>>(Handle&, int);
 
     void getrf(rocblas_handle& handle, int m, int n, float* A, int lda,
-               float* Workspace, int* devIpiv, int* devInfo) {
+               float*, std::int64_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrf_flops(m,n));
-      gpu_check(rocsolver_sgetrf(handle, m, n, A, lda, devIpiv, devInfo));
+      gpu_check(rocsolver_sgetrf(handle, m, n, A, lda, dpiv, dinfo));
     }
-    void getrf(rocblas_handle& handle, int m, int n, double* A,
-               int lda, double* Workspace, int* devIpiv, int* devInfo) {
+    void getrf(rocblas_handle& handle, int m, int n, double* A, int lda,
+               double*, std::int64_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrf_flops(m,n));
-      gpu_check(rocsolver_dgetrf(handle, m, n, A, lda, devIpiv, devInfo));
+      gpu_check(rocsolver_dgetrf(handle, m, n, A, lda, dpiv, dinfo));
     }
     void getrf(rocblas_handle& handle, int m, int n, std::complex<float>* A, int lda,
-               std::complex<float>* Workspace, int* devIpiv, int* devInfo) {
+               std::complex<float>*, std::int64_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(rocsolver_cgetrf
                 (handle, m, n, reinterpret_cast<rocblas_float_complex*>(A),
-                 lda, devIpiv, devInfo));
+                 lda, dpiv, dinfo));
     }
     void getrf(rocblas_handle& handle, int m, int n, std::complex<double>* A, int lda,
-               std::complex<double>* Workspace, int* devIpiv, int* devInfo) {
+               std::complex<double>*, std::int64_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(rocsolver_zgetrf
                 (handle, m, n, reinterpret_cast<rocblas_double_complex*>(A),
-                 lda, devIpiv, devInfo));
+                 lda, dpiv, dinfo));
     }
 
     template<typename scalar_t> void
     getrf(Handle& handle, DenseMatrix<scalar_t>& A,
-          scalar_t* Workspace, int* devIpiv, int* devInfo) {
+          scalar_t* work, std::int64_t lwork, int* dpiv, int* dinfo) {
       getrf(get_rocblas_handle(handle), A.rows(), A.cols(), A.data(), A.ld(),
-            Workspace, devIpiv, devInfo);
+            work, lwork, dpiv, dinfo);
     }
-    template void getrf(Handle&, DenseMatrix<float>&, float*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<double>&, double*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, int*, int*);
+    template void getrf(Handle&, DenseMatrix<float>&, float*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<double>&, double*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, std::int64_t, int*, int*);
 
     template<typename scalar_t> std::int64_t
     getrs_buffersize(Handle&, Trans, int, int, int, int) {

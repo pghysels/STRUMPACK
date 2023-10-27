@@ -129,7 +129,9 @@ namespace strumpack {
     void peek_at_last_error() {}
     void get_last_error() {}
 
-    void synchronize() { get_sycl_queue().wait(); }
+    void synchronize_default_stream() {
+      get_sycl_queue().wait();
+    }
 
     struct Stream::StreamImpl {
       StreamImpl() {
@@ -246,8 +248,8 @@ namespace strumpack {
       int flag = 0;
       MPI_Initialized(&flag);
       if (flag) {
-	MPIComm c;
-	rank = c.rank();
+        MPIComm c;
+        rank = c.rank();
       }
 #endif
       DeviceManager::instance().select_device(rank % devs);
@@ -321,8 +323,8 @@ namespace strumpack {
     getrf_buffersize(Handle& h, int n) {
       return oneapi::mkl::lapack::getrf_scratchpad_size<scalar_t>
         (get_sycl_queue(h), n, n, n)
-	// add some extra space to convert pivot data int/int64_t
-	+ scalars_for_int64<scalar_t>(n);
+        // add some extra space to convert pivot data int/int64_t
+        + scalars_for_int64<scalar_t>(n);
     }
     template std::int64_t getrf_buffersize<float>(Handle&, int);
     template std::int64_t getrf_buffersize<double>(Handle&, int);
@@ -332,25 +334,21 @@ namespace strumpack {
 
     template<typename scalar_t> void
     getrf(Handle& h, DenseMatrix<scalar_t>& A,
-          scalar_t* workspace, int* dev_piv, int* dev_info) {
+          scalar_t* work, std::int64_t lwork, int* dpiv, int*) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrf_flops(A.rows(),A.cols()));
-      std::int64_t scratchpad_size = getrf_buffersize<scalar_t>(h, A.rows());
-      // TODO
-      DeviceMemory<scalar_t> scratchpad(scratchpad_size);
-      DeviceMemory<std::int64_t> dpiv_(A.rows());
-      std::int64_t* dpiv = dpiv_;
+      auto np = scalars_for_int64<scalar_t>(A.rows());
       try {
-	oneapi::mkl::lapack::getrf
-	  (get_sycl_queue(h), A.rows(), A.cols(), A.data(), A.ld(),
-           dpiv, scratchpad, scratchpad_size);
+        oneapi::mkl::lapack::getrf
+          (get_sycl_queue(h), A.rows(), A.cols(), A.data(), A.ld(),
+           work, work+np, lwork-np);
       } catch (oneapi::mkl::lapack::exception e) {
         std::cerr << "Exception in oneapi::mkl::lapack::getrf, info = "
                   << e.info() << std::endl;
       }
       get_sycl_queue(h).parallel_for
-	(sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
-	  dev_piv[i[0]] = dpiv[i[0]];
-	});
+        (sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
+          dpiv[i[0]] = work[i[0]];
+        });
     }
     template void getrf(Handle&, DenseMatrix<float>&,float*, int*, int*);
     template void getrf(Handle&, DenseMatrix<double>&, double*, int*, int*);
@@ -361,8 +359,8 @@ namespace strumpack {
     getrs_buffersize(Handle& h, Trans t, int n, int nrhs, int lda, int ldb) {
       return oneapi::mkl::lapack::getrs_scratchpad_size<scalar_t>
         (get_sycl_queue(h), T2MKLOp(t), n, nrhs, lda, ldb)
-	// add some extra space to convert pivot data int/int64_t
-	+ scalars_for_int64<scalar_t>(n);
+        // add some extra space to convert pivot data int/int64_t
+        + scalars_for_int64<scalar_t>(n);
     }
     template std::int64_t getrs_buffersize<float>(Handle&, Trans, int, int, int, int);
     template std::int64_t getrs_buffersize<double>(Handle&, Trans, int, int, int, int);
@@ -374,17 +372,17 @@ namespace strumpack {
           const int* ipiv, DenseMatrix<scalar_t>& B, int *devinfo) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrs_flops(A.rows(),B.cols()));
       std::int64_t scratchpad_size = getrs_buffersize<scalar_t>
-	(handle, trans, A.rows(), B.cols(), A.ld(), B.ld());
+        (handle, trans, A.rows(), B.cols(), A.ld(), B.ld());
       // TODO
       DeviceMemory<scalar_t> scratchpad(scratchpad_size);
       DeviceMemory<std::int64_t> dpiv_(A.rows());
       std::int64_t* dpiv = dpiv_;
       get_sycl_queue(handle).parallel_for
-	(sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
-	  dpiv[i[0]] = ipiv[i[0]];
-	});
+        (sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
+          dpiv[i[0]] = ipiv[i[0]];
+        });
       try {
-	oneapi::mkl::lapack::getrs
+        oneapi::mkl::lapack::getrs
           (get_sycl_queue(handle), T2MKLOp(trans), A.rows(), B.cols(),
            const_cast<scalar_t*>(A.data()), A.ld(),
            dpiv, B.data(), B.ld(), scratchpad, scratchpad_size);
@@ -409,8 +407,8 @@ namespace strumpack {
          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::trsm_flops(A.rows(),B.cols(),alpha,char(side)));
       oneapi::mkl::blas::column_major::trsm
-	(get_sycl_queue(handle), S2MKLOp(side), U2MKLOp(uplo), T2MKLOp(trans), D2MKLOp(diag),
-	 B.rows(), B.cols(), alpha, A.data(), A.ld(), B.data(), B.ld());
+        (get_sycl_queue(handle), S2MKLOp(side), U2MKLOp(uplo), T2MKLOp(trans), D2MKLOp(diag),
+         B.rows(), B.cols(), alpha, A.data(), A.ld(), B.data(), B.ld());
     }
     template void trsm(Handle&, Side, UpLo, Trans, Diag, const float,
                        DenseMatrix<float>&, DenseMatrix<float>&);

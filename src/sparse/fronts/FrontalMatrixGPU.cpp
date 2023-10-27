@@ -207,7 +207,7 @@ namespace strumpack {
     std::vector<std::size_t> elems11, elems12, elems21, Isize;
     scalar_t* dev_getrf_work = nullptr;
     int* dev_getrf_err = nullptr;
-    int getrf_work_size = 0;
+    std::int64_t getrf_work_size = 0;
     gpu::FrontData<scalar_t> *f8 = nullptr, *f16 = nullptr,
       *f24 = nullptr, *f32 = nullptr;
   };
@@ -439,12 +439,12 @@ namespace strumpack {
     // tl.start();
     if (dsep) {
       gpu::Handle h;
-      gpu::DeviceMemory<scalar_t> dm11
-        (dsep*dsep + gpu::getrf_buffersize<scalar_t>(h, dsep));
+      auto lwork = gpu::getrf_buffersize<scalar_t>(h, dsep);
+      gpu::DeviceMemory<scalar_t> dm11(dsep*dsep + lwork);
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
       gpu::copy_host_to_device(dF11, F11_);
-      gpu::getrf(h, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
+      gpu::getrf(h, dF11, dm11 + dsep*dsep, lwork, dpiv, dpiv+dsep);
       if (opts.replace_tiny_pivots())
         gpu::replace_pivots
           (F11_.rows(), dF11.data(), opts.pivot_threshold());
@@ -634,7 +634,7 @@ namespace strumpack {
                   auto& f = *(L.f[n]);
                   gpu::getrf
                     (handles[s], f.F11_, L.dev_getrf_work + s * L.getrf_work_size,
-                     f.piv_, L.dev_getrf_err + n);
+                     L.getrf_work_size, f.piv_, L.dev_getrf_err + n);
                   if (opts.replace_tiny_pivots())
                     gpu::replace_pivots
                       (f.dim_sep(), f.F11_.data(),

@@ -464,6 +464,7 @@ namespace strumpack {
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
             (handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
+             L.getrf_work_bytes / sizeof(scalar_t),
              L.f[i]->piv_, L.dev_getrf_err+i);
         // TODO check error code
         if (opts.replace_tiny_pivots()) {
@@ -568,12 +569,12 @@ namespace strumpack {
     // tl.start();
     if (dsep) {
       gpu::Handle h;
-      gpu::DeviceMemory<scalar_t> dm11
-        (dsep*dsep + gpu::getrf_buffersize<scalar_t>(h, dsep));
+      auto lwork = gpu::getrf_buffersize<scalar_t>(h, dsep);
+      gpu::DeviceMemory<scalar_t> dm11(dsep*dsep + lwork);
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
       gpu::copy_host_to_device(dF11, F11_);
-      gpu::getrf(h, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
+      gpu::getrf(h, dF11, dm11 + dsep*dsep, lwork, dpiv, dpiv+dsep);
       // TODO check return code!
       if (opts.replace_tiny_pivots())
         gpu::replace_pivots
@@ -739,6 +740,7 @@ namespace strumpack {
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
             (handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
+             L.getrf_work_bytes / sizeof(scalar_t),
              L.f[i]->piv_, L.dev_getrf_err+i);
         // TODO check error code
         if (opts.replace_tiny_pivots()) {
@@ -985,7 +987,7 @@ namespace strumpack {
 
     // forward solve
     for (int l=lvls-1; l>=0; l--) {
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       auto& L = ldata[l];
       std::size_t N = L.f.size(), Nsmall = L.Nsmall;
       L.set_batch_data(dwork_mem);
@@ -998,7 +1000,7 @@ namespace strumpack {
         gpu::extend_add_rhs
           (b.rows(), nrhs, N, &h_asmbl[l_off[l]], d_asmbl+l_off[l]);
       // TODO remove?
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       gpu::laswp_fwd_vbatched
         (handle, nrhs_batch+Nmax-Nsmall, nrhs,
          d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall,
@@ -1041,7 +1043,8 @@ namespace strumpack {
                     L.f[i]->F21_, fb, scalar_t(1.), fbu);
       }
     }
-    gpu::synchronize();
+    gpu::synchronize_default_stream();
+
 
     // backward solve
     for (int l=0; l<lvls; l++) {
@@ -1051,7 +1054,7 @@ namespace strumpack {
       auto d1 = L.dev_d1_batch;   auto d2 = L.dev_d2_batch;
       auto ld1 = L.dev_ld1_batch; auto ld2 = L.dev_ld2_batch;
       auto F12 = L.dev_F_batch + Nsmall;
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       if (l != 0) {
         if (nrhs == 1)
           gpu::magma::gemv_vbatched_max_nocheck
@@ -1076,7 +1079,7 @@ namespace strumpack {
                       L.f[i]->F12_, fbu, scalar_t(1.), fb);
         }
       }
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       if (l != lvls-1)
         gpu::extract_rhs
           (b.rows(), nrhs, N, &h_asmbl[l_off[l]], d_asmbl+l_off[l]);

@@ -205,7 +205,8 @@ namespace strumpack {
       for (std::size_t i=0; i<rb; i++) {
         // TODO why handle2?
         gpu::getrf(handle2, B11.tile(i, i).D(),
-                   d_work_mem, dpiv+B11.tileroff(i), dinfo);
+                   d_work_mem, getrf_work_size,
+                   dpiv+B11.tileroff(i), dinfo);
 
 #if defined(STRUMPACK_USE_KBLAS)
         VBatchedARA<scalar_t> ara;

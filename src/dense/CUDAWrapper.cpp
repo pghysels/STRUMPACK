@@ -44,8 +44,8 @@ namespace strumpack {
       cudaGetLastError();
     }
 
-    void synchronize() {
-      gpu_check(cudaDeviceSynchronize());
+    void synchronize_default_stream() {
+      gpu_check(cudaStreamSynchronize(0));
     }
 
     struct Stream::StreamImpl {
@@ -456,7 +456,8 @@ namespace strumpack {
       gpu_check(cusolverDnZgetrf_bufferSize(handle, m, n, reinterpret_cast<cuDoubleComplex*>(A), lda, Lwork));
     }
 
-    template<typename scalar_t> std::int64_t getrf_buffersize(Handle& handle, int n) {
+    template<typename scalar_t>
+    std::int64_t getrf_buffersize(Handle& handle, int n) {
       int Lwork;
       getrf_buffersize(get_cusolver_handle(handle), n, n, static_cast<scalar_t*>(nullptr), n, &Lwork);
       return Lwork;
@@ -468,43 +469,43 @@ namespace strumpack {
 
 
     void getrf(cusolverDnHandle_t& handle, int m, int n, float* A, int lda,
-               float* Workspace, int* devIpiv, int* devInfo) {
+               float* work, std::size_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrf_flops(m,n));
       gpu_check(cusolverDnSgetrf
-                (handle, m, n, A, lda, Workspace, devIpiv, devInfo));
+                (handle, m, n, A, lda, work, dpiv, dinfo));
     }
-    void getrf(cusolverDnHandle_t& handle, int m, int n, double* A,
-               int lda, double* Workspace, int* devIpiv, int* devInfo) {
+    void getrf(cusolverDnHandle_t& handle, int m, int n, double* A, int lda,
+               double* work, std::int64_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrf_flops(m,n));
       gpu_check(cusolverDnDgetrf
-                (handle, m, n, A, lda, Workspace, devIpiv, devInfo));
+                (handle, m, n, A, lda, work, dpiv, dinfo));
     }
     void getrf(cusolverDnHandle_t& handle, int m, int n, std::complex<float>* A, int lda,
-               std::complex<float>* Workspace, int* devIpiv, int* devInfo) {
+               std::complex<float>* work, std::int64_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(cusolverDnCgetrf
                 (handle, m, n, reinterpret_cast<cuComplex*>(A), lda,
-                 reinterpret_cast<cuComplex*>(Workspace), devIpiv, devInfo));
+                 reinterpret_cast<cuComplex*>(work), dpiv, dinfo));
     }
     void getrf(cusolverDnHandle_t& handle, int m, int n, std::complex<double>* A, int lda,
-               std::complex<double>* Workspace, int* devIpiv, int* devInfo) {
+               std::complex<double>* work, std::int64_t, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS(4*blas::getrf_flops(m,n));
       gpu_check(cusolverDnZgetrf
                 (handle, m, n, reinterpret_cast<cuDoubleComplex*>(A), lda,
-                 reinterpret_cast<cuDoubleComplex*>(Workspace),
-                 devIpiv, devInfo));
+                 reinterpret_cast<cuDoubleComplex*>(work),
+                 dpiv, dinfo));
     }
 
     template<typename scalar_t> void
     getrf(Handle& handle, DenseMatrix<scalar_t>& A,
-          scalar_t* Workspace, int* devIpiv, int* devInfo) {
+          scalar_t* work, std::int64_t lwork, int* dpiv, int* dinfo) {
       getrf(get_cusolver_handle(handle), A.rows(), A.cols(), A.data(), A.ld(),
-            Workspace, devIpiv, devInfo);
+            work, lwork, dpiv, dinfo);
     }
-    template void getrf(Handle&, DenseMatrix<float>&,float*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<double>&, double*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, int*, int*);
-    template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, int*, int*);
+    template void getrf(Handle&, DenseMatrix<float>&, float*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<double>&, double*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<std::complex<float>>&, std::complex<float>*, std::int64_t, int*, int*);
+    template void getrf(Handle&, DenseMatrix<std::complex<double>>& A, std::complex<double>*, std::int64_t, int*, int*);
 
     template<typename scalar_t> std::int64_t
     getrs_buffersize(Handle& handle, Trans, int, int, int, int) {

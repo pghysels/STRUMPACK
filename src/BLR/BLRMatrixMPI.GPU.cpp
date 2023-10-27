@@ -79,13 +79,17 @@ namespace strumpack {
 
     template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
     create_device_tile_from_ptr(scalar_t*& dptr, scalar_t*& ptr,
-				int m, int n, int r, bool gpu_aware) {
+                                int m, int n, int r, bool gpu_aware) {
       if (r != -1) {
-	if (gpu_aware) return LRTile<scalar_t>::create_as_device_wrapper_from_device_ptr(dptr, ptr, m, n, r);
-	else           return LRTile<scalar_t>::create_as_device_wrapper_from_host_ptr(dptr, ptr, m, n, r);
+        if (gpu_aware)
+          return LRTile<scalar_t>::create_as_device_wrapper_from_device_ptr(dptr, ptr, m, n, r);
+        else
+          return LRTile<scalar_t>::create_as_device_wrapper_from_host_ptr(dptr, ptr, m, n, r);
       } else {
-	if (gpu_aware) return DenseTile<scalar_t>::create_as_device_wrapper_from_device_ptr(dptr, ptr, m, n);
-	else           return DenseTile<scalar_t>::create_as_device_wrapper_from_host_ptr(dptr, ptr, m, n);
+        if (gpu_aware)
+          return DenseTile<scalar_t>::create_as_device_wrapper_from_device_ptr(dptr, ptr, m, n);
+        else
+          return DenseTile<scalar_t>::create_as_device_wrapper_from_host_ptr(dptr, ptr, m, n);
       }
     }
 
@@ -116,22 +120,20 @@ namespace strumpack {
       if (grid()->is_local_row(i))
         for (std::size_t j=j0; j<j1; j++)
           if (grid()->is_local_col(j)) {
-	    if (gpu_aware) ptr = tile(i, j).copy_device_to_device(ptr);
-	    else           ptr = tile(i, j).copy_device_to_host(ptr);
-	  }
+            if (gpu_aware) ptr = tile(i, j).copy_device_to_device(ptr);
+            else           ptr = tile(i, j).copy_device_to_host(ptr);
+          }
       ptr = work;
       if (gpu_aware)
-	gpu::synchronize();
+        gpu::synchronize_default_stream();
       grid()->col_comm().broadcast_from(ptr, msg_size, src);
       Tij.reserve(nr_tiles);
       auto m = tilerows(i);
       for (std::size_t j=j0; j<j1; j++)
         if (grid()->is_local_col(j))
-	  Tij.emplace_back
-	    (create_device_tile_from_ptr
-	     (dptr, ptr, m, tilecols(j), ranks[Tij.size()], gpu_aware));
-      if (gpu_aware)
-	gpu::synchronize();
+          Tij.emplace_back
+            (create_device_tile_from_ptr
+             (dptr, ptr, m, tilecols(j), ranks[Tij.size()], gpu_aware));
       return Tij;
     }
 
@@ -162,22 +164,20 @@ namespace strumpack {
       if (grid()->is_local_col(j))
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i)) {
-	    if (gpu_aware) ptr = tile(i, j).copy_device_to_device(ptr);
-	    else           ptr = tile(i, j).copy_device_to_host(ptr);
-	  }
+            if (gpu_aware) ptr = tile(i, j).copy_device_to_device(ptr);
+            else           ptr = tile(i, j).copy_device_to_host(ptr);
+          }
       ptr = work;
       if (gpu_aware)
-	gpu::synchronize();
+        gpu::synchronize_default_stream();
       grid()->row_comm().broadcast_from(ptr, msg_size, src);
       Tij.reserve(nr_tiles);
       auto n = tilecols(j);
       for (std::size_t i=i0; i<i1; i++)
         if (grid()->is_local_row(i))
           Tij.emplace_back
-	    (create_device_tile_from_ptr
-	     (dptr, ptr, tilerows(i), n, ranks[Tij.size()], gpu_aware));
-      if (gpu_aware)
-	gpu::synchronize();
+            (create_device_tile_from_ptr
+             (dptr, ptr, tilerows(i), n, ranks[Tij.size()], gpu_aware));
       return Tij;
     }
 
@@ -241,14 +241,14 @@ namespace strumpack {
       scalar_t* comm_buffer = pinned;
       gpu::DeviceMemory<scalar_t> dcomm;
       if (gpu_aware) {
-	dcomm = gpu::DeviceMemory<scalar_t>(pinned_size);
-	comm_buffer = dcomm;
+        dcomm = gpu::DeviceMemory<scalar_t>(pinned_size);
+        comm_buffer = dcomm;
       }
 
       gpu::DeviceMemory<int> dpiv(max_m1+1);
       auto dinfo = dpiv + max_m1;
       gpu::DeviceMemory<char> d_batch_mem(3*d_batch_meta),
-	d_batch_matrix_mem;
+        d_batch_matrix_mem;
 
       // TODO do this column wise to overlap
       A11.move_to_gpu(copy_stream, dA11, pinned);
@@ -258,11 +258,12 @@ namespace strumpack {
 
       for (std::size_t i=0; i<rb; i++) {
         auto mi = A11.tilerows(i);
-	auto Tii = DenseTile<scalar_t>::create_as_wrapper(pinned, mi, mi);
+        auto Tii = DenseTile<scalar_t>::create_as_wrapper(pinned, mi, mi);
         if (g->is_local_row(i)) {
           piv_tile.resize(mi);
           if (g->is_local_col(i)) {
-            gpu::getrf(handle, A11.tile(i, i).D(), dwork, dpiv, dinfo);
+            gpu::getrf(handle, A11.tile(i, i).D(),
+                       dwork, getrf_work_size, dpiv, dinfo);
             comp_stream.synchronize();
             gpu::copy_device_to_host(Tii->D(), A11.tile(i, i).D());
             gpu::copy_device_to_host<int>(piv_tile.data(), dpiv, mi);
@@ -405,7 +406,7 @@ namespace strumpack {
           for (std::size_t j=i+1, lj=0; j<rb; j++)
             if (g->is_local_col(j))
               add_tile_mult
-		(*(Tk2i[lk]), *(Tij[lj++]), A21.tile_dense(k, j).D(),
+                (*(Tk2i[lk]), *(Tij[lj++]), A21.tile_dense(k, j).D(),
                  b1, b2, b3, dVU, dUVU);
           for (std::size_t j=0, lj=0; j<rb2; j++)
             if (g->is_local_col(j))
