@@ -467,60 +467,59 @@ namespace strumpack {
 
     void getrs(rocblas_handle& handle, rocblas_operation trans,
                int n, int nrhs, const float* A, int lda,
-               const int* devIpiv, float* B, int ldb, int* devInfo) {
+               const int* dpiv, float* B, int ldb, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_sgetrs
                 (handle, trans, n, nrhs,
-                 const_cast<float*>(A), lda, devIpiv, B, ldb));
+                 const_cast<float*>(A), lda, dpiv, B, ldb));
     }
     void getrs(rocblas_handle& handle, rocblas_operation trans,
                int n, int nrhs, const double* A, int lda,
-               const int* devIpiv, double* B, int ldb,
-               int* devInfo) {
+               const int* dpiv, double* B, int ldb, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_dgetrs
                 (handle, trans, n, nrhs,
-                 const_cast<double*>(A), lda, devIpiv, B, ldb));
+                 const_cast<double*>(A), lda, dpiv, B, ldb));
     }
     void getrs(rocblas_handle& handle, rocblas_operation trans,
                int n, int nrhs, const std::complex<float>* A, int lda,
-               const int* devIpiv, std::complex<float>* B, int ldb,
-               int* devInfo) {
+               const int* dpiv, std::complex<float>* B, int ldb, int* dinfo) {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_cgetrs
                 (handle, trans, n, nrhs,
                  reinterpret_cast<rocblas_float_complex*>
-                 (const_cast<std::complex<float>*>(A)), lda, devIpiv,
+                 (const_cast<std::complex<float>*>(A)), lda, dpiv,
                  reinterpret_cast<rocblas_float_complex*>
                  (const_cast<std::complex<float>*>(B)), ldb));
     }
     void getrs(rocblas_handle& handle, rocblas_operation trans,
                int n, int nrhs, const std::complex<double>* A, int lda,
-               const int* devIpiv, std::complex<double>* B, int ldb,
-               int *devInfo) {
+               const int* dpiv, std::complex<double>* B, int ldb,
+               int *dinfo) {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(rocsolver_zgetrs
                 (handle, trans, n, nrhs,
                  reinterpret_cast<rocblas_double_complex*>
-                 (const_cast<std::complex<double>*>(A)), lda, devIpiv,
+                 (const_cast<std::complex<double>*>(A)), lda, dpiv,
                  reinterpret_cast<rocblas_double_complex*>
                  (const_cast<std::complex<double>*>(B)), ldb));
     }
 
     template<typename scalar_t> void
     getrs(Handle& handle, Trans trans, const DenseMatrix<scalar_t>& A,
-          const int* devIpiv, DenseMatrix<scalar_t>& B, int *devInfo) {
+          const int* dpiv, DenseMatrix<scalar_t>& B, int *dinfo,
+          scalar_t*, std::int64_t) {
       getrs(get_rocblas_handle(handle), T2rocOp(trans), A.rows(), B.cols(),
-            A.data(), A.ld(), devIpiv, B.data(), B.ld(), devInfo);
+            A.data(), A.ld(), dpiv, B.data(), B.ld(), dinfo);
     }
     template void getrs(Handle&, Trans, const DenseMatrix<float>&,
-                        const int*, DenseMatrix<float>&, int*);
+                        const int*, DenseMatrix<float>&, int*, float*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<double>&,
-                        const int*, DenseMatrix<double>&, int*);
+                        const int*, DenseMatrix<double>&, int*, double*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<std::complex<float>>&, const int*,
-                        DenseMatrix<std::complex<float>>&, int*);
+                        DenseMatrix<std::complex<float>>&, int*, std::complex<float>*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<std::complex<double>>&, const int*,
-                        DenseMatrix<std::complex<double>>&, int*);
+                        DenseMatrix<std::complex<double>>&, int*, std::complex<double>*, std::int64_t);
 
     void trsm(hipblasHandle_t& handle, hipblasSideMode_t side,
               hipblasFillMode_t uplo, hipblasOperation_t trans,
@@ -593,7 +592,7 @@ namespace strumpack {
 
     template<typename scalar_t, typename real_t> void
     gesvdj(Handle& handle, Jobz jobz, DenseMatrix<scalar_t>& A, real_t* S,
-           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, int* devInfo,
+           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, int* dinfo,
            scalar_t* work, int lwork, const double tol) {
       std::cerr << "TODO gesvdj not implemented for HIP" << std::endl;
     }

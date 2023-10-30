@@ -71,22 +71,22 @@ namespace strumpack {
       std::size_t nf;
       Assemble(AssembleData<T>* d, std::size_t N) : dat(d), nf(N) {}
       void operator()(cl::sycl::nd_item<2> it) const {
-	std::size_t op = it.get_global_id(0);
-	if (op >= nf) return;
-	auto& F = dat[op];
-	auto idx = it.get_global_id(1);
-	if (idx < F.n11) {
-	  auto& t = F.e11[idx];
-	  F.F11[t.r + t.c*F.d1] = t.v;
-	}
-	if (idx < F.n12) {
-	  auto& t = F.e12[idx];
-	  F.F12[t.r + t.c*F.d1] = t.v;
-	}
-	if (idx < F.n21) {
-	  auto& t = F.e21[idx];
-	  F.F21[t.r + t.c*F.d2] = t.v;
-	}
+        std::size_t op = it.get_global_id(0);
+        if (op >= nf) return;
+        auto& F = dat[op];
+        auto idx = it.get_global_id(1);
+        if (idx < F.n11) {
+          auto& t = F.e11[idx];
+          F.F11[t.r + t.c*F.d1] = t.v;
+        }
+        if (idx < F.n12) {
+          auto& t = F.e12[idx];
+          F.F12[t.r + t.c*F.d1] = t.v;
+        }
+        if (idx < F.n21) {
+          auto& t = F.e21[idx];
+          F.F21[t.r + t.c*F.d2] = t.v;
+        }
       }
     };
 
@@ -100,39 +100,39 @@ namespace strumpack {
       bool left;
       std::size_t nf;
       EA(AssembleData<T>* d, std::size_t N, bool l)
-	: dat(d), nf(N), left(l) {}
+        : dat(d), nf(N), left(l) {}
       void operator()(cl::sycl::nd_item<3> it) const {
-	int y = it.get_global_id(2),
-	  x0 = it.get_group(1) * unroll,
-	  z = it.get_global_id(0);
-	if (z >= nf) return;
-	auto& f = dat[z];
-	auto CB = left ? f.CB1 : f.CB2;
-	if (!CB) return;
-	auto dCB = left ? f.dCB1 : f.dCB2;
-	if (y >= dCB) return;
-	auto I = left ? f.I1 : f.I2;
-	auto Iy = I[y];
-	CB += y + x0*dCB;
-	int d1 = f.d1, d2 = f.d2;
-	int ld;
-	T* F[2];
-	if (Iy < d1) {
-	  ld = d1;
-	  F[0] = f.F11+Iy;
-	  F[1] = f.F12+Iy-d1*d1;
-	} else {
-	  ld = d2;
-	  F[0] = f.F21+Iy-d1;
-	  F[1] = f.F22+Iy-d1-d1*d2;
-	}
+        int y = it.get_global_id(2),
+          x0 = it.get_group(1) * unroll,
+          z = it.get_global_id(0);
+        if (z >= nf) return;
+        auto& f = dat[z];
+        auto CB = left ? f.CB1 : f.CB2;
+        if (!CB) return;
+        auto dCB = left ? f.dCB1 : f.dCB2;
+        if (y >= dCB) return;
+        auto I = left ? f.I1 : f.I2;
+        auto Iy = I[y];
+        CB += y + x0*dCB;
+        int d1 = f.d1, d2 = f.d2;
+        int ld;
+        T* F[2];
+        if (Iy < d1) {
+          ld = d1;
+          F[0] = f.F11+Iy;
+          F[1] = f.F12+Iy-d1*d1;
+        } else {
+          ld = d2;
+          F[0] = f.F21+Iy-d1;
+          F[1] = f.F22+Iy-d1-d1*d2;
+        }
 #pragma unroll
-	for (int i=0; i<unroll; i++) {
-	  int x = x0 + i;
-	  if (x >= dCB) break;
-	  auto Ix = I[x];
-	  F[Ix >= d1][Ix*ld] += CB[i*dCB];
-	}
+        for (int i=0; i<unroll; i++) {
+          int x = x0 + i;
+          if (x >= dCB) break;
+          auto Ix = I[x];
+          F[Ix >= d1][Ix*ld] += CB[i*dCB];
+        }
       }
     };
 
@@ -143,46 +143,46 @@ namespace strumpack {
                   AssembleData<T> *ddat) {
       sycl::queue &q = get_sycl_queue();
       { // front assembly from sparse matrix
-	std::size_t nnz = 0;
-	for (std::size_t f=0; f<N; f++)
-	  nnz = std::max
-	    (nnz, std::size_t(std::max(dat[f].n11,
-				       std::max(dat[f].n12, dat[f].n21))));
-	if (nnz) {
-	  // TODO unroll
-	  std::size_t nt = 512, ops = 1;
-	  while (nt > nnz && ops < 64) {
-	    nt /= 2;
-	    ops *= 2;
-	  }
-	  // assert(rnd(std::size_t(N),ops) * rnd(nnz,nt) < std::numeric_limits<int>::max());
-	  sycl::range<2> global{rnd(std::size_t(N),ops),
-	      rnd(nnz,nt)}, local{ops, nt};
-	  q.parallel_for(sycl::nd_range<2>{global, local},
-			 Assemble<T>(ddat, N));
-	}
+        std::size_t nnz = 0;
+        for (std::size_t f=0; f<N; f++)
+          nnz = std::max
+            (nnz, std::size_t(std::max(dat[f].n11,
+                                       std::max(dat[f].n12, dat[f].n21))));
+        if (nnz) {
+          // TODO unroll
+          std::size_t nt = 512, ops = 1;
+          while (nt > nnz && ops < 64) {
+            nt /= 2;
+            ops *= 2;
+          }
+          // assert(rnd(std::size_t(N),ops) * rnd(nnz,nt) < std::numeric_limits<int>::max());
+          sycl::range<2> global{rnd(std::size_t(N),ops),
+              rnd(nnz,nt)}, local{ops, nt};
+          q.parallel_for(sycl::nd_range<2>{global, local},
+                         Assemble<T>(ddat, N));
+        }
       }
       { // extend-add
-	std::size_t gCB = 0;
-	for (std::size_t f=0; f<N; f++)
-	  gCB = std::max(gCB, std::size_t(std::max(dat[f].dCB1, dat[f].dCB2)));
-	if (gCB) {
-	  std::size_t nt = 256, ops = 1;
-	  const std::size_t unroll = 16;
-	  while (nt > gCB && ops < 64) {
-	    nt /= 2;
-	    ops *= 2;
-	  }
-	  std::size_t gx = (gCB + unroll - 1) / unroll;
-	  gCB = rnd(gCB, nt);
-	  // assert(gCB * gx * rnd(N,ops) < std::numeric_limits<int>::max());
-	  sycl::range<3> global{rnd(std::size_t(N), ops), gx, gCB},
-	    local{ops, 1, nt};
-	  q.parallel_for(sycl::nd_range<3>{global, local},
-			 EA<T,unroll>(ddat, N, true));
-	  q.parallel_for(sycl::nd_range<3>{global, local},
-			 EA<T,unroll>(ddat, N, false));
-	}
+        std::size_t gCB = 0;
+        for (std::size_t f=0; f<N; f++)
+          gCB = std::max(gCB, std::size_t(std::max(dat[f].dCB1, dat[f].dCB2)));
+        if (gCB) {
+          std::size_t nt = 256, ops = 1;
+          const std::size_t unroll = 16;
+          while (nt > gCB && ops < 64) {
+            nt /= 2;
+            ops *= 2;
+          }
+          std::size_t gx = (gCB + unroll - 1) / unroll;
+          gCB = rnd(gCB, nt);
+          // assert(gCB * gx * rnd(N,ops) < std::numeric_limits<int>::max());
+          sycl::range<3> global{rnd(std::size_t(N), ops), gx, gCB},
+            local{ops, 1, nt};
+          q.parallel_for(sycl::nd_range<3>{global, local},
+                         EA<T,unroll>(ddat, N, true));
+          q.parallel_for(sycl::nd_range<3>{global, local},
+                         EA<T,unroll>(ddat, N, false));
+        }
       }
     }
 
@@ -392,7 +392,7 @@ namespace strumpack {
         nbf = (batchCount + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
-	std::cout << "TODO fix" << std::endl;
+        std::cout << "TODO fix" << std::endl;
         sycl::range<3> grid(nbx, std::min(nbf - f, MAX_BLOCKS_Y), 1);
         auto f0 = f * ops;
         /*
@@ -697,7 +697,7 @@ namespace strumpack {
       unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
-	std::cout << "TODO fix" << std::endl;
+        std::cout << "TODO fix" << std::endl;
         sycl::range<3> grid(nb, std::min(nbf - f, MAX_BLOCKS_Z), 1);
         /*
           DPCT1049:24: The work-group size passed to the SYCL kernel may exceed
@@ -772,7 +772,7 @@ namespace strumpack {
       unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
       sycl::range<3> block(1, ops, nt);
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
-	std::cout << "TODO fix" << std::endl;
+        std::cout << "TODO fix" << std::endl;
         sycl::range<3> grid(nb, std::min(nbf - f, MAX_BLOCKS_Z), 1);
         /*
           DPCT1049:26: The work-group size passed to the SYCL kernel may exceed

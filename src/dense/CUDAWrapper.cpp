@@ -518,54 +518,53 @@ namespace strumpack {
 
     void getrs(cusolverDnHandle_t& handle, cublasOperation_t trans,
                int n, int nrhs, const float* A, int lda,
-               const int* devIpiv, float* B, int ldb, int* devInfo) {
+               const int* dpiv, float* B, int ldb, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
       gpu_check(cusolverDnSgetrs
-                (handle, trans, n, nrhs, A, lda, devIpiv, B, ldb, devInfo));
+                (handle, trans, n, nrhs, A, lda, dpiv, B, ldb, dinfo));
     }
     void getrs(cusolverDnHandle_t& handle, cublasOperation_t trans,
                int n, int nrhs, const double* A, int lda,
-               const int* devIpiv, double* B, int ldb,
-               int* devInfo) {
+               const int* dpiv, double* B, int ldb, int* dinfo) {
       STRUMPACK_FLOPS(blas::getrs_flops(n,nrhs));
       gpu_check(cusolverDnDgetrs
-                (handle, trans, n, nrhs, A, lda, devIpiv, B, ldb, devInfo));
+                (handle, trans, n, nrhs, A, lda, dpiv, B, ldb, dinfo));
     }
     void getrs(cusolverDnHandle_t& handle, cublasOperation_t trans,
                int n, int nrhs, const std::complex<float>* A, int lda,
-               const int* devIpiv, std::complex<float>* B, int ldb,
-               int* devInfo) {
+               const int* dpiv, std::complex<float>* B, int ldb,
+               int* dinfo) {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(cusolverDnCgetrs
                 (handle, trans, n, nrhs,
                  reinterpret_cast<const cuComplex*>(A), lda,
-                 devIpiv, reinterpret_cast<cuComplex*>(B), ldb, devInfo));
+                 dpiv, reinterpret_cast<cuComplex*>(B), ldb, dinfo));
     }
     void getrs(cusolverDnHandle_t& handle, cublasOperation_t trans,
                int n, int nrhs, const std::complex<double>* A, int lda,
-               const int* devIpiv, std::complex<double>* B, int ldb,
-               int *devInfo) {
+               const int* dpiv, std::complex<double>* B, int ldb,
+               int *dinfo) {
       STRUMPACK_FLOPS(4*blas::getrs_flops(n,nrhs));
       gpu_check(cusolverDnZgetrs
                 (handle, trans, n, nrhs,
-                 reinterpret_cast<const cuDoubleComplex*>(A), lda, devIpiv,
-                 reinterpret_cast<cuDoubleComplex*>(B), ldb, devInfo));
+                 reinterpret_cast<const cuDoubleComplex*>(A), lda, dpiv,
+                 reinterpret_cast<cuDoubleComplex*>(B), ldb, dinfo));
     }
     template<typename scalar_t> void
     getrs(Handle& handle, Trans trans,
-          const DenseMatrix<scalar_t>& A, const int* devIpiv,
-          DenseMatrix<scalar_t>& B, int *devInfo) {
+          const DenseMatrix<scalar_t>& A, const int* dpiv,
+          DenseMatrix<scalar_t>& B, int *dinfo, scalar_t*, std::int64_t) {
       getrs(get_cusolver_handle(handle), T2cuOp(trans), A.rows(), B.cols(),
-            A.data(), A.ld(), devIpiv, B.data(), B.ld(), devInfo);
+            A.data(), A.ld(), dpiv, B.data(), B.ld(), dinfo);
     }
     template void getrs(Handle&, Trans, const DenseMatrix<float>&,
-                        const int*, DenseMatrix<float>&, int*);
+                        const int*, DenseMatrix<float>&, int*, float*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<double>&,
-                        const int*, DenseMatrix<double>&, int*);
+                        const int*, DenseMatrix<double>&, int*, double*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<std::complex<float>>&, const int*,
-                        DenseMatrix<std::complex<float>>&, int*);
+                        DenseMatrix<std::complex<float>>&, int*, std::complex<float>*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<std::complex<double>>&, const int*,
-                        DenseMatrix<std::complex<double>>&, int*);
+                        DenseMatrix<std::complex<double>>&, int*, std::complex<double>*, std::int64_t);
 
     void trsm(cublasHandle_t& handle, cublasSideMode_t side,
               cublasFillMode_t uplo, cublasOperation_t trans,
@@ -743,10 +742,10 @@ namespace strumpack {
     template<typename scalar_t, typename real_t> void
     gesvdj(Handle& handle, Jobz jobz, DenseMatrix<scalar_t>& A, real_t* d_S,
            DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
-           scalar_t* Workspace, int Lwork, int* devInfo, gesvdjInfo_t& params) {
+           scalar_t* Workspace, int Lwork, int* dinfo, gesvdjInfo_t& params) {
       gesvdj(get_cusolver_handle(handle), E2cuOp(jobz), 1, A.rows(), A.cols(),
              A.data(), A.ld(), d_S, U.data(), A.ld(), V.data(), A.cols(),
-             Workspace, Lwork, devInfo, params);
+             Workspace, Lwork, dinfo, params);
     }
     template void gesvdj(Handle&, Jobz, DenseMatrix<float>&, float*,
                          DenseMatrix<float>&, DenseMatrix<float>&,
@@ -765,13 +764,13 @@ namespace strumpack {
 
     template<typename scalar_t, typename real_t> void
     gesvdj(Handle& handle, Jobz jobz, DenseMatrix<scalar_t>& A, real_t* S,
-           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, int* devInfo,
+           DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, int* dinfo,
            scalar_t* work, int lwork, const double tol) {
       gesvdjInfo_t params;
       gesvdj_info_create(&params);
       cusolverDnXgesvdjSetTolerance(params, tol);
       gesvdj<scalar_t>
-        (handle, jobz, A, S, U, V, work, lwork, devInfo, params);
+        (handle, jobz, A, S, U, V, work, lwork, dinfo, params);
       gesvdj_info_destroy(params);
     }
     template void gesvdj(Handle&, Jobz, DenseMatrix<float>&, float*,

@@ -350,12 +350,14 @@ namespace strumpack {
           scalar_t* work, std::int64_t lwork, int* dpiv, int* dinfo);
 
     template<typename scalar_t> std::int64_t
-    getrs_buffersize(Handle& handle, Trans t, int n, int nrhs, int lda, int ldb);
+    getrs_buffersize(Handle& handle, Trans t,
+                     int n, int nrhs, int lda, int ldb);
 
     template<typename scalar_t> void
     getrs(Handle& handle, Trans trans,
-          const DenseMatrix<scalar_t>& A, const int* devIpiv,
-          DenseMatrix<scalar_t>& B, int *devInfo);
+          const DenseMatrix<scalar_t>& A, const int* dpiv,
+          DenseMatrix<scalar_t>& B, int *dinfo,
+          scalar_t* work=nullptr, std::int64_t lwork=0);
 
     template<typename scalar_t> void
     trsm(Handle& handle, Side side, UpLo uplo,

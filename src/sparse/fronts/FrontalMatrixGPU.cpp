@@ -53,7 +53,6 @@ namespace strumpack {
       f.reserve(fronts.size());
       for (auto& F : fronts)
         f.push_back(dynamic_cast<FG_t*>(F));
-      std::size_t max_dsep = 0;
       // This pragma causes "internal error: null pointer" on the
       // intel compiler.  It seems to be because the variables are
       // class members.
@@ -73,8 +72,12 @@ namespace strumpack {
           else if (dsep <= 16) N16++;
           else if (dsep <= 24) N24++;
           else N32++;
-        }
-        if (dsep > max_dsep) max_dsep = dsep;
+        } else
+          getrf_work_size = std::max
+            (getrf_work_size, std::max
+             (gpu::getrf_buffersize<scalar_t>(handle, dsep),
+              gpu::getrs_buffersize<scalar_t>
+              (handle, Trans::N, dsep, dupd, dsep, dsep)));
       }
       small_fronts = N8 + N16 + N24 + N32;
       if (small_fronts && small_fronts != f.size())
@@ -104,7 +107,6 @@ namespace strumpack {
         }
       }
       factor_size = L_size + U_size;
-      getrf_work_size = gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
 
       factor_bytes = sizeof(scalar_t) * factor_size;
       factor_bytes = gpu::round_up(factor_bytes);
@@ -642,7 +644,9 @@ namespace strumpack {
                   if (f.dim_upd()) {
                     gpu::getrs
                       (handles[s], Trans::N, f.F11_, f.piv_,
-                       f.F12_, L.dev_getrf_err + n);
+                       f.F12_, L.dev_getrf_err + n,
+                       L.dev_getrf_work + s * L.getrf_work_size,
+                       L.getrf_work_size);
                     gpu::gemm
                       (handles[s], Trans::N, Trans::N,
                        scalar_t(-1.), f.F21_, f.F12_, scalar_t(1.), f.F22_);

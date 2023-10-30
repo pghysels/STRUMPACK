@@ -370,23 +370,36 @@ namespace strumpack {
 
     template<typename scalar_t> void
     getrs(Handle& handle, Trans trans, const DenseMatrix<scalar_t>& A,
-          const int* ipiv, DenseMatrix<scalar_t>& B, int *devinfo) {
+          const int* ipiv, DenseMatrix<scalar_t>& B, int*,
+          scalar_t* work, std::int64_t lwork) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrs_flops(A.rows(),B.cols()));
-      std::int64_t scratchpad_size = getrs_buffersize<scalar_t>
-        (handle, trans, A.rows(), B.cols(), A.ld(), B.ld());
-      // TODO
-      DeviceMemory<scalar_t> scratchpad(scratchpad_size);
-      DeviceMemory<std::int64_t> dpiv_(A.rows());
-      std::int64_t* dpiv = dpiv_;
+      DeviceMemory<scalar_t> dwork;
+      scalar_t* scratchpad = nullptr;
+      std::int64_t scratchpad_size = 0;
+      std::int64_t* dpiv64 = nullptr;
+      auto np = scalars_for_int64<scalar_t>(n);
+      if (work) {
+        dpiv64 = reinterpret_cast<std::int64_t>(work);
+        scratchpad = work + np;
+        scratchpad_size = lwork - np;
+      } else {
+        dwork = DeviceMemory<scalar_t>(scratchpad_size);
+        scratchpad_size = getrs_buffersize<scalar_t>
+          (handle, trans, A.rows(), B.cols(), A.ld(), B.ld());
+        scratchpad = dwork;
+        dpiv64 = reinterpret_cast<std::int64_t>(scratchpad);
+        scratchpad += np;
+        scratchpad_size -= np;
+      }
       get_sycl_queue(handle).parallel_for
         (sycl::range<1>(A.rows()), [=](sycl::id<1> i) {
-          dpiv[i[0]] = ipiv[i[0]];
+          dpiv64[i[0]] = ipiv[i[0]];
         });
       try {
         oneapi::mkl::lapack::getrs
           (get_sycl_queue(handle), T2MKLOp(trans), A.rows(), B.cols(),
            const_cast<scalar_t*>(A.data()), A.ld(),
-           dpiv, B.data(), B.ld(), scratchpad, scratchpad_size);
+           dpiv64, B.data(), B.ld(), scratchpad, scratchpad_size);
       } catch (oneapi::mkl::lapack::exception e) {
         std::cerr << "Exception in oneapi::mkl::lapack::getrs, info = "
                   << e.info() << std::endl;
