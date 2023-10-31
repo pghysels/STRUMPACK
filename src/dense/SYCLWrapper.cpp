@@ -334,7 +334,7 @@ namespace strumpack {
 
     template<typename scalar_t> void
     getrf(Handle& h, DenseMatrix<scalar_t>& A,
-          scalar_t* work, std::int64_t lwork, int* dpiv, int*) {
+          scalar_t* work, std::int64_t lwork, int* dpiv, int* dinfo) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrf_flops(A.rows(),A.cols()));
       auto np = scalars_for_int64<scalar_t>(A.rows());
       auto dpiv64 = reinterpret_cast<std::int64_t*>(work);
@@ -342,6 +342,7 @@ namespace strumpack {
         oneapi::mkl::lapack::getrf
           (get_sycl_queue(h), A.rows(), A.cols(), A.data(), A.ld(),
            dpiv64, work+np, lwork-np);
+        memset<int>(dinfo, 0, 1);
       } catch (oneapi::mkl::lapack::exception e) {
         std::cerr << "Exception in oneapi::mkl::lapack::getrf, info = "
                   << e.info() << std::endl;
@@ -370,24 +371,24 @@ namespace strumpack {
 
     template<typename scalar_t> void
     getrs(Handle& handle, Trans trans, const DenseMatrix<scalar_t>& A,
-          const int* ipiv, DenseMatrix<scalar_t>& B, int*,
+          const int* ipiv, DenseMatrix<scalar_t>& B, int* dinfo,
           scalar_t* work, std::int64_t lwork) {
       STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::getrs_flops(A.rows(),B.cols()));
       DeviceMemory<scalar_t> dwork;
       scalar_t* scratchpad = nullptr;
       std::int64_t scratchpad_size = 0;
       std::int64_t* dpiv64 = nullptr;
-      auto np = scalars_for_int64<scalar_t>(n);
+      auto np = scalars_for_int64<scalar_t>(A.rows());
       if (work) {
-        dpiv64 = reinterpret_cast<std::int64_t>(work);
+        dpiv64 = reinterpret_cast<std::int64_t*>(work);
         scratchpad = work + np;
         scratchpad_size = lwork - np;
       } else {
-        dwork = DeviceMemory<scalar_t>(scratchpad_size);
         scratchpad_size = getrs_buffersize<scalar_t>
           (handle, trans, A.rows(), B.cols(), A.ld(), B.ld());
+        dwork = DeviceMemory<scalar_t>(scratchpad_size);
         scratchpad = dwork;
-        dpiv64 = reinterpret_cast<std::int64_t>(scratchpad);
+        dpiv64 = reinterpret_cast<std::int64_t*>(scratchpad);
         scratchpad += np;
         scratchpad_size -= np;
       }
@@ -400,6 +401,7 @@ namespace strumpack {
           (get_sycl_queue(handle), T2MKLOp(trans), A.rows(), B.cols(),
            const_cast<scalar_t*>(A.data()), A.ld(),
            dpiv64, B.data(), B.ld(), scratchpad, scratchpad_size);
+        memset<int>(dinfo, 0, 1);
       } catch (oneapi::mkl::lapack::exception e) {
         std::cerr << "Exception in oneapi::mkl::lapack::getrs, info = "
                   << e.info() << std::endl;
@@ -407,13 +409,13 @@ namespace strumpack {
     }
 
     template void getrs(Handle&, Trans, const DenseMatrix<float>&,
-                        const int*, DenseMatrix<float>&, int*);
+                        const int*, DenseMatrix<float>&, int*, float*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<double>&,
-                        const int*, DenseMatrix<double>&, int*);
+                        const int*, DenseMatrix<double>&, int*, double*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<std::complex<float>>&, const int*,
-                        DenseMatrix<std::complex<float>>&, int*);
+                        DenseMatrix<std::complex<float>>&, int*, std::complex<float>*, std::int64_t);
     template void getrs(Handle&, Trans, const DenseMatrix<std::complex<double>>&, const int*,
-                        DenseMatrix<std::complex<double>>&, int*);
+                        DenseMatrix<std::complex<double>>&, int*, std::complex<double>*, std::int64_t);
 
     template<typename scalar_t> void
     trsm(Handle& handle, Side side, UpLo uplo,
