@@ -70,7 +70,7 @@ namespace strumpack {
       AssembleData<T>* dat;
       std::size_t nf;
       Assemble(AssembleData<T>* d, std::size_t N) : dat(d), nf(N) {}
-      void operator()(cl::sycl::nd_item<2> it) const {
+      void operator()(const sycl::nd_item<2>& it) const {
         std::size_t op = it.get_global_id(0);
         if (op >= nf) return;
         auto& F = dat[op];
@@ -101,7 +101,7 @@ namespace strumpack {
       std::size_t nf;
       EA(AssembleData<T>* d, std::size_t N, bool l)
         : dat(d), nf(N), left(l) {}
-      void operator()(cl::sycl::nd_item<3> it) const {
+      void operator()(const sycl::nd_item<3>& it) const {
         int y = it.get_global_id(2),
           x0 = it.get_group(1) * unroll,
           z = it.get_global_id(0);
