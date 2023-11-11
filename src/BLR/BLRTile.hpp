@@ -89,7 +89,7 @@ namespace strumpack {
       virtual const DenseM_t& U() const = 0; //{ assert(false); }
       virtual const DenseM_t& V() const = 0; //{ assert(false); }
 
-      virtual scalar_t* copy_to(scalar_t* ptr) const = 0;
+      virtual void copy_to(scalar_t*& ptr) const = 0;
 
       virtual
       LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const = 0;
@@ -130,8 +130,7 @@ namespace strumpack {
       virtual void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
                                scalar_t* pinned=nullptr) = 0;
 
-      virtual scalar_t* copy_device_to_host(scalar_t* ptr) const = 0;
-      virtual scalar_t* copy_device_to_device(scalar_t* ptr) const = 0;
+      virtual void copy_from_device_to(scalar_t*& ptr) const = 0;
 #endif
 
       virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,

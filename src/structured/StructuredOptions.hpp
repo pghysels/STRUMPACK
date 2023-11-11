@@ -132,7 +132,7 @@ namespace strumpack {
         type_ = a;
       }
       void set_verbose(bool verbose) {
-	verbose_ = verbose;
+        verbose_ = verbose;
       }
 
       real_t rel_tol() const { return rel_tol_; }

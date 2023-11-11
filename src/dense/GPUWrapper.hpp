@@ -198,8 +198,20 @@ namespace strumpack {
 
 
     template<typename T> void
+    copy(T* dst, const T* src, std::size_t count) {
+      device_copy(dst, src, count*sizeof(T), CopyDir::DEF);
+    }
+    template<typename T> void
     copy_device_to_host(T* hptr, const T* dptr, std::size_t count) {
       device_copy(hptr, dptr, count*sizeof(T), CopyDir::D2H);
+    }
+    template<typename T> void
+    copy_host_to_device(T* dptr, const T* hptr, std::size_t count) {
+      device_copy(dptr, hptr, count*sizeof(T), CopyDir::H2D);
+    }
+    template<typename T> void
+    copy_device_to_device(T* d1ptr, const T* d2ptr, std::size_t count) {
+      device_copy(d1ptr, d2ptr, count*sizeof(T), CopyDir::D2D);
     }
 
     template<typename T> void
@@ -207,12 +219,6 @@ namespace strumpack {
                               std::size_t count, Stream& s) {
       device_copy_async(hptr, dptr, count*sizeof(T), CopyDir::D2H, s);
     }
-
-    template<typename T> void
-    copy_host_to_device(T* dptr, const T* hptr, std::size_t count) {
-      device_copy(dptr, hptr, count*sizeof(T), CopyDir::H2D);
-    }
-
     template<typename T> void
     copy_host_to_device_async(T* dptr, const T* hptr,
                               std::size_t count, Stream& s) {
@@ -231,10 +237,13 @@ namespace strumpack {
       else
         copy_device_to_host_async(h.data(), d.data(), d.rows()*d.cols(), s);
     }
-
     template<typename T> void
-    copy_device_to_device(T* d1ptr, const T* d2ptr, std::size_t count) {
-      device_copy(d1ptr, d2ptr, count*sizeof(T), CopyDir::D2D);
+    copy_host_to_device_async(DenseMatrix<T>& d, const DenseMatrix<T>& h,
+                              Stream& s) {
+      if (!d.rows() || !d.cols()) return;
+      assert(d.rows() == h.rows() && d.cols() == h.cols());
+      assert(d.rows() == d.ld() && h.rows() == h.ld());
+      copy_host_to_device_async(d.data(), h.data(), std::size_t(d.rows())*d.cols(), s);
     }
 
     template<typename T> void
@@ -249,16 +258,13 @@ namespace strumpack {
         copy_device_to_device(d1.data(), d2.data(), d1.rows()*d1.cols());
     }
 
-    template<typename scalar_t,
-             typename real_t=typename RealType<scalar_t>::value_type>
-    void
-    copy_real_to_scalar(scalar_t* dest, const real_t* src, std::size_t size) {
-      memset<scalar_t>(dest, 0, size);
-      device_copy_2D(dest, sizeof(scalar_t), src, sizeof(real_t),
-                     sizeof(real_t), size, CopyDir::D2D);
+    template<typename T> void
+    copy(DenseMatrix<T>& dst, const DenseMatrix<T>& src) {
+      if (!dst.rows() || !dst.cols()) return;
+      assert(src.rows() == dst.rows() && src.cols() == dst.cols());
+      assert(src.rows() == src.ld() && dst.rows() == dst.ld());
+      copy(dst.data(), src.data(), std::size_t(src.rows())*src.cols());
     }
-
-
     template<typename T> void
     copy_device_to_host(DenseMatrix<T>& h, const DenseMatrix<T>& d) {
       if (!h.rows() || !h.cols()) return;
@@ -266,21 +272,6 @@ namespace strumpack {
       assert(d.rows() == d.ld() && h.rows() == h.ld());
       copy_device_to_host(h.data(), d.data(), std::size_t(d.rows())*d.cols());
     }
-
-    template<typename T> void
-    copy_device_to_host(DenseMatrix<T>& h, const T* d) {
-      if (!h.rows() || !h.cols()) return;
-      assert(h.rows() == h.ld());
-      copy_device_to_host(h.data(), d, std::size_t(h.rows())*h.cols());
-    }
-
-    template<typename T> void
-    copy_device_to_host(T* h, const DenseMatrix<T>& d) {
-      if (!d.rows() || !d.cols()) return;
-      assert(d.rows() == d.ld());
-      copy_device_to_host(h, d.data(), std::size_t(d.rows())*d.cols());
-    }
-
     template<typename T> void
     copy_host_to_device(DenseMatrix<T>& d, const DenseMatrix<T>& h) {
       if (!d.rows() || !d.cols()) return;
@@ -290,35 +281,30 @@ namespace strumpack {
     }
 
     template<typename T> void
+    copy(DenseMatrix<T>& dst, const T* src) {
+      if (!dst.rows() || !dst.cols()) return;
+      assert(dst.rows() == dst.ld());
+      copy(dst.data(), src, std::size_t(dst.rows())*dst.cols());
+    }
+    template<typename T> void
+    copy_device_to_host(DenseMatrix<T>& h, const T* d) {
+      if (!h.rows() || !h.cols()) return;
+      assert(h.rows() == h.ld());
+      copy_device_to_host(h.data(), d, std::size_t(h.rows())*h.cols());
+    }
+    template<typename T> void
     copy_host_to_device(DenseMatrix<T>& d, const T* h) {
       if (!d.rows() || !d.cols()) return;
       assert(d.rows() == d.ld());
       copy_host_to_device(d.data(), h, std::size_t(d.rows())*d.cols());
     }
-
     template<typename T> void
-    copy_host_to_device(T* d, const DenseMatrix<T>& h) {
-      if (!h.rows() || !h.cols()) return;
-      assert(h.rows() == h.ld());
-      copy_host_to_device(d, h.data(), std::size_t(h.rows())*h.cols());
+    copy_device_to_device(DenseMatrix<T>& d1, const T* d2) {
+      if (!d1.rows() || !d1.cols()) return;
+      assert(d1.rows() == d1.ld());
+      copy_device_to_device
+        (d1.data(), d2, std::size_t(d1.rows())*d1.cols());
     }
-
-    template<typename T> void
-    copy_host_to_device_async(DenseMatrix<T>& d, const DenseMatrix<T>& h,
-                              Stream& s) {
-      if (!d.rows() || !d.cols()) return;
-      assert(d.rows() == h.rows() && d.cols() == h.cols());
-      assert(d.rows() == d.ld() && h.rows() == h.ld());
-      copy_host_to_device_async(d.data(), h.data(), std::size_t(d.rows())*d.cols(), s);
-    }
-
-    template<typename T> void
-    copy_host_to_device_async(T* d, const DenseMatrix<T>& h, Stream& s) {
-      if (!h.rows() || !h.cols()) return;
-      assert(h.rows() == h.ld());
-      copy_host_to_device_async(d, h.data(), h.rows()*h.cols(), s);
-    }
-
     template<typename T> void
     copy_host_to_device_async(DenseMatrix<T>& d, const T* h,
                               Stream& s) {
@@ -328,19 +314,45 @@ namespace strumpack {
     }
 
     template<typename T> void
-    copy_device_to_device(DenseMatrix<T>& d1, const T* d2) {
-      if (!d1.rows() || !d1.cols()) return;
-      assert(d1.rows() == d1.ld());
-      copy_device_to_device
-        (d1.data(), d2, std::size_t(d1.rows())*d1.cols());
+    copy(T* dst, const DenseMatrix<T>& src) {
+      if (!src.rows() || !src.cols()) return;
+      assert(src.rows() == src.ld());
+      copy(dst, src.data(), std::size_t(src.rows())*src.cols());
     }
-
+    template<typename T> void
+    copy_device_to_host(T* h, const DenseMatrix<T>& d) {
+      if (!d.rows() || !d.cols()) return;
+      assert(d.rows() == d.ld());
+      copy_device_to_host(h, d.data(), std::size_t(d.rows())*d.cols());
+    }
+    template<typename T> void
+    copy_host_to_device(T* d, const DenseMatrix<T>& h) {
+      if (!h.rows() || !h.cols()) return;
+      assert(h.rows() == h.ld());
+      copy_host_to_device(d, h.data(), std::size_t(h.rows())*h.cols());
+    }
     template<typename T> void
     copy_device_to_device(T* d1, const DenseMatrix<T>& d2) {
       if (!d2.rows() || !d2.cols()) return;
       assert(d2.rows() == d2.ld());
       copy_device_to_device(d1, d2.data(), std::size_t(d2.rows())*d2.cols());
     }
+    template<typename T> void
+    copy_host_to_device_async(T* d, const DenseMatrix<T>& h, Stream& s) {
+      if (!h.rows() || !h.cols()) return;
+      assert(h.rows() == h.ld());
+      copy_host_to_device_async(d, h.data(), h.rows()*h.cols(), s);
+    }
+
+    template<typename scalar_t,
+             typename real_t=typename RealType<scalar_t>::value_type>
+    void
+    copy_real_to_scalar(scalar_t* dest, const real_t* src, std::size_t size) {
+      memset<scalar_t>(dest, 0, size);
+      device_copy_2D(dest, sizeof(scalar_t), src, sizeof(real_t),
+                     sizeof(real_t), size, CopyDir::D2D);
+    }
+
 
     template<typename scalar_t> std::int64_t
     getrf_buffersize(Handle& handle, int n);

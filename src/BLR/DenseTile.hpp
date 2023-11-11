@@ -67,20 +67,11 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_GPU)
       static std::unique_ptr<DenseTile<scalar_t>>
-      create_as_device_wrapper_from_device_ptr
+      create_as_device_wrapper_from_ptr
       (scalar_t*& dptr, scalar_t*& ptr, int m, int n) {
         DenseMW_t dD(m, n, dptr, m);   dptr += m*n;
         auto t = create_as_wrapper(dD);
-        gpu::copy_device_to_device(t->D(), ptr);
-        ptr += m*n;
-        return t;
-      }
-      static std::unique_ptr<DenseTile<scalar_t>>
-      create_as_device_wrapper_from_host_ptr
-      (scalar_t*& dptr, scalar_t*& ptr, int m, int n) {
-        DenseMW_t dD(m, n, dptr, m);   dptr += m*n;
-        auto t = create_as_wrapper(dD);
-        gpu::copy_host_to_device(t->D(), ptr);
+        gpu::copy(t->D(), ptr);
         ptr += m*n;
         return t;
       }
@@ -120,7 +111,7 @@ namespace strumpack {
       const DenseM_t& U() const override { return *D_; }
       const DenseM_t& V() const override { return *D_; }
 
-      scalar_t* copy_to(scalar_t* ptr) const override;
+      void copy_to(scalar_t*& ptr) const override;
 
       LRTile<scalar_t>
       multiply(const BLRTile<scalar_t>& a) const override;
@@ -153,8 +144,7 @@ namespace strumpack {
       void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
                        scalar_t* pinned=nullptr) override;
 
-      scalar_t* copy_device_to_host(scalar_t* ptr) const override;
-      scalar_t* copy_device_to_device(scalar_t* ptr) const override;
+      void copy_from_device_to(scalar_t*& ptr) const override;
 #endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,

@@ -47,22 +47,17 @@ namespace strumpack {
         (new LRTile<scalar_t>(D(), opts));
     }
 
-    template<typename scalar_t> scalar_t*
-    DenseTile<scalar_t>::copy_to(scalar_t* ptr) const {
+    template<typename scalar_t> void
+    DenseTile<scalar_t>::copy_to(scalar_t*& ptr) const {
       std::copy(D().data(), D().end(), ptr);
-      return ptr + rows()*cols();
+      ptr += rows()*cols();
     }
 
 #if defined(STRUMPACK_USE_GPU)
-    template<typename scalar_t> scalar_t*
-    DenseTile<scalar_t>::copy_device_to_host(scalar_t* ptr) const {
-      gpu::copy_device_to_host(ptr, D());
-      return ptr + rows()*cols();
-    }
-    template<typename scalar_t> scalar_t*
-    DenseTile<scalar_t>::copy_device_to_device(scalar_t* ptr) const {
-      gpu::copy_device_to_device(ptr, D());
-      return ptr + rows()*cols();
+    template<typename scalar_t> void
+    DenseTile<scalar_t>::copy_from_device_to(scalar_t*& ptr) const {
+      gpu::copy(ptr, D());
+      ptr += rows()*cols();
     }
 #endif
 

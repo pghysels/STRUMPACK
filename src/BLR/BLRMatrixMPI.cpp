@@ -352,7 +352,7 @@ namespace strumpack {
       if (grid()->is_local_row(i))
         for (std::size_t j=j0; j<j1; j++)
           if (grid()->is_local_col(j))
-            ptr = tile(i, j).copy_to(ptr);
+            tile(i, j).copy_to(ptr);
       grid()->col_comm().broadcast_from(buf, src);
       Tij.reserve(nr_tiles);
       ptr = buf.data();
@@ -391,7 +391,7 @@ namespace strumpack {
       if (grid()->is_local_col(j))
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i))
-            ptr = tile(i, j).copy_to(ptr);
+            tile(i, j).copy_to(ptr);
       grid()->row_comm().broadcast_from(buf, src);
       Tij.reserve(nr_tiles);
       ptr = buf.data();
@@ -423,7 +423,7 @@ namespace strumpack {
         auto ptr = sbuf.data();
         for (std::size_t j=j0; j<j1; j++)
           if (grid()->is_local_col(j))
-            ptr = tile(src_row, j).copy_to(ptr);
+            tile(src_row, j).copy_to(ptr);
         if (dest != src) {
           grid()->col_comm().send(ranks, dest, 0);
           grid()->col_comm().send(sbuf, dest, 1);
@@ -466,7 +466,7 @@ namespace strumpack {
         auto ptr = sbuf.data();
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i))
-            ptr = tile(i, src_col).copy_to(ptr);
+            tile(i, src_col).copy_to(ptr);
         if (dest != src) {
           grid()->row_comm().send(ranks, dest, 0);
           grid()->row_comm().send(sbuf, dest, 1);
@@ -519,7 +519,7 @@ namespace strumpack {
           buf.resize(msg_size);
           auto ptr = buf.data();
           if (grid()->is_local_row(k))
-            ptr = tile(k, j0).copy_to(ptr);
+            tile(k, j0).copy_to(ptr);
           grid()->col_comm().broadcast_from(buf, src);
         }
       }
@@ -559,7 +559,7 @@ namespace strumpack {
           auto ptr = buf2.data();
           for (std::size_t j=j0; j<j1; j++)
             if (((j == 0 && j0 == j) || (j0 != j)) && grid()->is_local_col(j))
-              ptr = tile(k, j).copy_to(ptr);
+              tile(k, j).copy_to(ptr);
           grid()->col_comm().isend(buf2.data(), buf2.size(), ddest, 1, &sreq);
         }
         if (grid()->is_local_row(i0)) {
@@ -642,7 +642,7 @@ namespace strumpack {
           auto ptr = buf.data() + tile_displs[grid()->prow()];
           for (std::size_t i=0; i<i0; i++)
             if (grid()->is_local_row(i))
-              ptr = tile(i, j0).copy_to(ptr);
+              tile(i, j0).copy_to(ptr);
           grid()->col_comm().all_gather_v
             (buf.data(), tile_rcnts.data(), tile_displs.data());
         }
@@ -717,7 +717,7 @@ namespace strumpack {
               if (((k == 0 && j0 == k) || (j0 != k)) && grid()->is_local_col(k))
                 for (std::size_t i=0; i<i0; i++)
                   if (grid()->is_local_row(i))
-                    ptr = tile(i, k).copy_to(ptr);
+                    tile(i, k).copy_to(ptr);
             grid()->col_comm().gather_v
               (sbuf.data(), msg_size2, buf2.data(),
                tile_rcnts.data(), tile_displs2.data(), src);
@@ -800,7 +800,7 @@ namespace strumpack {
           buf.resize(msg_size);
           auto ptr = buf.data();
           if (grid()->is_local_col(k))
-            ptr = tile(i0, k).copy_to(ptr);
+            tile(i0, k).copy_to(ptr);
           grid()->row_comm().broadcast_from(buf, src);
         }
       }
@@ -840,7 +840,7 @@ namespace strumpack {
           auto ptr = buf2.data();
           for (std::size_t i=i0; i<i1; i++)
             if (((i == 0 && i0 == i) || (i0 != i)) && grid()->is_local_row(i))
-              ptr = tile(i, k).copy_to(ptr);
+              tile(i, k).copy_to(ptr);
           grid()->row_comm().isend(buf2.data(), buf2.size(), ddest, 1, &sreq);
         }
         if (grid()->is_local_col(j0)) {
@@ -933,7 +933,7 @@ namespace strumpack {
           auto ptr = buf.data() + tile_displs[grid()->pcol()];
           for (std::size_t j=0; j<j0; j++)
             if (grid()->is_local_col(j))
-              ptr = tile(i0, j).copy_to(ptr);
+              tile(i0, j).copy_to(ptr);
           grid()->row_comm().all_gather_v
             (buf.data(), tile_rcnts.data(), tile_displs.data());
         }
@@ -1001,7 +1001,7 @@ namespace strumpack {
                 if (grid()->is_local_row(k))
                   for (std::size_t j=0; j<j0; j++)
                     if (grid()->is_local_col(j))
-                      ptr = tile(k, j).copy_to(ptr);
+                      tile(k, j).copy_to(ptr);
             grid()->row_comm().gather_v
               (sbuf.data(), msg_size2, buf2.data(),
                tile_rcnts.data(), tile_displs2.data(), src);
@@ -1099,7 +1099,7 @@ namespace strumpack {
           if (grid()->is_local_col(k))
             for (std::size_t i=0; i<i1; i++)
               if (grid()->is_local_row(i))
-                ptr = tile(i, k).copy_to(ptr);
+                tile(i, k).copy_to(ptr);
         grid()->col_comm().all_gather_v
           (buf.data(), tile_rcnts.data(), tile_displs.data());
       }
@@ -1177,7 +1177,7 @@ namespace strumpack {
           if (grid()->is_local_row(k))
             for (std::size_t j=0; j<i1; j++)
               if (grid()->is_local_col(j))
-                ptr = tile(k, j).copy_to(ptr);
+                tile(k, j).copy_to(ptr);
         grid()->row_comm().all_gather_v(buf.data(), tile_rcnts.data(), tile_displs.data());
       }
       if (nr_tiles == 0) return Tij;

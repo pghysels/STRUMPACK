@@ -80,28 +80,19 @@ namespace strumpack {
       V_.reset(new DenseM_t(V));
     }
 
-    template<typename scalar_t> scalar_t*
-    LRTile<scalar_t>::copy_to(scalar_t* ptr) const {
+    template<typename scalar_t> void
+    LRTile<scalar_t>::copy_to(scalar_t*& ptr) const {
       std::copy(U().data(), U().end(), ptr);
       ptr += U().rows()*U().cols();
       std::copy(V().data(), V().end(), ptr);
-      return ptr + V().rows()*V().cols();
+      ptr += V().rows()*V().cols();
     }
 
 #if defined(STRUMPACK_USE_GPU)
-    template<typename scalar_t> scalar_t*
-    LRTile<scalar_t>::copy_device_to_host(scalar_t* ptr) const {
-      gpu::copy_device_to_host(ptr, U());
-      ptr += rows() * rank();
-      gpu::copy_device_to_host(ptr, V());
-      return ptr + rank() * cols();
-    }
-    template<typename scalar_t> scalar_t*
-    LRTile<scalar_t>::copy_device_to_device(scalar_t* ptr) const {
-      gpu::copy_device_to_device(ptr, U());
-      ptr += rows() * rank();
-      gpu::copy_device_to_device(ptr, V());
-      return ptr + rank() * cols();
+    template<typename scalar_t> void
+    LRTile<scalar_t>::copy_from_device_to(scalar_t*& ptr) const {
+      gpu::copy(ptr, U());  ptr += rows() * rank();
+      gpu::copy(ptr, V());  ptr += rank() * cols();
     }
 #endif
 

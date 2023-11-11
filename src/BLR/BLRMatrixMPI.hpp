@@ -326,14 +326,14 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_GPU)
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols_gpu(std::size_t i,
-					std::size_t j0, std::size_t j1,
-                                        scalar_t* dptr, scalar_t* pinned,
-					bool gpu_aware) const;
+                                        std::size_t j0, std::size_t j1,
+                                        scalar_t* dptr, scalar_t* pinned)
+        const;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
                                         std::size_t j,
-                                        scalar_t* dptr, scalar_t* pinned,
-					bool gpu_aware) const;
+                                        scalar_t* dptr, scalar_t* pinned)
+        const;
 #endif
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
