@@ -206,11 +206,7 @@ namespace strumpack {
         A21.blocks_.size() + A22.blocks_.size();
       auto max_m1 = A11.maxtilerows();
 
-#if defined(STRUMPACK_USE_KBLAS)
       VBatchedARA<scalar_t>::kblas_wsquery(handle, max_batchcount);
-#else
-      // TODO no KBLAS
-#endif
 
       VectorPool<scalar_t> workspace;
 
@@ -286,7 +282,6 @@ namespace strumpack {
         }
         copy_stream.synchronize();
 
-#if defined(STRUMPACK_USE_KBLAS)
         VBatchedARA<scalar_t> ara;
         if (g->is_local_row(i)) {
           for (std::size_t j=i+1; j<rb; j++)
@@ -305,9 +300,6 @@ namespace strumpack {
               ara.add(A21.block(j, i));
         }
         ara.run(handle, workspace, opts.rel_tol());
-#else
-        std::cout << "TODO BLR compression requires KBLAS for now" << std::endl;
-#endif
 
         VBatchedTRSM<scalar_t> trsm_left, trsm_right;
         if (g->is_local_row(i)) {

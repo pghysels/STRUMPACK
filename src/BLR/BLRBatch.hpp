@@ -139,18 +139,24 @@ namespace strumpack {
     };
 
     template<typename scalar_t> class VBatchedARA {
+      using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using real_t = typename RealType<scalar_t>::value_type;
 
     public:
       void add(std::unique_ptr<BLRTile<scalar_t>>& tile);
-      void run(gpu::Handle& handle, VectorPool<scalar_t>& workspace, real_t tol);
+      void run(gpu::Handle& handle, VectorPool<scalar_t>& workspace,
+               real_t tol);
 
-      static const int KBLAS_ARA_BLOCK_SIZE;
       static void kblas_wsquery(gpu::Handle& handle, int batchcount);
 
     private:
       std::vector<std::unique_ptr<BLRTile<scalar_t>>*> tile_;
+
+      void compress(gpu::Handle& handle,
+                    std::unique_ptr<BLRTile<scalar_t>>& t,
+                    scalar_t* work, int* dinfo, real_t tol);
+      static const int KBLAS_ARA_BLOCK_SIZE;
     };
 
   } // end namespace BLR

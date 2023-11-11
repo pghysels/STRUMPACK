@@ -265,10 +265,48 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    VBatchedARA<scalar_t>::compress(gpu::Handle& handle,
+                                    std::unique_ptr<BLRTile<scalar_t>>& t,
+                                    scalar_t* work, int* dinfo, real_t tol) {
+      auto& A = t->D();
+      auto m = A.rows(), n = A.cols();
+      if (m == 0 || n == 0) return;
+      std::size_t minmn = std::min(m, n);
+      auto d_sval_real = reinterpret_cast<real_t*>(work);
+      auto d_sval_scalar = work + minmn;
+      auto dUmem = d_sval_scalar + minmn;
+      auto dVmem = dUmem + m*minmn;
+      auto dAmem = dVmem + n*minmn;
+      auto svd_work = dAmem + m*n;
+      DenseMW_t Atmp(m, n, dAmem, m);
+      gpu::copy_device_to_device(Atmp, A);
+      DenseMW_t dU(m, minmn, dUmem, m), dV(n, minmn, dVmem, n);
+      std::vector<real_t> h_sval_real(minmn);
+      int lwork = gpu::gesvdj_buffersize<scalar_t>(handle, Jobz::V, m, n);
+      gpu::gesvdj<scalar_t>
+        (handle, Jobz::V, Atmp, d_sval_real, dU, dV, dinfo,
+         svd_work, lwork, tol);
+      gpu::copy_device_to_host(h_sval_real.data(), d_sval_real, minmn);
+      std::size_t rank = 0;
+      while (rank < minmn && h_sval_real[rank] >= tol) rank++;
+      if (rank*(m+n) >= m*n) return;
+      auto dA = A.data();
+      DenseMW_t tU(m, rank, dA, m), tV(rank, n, dA+m*rank, rank);
+      auto t_lr = LRTile<scalar_t>::create_as_wrapper(tU, tV);
+      DenseMW_t dU_tmp(m, rank, dU, 0, 0), dV_tmp(n, rank, dV, 0, 0);
+      gpu::copy_device_to_device(tU, dU_tmp);
+      gpu::geam<scalar_t>
+        (handle, Trans::C, Trans::N, 1., dV_tmp, 0., dV_tmp, tV);
+      gpu::copy_real_to_scalar<scalar_t>(d_sval_scalar, d_sval_real, rank);
+      gpu::dgmm(handle, Side::L, tV, d_sval_scalar, tV);
+      t = std::move(t_lr);
+    }
+
+#if defined(STRUMPACK_USE_KBLAS)
+    template<typename scalar_t> void
     VBatchedARA<scalar_t>::run(gpu::Handle& handle,
                                VectorPool<scalar_t>& workspace,
                                real_t tol) {
-#if defined(STRUMPACK_USE_KBLAS)
       auto B = tile_.size();
       if (!B) return;
       int maxm = 0, maxn = 0, maxminmn = KBLAS_ARA_BLOCK_SIZE;
@@ -333,10 +371,33 @@ namespace strumpack {
         }
       }
       workspace.restore(dmem);
-#else
-      std::cout << "VBatchedARA TODO" << std::endl;
-#endif
     }
+#else
+    template<typename scalar_t> void
+    VBatchedARA<scalar_t>::run(gpu::Handle& handle,
+                               VectorPool<scalar_t>& workspace,
+                               real_t tol) {
+      auto B = tile_.size();
+      if (!B) return;
+      std::size_t compress_lwork = 0;
+      for (std::size_t i=0; i<B; i++) {
+        auto m = tile_[i]->get()->D().rows(), n = tile_[i]->get()->D().cols();
+        auto minmn = std::min(m, n);
+        compress_lwork =
+          std::max(compress_lwork,
+                   gpu::gesvdj_buffersize<scalar_t>(handle, Jobz::V, m, n)
+                   // singular values (real and scalar), U, V and A
+                   + minmn * (2 + m + n) + m*n);
+      }
+      auto lwork = gpu::round_up(compress_lwork*sizeof(scalar_t)) + sizeof(int);
+      auto work = workspace.get_device_bytes(lwork);
+      auto wptr = work.template as<scalar_t>();
+      auto dinfo = gpu::aligned_ptr<int>(wptr + compress_lwork);
+      for (std::size_t i=0; i<B; i++)
+        compress(handle, *tile_[i], wptr, dinfo, tol);
+      workspace.restore(work);
+    }
+#endif
 
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::kblas_wsquery(gpu::Handle& handle,

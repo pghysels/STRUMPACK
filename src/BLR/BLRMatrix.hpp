@@ -249,10 +249,6 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_GPU)
       void create_from_column_major_gpu(DenseM_t& A, scalar_t* work);
-      void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
-      void move_column_to_cpu(int j, gpu::Stream& s, scalar_t* pinned);
-      void compress_tile_gpu(gpu::Handle& handle, std::size_t i, std::size_t j,
-                             int* dinfo, scalar_t* work, const Opts_t& opts);
 #endif
 
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
