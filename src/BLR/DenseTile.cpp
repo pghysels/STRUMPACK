@@ -125,10 +125,10 @@ namespace strumpack {
     DenseTile<scalar_t>::move_to_cpu(gpu::Stream& s, scalar_t* pinned) {
       DenseM_t hD(rows(), cols());
       if (!pinned)
-        gpu::copy_device_to_host(hD, D());
+        gpu::copy(hD, D());
       else {
         DenseMW_t pD(rows(), cols(), pinned, rows());
-        gpu::copy_device_to_host_async(pD, D(), s);
+        gpu::copy_async(pD, D(), s);
         s.synchronize();
         hD.copy(pD);
       }
@@ -140,11 +140,11 @@ namespace strumpack {
                                      scalar_t* pinned) {
       DenseMW_t dD(rows(), cols(), dptr, rows());
       if (!pinned)
-        gpu::copy_host_to_device(dD, D());
+        gpu::copy(dD, D());
       else {
         DenseMW_t hD(rows(), cols(), pinned, rows());
         hD.copy(D());
-        gpu::copy_host_to_device_async(dD, hD, s);
+        gpu::copy_async(dD, hD, s);
         s.synchronize();
       }
       D_.reset(new DenseMW_t(std::move(dD)));

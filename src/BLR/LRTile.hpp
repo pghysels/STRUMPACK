@@ -102,6 +102,13 @@ namespace strumpack {
         DenseMW_t dV(r, n, ptr+m*r, r);
         return create_as_wrapper(dU, dV);
       }
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_wrapper_adv(scalar_t*& ptr, int m, int n, int r) {
+        auto t = std::make_unique<LRTile<scalar_t>>();
+        DenseMW_t dU(m, r, ptr, m);  ptr += m*r;
+        DenseMW_t dV(r, n, ptr, r);  ptr += n*r;
+        return create_as_wrapper(dU, dV);
+      }
 
 #if defined(STRUMPACK_USE_GPU)
       static std::unique_ptr<LRTile<scalar_t>>

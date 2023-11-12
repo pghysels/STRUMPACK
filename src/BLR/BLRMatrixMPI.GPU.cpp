@@ -77,22 +77,55 @@ namespace strumpack {
       }
     }
 
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::move_row_to_cpu(int i, gpu::Stream& s, scalar_t* pinned) {
+      if (!grid() || !grid()->is_local_row(i)) return;
+      auto pin = pinned;
+      for (std::size_t j=0; j<colblocks(); j++) {
+	if (!grid()->is_local_col(j)) continue;
+#pragma omp task firstprivate(i,j,pin) shared(s)
+	tile(i, j).move_to_cpu(s, pin);
+	pin += tile(i, j).nonzeros();
+      }
+#pragma omp taskwait
+    }
+
+    template<typename scalar_t> void
+    BLRMatrixMPI<scalar_t>::move_col_to_cpu(int j, gpu::Stream& s, scalar_t* pinned) {
+      if (!grid() || !grid()->is_local_col(j)) return;
+      auto pin = pinned;
+      for (std::size_t i=0; i<rowblocks(); i++) {
+	if (!grid()->is_local_row(i)) continue;
+#pragma omp task firstprivate(i,j,pin) shared(s)
+	tile(i, j).move_to_cpu(s, pin);
+	pin += tile(i, j).nonzeros();
+      }
+#pragma omp taskwait
+    }
+
     template<typename scalar_t> std::unique_ptr<BLRTile<scalar_t>>
     create_device_tile_from_ptr(scalar_t*& dptr, scalar_t*& ptr,
-                                int m, int n, int r) {
-      if (r != -1)
-        return LRTile<scalar_t>::create_as_device_wrapper_from_ptr
-          (dptr, ptr, m, n, r);
-      else
-        return DenseTile<scalar_t>::create_as_device_wrapper_from_ptr
-          (dptr, ptr, m, n);
+                                int m, int n, int r, bool gpu_aware) {
+      if (gpu_aware) {
+	if (r != -1)
+	  return LRTile<scalar_t>::create_as_wrapper_adv(dptr, m, n, r);
+	else
+	  return DenseTile<scalar_t>::create_as_wrapper_adv(dptr, m, n);
+      } else {
+	if (r != -1)
+	  return LRTile<scalar_t>::create_as_device_wrapper_from_ptr
+	    (dptr, ptr, m, n, r);
+	else
+	  return DenseTile<scalar_t>::create_as_device_wrapper_from_ptr
+	    (dptr, ptr, m, n);
+      }
     }
 
     template<typename scalar_t>
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_row_of_tiles_along_cols_gpu
     (std::size_t i, std::size_t j0, std::size_t j1,
-     scalar_t* dptr, scalar_t* work) const {
+     scalar_t* dptr, scalar_t* pinned, bool gpu_aware) const {
       if (!grid()) return {};
       int src = i % grid()->nprows();
       std::size_t msg_size = 0, nr_tiles = 0;
@@ -111,21 +144,21 @@ namespace strumpack {
       ranks.push_back(msg_size);
       grid()->col_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
-      auto ptr = work;
+      auto ptr = gpu_aware ? dptr : pinned;
       if (grid()->is_local_row(i))
         for (std::size_t j=j0; j<j1; j++)
           if (grid()->is_local_col(j))
             tile(i, j).copy_from_device_to(ptr);
-      ptr = work;
-      gpu::synchronize_default_stream();
+      ptr = gpu_aware ? dptr : pinned;
+      if (gpu_aware) gpu::synchronize_default_stream();
       grid()->col_comm().broadcast_from(ptr, msg_size, src);
       Tij.reserve(nr_tiles);
       auto m = tilerows(i);
       for (std::size_t j=j0; j<j1; j++)
-        if (grid()->is_local_col(j))
-          Tij.emplace_back
-            (create_device_tile_from_ptr
-             (dptr, ptr, m, tilecols(j), ranks[Tij.size()]));
+	if (grid()->is_local_col(j))
+	  Tij.emplace_back
+	    (create_device_tile_from_ptr
+	     (dptr, ptr, m, tilecols(j), ranks[Tij.size()], gpu_aware));
       return Tij;
     }
 
@@ -133,7 +166,7 @@ namespace strumpack {
     std::vector<std::unique_ptr<BLRTile<scalar_t>>>
     BLRMatrixMPI<scalar_t>::bcast_col_of_tiles_along_rows_gpu
     (std::size_t i0, std::size_t i1, std::size_t j,
-     scalar_t* dptr, scalar_t* work) const {
+     scalar_t* dptr, scalar_t* pinned, bool gpu_aware) const {
       if (!grid()) return {};
       int src = j % grid()->npcols();
       std::size_t msg_size = 0, nr_tiles = 0;
@@ -152,13 +185,13 @@ namespace strumpack {
       ranks.push_back(msg_size);
       grid()->row_comm().broadcast_from(ranks, src);
       msg_size = ranks.back();
-      auto ptr = work;
+      auto ptr = gpu_aware ? dptr : pinned;
       if (grid()->is_local_col(j))
         for (std::size_t i=i0; i<i1; i++)
           if (grid()->is_local_row(i))
             tile(i, j).copy_from_device_to(ptr);
-      ptr = work;
-      gpu::synchronize_default_stream();
+      ptr = gpu_aware ? dptr : pinned;
+      if (gpu_aware) gpu::synchronize_default_stream();
       grid()->row_comm().broadcast_from(ptr, msg_size, src);
       Tij.reserve(nr_tiles);
       auto n = tilecols(j);
@@ -166,7 +199,7 @@ namespace strumpack {
         if (grid()->is_local_row(i))
           Tij.emplace_back
             (create_device_tile_from_ptr
-             (dptr, ptr, tilerows(i), n, ranks[Tij.size()]));
+             (dptr, ptr, tilerows(i), n, ranks[Tij.size()], gpu_aware));
       return Tij;
     }
 
@@ -223,12 +256,12 @@ namespace strumpack {
       auto dA21  = dA12 + A12.lrows() * A12.lcols();
       auto dA22  = dA21 + A21.lrows() * A21.lcols();
 
-      scalar_t* comm_buffer = pinned;
-      gpu::DeviceMemory<scalar_t> dcomm;
-      if (gpu_aware) {
-        dcomm = gpu::DeviceMemory<scalar_t>(pinned_size);
-        comm_buffer = dcomm;
-      }
+      // scalar_t* comm_buffer = pinned;
+      // gpu::DeviceMemory<scalar_t> dcomm;
+      // if (gpu_aware) {
+      //   dcomm = gpu::DeviceMemory<scalar_t>(pinned_size);
+      //   comm_buffer = dcomm;
+      // }
 
       gpu::DeviceMemory<int> dpiv(max_m1+1);
       auto dinfo = dpiv + max_m1;
@@ -243,22 +276,23 @@ namespace strumpack {
 
       for (std::size_t i=0; i<rb; i++) {
         auto mi = A11.tilerows(i);
-        auto Tii = DenseTile<scalar_t>::create_as_wrapper(pinned, mi, mi);
+        auto Tii = DenseTile<scalar_t>::create_as_wrapper
+	  (gpu_aware ? (g->is_local_col(i) ? drow1 : dcol1) : pinned, mi, mi);
         if (g->is_local_row(i)) {
           piv_tile.resize(mi);
           if (g->is_local_col(i)) {
             gpu::getrf(handle, A11.tile(i, i).D(),
                        dwork, getrf_work_size, dpiv, dinfo);
             comp_stream.synchronize();
-            gpu::copy_device_to_host(Tii->D(), A11.tile(i, i).D());
-            gpu::copy_device_to_host<int>(piv_tile.data(), dpiv, mi);
+            gpu::copy(Tii->D(), A11.tile(i, i).D());
+            gpu::copy<int>(piv_tile.data(), dpiv, mi);
           }
           int src = i % g->npcols();
           g->row_comm().broadcast_from(piv_tile, src);
           g->row_comm().broadcast_from(Tii->D().data(), mi*mi, src);
           if (!g->is_local_col(i)) {
-            gpu::copy_host_to_device<int>(dpiv, piv_tile.data(), mi);
-            Tii->move_to_gpu(copy_stream, dcol1);
+            gpu::copy<int>(dpiv, piv_tile.data(), mi);
+            if (!gpu_aware) Tii->move_to_gpu(copy_stream, dcol1);
           }
           int r0 = A11.tileroff(i);
           std::transform
@@ -267,7 +301,7 @@ namespace strumpack {
         }
         if (g->is_local_col(i)) {
           g->col_comm().broadcast_from(Tii->D().data(), mi*mi, i % g->nprows());
-          Tii->move_to_gpu(copy_stream, drow1);
+          if (!gpu_aware) Tii->move_to_gpu(copy_stream, drow1);
         }
         copy_stream.synchronize();
 
@@ -317,13 +351,13 @@ namespace strumpack {
 
         // Schur complement update
         auto Tij = A11.bcast_row_of_tiles_along_cols_gpu
-          (i, i+1, rb, drow1, comm_buffer);
+          (i, i+1, rb, drow1, pinned, gpu_aware);
         auto Tij2 = A12.bcast_row_of_tiles_along_cols_gpu
-          (i, 0, rb2, drow2, comm_buffer);
+          (i, 0, rb2, drow2, pinned, gpu_aware);
         auto Tki = A11.bcast_col_of_tiles_along_rows_gpu
-          (i+1, rb, i, dcol1, comm_buffer);
+          (i+1, rb, i, dcol1, pinned, gpu_aware);
         auto Tk2i = A21.bcast_col_of_tiles_along_rows_gpu
-          (0, rb2, i, dcol2, comm_buffer);
+          (0, rb2, i, dcol2, pinned, gpu_aware);
 
         int batchcount = 0;
         std::size_t sVU = 0, sUVU = 0;
@@ -396,14 +430,32 @@ namespace strumpack {
                  b1, b2, b3, dVU, dUVU);
           lk++;
         }
-        b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-        b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
-        b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
-        comp_stream.synchronize();
+#pragma omp parallel
+#pragma omp single nowait
+        {
+#pragma omp task
+          {
+	    b1.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+	    b2.run(scalar_t(1.), scalar_t(0.), comp_stream, handle);
+	    b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
+	  }
+	  if (i > 0) {
+	    A11.move_col_to_cpu(i-1, copy_stream, pinned);
+	    A12.move_row_to_cpu(i-1, copy_stream, pinned);
+	    A21.move_col_to_cpu(i-1, copy_stream, pinned);
+          }
+        }
+	comp_stream.synchronize();
       }
-      A11.move_to_cpu(copy_stream, pinned);
-      A12.move_to_cpu(copy_stream, pinned);
-      A21.move_to_cpu(copy_stream, pinned);
+      if (rb > 0) {
+#pragma omp parallel
+#pragma omp single nowait
+        {
+	  A11.move_col_to_cpu(rb-1, copy_stream, pinned);
+	  A12.move_row_to_cpu(rb-1, copy_stream, pinned);
+	  A21.move_col_to_cpu(rb-1, copy_stream, pinned);
+	}
+      }
       A22.move_to_cpu(copy_stream, pinned);
       return piv;
     }

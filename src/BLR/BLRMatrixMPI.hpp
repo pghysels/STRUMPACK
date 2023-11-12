@@ -327,13 +327,13 @@ namespace strumpack {
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_row_of_tiles_along_cols_gpu(std::size_t i,
                                         std::size_t j0, std::size_t j1,
-                                        scalar_t* dptr, scalar_t* pinned)
-        const;
+                                        scalar_t* dptr, scalar_t* pinned,
+					bool gpu_aware) const;
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
                                         std::size_t j,
-                                        scalar_t* dptr, scalar_t* pinned)
-        const;
+                                        scalar_t* dptr, scalar_t* pinned,
+					bool gpu_aware) const;
 #endif
 
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
@@ -382,6 +382,8 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_GPU)
       void move_to_gpu(gpu::Stream& s, scalar_t* dptr, scalar_t* pinned);
       void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
+      void move_row_to_cpu(int i, gpu::Stream& s, scalar_t* pinned);
+      void move_col_to_cpu(int j, gpu::Stream& s, scalar_t* pinned);
 #endif
 
       // suppress warnings

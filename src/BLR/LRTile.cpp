@@ -257,12 +257,12 @@ namespace strumpack {
       auto m = rows(), n = cols(), r = rank();
       DenseM_t hU(m, r), hV(r, n);
       if (!pinned) {
-        gpu::copy_device_to_host(hU, U());
-        gpu::copy_device_to_host(hV, V());
+        gpu::copy(hU, U());
+        gpu::copy(hV, V());
       } else {
         DenseMW_t pU(m, r, pinned, m), pV(r, n, pinned+m*r, r);
-        gpu::copy_device_to_host_async(pU, U(), s);
-        gpu::copy_device_to_host_async(pV, V(), s);
+        gpu::copy_async(pU, U(), s);
+        gpu::copy_async(pV, V(), s);
         s.synchronize();
         hU.copy(pU);
         hV.copy(pV);
@@ -278,14 +278,14 @@ namespace strumpack {
       DenseMW_t dU(m, r, dptr, m); dptr += m*r;
       DenseMW_t dV(r, n, dptr, r); dptr += r*n;
       if (!pinned) {
-        gpu::copy_host_to_device(dU, U());
-        gpu::copy_host_to_device(dV, V());
+        gpu::copy(dU, U());
+        gpu::copy(dV, V());
       } else {
         DenseMW_t pU(m, r, pinned, m), pV(r, n, pinned+m*r, r);
         pU.copy(U());
+        gpu::copy_async(dU, pU, s);
         pV.copy(V());
-        gpu::copy_host_to_device_async(dU, pU, s);
-        gpu::copy_host_to_device_async(dV, pV, s);
+        gpu::copy_async(dV, pV, s);
         s.synchronize();
       }
       U_.reset(new DenseMW_t(std::move(dU)));

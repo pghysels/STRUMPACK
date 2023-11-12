@@ -215,6 +215,11 @@ namespace strumpack {
     }
 
     template<typename T> void
+    copy_async(T* hptr, const T* dptr,
+	       std::size_t count, Stream& s) {
+      device_copy_async(hptr, dptr, count*sizeof(T), CopyDir::DEF, s);
+    }
+    template<typename T> void
     copy_device_to_host_async(T* hptr, const T* dptr,
                               std::size_t count, Stream& s) {
       device_copy_async(hptr, dptr, count*sizeof(T), CopyDir::D2H, s);
@@ -225,6 +230,18 @@ namespace strumpack {
       device_copy_async(dptr, hptr, count*sizeof(T), CopyDir::H2D, s);
     }
 
+    template<typename T> void
+    copy_async(DenseMatrix<T>& h, const DenseMatrix<T>& d,
+	       Stream& s) {
+      if (!d.rows() || !d.cols()) return;
+      assert(d.rows() == h.rows() && d.cols() == h.cols());
+      if (d.rows() != d.ld() || h.rows() != h.ld())
+        device_copy_2D_async
+          (h.data(), h.ld()*sizeof(T), d.data(), d.ld()*sizeof(T),
+           h.rows()*sizeof(T), h.cols(), CopyDir::DEF, s);
+      else
+        copy_async(h.data(), d.data(), d.rows()*d.cols(), s);
+    }
     template<typename T> void
     copy_device_to_host_async(DenseMatrix<T>& h, const DenseMatrix<T>& d,
                               Stream& s) {
