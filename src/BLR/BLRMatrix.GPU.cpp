@@ -125,10 +125,13 @@ namespace strumpack {
       B21.create_from_column_major_gpu(A21, temp_col);
 
       for (std::size_t i=0; i<rb; i++) {
-        // TODO why handle2?
-        gpu::getrf(handle2, B11.tile(i, i).D(),
-                   d_work_mem, getrf_work_size,
+        auto& D = B11.tile(i, i).D();
+        // handle2 uses copy_stream, overlap this with ARA
+        gpu::getrf(handle2, D, d_work_mem, getrf_work_size,
                    dpiv+B11.tileroff(i), dinfo);
+        if (opts.pivot_threshold() > 0)
+          gpu::replace_pivots
+            (D.rows(), D.data(), opts.pivot_threshold(), &copy_stream);
 
         VBatchedARA<scalar_t> ara;
         for (std::size_t j=i+1; j<rb; j++) {
@@ -145,13 +148,11 @@ namespace strumpack {
         VBatchedTRSMLeftRight<scalar_t> batched_trsm;
         for (std::size_t j=i+1; j<rb; j++) {
           B11.tile(i, j).laswp(handle, dpiv+B11.tileroff(i), true);
-          batched_trsm.add(B11.tile(i, i).D(), B11.tile(i, j).U(),
-                           B11.tile(j, i).V());
+          batched_trsm.add(D, B11.tile(i, j).U(), B11.tile(j, i).V());
         }
         for (std::size_t j=0; j<rb2; j++) {
           B12.tile(i, j).laswp(handle, dpiv+B11.tileroff(i), true);
-          batched_trsm.add(B11.tile(i, i).D(), B12.tile(i, j).U(),
-                           B21.tile(j, i).V());
+          batched_trsm.add(D, B12.tile(i, j).U(), B21.tile(j, i).V());
         }
         batched_trsm.run(handle, workspace);
 

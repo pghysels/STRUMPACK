@@ -209,22 +209,24 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::separator_reordering() {
-    // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
-    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
-    // tree_mpi_dist_->separator_reordering(opts_, *shifted_mat);
-    tree_mpi_dist_->separator_reordering(opts_, *mat_mpi_);
+    if (opts_.replace_tiny_pivots() && opts_.matching() == MatchingJob::NONE) {
+      auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
+      tree_mpi_dist_->separator_reordering(opts_, *shifted_mat);
+    } else
+      tree_mpi_dist_->separator_reordering(opts_, *mat_mpi_);
   }
 
   template<typename scalar_t,typename integer_t> void
   SparseSolverMPIDist<scalar_t,integer_t>::setup_tree() {
-    // TODO only if not doing MC64 and if enable_replace_tiny_pivots?
-    // auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
-    // tree_mpi_dist_.reset
-    //   (new EliminationTreeMPIDist<scalar_t,integer_t>
-    //    (opts_, *shifted_mat, *nd_mpi_, comm_));
-    tree_mpi_dist_.reset
-      (new EliminationTreeMPIDist<scalar_t,integer_t>
-       (opts_, *mat_mpi_, *nd_mpi_, comm_));
+    if (opts_.replace_tiny_pivots() && opts_.matching() == MatchingJob::NONE) {
+      auto shifted_mat = mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
+      tree_mpi_dist_.reset
+        (new EliminationTreeMPIDist<scalar_t,integer_t>
+         (opts_, *shifted_mat, *nd_mpi_, comm_));
+    } else
+      tree_mpi_dist_.reset
+        (new EliminationTreeMPIDist<scalar_t,integer_t>
+         (opts_, *mat_mpi_, *nd_mpi_, comm_));
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode

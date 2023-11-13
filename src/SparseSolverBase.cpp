@@ -340,9 +340,11 @@ namespace strumpack {
                 << equil_.rcond << " , c_cond = " << equil_.ccond
                 << " , type = " << char(equil_.type) << std::endl;
 
-    using real_t = typename RealType<scalar_t>::value_type;
-    opts_.set_pivot_threshold
-      (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
+    if (opts_.replace_tiny_pivots()) {
+      using real_t = typename RealType<scalar_t>::value_type;
+      opts_.set_pivot_threshold
+        (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
+    }
 
     auto old_nnz = matrix()->nnz();
     TaskTimer t2("sparsity-symmetrization",
@@ -576,10 +578,11 @@ namespace strumpack {
     flop_breakdown_reset();
     ReturnCode err_code;
     TaskTimer t1("Sparse-factorization", [&]() {
-      // TODO add shift if opts_.replace...
-      // auto shifted_mat = matrix_nonzero_diag();
-      // err_code = tree()->multifrontal_factorization(*shifted_mat, opts_);
-      err_code = tree()->multifrontal_factorization(*matrix(), opts_);
+      if (opts_.replace_tiny_pivots() && opts_.matching() == MatchingJob::NONE) {
+        auto shifted_mat = matrix_nonzero_diag();
+        err_code = tree()->multifrontal_factorization(*shifted_mat, opts_);
+      } else
+        err_code = tree()->multifrontal_factorization(*matrix(), opts_);
     });
     perf_counters_stop("numerical factorization");
     if (opts_.verbose()) {

@@ -124,6 +124,9 @@ namespace strumpack {
         assert(leaf_size_ > 0);
         leaf_size_ = leaf_size;
       }
+      void set_pivot_threshold(real_t thresh) {
+        pivot_ = thresh;
+      }
       void set_max_rank(int max_rank) {
         assert(max_rank > 0);
         max_rank_ = max_rank;
@@ -137,6 +140,7 @@ namespace strumpack {
 
       real_t rel_tol() const { return rel_tol_; }
       real_t abs_tol() const { return abs_tol_; }
+      real_t pivot_threshold() const { return pivot_; }
       int leaf_size() const { return leaf_size_; }
       int max_rank() const { return max_rank_; }
       Type type() const { return type_; }
@@ -150,6 +154,7 @@ namespace strumpack {
       Type type_ = Type::BLR;
       real_t rel_tol_ = default_structured_rel_tol<real_t>();
       real_t abs_tol_ = default_structured_abs_tol<real_t>();
+      real_t pivot_ = -1.;
       int leaf_size_ = 128;
       int max_rank_ = 5000;
       bool verbose_ = true;

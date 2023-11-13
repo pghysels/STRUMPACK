@@ -226,7 +226,11 @@ namespace strumpack {
      * Default constructor, initializing all options to their default
      * values.
      */
-    SPOptions() { hss_opts_.set_verbose(false); }
+    SPOptions() {
+      hss_opts_.set_verbose(false);
+      blr_opts_.set_verbose(false);
+      hodlr_opts_.set_verbose(false);
+    }
 
     /**
      * Constructor, initializing all options to their default
@@ -720,7 +724,12 @@ namespace strumpack {
      *
      * \see enable_replace_tiny_pivots()
      */
-    void set_pivot_threshold(real_t thresh) { pivot_ = thresh; }
+    void set_pivot_threshold(real_t thresh) {
+      pivot_ = thresh;
+      hss_opts_.set_pivot_threshold(thresh);
+      blr_opts_.set_pivot_threshold(thresh);
+      hodlr_opts_.set_pivot_threshold(thresh);
+    }
 
     /**
      * Dump the root front to a set of files, one for each rank. This
