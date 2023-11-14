@@ -37,13 +37,6 @@
 #include "FrontalMatrixBLRMPI.hpp"
 #endif
 
-#include "zfp.h"
-#if ZFP_VERSION >= 0x1000
-#include "zfp/array2.hpp"
-#else
-#include "zfparray2.h"
-#endif
-
 
 namespace strumpack {
 
@@ -688,49 +681,6 @@ namespace strumpack {
           (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         L.set_factor_pointers(L.f[0]->host_factors_.get());
         L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
-
-        // {
-        //   std::vector<unsigned char> buffer;
-        //   {
-        //     zfp_field* field = zfp_field_1d
-        //       (static_cast<void*>(L.f[0]->host_factors_.get()),
-        //        get_zfp_type<scalar_t>(), L.factor_size);
-        //     zfp_stream* stream = zfp_stream_open(NULL);
-        //     // zfp_stream_set_precision(stream, 8);
-        //     zfp_stream_set_accuracy(stream, 1e-4);
-        //     auto bufsize = zfp_stream_maximum_size(stream, field);
-        //     buffer.resize(bufsize);
-        //     bitstream* bstream = stream_open(buffer.data(), bufsize);
-        //     zfp_stream_set_bit_stream(stream, bstream);
-        //     zfp_stream_rewind(stream);
-        //     auto comp_size = zfp_compress(stream, field);
-        //     buffer.resize(comp_size);
-        //     std::cout << "Ratio= " <<  (L.factor_size*sizeof(scalar_t)) / (float)comp_size
-        //               << ", uncompressed= " << L.factor_size*sizeof(scalar_t) / 1e6 << " MB"
-        //               << ", compressed= " << comp_size / 1e6 << " MB." << std::endl;
-        //     zfp_stream_flush(stream);
-        //     zfp_field_free(field);
-        //     zfp_stream_close(stream);
-        //     stream_close(bstream);
-        //   }
-        //   {
-        //     zfp_field* f = zfp_field_1d
-        //       (static_cast<void*>(L.f[0]->host_factors_.get()),
-        //        get_zfp_type<scalar_t>(), L.factor_size);
-        //     zfp_stream* destream = zfp_stream_open(NULL);
-        //     // zfp_stream_set_precision(destream, 8);
-        //     zfp_stream_set_accuracy(destream, 1e-4);
-        //     bitstream* bstream = stream_open
-        //       (static_cast<void*>
-        //        (const_cast<uchar*>(buffer.data())), buffer.size());
-        //     zfp_stream_set_bit_stream(destream, bstream);
-        //     zfp_stream_rewind(destream);
-        //     zfp_decompress(destream, f);
-        //     zfp_field_free(f);
-        //     zfp_stream_close(destream);
-        //     stream_close(bstream);
-        //   }
-        // }
 
         std::vector<int> getrf_infos(L.f.size());
         gpu::copy_device_to_host
