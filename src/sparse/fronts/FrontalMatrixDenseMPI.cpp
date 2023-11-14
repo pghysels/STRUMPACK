@@ -274,9 +274,10 @@ namespace strumpack {
         opts.compression() == CompressionType::LOSSLESS ||
         opts.compression() == CompressionType::ZFP_BLR_HODLR) {
       auto prec = opts.lossy_precision();
-      F11c_ = LossyMatrix<scalar_t>(F11_.dense_wrapper(), prec);
-      F12c_ = LossyMatrix<scalar_t>(F12_.dense_wrapper(), prec);
-      F21c_ = LossyMatrix<scalar_t>(F21_.dense_wrapper(), prec);
+      auto acc = opts.lossy_accuracy();
+      F11c_ = LossyMatrix<scalar_t>(F11_.dense_wrapper(), prec, acc);
+      F12c_ = LossyMatrix<scalar_t>(F12_.dense_wrapper(), prec, acc);
+      F21c_ = LossyMatrix<scalar_t>(F21_.dense_wrapper(), prec, acc);
       F11_.clear();
       F12_.clear();
       F21_.clear();

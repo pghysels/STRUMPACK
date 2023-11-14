@@ -769,9 +769,23 @@ namespace strumpack {
     void disable_openmp_tree() { use_openmp_tree_ = false; }
 
     /**
-     * Set the precision for lossy compression.
+     * Set the precision for lossy compression. Preferred mode is
+     * accuracy. To use precision mode, set the accuracy to a negative
+     * value. For lossless compression, set both accuracy and
+     * precision to a negative value.
+     *
+     * \see set_lossy_accuracy
      */
-    void set_lossy_precision(int p) { lossy_precision_ = p; }
+    void set_lossy_precision(int p) {
+      lossy_precision_ = p;
+    }
+
+    /**
+     * Set the accuracy for lossy compression.
+     *
+     * \see set_lossy_precision
+     */
+    void set_lossy_accuracy(double a) { lossy_accuracy_ = a; }
 
     /**
      * Print statistics, about ranks, memory etc, for the root front
@@ -1160,6 +1174,14 @@ namespace strumpack {
     }
 
     /**
+     * Returns the precision for lossy compression.
+     */
+    double lossy_accuracy() const {
+      return (compression() == CompressionType::LOSSLESS) ?
+        -1 : lossy_accuracy_;
+    }
+
+    /**
      * Info about the stats of the root front will be printed to
      * std::cout
      */
@@ -1308,6 +1330,7 @@ namespace strumpack {
     int lossy_min_front_size_ = 100000;
     int lossy_min_sep_size_ = 8;
     int lossy_precision_ = 16;
+    double lossy_accuracy_ = 1e-3;
 
     // ordering::NDOptions nd_opts_;
 

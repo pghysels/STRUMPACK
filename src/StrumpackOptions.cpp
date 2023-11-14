@@ -172,18 +172,19 @@ namespace strumpack {
        {"sp_disable_gpu",               no_argument, 0, 37},
        {"sp_gpu_streams",               required_argument, 0, 38},
        {"sp_lossy_precision",           required_argument, 0, 39},
-       {"sp_hss_min_sep_size",          required_argument, 0, 40},
-       {"sp_hss_min_front_size",        required_argument, 0, 41},
-       {"sp_hodlr_min_sep_size",        required_argument, 0, 42},
-       {"sp_hodlr_min_front_size",      required_argument, 0, 43},
-       {"sp_blr_min_sep_size",          required_argument, 0, 44},
-       {"sp_blr_min_front_size",        required_argument, 0, 45},
-       {"sp_lossy_min_sep_size",        required_argument, 0, 46},
-       {"sp_lossy_min_front_size",      required_argument, 0, 47},
-       {"sp_nd_planar_levels",          required_argument, 0, 48},
-       {"sp_proportional_mapping",      required_argument, 0, 49},
-       {"sp_enable_openmp_tree",        no_argument, 0, 50},
-       {"sp_disable_openmp_tree",       no_argument, 0, 51},
+       {"sp_lossy_accuracy",            required_argument, 0, 40},
+       {"sp_hss_min_sep_size",          required_argument, 0, 41},
+       {"sp_hss_min_front_size",        required_argument, 0, 42},
+       {"sp_hodlr_min_sep_size",        required_argument, 0, 43},
+       {"sp_hodlr_min_front_size",      required_argument, 0, 44},
+       {"sp_blr_min_sep_size",          required_argument, 0, 45},
+       {"sp_blr_min_front_size",        required_argument, 0, 46},
+       {"sp_lossy_min_sep_size",        required_argument, 0, 47},
+       {"sp_lossy_min_front_size",      required_argument, 0, 48},
+       {"sp_nd_planar_levels",          required_argument, 0, 49},
+       {"sp_proportional_mapping",      required_argument, 0, 50},
+       {"sp_enable_openmp_tree",        no_argument, 0, 51},
+       {"sp_disable_openmp_tree",       no_argument, 0, 52},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -359,58 +360,63 @@ namespace strumpack {
       } break;
       case 40: {
         std::istringstream iss(optarg);
+        iss >> lossy_accuracy_;
+        set_lossy_accuracy(lossy_accuracy_);
+      } break;
+      case 41: {
+        std::istringstream iss(optarg);
         int min_sep;
         iss >> min_sep;
         set_hss_min_sep_size(min_sep);
       } break;
-      case 41: {
+      case 42: {
         std::istringstream iss(optarg);
         int min_front;
         iss >> min_front;
         set_hss_min_front_size(min_front);
       } break;
-      case 42: {
+      case 43: {
         std::istringstream iss(optarg);
         int min_sep;
         iss >> min_sep;
         set_hodlr_min_sep_size(min_sep);
       } break;
-      case 43: {
+      case 44: {
         std::istringstream iss(optarg);
         int min_front;
         iss >> min_front;
         set_hodlr_min_front_size(min_front);
       } break;
-      case 44: {
+      case 45: {
         std::istringstream iss(optarg);
         int min_sep;
         iss >> min_sep;
         set_blr_min_sep_size(min_sep);
       } break;
-      case 45: {
+      case 46: {
         std::istringstream iss(optarg);
         int min_front;
         iss >> min_front;
         set_blr_min_front_size(min_front);
       } break;
-      case 46: {
+      case 47: {
         std::istringstream iss(optarg);
         int min_sep;
         iss >> min_sep;
         set_lossy_min_sep_size(min_sep);
       } break;
-      case 47: {
+      case 48: {
         std::istringstream iss(optarg);
         int min_front;
         iss >> min_front;
         set_lossy_min_front_size(min_front);
       } break;
-      case 48: {
+      case 49: {
         std::istringstream iss(optarg);
         iss >> nd_planar_levels_;
         set_nd_planar_levels(nd_planar_levels_);
       } break;
-      case 49: {
+      case 50: {
         std::string s; std::istringstream iss(optarg); iss >> s;
         for (auto& c : s) c = std::toupper(c);
         if (s == "FLOPS") set_proportional_mapping(ProportionalMapping::FLOPS);
@@ -420,8 +426,8 @@ namespace strumpack {
                " recognized, use 'FLOPS', 'FACTOR_MEMORY', 'PEAK_MEMORY'"
                        << std::endl;
       } break;
-      case 50: enable_openmp_tree(); break;
-      case 51: disable_openmp_tree(); break;
+      case 51: enable_openmp_tree(); break;
+      case 52: disable_openmp_tree(); break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -567,6 +573,10 @@ namespace strumpack {
               << lossy_precision() << ")" << std::endl
               << "#          lossy compression precision" << std::endl
               << "#          (for lossless use <= 0)" << std::endl;
+    std::cout << "#   --sp_lossy_accuracy (default "
+              << lossy_accuracy() << ")" << std::endl
+              << "#          lossy compression accuracy" << std::endl
+              << "#          (for precision mode, set < 0)" << std::endl;
     std::cout << "#   --sp_hss_min_sep_size (default "
               << hss_min_sep_size() << ")" << std::endl
               << "#          minimum separator size for hss compression"

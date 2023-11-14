@@ -99,7 +99,7 @@ namespace strumpack {
       case Type::LOSSY: {
 #if defined(STRUMPACK_USE_ZFP)
         return std::unique_ptr<StructuredMatrix<scalar_t>>
-          (new LossyMatrix<scalar_t>(A, 16 /* TODO */));
+          (new LossyMatrix<scalar_t>(A, 16, 1e-3));
 #else
         throw std::runtime_error
           ("Lossy compression requires ZFP to be enabled.");
@@ -108,7 +108,7 @@ namespace strumpack {
       case Type::LOSSLESS: {
 #if defined(STRUMPACK_USE_ZFP)
         return std::unique_ptr<StructuredMatrix<scalar_t>>
-          (new LossyMatrix<scalar_t>(A, 0));
+          (new LossyMatrix<scalar_t>(A, 16, 1e-3));
 #else
         throw std::runtime_error
           ("Lossless compression requires ZFP to be enabled.");

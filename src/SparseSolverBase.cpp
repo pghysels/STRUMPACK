@@ -674,7 +674,9 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_ZFP)
           if (opts_.compression() == CompressionType::LOSSY)
             std::cout << "#   - lossy compression precision = "
-                      << opts_.lossy_precision() << " bitplanes" << std::endl;
+                      << opts_.lossy_precision() << " bitplanes" << std::endl
+                      << "#   - lossy compression accuracy = "
+                      << opts_.lossy_accuracy() << std::endl;
 #endif
         }
       }

@@ -41,15 +41,21 @@ namespace strumpack {
   template<> inline zfp_type get_zfp_type<double>() { return zfp_type_double; }
 
   template<typename T> LossyMatrix<T>::LossyMatrix
-  (const DenseMatrix<T>& F, int prec)
-    : rows_(F.rows()), cols_(F.cols()), prec_(prec) {
+  (const DenseMatrix<T>& F, int prec, double acc)
+    : rows_(F.rows()), cols_(F.cols()), prec_(prec), acc_(acc) {
     if (!rows_ || !cols_) return;
     zfp_field* f = zfp_field_2d
       (static_cast<void*>(const_cast<T*>(F.data())),
        get_zfp_type<T>(), rows_, cols_);
     zfp_stream* stream = zfp_stream_open(NULL);
-    if (prec_ <= 0) zfp_stream_set_reversible(stream);
-    else zfp_stream_set_precision(stream, prec_);
+#if defined(STRUMPACK_USE_OPENMP)
+    zfp_stream_set_execution(stream, zfp_exec_omp);
+#endif
+    if (acc_ < 0) {
+      if (prec_ <= 0) zfp_stream_set_reversible(stream);
+      else zfp_stream_set_precision(stream, prec_);
+    } else
+      zfp_stream_set_accuracy(stream, acc_);
     auto bufsize = zfp_stream_maximum_size(stream, f);
     buffer_.resize(bufsize);
     bitstream* bstream = stream_open(buffer_.data(), bufsize);
@@ -71,8 +77,14 @@ namespace strumpack {
     zfp_field* f = zfp_field_2d
       (static_cast<void*>(F.data()), get_zfp_type<T>(), rows_, cols_);
     zfp_stream* destream = zfp_stream_open(NULL);
-    if (prec_ <= 0) zfp_stream_set_reversible(destream);
-    else zfp_stream_set_precision(destream, prec_);
+// #if defined(STRUMPACK_USE_OPENMP)
+//     zfp_stream_set_execution(destream, zfp_exec_omp);
+// #endif
+    if (acc_ < 0) {
+      if (prec_ <= 0) zfp_stream_set_reversible(destream);
+      else zfp_stream_set_precision(destream, prec_);
+    } else
+      zfp_stream_set_accuracy(destream, acc_);
     bitstream* bstream = stream_open
       (static_cast<void*>
        (const_cast<uchar*>(buffer_.data())), buffer_.size());
@@ -85,7 +97,7 @@ namespace strumpack {
   }
 
   template<typename T> LossyMatrix<std::complex<T>>::LossyMatrix
-  (const DenseMatrix<std::complex<T>>& F, int prec) {
+  (const DenseMatrix<std::complex<T>>& F, int prec, double acc) {
     int rows = F.rows(), cols = F.cols();
     DenseMatrix<T> Freal(rows, cols), Fimag(rows, cols);
     for (int j=0; j<cols; j++)
@@ -93,8 +105,8 @@ namespace strumpack {
         Freal(i, j) = F(i,j).real();
         Fimag(i, j) = F(i,j).imag();
       }
-    Freal_ = LossyMatrix<T>(Freal, prec);
-    Fimag_ = LossyMatrix<T>(Fimag, prec);
+    Freal_ = LossyMatrix<T>(Freal, prec, acc);
+    Fimag_ = LossyMatrix<T>(Fimag, prec, acc);
   }
 
   template<typename T> void LossyMatrix<std::complex<T>>::decompress
@@ -129,10 +141,11 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixLossy<scalar_t,integer_t>::compress(const Opts_t& opts) {
-    int prec = opts.lossy_precision();
-    F11c_ = LossyMatrix<scalar_t>(this->F11_, prec);
-    F12c_ = LossyMatrix<scalar_t>(this->F12_, prec);
-    F21c_ = LossyMatrix<scalar_t>(this->F21_, prec);
+    auto prec = opts.lossy_precision();
+    auto acc = opts.lossy_accuracy();
+    F11c_ = LossyMatrix<scalar_t>(this->F11_, prec, acc);
+    F12c_ = LossyMatrix<scalar_t>(this->F12_, prec, acc);
+    F21c_ = LossyMatrix<scalar_t>(this->F21_, prec, acc);
     this->F11_.clear();
     this->F12_.clear();
     this->F21_.clear();
