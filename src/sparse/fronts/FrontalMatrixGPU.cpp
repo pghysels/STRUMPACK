@@ -40,13 +40,6 @@
 
 namespace strumpack {
 
-  template<typename T> zfp_type get_zfp_type();
-  template<> inline zfp_type get_zfp_type<float>() { return zfp_type_float; }
-  template<> inline zfp_type get_zfp_type<double>() { return zfp_type_double; }
-  template<> inline zfp_type get_zfp_type<std::complex<float>>() { return zfp_type_float; }
-  template<> inline zfp_type get_zfp_type<std::complex<double>>() { return zfp_type_double; }
-
-
   template<typename scalar_t, typename integer_t> class LevelInfo {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FG_t = FrontalMatrixGPU<scalar_t,integer_t>;
