@@ -87,6 +87,7 @@ namespace strumpack {
                                DenseM_t& B, int task_depth) const override {}
 
     std::string type() const override { return "FrontalMatrixMAGMA"; }
+    bool isGPU() const override { return true; }
 
 #if defined(STRUMPACK_USE_MPI)
     void multifrontal_solve(DenseM_t& bloc,
@@ -111,10 +112,9 @@ namespace strumpack {
       const override;
 #endif
 
-    std::size_t get_device_F22_worksize() override {
-      return 0; //dim_upd()*dim_upd();
-    }
+    std::size_t get_device_F22_worksize() override { return 0; }
     scalar_t* get_device_F22(scalar_t* dF22) override;
+
 
   private:
     std::unique_ptr<scalar_t[]> host_factors_;
@@ -122,7 +122,6 @@ namespace strumpack {
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
     std::unique_ptr<gpu::DeviceMemory<char>> dev_factors_ = nullptr;
-    std::unique_ptr<gpu::HostMemory<scalar_t>> host_Schur_ = nullptr;
     std::unique_ptr<gpu::DeviceMemory<char>> dev_Schur_ = nullptr;
 
     FrontalMatrixMAGMA(const FrontalMatrixMAGMA&) = delete;

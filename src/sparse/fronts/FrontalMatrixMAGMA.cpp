@@ -117,6 +117,8 @@ namespace strumpack {
       }
 
       if (A) { // not needed for the solve
+        // TODO not needed when always using MAGMA? also should now be
+        // std::int64_t, and work for getrs as well?
         int getrf_work_cusolver = sizeof(scalar_t) *
           gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
         getrf_work_bytes = -1;
@@ -274,8 +276,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::
   release_work_memory(VectorPool<scalar_t>& workspace) {
-    if (host_Schur_) workspace.restore(*host_Schur_);
-    if (dev_Schur_)  workspace.restore(*dev_Schur_);
+    if (dev_Schur_) workspace.restore(*dev_Schur_);
   }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -283,30 +284,18 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
-    if (dev_Schur_->size()) {
-      DenseM_t F22(dim_upd(), dim_upd());
-      gpu::copy_device_to_host(F22, dev_Schur_->template as<scalar_t>());
-      ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
-        (F22, sbuf, pa, this);
-      return;
-    }
-    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
-      (F22_, sbuf, pa, this);
+    DenseM_t F22(dim_upd(), dim_upd());
+    gpu::copy_device_to_host(F22, F22_);
+    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa) const {
-    if (dev_Schur_->size()) {
-      DenseM_t F22(dim_upd(), dim_upd());
-      gpu::copy_device_to_host(F22, dev_Schur_->template as<scalar_t>());
-      BLR::BLRExtendAdd<scalar_t,integer_t>::
-        seq_copy_to_buffers(F22, sbuf, pa, this);
-      return;
-    }
-    BLR::BLRExtendAdd<scalar_t,integer_t>::
-      seq_copy_to_buffers(F22_, sbuf, pa, this);
+    DenseM_t F22(dim_upd(), dim_upd());
+    gpu::copy_device_to_host(F22, F22_);
+    BLR::BLRExtendAdd<scalar_t,integer_t>::seq_copy_to_buffers(F22, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -314,15 +303,10 @@ namespace strumpack {
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
-    if (dev_Schur_->size()) {
-      DenseM_t F22(dim_upd(), dim_upd());
-      gpu::copy_device_to_host(F22, dev_Schur_->template as<scalar_t>());
-      BLR::BLRExtendAdd<scalar_t,integer_t>::
-        seq_copy_to_buffers_col(F22, sbuf, pa, this, begin_col, end_col);
-      return;
-    }
+    DenseM_t F22(dim_upd(), dim_upd());
+    gpu::copy_device_to_host(F22, F22_);
     BLR::BLRExtendAdd<scalar_t,integer_t>::
-      seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
+      seq_copy_to_buffers_col(F22, sbuf, pa, this, begin_col, end_col);
   }
 #endif
 
@@ -330,30 +314,10 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
-    const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
-    std::size_t upd2sep;
-    auto I = this->upd_to_parent(p, upd2sep);
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop default(shared) grainsize(64)      \
-  if(task_depth < params::task_recursion_cutoff_level)
-#endif
-    for (std::size_t c=0; c<dupd; c++) {
-      auto pc = I[c];
-      if (pc < pdsep) {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF11(I[r],pc) += F22_(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF21(I[r]-pdsep,pc) += F22_(r,c);
-      } else {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF12(I[r],pc-pdsep) += F22_(r, c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
-      }
-    }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+    DenseM_t F22(dupd, dupd);
+    gpu::copy_device_to_host(F22, F22_);
+    this->extend_add(paF11, paF12, paF21, paF22, F22, p);
     release_work_memory(workspace);
   }
 
@@ -541,29 +505,27 @@ namespace strumpack {
     STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
     STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
     host_factors_.reset(new scalar_t[dsep*(dsep+2*dupd)]);
-    // host_Schur_.reset(new scalar_t[dupd*dupd]);
-    host_Schur_.reset(new gpu::HostMemory<scalar_t>(dupd*dupd));
     {
       auto fmem = host_factors_.get();
       F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
       F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
       F21_ = DenseMW_t(dupd, dsep, fmem, dupd);
     }
-    F22_ = DenseMW_t(dupd, dupd, *host_Schur_, dupd);
+    DenseM_t F22(dupd, dupd);
     F11_.zero(); F12_.zero();
-    F21_.zero(); F22_.zero();
+    F21_.zero(); F22.zero();
     A.extract_front
       (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
        this->upd_, task_depth);
     if (lchild_) {
 #pragma omp parallel
 #pragma omp single
-      lchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+      lchild_->extend_add_to_dense(F11_, F12_, F21_, F22, this, 0);
     }
     if (rchild_) {
 #pragma omp parallel
 #pragma omp single
-      rchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+      rchild_->extend_add_to_dense(F11_, F12_, F21_, F22, this, 0);
     }
     // TaskTimer tl("");
     // tl.start();
@@ -590,14 +552,14 @@ namespace strumpack {
         gpu::getrs(h, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
         gpu::copy_device_to_host(F12_, dF12);
         dm11.release();
-        gpu::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd);
-        DenseMW_t dF21(dupd, dsep, dm2122, dupd);
-        DenseMW_t dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
+        gpu::DeviceMemory<scalar_t> dm21(dsep*dupd);
+        DenseMW_t dF21(dupd, dsep, dm21, dupd);
         gpu::copy_host_to_device(dF21, F21_);
-        gpu::copy_host_to_device(dF22, F22_);
+        dev_Schur_.reset(new gpu::DeviceMemory<char>(dupd*dupd*sizeof(scalar_t)));
+        F22_ = DenseMW_t(dupd, dupd, dev_Schur_->template as<scalar_t>(), dupd);
+        gpu::copy_host_to_device(F22_, F22);
         gpu::gemm(h, Trans::N, Trans::N, scalar_t(-1.),
-                  dF21, dF12, scalar_t(1.), dF22);
-        gpu::copy_device_to_host(F22_, dF22);
+                  dF21, dF12, scalar_t(1.), F22_);
       }
     }
     // count flops
@@ -665,13 +627,18 @@ namespace strumpack {
     gpu::Handle handle(comp_stream);
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
-    for (int l=lvls-1; l>=0; l--) {
-      std::vector<F_t*> fp;
-      this->get_level_fronts(fp, l);
-      ldata[l] = LInfo_t(fp, handle, &A);
+    {
+      std::vector<std::vector<F_t*>> fp(lvls);
+      try {
+        this->get_level_fronts_gpu(fp);
+      } catch (...) {
+        return split_smaller(A, opts, etree_level, task_depth);
+      }
+      for (int l=lvls-1; l>=0; l--)
+        ldata[l] = LInfo_t(fp[l], handle, &A);
     }
 
-#if 1 // enable for solve on GPU (if factors fit on device)
+#if 0 // enable for solve on GPU (if factors fit on device)
     if (etree_level == 0) {
       auto total_dmem = total_peak_device_memory_MAGMA(ldata);
       if (opts.verbose())
@@ -815,11 +782,6 @@ namespace strumpack {
     }
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
-      // host_Schur_.reset(new gpu::HostMemory<scalar_t>
-      //                   (workspace.get_pinned(dupd*dupd)));
-      // gpu_check(gpu::copy_device_to_host<scalar_t>
-      //           (*host_Schur_, (scalar_t*)(old_work), dupd*dupd));
-
       dev_Schur_.reset(new gpu::DeviceMemory<char>
                        (workspace.get_device_bytes
                         (dupd*dupd*sizeof(scalar_t))));

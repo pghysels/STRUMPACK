@@ -61,7 +61,7 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t s, integer_t sbegin,
-   integer_t send, std::vector<integer_t>& upd, bool compressed_parent,
+   integer_t send, std::vector<integer_t>& upd,
    int level, FrontCounter& fc, bool root) {
     auto dsep = send - sbegin;
     auto dupd = upd.size();
@@ -71,21 +71,21 @@ namespace strumpack {
       // see below
     } break;
     case CompressionType::HSS: {
-      if (is_HSS(dsep, dupd, compressed_parent, opts)) {
+      if (is_HSS(dsep, dupd, opts)) {
         front.reset
           (new FrontalMatrixHSS<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.HSS++;
       }
     } break;
     case CompressionType::BLR: {
-      if (is_BLR(dsep, dupd, compressed_parent, opts)) {
+      if (is_BLR(dsep, dupd, opts)) {
         front.reset
           (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.BLR++;
       }
     } break;
     case CompressionType::HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts)) {
+      if (is_HODLR(dsep, dupd, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
         front.reset
           (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
@@ -94,30 +94,30 @@ namespace strumpack {
       }
     } break;
     case CompressionType::BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts, 0)) {
+      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
         front.reset
           (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.HODLR++;
 #endif
-      } else if (is_BLR(dsep, dupd, compressed_parent, opts, 1)) {
+      } else if (is_BLR(dsep, dupd, opts, 1)) {
         front.reset
           (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.BLR++;
       }
     } break;
     case CompressionType::ZFP_BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts, 0)) {
+      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
         front.reset
           (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.HODLR++;
 #endif
-      } else if (is_BLR(dsep, dupd, compressed_parent, opts, 1)) {
+      } else if (is_BLR(dsep, dupd, opts, 1)) {
         front.reset
           (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.BLR++;
-      } else if (is_lossy(dsep, dupd, compressed_parent, opts, 2)) {
+      } else if (is_lossy(dsep, dupd, opts, 2)) {
 #if defined(STRUMPACK_USE_ZFP)
         front.reset
           (new FrontalMatrixLossy<scalar_t,integer_t>(s, sbegin, send, upd));
@@ -127,7 +127,7 @@ namespace strumpack {
     } break;
     case CompressionType::LOSSLESS:
     case CompressionType::LOSSY: {
-      if (is_lossy(dsep, dupd, compressed_parent, opts)) {
+      if (is_lossy(dsep, dupd, opts)) {
 #if defined(STRUMPACK_USE_ZFP)
         front.reset
           (new FrontalMatrixLossy<scalar_t,integer_t>(s, sbegin, send, upd));
@@ -136,80 +136,74 @@ namespace strumpack {
       }
     } break;
     };
-    if (!front) {
-      if (is_GPU(opts)) {
+    if (front) return front;
+    if (is_GPU(opts)) {
 #if defined(STRUMPACK_USE_MAGMA)
-        front.reset
-          (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
+      front.reset
+        (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
 #else
 #if defined(STRUMPACK_USE_GPU)
-        front.reset
-          (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
-#endif
-#endif
-        if (root) fc.dense++;
-      }
-    }
-    if (!front) {
-      // fallback in case support for cublas/zfp/hodlr is missing
       front.reset
-        (new FrontalMatrixDense<scalar_t,integer_t>(s, sbegin, send, upd));
+        (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
+#endif
+#endif
       if (root) fc.dense++;
     }
+    if (front) return front;
+    // fallback in case support for cublas/zfp/hodlr is missing
+    front.reset
+      (new FrontalMatrixDense<scalar_t,integer_t>(s, sbegin, send, upd));
+    if (root) fc.dense++;
     return front;
   }
 
   // explicit template instantiations
   template std::unique_ptr<FrontalMatrix<float,int>>
   create_frontal_matrix(const SPOptions<float>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<double,int>>
   create_frontal_matrix(const SPOptions<double>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<std::complex<float>,int>>
   create_frontal_matrix(const SPOptions<std::complex<float>>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<std::complex<double>,int>>
   create_frontal_matrix(const SPOptions<std::complex<double>>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc, bool root);
 
   template std::unique_ptr<FrontalMatrix<float,long int>>
   create_frontal_matrix(const SPOptions<float>& opts, long int s, long int sbegin,
                         long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<double,long int>>
   create_frontal_matrix(const SPOptions<double>& opts, long int s, long int sbegin,
                         long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<std::complex<float>,long int>>
   create_frontal_matrix(const SPOptions<std::complex<float>>& opts, long int s,
                         long int sbegin, long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<std::complex<double>,long int>>
   create_frontal_matrix(const SPOptions<std::complex<double>>& opts, long int s,
                         long int sbegin, long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
 
   template std::unique_ptr<FrontalMatrix<float,long long int>>
   create_frontal_matrix(const SPOptions<float>& opts, long long int s, long long int sbegin,
                         long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<double,long long int>>
   create_frontal_matrix(const SPOptions<double>& opts, long long int s, long long int sbegin,
                         long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<std::complex<float>,long long int>>
   create_frontal_matrix(const SPOptions<std::complex<float>>& opts, long long int s,
                         long long int sbegin, long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
   template std::unique_ptr<FrontalMatrix<std::complex<double>,long long int>>
   create_frontal_matrix(const SPOptions<std::complex<double>>& opts, long long int s,
                         long long int sbegin, long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, bool root);
+                        int level, FrontCounter& fc, bool root);
 
 
 #if defined(STRUMPACK_USE_MPI)
@@ -217,14 +211,13 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrixMPI<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t s,
    integer_t sbegin, integer_t send, std::vector<integer_t>& upd,
-   bool compressed_parent, int level, FrontCounter& fc,
-   const MPIComm& comm, int P, bool root) {
+   int level, FrontCounter& fc, const MPIComm& comm, int P, bool root) {
     auto dsep = send - sbegin;
     auto dupd = upd.size();
     std::unique_ptr<FrontalMatrixMPI<scalar_t,integer_t>> front;
     switch (opts.compression()) {
     case CompressionType::HSS: {
-      if (is_HSS(dsep, dupd, compressed_parent, opts)) {
+      if (is_HSS(dsep, dupd, opts)) {
         front.reset
           (new FrontalMatrixHSSMPI<scalar_t,integer_t>
            (s, sbegin, send, upd, comm, P));
@@ -232,7 +225,7 @@ namespace strumpack {
       }
     } break;
     case CompressionType::BLR: {
-      if (is_BLR(dsep, dupd, compressed_parent, opts)) {
+      if (is_BLR(dsep, dupd, opts)) {
         front.reset
           (new FrontalMatrixBLRMPI<scalar_t,integer_t>
            (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
@@ -240,7 +233,7 @@ namespace strumpack {
       }
     } break;
     case CompressionType::HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts)) {
+      if (is_HODLR(dsep, dupd, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
         front.reset
           (new FrontalMatrixHODLRMPI<scalar_t,integer_t>
@@ -250,13 +243,13 @@ namespace strumpack {
       }
     } break;
     case CompressionType::BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts, 0)) {
+      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
         front.reset
           (new FrontalMatrixHODLRMPI<scalar_t,integer_t>(s, sbegin, send, upd, comm, P));
         if (root) fc.HODLR++;
 #endif
-      } else if (is_BLR(dsep, dupd, compressed_parent, opts, 1)) {
+      } else if (is_BLR(dsep, dupd, opts, 1)) {
         front.reset
           (new FrontalMatrixBLRMPI<scalar_t,integer_t>
            (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
@@ -264,13 +257,13 @@ namespace strumpack {
       }
     } break;
     case CompressionType::ZFP_BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, compressed_parent, opts, 0)) {
+      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
         front.reset
           (new FrontalMatrixHODLRMPI<scalar_t,integer_t>(s, sbegin, send, upd, comm, P));
         if (root) fc.HODLR++;
 #endif
-      } else if (is_BLR(dsep, dupd, compressed_parent, opts, 1)) {
+      } else if (is_BLR(dsep, dupd, opts, 1)) {
         front.reset
           (new FrontalMatrixBLRMPI<scalar_t,integer_t>
            (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
@@ -293,62 +286,54 @@ namespace strumpack {
 
   template std::unique_ptr<FrontalMatrixMPI<float,int>>
   create_frontal_matrix(const SPOptions<float>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, const MPIComm& comm, int P, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc,
+                        const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<double,int>>
   create_frontal_matrix(const SPOptions<double>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, const MPIComm& comm, int P, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc,
+                        const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<std::complex<float>,int>>
   create_frontal_matrix(const SPOptions<std::complex<float>>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, const MPIComm& comm, int P, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc,
+                        const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<std::complex<double>,int>>
   create_frontal_matrix(const SPOptions<std::complex<double>>& opts, int s, int sbegin, int send,
-                        std::vector<int>& upd, bool compressed_parent, int level,
-                        FrontCounter& fc, const MPIComm& comm, int P, bool root);
+                        std::vector<int>& upd, int level, FrontCounter& fc,
+                        const MPIComm& comm, int P, bool root);
 
   template std::unique_ptr<FrontalMatrixMPI<float,long int>>
   create_frontal_matrix(const SPOptions<float>& opts, long int s, long int sbegin,
-                        long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc,
-                        const MPIComm& comm, int P, bool root);
+                        long int send, std::vector<long int>& upd, int level,
+                        FrontCounter& fc, const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<double,long int>>
   create_frontal_matrix(const SPOptions<double>& opts, long int s, long int sbegin,
-                        long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc,
-                        const MPIComm& comm, int P, bool root);
+                        long int send, std::vector<long int>& upd, int level,
+                        FrontCounter& fc, const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<std::complex<float>,long int>>
   create_frontal_matrix(const SPOptions<std::complex<float>>& opts, long int s,
                         long int sbegin, long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc,
-                        const MPIComm& comm, int P, bool root);
+                        int level, FrontCounter& fc, const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<std::complex<double>,long int>>
   create_frontal_matrix(const SPOptions<std::complex<double>>& opts, long int s,
                         long int sbegin, long int send, std::vector<long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, const MPIComm& comm,
-                        int P, bool root);
+                        int level, FrontCounter& fc, const MPIComm& comm, int P, bool root);
 
   template std::unique_ptr<FrontalMatrixMPI<float,long long int>>
   create_frontal_matrix(const SPOptions<float>& opts, long long int s, long long int sbegin,
                         long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc,
-                        const MPIComm& comm, int P, bool root);
+                        int level, FrontCounter& fc, const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<double,long long int>>
   create_frontal_matrix(const SPOptions<double>& opts, long long int s, long long int sbegin,
                         long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc,
-                        const MPIComm& comm, int P, bool root);
+                        int level, FrontCounter& fc, const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<std::complex<float>,long long int>>
   create_frontal_matrix(const SPOptions<std::complex<float>>& opts, long long int s,
                         long long int sbegin, long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc,
-                        const MPIComm& comm, int P, bool root);
+                        int level, FrontCounter& fc, const MPIComm& comm, int P, bool root);
   template std::unique_ptr<FrontalMatrixMPI<std::complex<double>,long long int>>
   create_frontal_matrix(const SPOptions<std::complex<double>>& opts, long long int s,
                         long long int sbegin, long long int send, std::vector<long long int>& upd,
-                        bool compressed_parent, int level, FrontCounter& fc, const MPIComm& comm,
-                        int P, bool root);
+                        int level, FrontCounter& fc, const MPIComm& comm, int P, bool root);
 
 #endif
 

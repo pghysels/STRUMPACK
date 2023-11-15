@@ -73,6 +73,7 @@ namespace strumpack {
                                DenseM_t& B, int task_depth) const override {}
 
     std::string type() const override { return "FrontalMatrixGPU"; }
+    bool isGPU() const override { return true; }
 
 #if defined(STRUMPACK_USE_MPI)
     void

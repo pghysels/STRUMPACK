@@ -607,8 +607,8 @@ namespace strumpack {
      * \param B matrix to add, should be the same size of this matrix
      * \param depth current OpenMP task recursion depth
      */
-    DenseMatrix<scalar_t>& scale_and_add
-    (scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth=0);
+    DenseMatrix<scalar_t>&
+    scale_and_add(scalar_t alpha, const DenseMatrix<scalar_t>& B, int depth=0);
 
     /**
      * Scale the rows of this matrix with the scalar values from the
@@ -764,9 +764,8 @@ namespace strumpack {
      * \return the solution x
      * \see LU, solve_LU_in_place, solve_LDLt_in_place, solve_LDLt_rook_in_place
      */
-    DenseMatrix<scalar_t> solve
-    (const DenseMatrix<scalar_t>& b,
-     const std::vector<int>& piv, int depth=0) const;
+    DenseMatrix<scalar_t> solve(const DenseMatrix<scalar_t>& b,
+                                const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its LU
@@ -779,8 +778,8 @@ namespace strumpack {
      * \param depth current OpenMP task recursion depth
      * \see LU, solve_LU_in_place, solve_LDLt_in_place, solve_LDLt_rook_in_place
      */
-    void solve_LU_in_place
-    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
+    void solve_LU_in_place(DenseMatrix<scalar_t>& b,
+                           const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its LU
@@ -793,8 +792,8 @@ namespace strumpack {
      * \param depth current OpenMP task recursion depth
      * \see LU, solve_LU_in_place, solve_LDLt_in_place, solve_LDLt_rook_in_place
      */
-    void solve_LU_in_place
-    (DenseMatrix<scalar_t>& b, const int* piv, int depth=0) const;
+    void solve_LU_in_place(DenseMatrix<scalar_t>& b,
+                           const int* piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its
@@ -807,8 +806,8 @@ namespace strumpack {
      * \param depth current OpenMP task recursion depth
      * \see LDLt, LDLt_rook, solve_LDLt_rook_in_place, LU, solve_LU_in_place
      */
-    void solve_LDLt_in_place
-    (DenseMatrix<scalar_t>& b, const std::vector<int>& piv, int depth=0) const;
+    void solve_LDLt_in_place(DenseMatrix<scalar_t>& b,
+                             const std::vector<int>& piv, int depth=0) const;
 
     /**
      * Solve a linear system Ax=b with this matrix, factored in its
@@ -880,10 +879,9 @@ namespace strumpack {
      * \param depth current OpenMP task recursion depth
      * \see ID_row
      */
-    void ID_column
-    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol,
-     real_t abs_tol, int max_rank, int depth);
+    void ID_column(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+                   std::vector<std::size_t>& ind, real_t rel_tol,
+                   real_t abs_tol, int max_rank, int depth);
 
     /**
      * Similar to ID_column, but transposed. This is implemented by
@@ -902,10 +900,9 @@ namespace strumpack {
      * \param depth current OpenMP task recursion depth
      * \see ID_column
      */
-    void ID_row
-    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
-     int max_rank, int depth) const;
+    void ID_row(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+                std::vector<std::size_t>& ind, real_t rel_tol, real_t abs_tol,
+                int max_rank, int depth) const;
 
     /**
      * Computes a low-rank factorization of this matrix, with
@@ -925,9 +922,8 @@ namespace strumpack {
      * \param max_rank maximum rank for RRQR
      * \param depth current OpenMP task recursion depth
      */
-    void low_rank
-    (DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
-     real_t rel_tol, real_t abs_tol, int max_rank, int depth) const;
+    void low_rank(DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V,
+                  real_t rel_tol, real_t abs_tol, int max_rank, int depth) const;
 
     /**
      * Return a vector with the singular values of this matrix. Used
@@ -984,10 +980,9 @@ namespace strumpack {
     std::size_t zeros() const;
 
   private:
-    void ID_column_GEQP3
-    (DenseMatrix<scalar_t>& X, std::vector<int>& piv,
-     std::vector<std::size_t>& ind, real_t rel_tol,
-     real_t abs_tol, int max_rank, int depth);
+    void ID_column_GEQP3(DenseMatrix<scalar_t>& X, std::vector<int>& piv,
+                         std::vector<std::size_t>& ind, real_t rel_tol,
+                         real_t abs_tol, int max_rank, int depth);
 
     template<typename T> friend class DistributedMatrix;
 

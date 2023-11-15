@@ -44,7 +44,7 @@ namespace strumpack {
 #pragma omp parallel default(shared)
 #pragma omp single
     symbolic_factorization(A, sep_tree, sep_tree.root(), upd);
-    root_ = setup_tree(opts, A, sep_tree, upd, sep_tree.root(), true, 0);
+    root_ = setup_tree(opts, A, sep_tree, upd, sep_tree.root(), 0);
   }
 
   template<typename scalar_t,typename integer_t>
@@ -127,8 +127,8 @@ namespace strumpack {
   EliminationTree<scalar_t,integer_t>::setup_tree
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
    SeparatorTree<integer_t>& sep_tree,
-   std::vector<std::vector<integer_t>>& upd, integer_t sep,
-   bool hss_parent, int level) {
+   std::vector<std::vector<integer_t>>& upd,
+   integer_t sep, int level) {
     auto sep_begin = sep_tree.sizes[sep];
     auto sep_end = sep_tree.sizes[sep+1];
     auto dim_sep = sep_end - sep_begin;
@@ -138,18 +138,13 @@ namespace strumpack {
     if (dim_sep == 0 && sep_tree.lch[sep] != -1)
       sep_begin = sep_end = sep_tree.sizes[sep_tree.rch[sep]+1];
     auto front = create_frontal_matrix<scalar_t,integer_t>
-      (opts, sep, sep_begin, sep_end, upd[sep],
-       hss_parent, level, nr_fronts_);
-    bool compressed =
-      is_compressed(dim_sep, upd[sep].size(), hss_parent, opts);
+      (opts, sep, sep_begin, sep_end, upd[sep], level, nr_fronts_);
     if (sep_tree.lch[sep] != -1)
       front->set_lchild
-        (setup_tree(opts, A, sep_tree, upd, sep_tree.lch[sep],
-                    compressed, level+1));
+        (setup_tree(opts, A, sep_tree, upd, sep_tree.lch[sep], level+1));
     if (sep_tree.rch[sep] != -1)
       front->set_rchild
-        (setup_tree(opts, A, sep_tree, upd, sep_tree.rch[sep],
-                    compressed, level+1));
+        (setup_tree(opts, A, sep_tree, upd, sep_tree.rch[sep], level+1));
     return front;
   }
 

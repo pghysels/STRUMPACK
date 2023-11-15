@@ -143,34 +143,21 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
-    const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
-    std::size_t upd2sep;
-    auto I = this->upd_to_parent(p, upd2sep);
-    // if ACA was used, a compressed version of the CB was constructed
-    // in F22blr_, so we need to expand it first into F22_
-    if (F22blr_.rows() == dupd)
-      F22blr_.dense(F22_);
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop default(shared) grainsize(64)      \
-  if(task_depth < params::task_recursion_cutoff_level)
+#if defined(STRUMPACK_USE_GPU)
+    if (CBdev_.size()) {
+      DenseM_t F22(dupd, dupd);
+      gpu::copy_device_to_host(F22, CBdev_.template as<scalar_t>());
+      this->extend_add(paF11, paF12, paF21, paF22, F22, p);
+    } else
 #endif
-    for (std::size_t c=0; c<dupd; c++) {
-      auto pc = I[c];
-      if (pc < pdsep) {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF11(I[r],pc) += F22_(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF21(I[r]-pdsep,pc) += F22_(r,c);
-      } else {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF12(I[r],pc-pdsep) += F22_(r, c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
+      {
+        if (F22blr_.rows() == dupd) {
+          auto F22 = F22blr_.dense();
+          this->extend_add(paF11, paF12, paF21, paF22, F22, p);
+        } else
+          this->extend_add(paF11, paF12, paF21, paF22, F22_, p);
       }
-    }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     release_work_memory(workspace);
   }
 
@@ -300,6 +287,7 @@ namespace strumpack {
    int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
     if (opts.use_openmp_tree() &&
+        !opts.use_gpu() && // do not create too many GPU streams, handles, etc
         task_depth < params::task_recursion_cutoff_level) {
       if (lchild_)
 #pragma omp task default(shared)                                        \
@@ -311,8 +299,9 @@ namespace strumpack {
         er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth+1);
 #pragma omp taskwait
     } else {
-      if (lchild_)
+      if (lchild_) {
         el = lchild_->factor(A, opts, workspace, etree_level+1, task_depth);
+      }
       if (rchild_)
         er = rchild_->factor(A, opts, workspace, etree_level+1, task_depth);
     }
@@ -691,9 +680,18 @@ namespace strumpack {
       auto F22 = F22blr_.dense();
       ExtendAdd<scalar_t,integer_t>::
         extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
-    } else
-      ExtendAdd<scalar_t,integer_t>::
-        extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
+    } else {
+#if defined(STRUMPACK_USE_GPU)
+      if (CBdev_.size()) {
+        DenseM_t F22(dim_upd(), dim_upd());
+        gpu::copy_device_to_host(F22, CBdev_.template as<scalar_t>());
+        ExtendAdd<scalar_t,integer_t>::
+          extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
+      } else
+#endif
+        ExtendAdd<scalar_t,integer_t>::
+          extend_add_seq_copy_to_buffers(F22_, sbuf, pa, this);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -721,12 +719,12 @@ namespace strumpack {
   FrontalMatrixBLR<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
-    if (opts.BLR_options().BLR_factor_algorithm() ==
-             BLR::BLRFactorAlgorithm::COLWISE)
+    // GPU code does not support COLWISE, so will not call this
+    if (F22blr_.rows() == std::size_t(dim_upd())) {
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         blrseq_copy_to_buffers_col
         (F22blr_, sbuf, pa, this, begin_col, end_col, opts.BLR_options());
-    else
+    } else
       BLR::BLRExtendAdd<scalar_t,integer_t>::
         seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
   }

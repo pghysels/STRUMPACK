@@ -80,7 +80,7 @@ namespace strumpack {
     MPIComm::control_start("proportional_mapping");
     this->root_ = prop_map
       (opts, lupd, ltree_work, dist_upd, dleaf_upd, dtree_work,
-       nd_.tree().root(), 0, P_, 0, 0, comm_, true, 0);
+       nd_.tree().root(), 0, P_, 0, 0, comm_, 0);
     MPIComm::control_stop("proportional_mapping");
 
     MPIComm::control_start("block_row_A_to_prop_A");
@@ -634,8 +634,7 @@ namespace strumpack {
    std::vector<float>& local_subtree_work,
    std::vector<integer_t>& dist_upd, std::vector<integer_t>& dleaf_upd,
    std::vector<float>& dist_subtree_work, integer_t dsep,
-   int P0, int P, int P0_sib, int P_sib,
-   const MPIComm& fcomm, bool pa_comp, int level) {
+   int P0, int P, int P0_sib, int P_sib, const MPIComm& fcomm, int level) {
     auto owner = nd_.proc_dist_sep[dsep];
     if (nd_.tree().is_leaf(dsep)) {
       RedistSubTree<integer_t> sub_tree
@@ -644,17 +643,13 @@ namespace strumpack {
          P0, P, P0_sib, P_sib, owner, comm_);
       if (!sub_tree.nr_sep) return nullptr;
       return prop_map_sub_graphs
-        (opts, sub_tree, P0, P, P0_sib, P_sib,
-         fcomm, pa_comp, level);
+        (opts, sub_tree, P0, P, P0_sib, P_sib, fcomm, level);
     }
     std::vector<integer_t> dsep_upd;
     integer_t dsep_begin = nd_.dist_sep_range.first,
       dsep_end = nd_.dist_sep_range.second;
     comm_dist_sep(dsep, dist_upd, dsep_begin, dsep_end, dsep_upd,
                   P0, P, P0_sib, P_sib, owner);
-    auto dim_dsep = dsep_end - dsep_begin;
-    bool use_compression = is_compressed
-      (dim_dsep, dsep_upd.size(), pa_comp, opts);
     std::unique_ptr<F_t> front;
     // only store fronts you work on and their siblings (needed for
     // extend-add operation)
@@ -662,13 +657,13 @@ namespace strumpack {
         (rank_ >= P0_sib && rank_ < P0_sib+P_sib)) {
       if (P == 1) {
         front = create_frontal_matrix<scalar_t,integer_t>
-          (opts, dsep, dsep_begin, dsep_end, dsep_upd, pa_comp,
+          (opts, dsep, dsep_begin, dsep_end, dsep_upd,
            level, this->nr_fronts_, rank_ == P0);
         if (P0 == rank_) this->update_local_ranges(dsep_begin, dsep_end);
       } else {
         auto fmpi = create_frontal_matrix<scalar_t,integer_t>
           (opts, local_pfronts_.size(), dsep_begin, dsep_end, dsep_upd,
-           pa_comp, level, this->nr_fronts_, fcomm, P, rank_ == P0);
+           level, this->nr_fronts_, fcomm, P, rank_ == P0);
         if (rank_ >= P0 && rank_ < P0+P)
           local_pfronts_.emplace_back
             (dsep_begin, dsep_end, P0, P, fmpi->grid());
@@ -687,12 +682,10 @@ namespace strumpack {
     auto cr = fcomm.sub(P-Pr, Pr);
     auto lch = prop_map
       (opts, local_upd, local_subtree_work, dist_upd, dleaf_upd,
-       dist_subtree_work, chl, P0, Pl, P0+P-Pr, Pr, cl,
-       use_compression, level+1);
+       dist_subtree_work, chl, P0, Pl, P0+P-Pr, Pr, cl, level+1);
     auto rch = prop_map
       (opts, local_upd, local_subtree_work, dist_upd, dleaf_upd,
-       dist_subtree_work, chr, P0+P-Pr, Pr, P0, Pl, cr,
-       use_compression, level+1);
+       dist_subtree_work, chr, P0+P-Pr, Pr, P0, Pl, cr, level+1);
     if (front) {
       front->set_lchild(std::move(lch));
       front->set_rchild(std::move(rch));
@@ -709,14 +702,12 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::prop_map_sub_graphs
   (const Opts_t& opts, const RedistSubTree<integer_t>& tree,
-   int P0, int P, int P0_sib, int P_sib,
-   const MPIComm& fcomm, bool pa_comp, int level) {
+   int P0, int P, int P0_sib, int P_sib, const MPIComm& fcomm, int level) {
     struct MapData {
       integer_t sep;
       int P0, P, P0_sib, P_sib;
       const MPIComm *pfcomm;
       MPIComm fcomm;
-      bool pa_comp;
       int level;
       F_t* parent;
       bool left;
@@ -724,14 +715,13 @@ namespace strumpack {
     std::stack<MapData> fstack;
     fstack.emplace
       (MapData{tree.root, P0, P, P0_sib, P_sib,
-         &fcomm, MPI_COMM_NULL, pa_comp, level, nullptr, true});
+               &fcomm, MPI_COMM_NULL, level, nullptr, true});
     std::unique_ptr<F_t> froot;
     while (!fstack.empty()) {
       auto m = fstack.top();
       fstack.pop();
       auto sep_beg = tree.sep_ptr[m.sep];
       auto sep_end = tree.sep_ptr[m.sep+1];
-      auto dim_sep = sep_end - sep_beg;
       auto dim_upd = tree.dim_upd[m.sep];
       std::unique_ptr<F_t> front;
       const MPIComm* pcomm = m.pfcomm ? m.pfcomm : &m.fcomm;
@@ -740,14 +730,13 @@ namespace strumpack {
         std::vector<integer_t> upd(tree.upd[m.sep], tree.upd[m.sep]+dim_upd);
         if (m.P == 1) {
           front = create_frontal_matrix<scalar_t,integer_t>
-            (opts, m.sep, sep_beg, sep_end, upd, m.pa_comp,
+            (opts, m.sep, sep_beg, sep_end, upd,
              m.level, this->nr_fronts_, rank_ == m.P0);
           if (m.P0 == rank_) this->update_local_ranges(sep_beg, sep_end);
         } else {
           auto fmpi = create_frontal_matrix<scalar_t,integer_t>
             (opts, local_pfronts_.size(), sep_beg, sep_end, upd,
-             m.pa_comp, m.level, this->nr_fronts_,
-             *pcomm, m.P, rank_ == m.P0);
+             m.level, this->nr_fronts_, *pcomm, m.P, rank_ == m.P0);
           if (rank_ >= m.P0 && rank_ < m.P0+m.P)
             local_pfronts_.emplace_back
               (sep_beg, sep_end, m.P0, m.P, fmpi->grid());
@@ -758,15 +747,13 @@ namespace strumpack {
         auto chl = tree.lchild[m.sep];
         auto chr = tree.rchild[m.sep];
         if (chl != -1 && chr != -1) {
-          bool comp = is_compressed
-            (dim_sep, dim_upd, m.pa_comp, opts);
           if (m.P == 1) {
             fstack.emplace
               (MapData{chl, m.P0, 1, m.P0, 1, pcomm, MPI_COMM_NULL,
-                 comp, m.level+1, front.get(), true});
+                       m.level+1, front.get(), true});
             fstack.emplace
               (MapData{chr, m.P0, 1, m.P0, 1, pcomm, MPI_COMM_NULL,
-                 comp, m.level+1, front.get(), false});
+                       m.level+1, front.get(), false});
           } else {
             auto wl = tree.work[chl];
             auto wr = tree.work[chr];
@@ -775,12 +762,12 @@ namespace strumpack {
             int Pr = std::max(1, m.P - Pl);
             fstack.emplace
               (MapData{chl, m.P0, Pl, m.P0+m.P-Pr, Pr,
-                 nullptr, pcomm->sub(0, Pl),
-                 comp, m.level+1, front.get(), true});
+                       nullptr, pcomm->sub(0, Pl),
+                       m.level+1, front.get(), true});
             fstack.emplace
               (MapData{chr, m.P0+m.P-Pr, Pr, m.P0, Pl,
-                 nullptr, pcomm->sub(m.P-Pr, Pr),
-                 comp, m.level+1, front.get(), false});
+                       nullptr, pcomm->sub(m.P-Pr, Pr),
+                       m.level+1, front.get(), false});
           }
         }
       }

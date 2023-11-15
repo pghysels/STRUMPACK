@@ -274,30 +274,7 @@ namespace strumpack {
   FrontalMatrixGPU<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
-    const std::size_t pdsep = paF11.rows();
-    const std::size_t dupd = dim_upd();
-    std::size_t upd2sep;
-    auto I = this->upd_to_parent(p, upd2sep);
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop default(shared) grainsize(64)      \
-  if(task_depth < params::task_recursion_cutoff_level)
-#endif
-    for (std::size_t c=0; c<dupd; c++) {
-      auto pc = I[c];
-      if (pc < pdsep) {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF11(I[r],pc) += F22_(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF21(I[r]-pdsep,pc) += F22_(r,c);
-      } else {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF12(I[r],pc-pdsep) += F22_(r, c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
-      }
-    }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+    this->extend_add(paF11, paF12, paF21, paF22, F22_, p);
     release_work_memory();
   }
 
@@ -501,12 +478,17 @@ namespace strumpack {
     std::vector<gpu::Handle> handles(max_streams);
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
-    for (int l=lvls-1; l>=0; l--) {
-      std::vector<F_t*> fp;
-      this->get_level_fronts(fp, l);
-      auto& L = ldata[l];
-      L = LInfo_t(fp, handles[0], max_streams, &A);
+    {
+      std::vector<std::vector<F_t*>> fp(lvls);
+      try {
+        this->get_level_fronts_gpu(fp);
+      } catch (...) {
+        return split_smaller(A, opts, etree_level, task_depth);
+      }
+      for (int l=lvls-1; l>=0; l--)
+        ldata[l] = LInfo_t(fp[l], handles[0], max_streams, &A);
     }
+
     auto peak_dmem = peak_device_memory(ldata);
     if (peak_dmem >= 0.9 * gpu::available_memory())
       return split_smaller(A, opts, etree_level, task_depth);

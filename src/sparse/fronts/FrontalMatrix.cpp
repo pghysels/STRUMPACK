@@ -638,7 +638,6 @@ namespace strumpack {
       if (rchild_) rchild_->get_level_fronts(ldata, elvl, l+1);
     } else ldata.push_back(this);
   }
-
   template<typename scalar_t,typename integer_t> void
   FrontalMatrix<scalar_t,integer_t>::get_level_fronts
   (std::vector<F_t*>& ldata, int elvl, int l) {
