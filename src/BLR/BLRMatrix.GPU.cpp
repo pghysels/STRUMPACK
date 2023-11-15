@@ -227,7 +227,7 @@ namespace strumpack {
 #pragma omp taskloop
               for (std::size_t j=0; j<rb2; j++)
                 B21.tile(j, i-1).move_to_cpu
-                  (copy_stream, pinned+B21.tileroff(j)*B21.tilerows(i-1));
+                  (copy_stream, pinned+B21.tileroff(j)*B21.tilecols(i-1));
           }
         }
         comp_stream.synchronize();
@@ -244,7 +244,7 @@ namespace strumpack {
 #pragma omp parallel for schedule(static,1)
         for (std::size_t j=0; j<rb2; j++)
           B21.tile(j, rb-1).move_to_cpu
-            (copy_stream, pinned+B21.tileroff(j)*B21.tilerows(rb-1));
+            (copy_stream, pinned+B21.tileroff(j)*B21.tilecols(rb-1));
       }
       gpu::copy_device_to_host(B11.piv_.data(), dpiv, dsep);
       for (std::size_t i=0; i<rb; i++)
