@@ -134,10 +134,6 @@ namespace strumpack {
       if (!batchcount) return;
       // gpu::synchronize();
       for (std::size_t i=0; i<batchcount; i++) {
-        STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*
-                        blas::gemm_flops(m_[i],n_[i],k_[i],alpha,beta));
-        STRUMPACK_BYTES(sizeof(scalar_t)*
-                        blas::gemm_moves(m_[i],n_[i],k_[i]));
         DenseMatrixWrapper<scalar_t>
           A(m_[i], k_[i], A_[i], ldA_[i]),
           B(k_[i], n_[i], B_[i], ldB_[i]),
@@ -159,9 +155,9 @@ namespace strumpack {
     template<typename scalar_t> void
     VBatchedTRSMLeftRight<scalar_t>::run(gpu::Handle& h,
                                          VectorPool<scalar_t>& workspace) {
-#if defined(STRUMPACK_USE_MAGMA)
       auto B = A_.size();
       if (!B) return;
+#if defined(STRUMPACK_USE_MAGMA)
       std::vector<int> mn(3*B);
       std::vector<scalar_t*> AB(3*B);
       int maxm = 0, maxnl = 0, maxnr = 0;
@@ -198,7 +194,13 @@ namespace strumpack {
          dA, dm, dBr, dnr, B, h);
       workspace.restore(dmem);
 #else
-      std::cout << "VBatchedTRSMLeftRight TODO" << std::endl;
+      // std::cout << "VBatchedTRSMLeftRight TODO" << std::endl;
+      for (std::size_t i=0; i<B; i++) {
+        gpu::trsm(h, Side::L, UpLo::L, Trans::N, Diag::U,
+                  scalar_t(1.), *A_[i], *Bl_[i]);
+        gpu::trsm(h, Side::R, UpLo::U, Trans::N, Diag::N,
+                  scalar_t(1.), *A_[i], *Br_[i]);
+      }
 #endif
     }
 
@@ -213,9 +215,9 @@ namespace strumpack {
     VBatchedTRSM<scalar_t>::run(gpu::Handle& h,
                                 VectorPool<scalar_t>& workspace,
                                 bool left) {
-#if defined(STRUMPACK_USE_MAGMA)
       auto B = A_.size();
       if (!B) return;
+#if defined(STRUMPACK_USE_MAGMA)
       std::vector<int> mn(2*B);
       std::vector<scalar_t*> AB(2*B);
       int maxm = 0, maxn = 0;
@@ -249,7 +251,15 @@ namespace strumpack {
            dA, dm, dB, dn, B, h);
       workspace.restore(dmem);
 #else
-      std::cout << "VBatchedTRSM TODO" << std::endl;
+      // std::cout << "VBatchedTRSM TODO" << std::endl;
+      for (std::size_t i=0; i<B; i++) {
+        if (left)
+          gpu::trsm(h, Side::L, UpLo::L, Trans::N, Diag::U,
+                    scalar_t(1.), *A_[i], *B_[i]);
+        else
+          gpu::trsm(h, Side::R, UpLo::U, Trans::N, Diag::N,
+                    scalar_t(1.), *A_[i], *B_[i]);
+      }
 #endif
     }
 
@@ -302,11 +312,11 @@ namespace strumpack {
       t = std::move(t_lr);
     }
 
-#if defined(STRUMPACK_USE_KBLAS)
     template<typename scalar_t> void
-    VBatchedARA<scalar_t>::run(gpu::Handle& handle,
-                               VectorPool<scalar_t>& workspace,
-                               real_t tol) {
+    VBatchedARA<scalar_t>::run_kblas(gpu::Handle& handle,
+                                     VectorPool<scalar_t>& workspace,
+                                     real_t tol) {
+#if defined(STRUMPACK_USE_KBLAS)
       auto B = tile_.size();
       if (!B) return;
       int maxm = 0, maxn = 0, maxminmn = KBLAS_ARA_BLOCK_SIZE;
@@ -371,12 +381,13 @@ namespace strumpack {
         }
       }
       workspace.restore(dmem);
+#endif
     }
-#else
+
     template<typename scalar_t> void
-    VBatchedARA<scalar_t>::run(gpu::Handle& handle,
-                               VectorPool<scalar_t>& workspace,
-                               real_t tol) {
+    VBatchedARA<scalar_t>::run_svd(gpu::Handle& handle,
+                                   VectorPool<scalar_t>& workspace,
+                                   real_t tol) {
       auto B = tile_.size();
       if (!B) return;
       std::size_t compress_lwork = 0;
@@ -397,7 +408,53 @@ namespace strumpack {
         compress(handle, *tile_[i], wptr, dinfo, tol);
       workspace.restore(work);
     }
+
+    template<typename scalar_t> void
+    VBatchedARA<scalar_t>::run_magma(gpu::Handle& handle,
+                                     VectorPool<scalar_t>& workspace,
+                                     real_t tol) {
+// #if defined(STRUMPACK_USE_MAGMA)
+//       std::size_t lwork = 0, lrwork = 0;
+//       int max_n = 0, max_minmn = 0;
+//       for (std::size_t i=0; i<B; i++) {
+//         auto& A = *tile_[i]->D();
+//         auto m = A.rows(), n = A.cols();
+//         max_n = std::max(max_n, n);
+//         max_minmn = std::max(max_minmn, std::min(m, n));
+//         lwork = std::max(lwork, magma::geqp3_scalar_worksize(A));
+//         lrwork = std::max(lrwork, magma::geqp3_real_worksize(A));
+//       }
+//       // TODO combine and get from workspace
+//       gpu::DeviceMemory<magma_int_t> jpvt(max_n);
+//       gpu::DeviceMemory<scalar_t> tau(max_minmn), dwork(lwork);
+//       gpu::DeviceMemory<real_t> rwork(lrwork);
+//       gpu::DeviceMemory<magma_int_t> dinfo;
+//       for (std::size_t i=0; i<B; i++) {
+//         // TODO make a copy of A
+//         auto& A = *tile_[i]->D();
+//         // auto m = A.rows(), n = A.cols();
+//         magma::geqp3_gpu(A, jpvt, tau, dwork, lwork, rwork, dinfo);
+//         // TODO figure out the rank, based on tol?
+//         // TODO get V from R, transpose?
+//         // TODO get U from xxgqr
+//       }
+// #endif
+    }
+
+    template<typename scalar_t> void
+    VBatchedARA<scalar_t>::run(gpu::Handle& handle,
+                               VectorPool<scalar_t>& workspace,
+                               real_t tol) {
+#if defined(STRUMPACK_USE_KBLAS)
+      run_kblas(handle, workspace, tol);
+#else
+#if 0 // defined(STRUMPACK_USE_MAGMA)
+      run_magma(handle, workspace, tol);
+#else
+      run_svd(handle, workspace, tol);
 #endif
+#endif
+    }
 
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::kblas_wsquery(gpu::Handle& handle,

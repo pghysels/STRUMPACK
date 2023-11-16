@@ -153,9 +153,16 @@ namespace strumpack {
     private:
       std::vector<std::unique_ptr<BLRTile<scalar_t>>*> tile_;
 
+      void run_kblas(gpu::Handle& handle, VectorPool<scalar_t>& workspace,
+                     real_t tol);
+      void run_magma(gpu::Handle& handle, VectorPool<scalar_t>& workspace,
+                     real_t tol);
+      void run_svd(gpu::Handle& handle, VectorPool<scalar_t>& workspace,
+                   real_t tol);
       void compress(gpu::Handle& handle,
                     std::unique_ptr<BLRTile<scalar_t>>& t,
                     scalar_t* work, int* dinfo, real_t tol);
+
       static const int KBLAS_ARA_BLOCK_SIZE;
     };
 
