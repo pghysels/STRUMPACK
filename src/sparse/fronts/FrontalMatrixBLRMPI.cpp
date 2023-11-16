@@ -459,6 +459,12 @@ namespace strumpack {
       if (Comm().is_root()) {
         g = A.extract_graph
           (opts.separator_ordering_level(), sep_begin_, sep_end_);
+#if 1
+        auto sep_tree = g.recursive_bisection
+          (opts.BLR_options().leaf_size(), 0,
+           sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+        sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
+#else
         int K = std::round((1.* dim_sep()) / opts.BLR_options().leaf_size());
         if (K > 1)
           sep_tiles_ = g.partition_K_way
@@ -468,6 +474,7 @@ namespace strumpack {
           for (integer_t i=sep_begin_; i<sep_end_; i++)
             sorder[i] = i - sep_begin_;
         }
+#endif
       }
       auto nt = sep_tiles_.size();
       Comm().broadcast(nt);
