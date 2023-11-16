@@ -68,7 +68,7 @@ namespace strumpack {
       create_as_wrapper_adv(scalar_t*& D, int m, int n) {
         auto t = std::make_unique<DenseTile<scalar_t>>();
         t->D_.reset(new DenseMW_t(m, n, D, m));
-	D += m*n;
+        D += m*n;
         return t;
       }
 
@@ -141,7 +141,7 @@ namespace strumpack {
         return D_->operator()(i, j);
       }
 
-      std::vector<int> LU() override;
+      std::vector<int> LU(real_t thresh=0.) override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
 #if defined(STRUMPACK_USE_GPU)

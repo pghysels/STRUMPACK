@@ -118,7 +118,7 @@ namespace strumpack {
           }
       }
 
-      virtual std::vector<int> LU() {
+      virtual std::vector<int> LU(real_t thresh=0.) {
         assert(false); return std::vector<int>();
       };
 

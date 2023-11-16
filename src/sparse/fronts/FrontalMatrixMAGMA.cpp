@@ -487,9 +487,6 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    if (opts.verbose())
-      std::cout << "# Factorization does not fit in GPU memory, "
-        "splitting in smaller traversals." << std::endl;
     const std::size_t dupd = dim_upd(), dsep = dim_sep();
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (lchild_) {
@@ -638,7 +635,7 @@ namespace strumpack {
         ldata[l] = LInfo_t(fp[l], handle, &A);
     }
 
-#if 0 // enable for solve on GPU (if factors fit on device)
+#if 1 // enable for solve on GPU (if factors fit on device)
     if (etree_level == 0) {
       auto total_dmem = total_peak_device_memory_MAGMA(ldata);
       if (opts.verbose())
@@ -652,8 +649,12 @@ namespace strumpack {
 #endif
 
     auto peak_dmem = level_peak_device_memory_MAGMA(ldata);
-    if (peak_dmem >= 0.9 * gpu::available_memory())
+    if (peak_dmem >= 0.9 * gpu::available_memory()) {
+      if (opts.verbose())
+        std::cout << "# Factorization does not fit in GPU memory, "
+          "splitting in smaller traversals." << std::endl;
       return split_smaller(A, opts, etree_level, task_depth);
+    }
 
     std::size_t pinned_size = 0;
     for (int l=lvls-1; l>=0; l--)

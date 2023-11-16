@@ -374,9 +374,6 @@ namespace strumpack {
   FrontalMatrixGPU<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    if (opts.verbose())
-      std::cout << "# Factorization does not fit in GPU memory, "
-        "splitting in smaller traversals." << std::endl;
     const std::size_t dupd = dim_upd(), dsep = dim_sep();
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (lchild_) {
@@ -490,8 +487,12 @@ namespace strumpack {
     }
 
     auto peak_dmem = peak_device_memory(ldata);
-    if (peak_dmem >= 0.9 * gpu::available_memory())
+    if (peak_dmem >= 0.9 * gpu::available_memory()) {
+      if (opts.verbose())
+        std::cout << "# Factorization does not fit in GPU memory, "
+          "splitting in smaller traversals." << std::endl;
       return split_smaller(A, opts, etree_level, task_depth);
+    }
 
     std::vector<gpu::Stream> streams(max_streams);
     gpu::Stream copy_stream;

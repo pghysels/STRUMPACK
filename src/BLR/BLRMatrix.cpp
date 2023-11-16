@@ -133,7 +133,7 @@ namespace strumpack {
 #endif
           {
             create_dense_tile(i, i, A);
-            auto tpiv = tile(i, i).LU();
+            auto tpiv = tile(i, i).LU(opts.pivot_threshold());
             std::copy(tpiv.begin(), tpiv.end(), piv_.begin()+tileroff(i));
           }
           // COMPRESS and SOLVE
@@ -249,7 +249,7 @@ namespace strumpack {
       auto rb = rowblocks();
       for (std::size_t i=0; i<rb; i++) {
         create_dense_tile_left_looking(i, i, Aelem);
-        auto tpiv = tile(i, i).LU();
+        auto tpiv = tile(i, i).LU(opts.pivot_threshold());
         int ti = tileroff(i);
         for (std::size_t l=0; l<tilerows(i); l++)
           piv_[ti+l] = tpiv[l] + ti;
@@ -756,7 +756,7 @@ namespace strumpack {
 #endif
             {
               B11.create_dense_tile(i, i, A11);
-              auto tpiv = B11.tile(i, i).LU();
+              auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
               std::copy(tpiv.begin(), tpiv.end(),
                         B11.piv_.begin()+B11.tileroff(i));
             }
@@ -1255,7 +1255,7 @@ namespace strumpack {
 #pragma omp task default(shared) firstprivate(i,ii) depend(inout:B[ii])
 #endif
             {
-              auto tpiv = B11.tile(i, i).LU();
+              auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
               std::copy(tpiv.begin(), tpiv.end(),
                         B11.piv_.begin()+B11.tileroff(i));
             }
@@ -1463,7 +1463,7 @@ namespace strumpack {
   depend(inout:B[cc])
 #endif
               {
-                auto tpiv = B11.tile(c, c).LU();
+                auto tpiv = B11.tile(c, c).LU(opts.pivot_threshold());
                 std::copy(tpiv.begin(), tpiv.end(),
                           B11.piv_.begin()+B11.tileroff(c));
               }
@@ -1631,7 +1631,7 @@ namespace strumpack {
       auto rb2 = B21.rowblocks();
       for (std::size_t i=0; i<rb; i++) {
         B11.create_dense_tile_left_looking(i, i, A11);
-        auto tpiv = B11.tile(i, i).LU();
+        auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
         std::copy(tpiv.begin(), tpiv.end(), B11.piv_.begin()+B11.tileroff(i));
         for (std::size_t j=i+1; j<rb; j++) {
           // these blocks have received all updates, compress now

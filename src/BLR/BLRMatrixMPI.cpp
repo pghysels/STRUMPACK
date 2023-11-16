@@ -1233,7 +1233,7 @@ namespace strumpack {
             if (grid()->is_local_row(i)) {
               // LU factorization of diagonal tile
               if (grid()->is_local_col(i))
-                piv_tile = tile(i, i).LU();
+                piv_tile = tile(i, i).LU(opts.pivot_threshold());
               else piv_tile.resize(tilerows(i));
               grid()->row_comm().broadcast_from(piv_tile, i % grid()->npcols());
               int r0 = tileroff(i);
@@ -1438,7 +1438,7 @@ namespace strumpack {
               // LU factorization of diagonal tile
               if (grid()->is_local_row(c)) {
                 if (grid()->is_local_col(c))
-                  piv_tile=tile(c, c).LU();
+                  piv_tile = tile(c, c).LU(opts.pivot_threshold());
                 else piv_tile.resize(tilerows(c));
                 grid()->row_comm().broadcast_from(piv_tile, c % grid()->npcols());
                 piv_tile_global.push_back(piv_tile);
@@ -1613,7 +1613,7 @@ namespace strumpack {
               // LU factorization of diagonal tile
               if (g->is_local_row(c)) {
                 if (g->is_local_col(c))
-                  piv_tile = F11.tile(c, c).LU();
+                  piv_tile = F11.tile(c, c).LU(opts.pivot_threshold());
                 else piv_tile.resize(F11.tilerows(c));
               }
               if (g->is_local_row(c)) {
@@ -1820,7 +1820,7 @@ namespace strumpack {
             if (g->is_local_row(i)) {
               if (g->is_local_col(i))
                 // LU factorization of diagonal tile
-                piv_tile = A11.tile(i, i).LU();
+                piv_tile = A11.tile(i, i).LU(opts.pivot_threshold());
               else piv_tile.resize(A11.tilerows(i));
             }
             if (g->is_local_row(i)) {
@@ -2084,7 +2084,7 @@ namespace strumpack {
             if (g->is_local_row(i)) {
               for (std::size_t j=0, lk=0; j<B2; j++) {
                 if (g->is_local_col(j)) {
-                  lj=li;
+                  lj = li;
                   for (std::size_t k=0; k<B1; k++) {
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
                          *(Tk2j[lj]), *(Tik2[lk]), scalar_t(1.),
@@ -2094,7 +2094,7 @@ namespace strumpack {
                   }
                 }
               }
-              li+=B1;
+              li += B1;
             }
           }
         } else { //LUAR - Star or Comb

@@ -113,11 +113,11 @@ namespace strumpack {
       virtual ~StructuredOptions() {}
 
       void set_rel_tol(real_t rel_tol) {
-        assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
+        // assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
         rel_tol_ = rel_tol;
       }
       void set_abs_tol(real_t abs_tol) {
-        assert(abs_tol >= real_t(0.));
+        // assert(abs_tol >= real_t(0.));
         abs_tol_ = abs_tol;
       }
       void set_leaf_size(int leaf_size) {

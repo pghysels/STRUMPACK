@@ -570,8 +570,8 @@ namespace strumpack {
         std::cout << "#   - minimum pivot, sqrt(eps)*|A|_1 = "
                   << opts_.pivot_threshold() << std::endl;
         std::cout << "#   - replacing of small pivots is "
-                  << (opts_.replace_tiny_pivots() ? "" : "not")
-                  << " enabled" << std::endl;
+                  << (opts_.replace_tiny_pivots() ? "" : "not ")
+                  << "enabled" << std::endl;
       }
     }
     perf_counters_start();

@@ -107,8 +107,15 @@ namespace strumpack {
       std::cout.fill(prev);
     }
 
-    template<typename scalar_t> std::vector<int> DenseTile<scalar_t>::LU() {
-      return D().LU(params::task_recursion_cutoff_level);
+    template<typename scalar_t> std::vector<int>
+    DenseTile<scalar_t>::LU(real_t thresh) {
+      auto& A = D();
+      auto piv = A.LU(params::task_recursion_cutoff_level);
+      if (thresh > 0.)
+        for (std::size_t i=0; i<rows(); i++)
+          if (std::abs(A(i,i)) < thresh)
+            A(i,i) = (std::real(A(i,i)) < 0) ? -thresh : thresh;
+      return piv;
     }
 
     template<typename scalar_t> void DenseTile<scalar_t>::laswp
