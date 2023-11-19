@@ -52,7 +52,7 @@ namespace strumpack {
       for (std::size_t j=0; j<colblockslocal(); j++) {
         auto pin = pinned;
         for (std::size_t i=0; i<rowblockslocal(); i++) {
-#pragma omp task firstprivate(dptr)
+#pragma omp task shared(s) firstprivate(i,j,dptr,pin)
           ltile(i, j).move_to_gpu(s, dptr, pin);
           auto nnz = ltile(i, j).nonzeros();
           dptr += nnz;
@@ -69,7 +69,7 @@ namespace strumpack {
       for (std::size_t j=0; j<colblockslocal(); j++) {
         auto pin = pinned;
         for (std::size_t i=0; i<rowblockslocal(); i++) {
-#pragma omp task firstprivate(pin)
+#pragma omp task shared(s) firstprivate(i,j,pin)
           ltile(i, j).move_to_cpu(s, pin);
           pin += ltile(i, j).nonzeros();
         }
@@ -241,17 +241,18 @@ namespace strumpack {
 
       auto getrf_work_size = gpu::getrf_buffersize<scalar_t>(handle, max_m1);
       auto d_batch_meta = VBatchedGEMM<scalar_t>::dwork_bytes(max_batchcount);
+
       std::size_t d_scalars = getrf_work_size +
         max_m1 * (A11.lcols() + A22.lcols() + A11.lrows() + A22.lrows()) +
-        A11.lrows() * A11.lcols() + A12.lrows()*A12.lcols() +
-        A21.lrows() * A12.lcols() + A22.lrows()*A22.lcols();
+        A11.lrows() * A11.lcols() + A12.lrows() * A12.lcols() +
+        A21.lrows() * A21.lcols() + A22.lrows() * A22.lcols();
       gpu::DeviceMemory<scalar_t> d_scalar_mem(d_scalars);
       auto dwork = d_scalar_mem.template as<scalar_t>();
       auto drow1 = dwork + getrf_work_size;
-      auto drow2 = drow1 + max_m1*A11.lcols();
-      auto dcol1 = drow2 + max_m1*A22.lcols();
-      auto dcol2 = dcol1 + max_m1*A11.lrows();
-      auto dA11  = dcol2 + max_m1*A22.lrows();
+      auto drow2 = drow1 + max_m1 * A11.lcols();
+      auto dcol1 = drow2 + max_m1 * A22.lcols();
+      auto dcol2 = dcol1 + max_m1 * A11.lrows();
+      auto dA11  = dcol2 + max_m1 * A22.lrows();
       auto dA12  = dA11 + A11.lrows() * A11.lcols();
       auto dA21  = dA12 + A12.lrows() * A12.lcols();
       auto dA22  = dA21 + A21.lrows() * A21.lcols();
@@ -261,7 +262,6 @@ namespace strumpack {
       gpu::DeviceMemory<char> d_batch_mem(3*d_batch_meta),
         d_batch_matrix_mem;
 
-      // TODO do this column wise to overlap
       A11.move_to_gpu(copy_stream, dA11, pinned);
       A12.move_to_gpu(copy_stream, dA12, pinned);
       A21.move_to_gpu(copy_stream, dA21, pinned);
