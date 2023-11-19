@@ -41,7 +41,10 @@ namespace strumpack {
     }
 
     void get_last_error() {
-      cudaGetLastError();
+      // this is used to reset the last error. Some MAGMA calls fail
+      // on purpose, then use a different algorithm
+      auto e = cudaGetLastError();
+      ((void)e); // silence unused warning
     }
 
     void synchronize_default_stream() {
