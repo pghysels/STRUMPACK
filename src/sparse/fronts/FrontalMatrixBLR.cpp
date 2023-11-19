@@ -270,8 +270,8 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixBLR<scalar_t,integer_t>::factor
-  (const SpMat_t& A, const Opts_t& opts,
-   VectorPool<scalar_t>& workspace, int etree_level, int task_depth) {
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
+   int etree_level, int task_depth) {
     ReturnCode e = ReturnCode::SUCCESS;
     if (task_depth == 0) {
 #pragma omp parallel if(!omp_in_parallel()) default(shared)

@@ -209,6 +209,12 @@ namespace strumpack {
     }
 #endif
 
+    void clear() {
+      data_.clear();
+      device_bytes_.clear();
+      pinned_data_.clear();
+    }
+
   private:
     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
 #if defined(STRUMPACK_USE_GPU)

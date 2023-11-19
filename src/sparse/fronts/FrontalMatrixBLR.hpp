@@ -84,17 +84,9 @@ namespace strumpack {
     void sample_CB(const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
                    DenseM_t& Sc, F_t* pa, int task_depth) override;
 
-    ReturnCode
-    multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                               int etree_level=0, int task_depth=0)
-      override {
-      VectorPool<scalar_t> workspace;
-      return factor(A, opts, workspace, etree_level, task_depth);
-    }
-    ReturnCode
-    factor(const SpMat_t& A, const Opts_t& opts,
-           VectorPool<scalar_t>& workspace,
-           int etree_level=0, int task_depth=0) override;
+    ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
+                      VectorPool<scalar_t>& workspace,
+                      int etree_level=0, int task_depth=0) override;
 
     ReturnCode factor_node(const SpMat_t& A, const Opts_t& opts,
                            VectorPool<scalar_t>& workspace,

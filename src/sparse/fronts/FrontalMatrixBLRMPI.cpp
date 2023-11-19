@@ -230,19 +230,23 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
+   int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (visit(lchild_)) {
-      auto el = lchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      auto el = lchild_->factor
+        (A, opts, workspace, etree_level+1, task_depth);
       if (el != ReturnCode::SUCCESS) err_code = el;
     }
     if (visit(rchild_)) {
-      auto er = rchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      auto er = rchild_->factor
+        (A, opts, workspace, etree_level+1, task_depth);
       if (er != ReturnCode::SUCCESS) err_code = er;
     }
+    // TODO use the existing workspace
+    // now this is cleared to save space
+    workspace.clear();
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     if (opts.BLR_options().BLR_factor_algorithm() ==

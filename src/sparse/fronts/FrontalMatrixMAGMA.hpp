@@ -69,13 +69,6 @@ namespace strumpack {
                              VectorPool<scalar_t>& workspace,
                              int task_depth) override;
 
-    ReturnCode multifrontal_factorization(const SpMat_t& A,
-                                          const Opts_t& opts,
-                                          int etree_level=0,
-                                          int task_depth=0) override {
-      VectorPool<scalar_t> workspace;
-      return factor(A, opts, workspace, etree_level, task_depth);
-    }
     ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
                       VectorPool<scalar_t>& workspace,
                       int etree_level=0, int task_depth=0) override;
