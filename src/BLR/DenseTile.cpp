@@ -143,7 +143,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    DenseTile<scalar_t>::move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
+    DenseTile<scalar_t>::move_to_gpu(gpu::Stream& s, scalar_t* dptr,
                                      scalar_t* pinned) {
       DenseMW_t dD(rows(), cols(), dptr, rows());
       if (!pinned)
@@ -155,7 +155,6 @@ namespace strumpack {
         s.synchronize();
       }
       D_.reset(new DenseMW_t(std::move(dD)));
-      dptr += rows()*cols();
     }
 #endif
 

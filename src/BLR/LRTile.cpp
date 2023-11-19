@@ -272,11 +272,11 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    LRTile<scalar_t>::move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
+    LRTile<scalar_t>::move_to_gpu(gpu::Stream& s, scalar_t* dptr,
                                   scalar_t* pinned) {
       auto m = rows(), n = cols(), r = rank();
-      DenseMW_t dU(m, r, dptr, m); dptr += m*r;
-      DenseMW_t dV(r, n, dptr, r); dptr += r*n;
+      DenseMW_t dU(m, r, dptr, m);
+      DenseMW_t dV(r, n, dptr+m*r, r);
       if (!pinned) {
         gpu::copy(dU, U());
         gpu::copy(dV, V());

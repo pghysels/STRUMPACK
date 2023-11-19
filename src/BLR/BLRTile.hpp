@@ -127,7 +127,7 @@ namespace strumpack {
       virtual void laswp(gpu::Handle& h, int* dpiv, bool fwd) = 0;
 
       virtual void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) = 0;
-      virtual void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
+      virtual void move_to_gpu(gpu::Stream& s, scalar_t* dptr,
                                scalar_t* pinned=nullptr) = 0;
 
       virtual void copy_from_device_to(scalar_t*& ptr) const = 0;

@@ -190,7 +190,7 @@ namespace strumpack {
       void laswp(gpu::Handle& h, int* dpiv, bool fwd) override;
 
       void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) override;
-      void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
+      void move_to_gpu(gpu::Stream& s, scalar_t* dptr,
                        scalar_t* pinned=nullptr) override;
 
       void copy_from_device_to(scalar_t*& ptr) const override;

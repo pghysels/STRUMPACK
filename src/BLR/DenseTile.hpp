@@ -74,8 +74,8 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_GPU)
       static std::unique_ptr<DenseTile<scalar_t>>
-      create_as_device_wrapper_from_ptr
-      (scalar_t*& dptr, scalar_t*& ptr, int m, int n) {
+      create_as_device_wrapper_from_ptr(scalar_t*& dptr, scalar_t*& ptr,
+                                        int m, int n) {
         DenseMW_t dD(m, n, dptr, m);   dptr += m*n;
         auto t = create_as_wrapper(dD);
         gpu::copy(t->D(), ptr);
@@ -148,7 +148,7 @@ namespace strumpack {
       void laswp(gpu::Handle& h, int* dpiv, bool fwd) override;
 
       void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) override;
-      void move_to_gpu(gpu::Stream& s, scalar_t*& dptr,
+      void move_to_gpu(gpu::Stream& s, scalar_t* dptr,
                        scalar_t* pinned=nullptr) override;
 
       void copy_from_device_to(scalar_t*& ptr) const override;

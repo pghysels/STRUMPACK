@@ -168,6 +168,11 @@ namespace strumpack {
 
     void init();
     void peek_at_last_error();
+    /**
+     * This is used to reset the last error. Some MAGMA internal CUDA
+     * kernels calls can fail, but MAGMA detects this and uses a
+     * different algorithm.
+     */
     void get_last_error();
     void synchronize_default_stream();
     std::size_t available_memory();
@@ -216,7 +221,7 @@ namespace strumpack {
 
     template<typename T> void
     copy_async(T* hptr, const T* dptr,
-	       std::size_t count, Stream& s) {
+               std::size_t count, Stream& s) {
       device_copy_async(hptr, dptr, count*sizeof(T), CopyDir::DEF, s);
     }
     template<typename T> void
@@ -232,7 +237,7 @@ namespace strumpack {
 
     template<typename T> void
     copy_async(DenseMatrix<T>& h, const DenseMatrix<T>& d,
-	       Stream& s) {
+               Stream& s) {
       if (!d.rows() || !d.cols()) return;
       assert(d.rows() == h.rows() && d.cols() == h.cols());
       if (d.rows() != d.ld() || h.rows() != h.ld())
