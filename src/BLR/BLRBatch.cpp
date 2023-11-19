@@ -94,7 +94,6 @@ namespace strumpack {
       auto dimem = reinterpret_cast<magma_int_t*>(dmem_);
       auto dsmem = reinterpret_cast<scalar_t**>
         (dmem_ + gpu::round_up((batchcount+1)*6*sizeof(magma_int_t)));
-
       // TODO HostMemory?
       std::vector<magma_int_t> imem((batchcount+1)*6);
       auto iptr = imem.begin();
@@ -132,7 +131,6 @@ namespace strumpack {
 #else
       std::size_t batchcount = m_.size();
       if (!batchcount) return;
-      // gpu::synchronize();
       for (std::size_t i=0; i<batchcount; i++) {
         DenseMatrixWrapper<scalar_t>
           A(m_[i], k_[i], A_[i], ldA_[i]),
@@ -194,7 +192,6 @@ namespace strumpack {
          dA, dm, dBr, dnr, B, h);
       workspace.restore(dmem);
 #else
-      // std::cout << "VBatchedTRSMLeftRight TODO" << std::endl;
       for (std::size_t i=0; i<B; i++) {
         gpu::trsm(h, Side::L, UpLo::L, Trans::N, Diag::U,
                   scalar_t(1.), *A_[i], *Bl_[i]);
@@ -251,7 +248,6 @@ namespace strumpack {
            dA, dm, dB, dn, B, h);
       workspace.restore(dmem);
 #else
-      // std::cout << "VBatchedTRSM TODO" << std::endl;
       for (std::size_t i=0; i<B; i++) {
         if (left)
           gpu::trsm(h, Side::L, UpLo::L, Trans::N, Diag::U,
@@ -268,9 +264,14 @@ namespace strumpack {
 
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::add(std::unique_ptr<BLRTile<scalar_t>>& tile) {
+#if defined(STRUMPACK_USE_KBLAS)
       if (tile->D().rows() <= KBLAS_ARA_BLOCK_SIZE ||
           tile->D().cols() <= KBLAS_ARA_BLOCK_SIZE)
         return;
+#else
+      if (!tile->D().rows() || !tile->D().cols())
+        return;
+#endif
       tile_.push_back(&tile);
     }
 
@@ -413,32 +414,82 @@ namespace strumpack {
     VBatchedARA<scalar_t>::run_magma(gpu::Handle& handle,
                                      VectorPool<scalar_t>& workspace,
                                      real_t tol) {
-// #if defined(STRUMPACK_USE_MAGMA)
-//       std::size_t lwork = 0, lrwork = 0;
-//       int max_n = 0, max_minmn = 0;
-//       for (std::size_t i=0; i<B; i++) {
-//         auto& A = *tile_[i]->D();
-//         auto m = A.rows(), n = A.cols();
-//         max_n = std::max(max_n, n);
-//         max_minmn = std::max(max_minmn, std::min(m, n));
-//         lwork = std::max(lwork, magma::geqp3_scalar_worksize(A));
-//         lrwork = std::max(lrwork, magma::geqp3_real_worksize(A));
-//       }
-//       // TODO combine and get from workspace
-//       gpu::DeviceMemory<magma_int_t> jpvt(max_n);
-//       gpu::DeviceMemory<scalar_t> tau(max_minmn), dwork(lwork);
-//       gpu::DeviceMemory<real_t> rwork(lrwork);
-//       gpu::DeviceMemory<magma_int_t> dinfo;
-//       for (std::size_t i=0; i<B; i++) {
-//         // TODO make a copy of A
-//         auto& A = *tile_[i]->D();
-//         // auto m = A.rows(), n = A.cols();
-//         magma::geqp3_gpu(A, jpvt, tau, dwork, lwork, rwork, dinfo);
-//         // TODO figure out the rank, based on tol?
-//         // TODO get V from R, transpose?
-//         // TODO get U from xxgqr
-//       }
-// #endif
+#if defined(STRUMPACK_USE_MAGMA)
+      auto B = tile_.size();
+      if (!B) return;
+      std::size_t lwork = 0, lrwork = 0, max_mn = 0, max_minmn = 0;
+      for (std::size_t i=0; i<B; i++) {
+        auto& A = (*tile_[i])->D();
+        auto m = A.rows(), n = A.cols();
+        max_mn = std::max(max_mn, std::size_t(m)*n);
+        max_minmn = std::max(max_minmn, std::min(m, n));
+        lwork = std::max(lwork, gpu::magma::geqp3_scalar_worksize(A));
+        lrwork = std::max(lrwork, gpu::magma::geqp3_real_worksize(A));
+      }
+
+      // TODO combine and get from workspace
+      gpu::DeviceMemory<scalar_t> Acopy(max_mn), dtau(max_minmn), dwork(lwork);
+      gpu::DeviceMemory<real_t> rwork(lrwork);
+
+      for (std::size_t i=0; i<B; i++) {
+        auto& A = (*tile_[i])->D();
+        auto m = A.rows(), n = A.cols();
+        auto minmn = std::min(m, n);
+        DenseMW_t Ac(m, n, Acopy, m);
+        gpu::copy(Ac, A);
+
+        // {
+        //   DenseM_t hA(m, n);
+        //   gpu::copy(hA, Ac);
+        //   DenseM_t hU, hV;
+        //   hA.low_rank(hU, hV, tol, 0., minmn, 0);
+        //   hU.print("hU");
+        //   hV.print("hV");
+        // }
+
+        int info;
+        std::vector<magma_int_t> jpvt(n);
+        gpu::magma::geqp3(Ac, jpvt.data(), dtau, dwork, lwork, rwork, &info);
+        std::vector<scalar_t> tau(minmn);
+        gpu::copy<scalar_t>(tau.data(), dtau, minmn);
+        if (info) std::cerr << "ERROR: magma_geqp3 info= " << info << std::endl;
+        std::vector<scalar_t> diagR(minmn);
+        // copy diagonal elements
+        // for (std::size_t i=0; i<minmn; i++)
+        //   gpu::copy(diagR.data()+i, Ac.ptr(i, i), 1);
+        gpu::device_copy_2D(diagR.data(), sizeof(scalar_t),
+                            Ac.data(), sizeof(scalar_t)*(Ac.ld()+1),
+                            sizeof(scalar_t), minmn, gpu::CopyDir::D2H);
+        std::size_t rank = 0;
+        while (rank < minmn && std::abs(diagR[rank]/diagR[0]) >= tol) rank++;
+        if (rank*(m+n) >= m*n) continue;
+        DenseMW_t Q(m, rank, Ac, 0, 0), R(rank, n, Ac, 0, 0),
+          U(m, rank, A.data(), m), V(rank, n, A.data()+m*rank, rank);
+        *tile_[i] = LRTile<scalar_t>::create_as_wrapper(U, V);
+        gpu::memset<scalar_t>(V.data(), 0, rank*n);
+        // std::vector<magma_int_t> ind(n);
+        // for (magma_int_t i=1; i<=magma_int_t(n); i++) {
+        //   auto j = jpvt[i-1];
+        //   while (j < i) j = jpvt[j-1];
+        //   ind[i-1] = j;
+        // }
+        // TODO optimize?
+        for (std::size_t i=0; i<n; i++)
+          gpu::copy(V.ptr(0, jpvt[i]-1), R.ptr(0, i), std::min(rank, i+1));
+        auto nb = gpu::magma::get_geqp3_nb(Ac);
+        // std::cout << "nb= " << nb << std::endl;
+        gpu::magma::xxgqr(m, rank, rank, Q, tau.data(), dwork, nb, &info);
+        if (info) std::cerr << "ERROR: magma_xxgqr info= " << info << std::endl;
+        gpu::copy(U, Q);
+
+        // DenseM_t hdU(m, rank), hdV(rank, n);
+        // gpu::copy(hdU, U);
+        // gpu::copy(hdV, V);
+        // hdU.print("U");
+        // hdV.print("V");
+
+      }
+#endif
     }
 
     template<typename scalar_t> void
@@ -448,7 +499,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_KBLAS)
       run_kblas(handle, workspace, tol);
 #else
-#if 0 // defined(STRUMPACK_USE_MAGMA)
+#if 0 //defined(STRUMPACK_USE_MAGMA)
       run_magma(handle, workspace, tol);
 #else
       run_svd(handle, workspace, tol);

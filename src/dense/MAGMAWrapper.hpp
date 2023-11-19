@@ -41,6 +41,47 @@ namespace strumpack {
   namespace gpu {
     namespace magma {
 
+      magma_int_t get_geqp3_nb(const DenseMatrix<float>& A);
+      magma_int_t get_geqp3_nb(const DenseMatrix<double>& A);
+      magma_int_t get_geqp3_nb(const DenseMatrix<std::complex<float>>& A);
+      magma_int_t get_geqp3_nb(const DenseMatrix<std::complex<double>>& A);
+
+      std::size_t geqp3_scalar_worksize(const DenseMatrix<float>& A);
+      std::size_t geqp3_scalar_worksize(const DenseMatrix<double>& A);
+      std::size_t geqp3_scalar_worksize(const DenseMatrix<std::complex<float>>& A);
+      std::size_t geqp3_scalar_worksize(const DenseMatrix<std::complex<double>>& A);
+
+      std::size_t geqp3_real_worksize(const DenseMatrix<float>& A);
+      std::size_t geqp3_real_worksize(const DenseMatrix<double>& A);
+      std::size_t geqp3_real_worksize(const DenseMatrix<std::complex<float>>& A);
+      std::size_t geqp3_real_worksize(const DenseMatrix<std::complex<double>>& A);
+
+      void geqp3(DenseMatrix<float>& A, magma_int_t* jpvt,
+                 float* tau, float* dwork, magma_int_t lwork,
+                 float* rwork, magma_int_t* info);
+      void geqp3(DenseMatrix<double>& A, magma_int_t* jpvt,
+                 double* tau, double* dwork, magma_int_t lwork,
+                 double* rwork, magma_int_t* info);
+      void geqp3(DenseMatrix<std::complex<float>>& A, magma_int_t* jpvt,
+                 std::complex<float>* tau, std::complex<float>* dwork,
+                 magma_int_t lwork, float* rwork, magma_int_t* info);
+      void geqp3(DenseMatrix<std::complex<double>>& A, magma_int_t* jpvt,
+                 std::complex<double>* tau, std::complex<double>* dwork,
+                 magma_int_t lwork, double* rwork, magma_int_t* info);
+
+      void xxgqr(magma_int_t m, magma_int_t n, magma_int_t k,
+                 DenseMatrix<float>& Q, float* tau, float* dT,
+                 magma_int_t nb, int* info);
+      void xxgqr(magma_int_t m, magma_int_t n, magma_int_t k,
+                 DenseMatrix<double>& Q, double* tau, double* dT,
+                 magma_int_t nb, int* info);
+      void xxgqr(magma_int_t m, magma_int_t n, magma_int_t k,
+                 DenseMatrix<std::complex<float>>& Q, std::complex<float>* tau,
+                 std::complex<float>* dT, magma_int_t nb, int* info);
+      void xxgqr(magma_int_t m, magma_int_t n, magma_int_t k,
+                 DenseMatrix<std::complex<double>>& Q, std::complex<double>* tau,
+                 std::complex<double>* dT, magma_int_t nb, int* info);
+
       int getrf(DenseMatrix<float>& A, int* dpiv);
       int getrf(DenseMatrix<double>& A, int* dpiv);
       int getrf(DenseMatrix<std::complex<float>>& A, int* dpiv);
