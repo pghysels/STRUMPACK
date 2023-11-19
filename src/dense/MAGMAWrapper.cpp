@@ -108,8 +108,8 @@ namespace strumpack {
                  std::complex<float>* tau, std::complex<float>* dwork,
                  magma_int_t lwork, float* rwork, magma_int_t* info) {
         magma_cgeqp3_gpu(A.rows(), A.cols(),
-                         reinterpret_cast<magmaFloatComplex*>(A.data())
-                         , A.ld(), jpvt,
+                         reinterpret_cast<magmaFloatComplex*>(A.data()),
+                         A.ld(), jpvt,
                          reinterpret_cast<magmaFloatComplex*>(tau),
                          reinterpret_cast<magmaFloatComplex*>(dwork),
                          lwork, rwork, info);
@@ -264,8 +264,8 @@ namespace strumpack {
 
       template<typename scalar_t, typename real_t> void
       gesvd_magma(magma_vec_t jobu, magma_vec_t jobvt, real_t* S,
-          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U,
-          DenseMatrix<scalar_t>& V) {
+                  DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& U,
+                  DenseMatrix<scalar_t>& V) {
         int info = 0;
         std::size_t minmn = std::min(U.rows(), V.cols());
         DenseMatrix<scalar_t> hA(A.rows(), A.cols());
@@ -307,7 +307,8 @@ namespace strumpack {
                                       magma_int_t max_m, magma_int_t max_n,
                                       magma_int_t max_minmn, magma_int_t max_mxn,
                                       float **dA_array, magma_int_t *ldda,
-                                      magma_int_t **dipiv_array, magma_int_t *info_array,
+                                      magma_int_t **dipiv_array,
+                                      magma_int_t *info_array,
                                       void* work, magma_int_t* lwork,
                                       magma_int_t batchCount, Handle& h) {
         if (!batchCount) return 0;
@@ -326,7 +327,8 @@ namespace strumpack {
                                       magma_int_t max_m, magma_int_t max_n,
                                       magma_int_t max_minmn, magma_int_t max_mxn,
                                       double **dA_array, magma_int_t *ldda,
-                                      magma_int_t **dipiv_array, magma_int_t *info_array,
+                                      magma_int_t **dipiv_array,
+                                      magma_int_t *info_array,
                                       void* work, magma_int_t* lwork,
                                       magma_int_t batchCount, Handle& h) {
         if (!batchCount) return 0;
@@ -345,7 +347,8 @@ namespace strumpack {
                                       magma_int_t max_m, magma_int_t max_n,
                                       magma_int_t max_minmn, magma_int_t max_mxn,
                                       std::complex<float>** dA_array, magma_int_t *ldda,
-                                      magma_int_t **dipiv_array, magma_int_t *info_array,
+                                      magma_int_t **dipiv_array,
+                                      magma_int_t *info_array,
                                       void* work, magma_int_t* lwork,
                                       magma_int_t batchCount, Handle& h) {
         if (!batchCount) return 0;
@@ -364,7 +367,8 @@ namespace strumpack {
                                       magma_int_t max_m, magma_int_t max_n,
                                       magma_int_t max_minmn, magma_int_t max_mxn,
                                       std::complex<double>** dA_array,
-                                      magma_int_t *ldda, magma_int_t **dipiv_array,
+                                      magma_int_t *ldda,
+                                      magma_int_t **dipiv_array,
                                       magma_int_t *info_array,
                                       void* work, magma_int_t* lwork,
                                       magma_int_t batchCount, Handle& h) {
@@ -523,7 +527,8 @@ namespace strumpack {
       }
 
       void
-      gemv_vbatched_max_nocheck(magma_trans_t trans, magma_int_t *m, magma_int_t *n, float alpha,
+      gemv_vbatched_max_nocheck(magma_trans_t trans, magma_int_t *m, magma_int_t *n,
+                                float alpha,
                                 float const *const *dA_array, magma_int_t *ldda,
                                 float const *const *dB_array, magma_int_t *lddb,
                                 float beta, float **dC_array, magma_int_t *lddc,
@@ -538,7 +543,8 @@ namespace strumpack {
         get_last_error();
       }
       void
-      gemv_vbatched_max_nocheck(magma_trans_t trans, magma_int_t *m, magma_int_t *n, double alpha,
+      gemv_vbatched_max_nocheck(magma_trans_t trans, magma_int_t *m, magma_int_t *n,
+                                double alpha,
                                 double const *const *dA_array, magma_int_t *ldda,
                                 double const *const *dB_array, magma_int_t *lddb,
                                 double beta, double **dC_array, magma_int_t *lddc,
@@ -553,7 +559,8 @@ namespace strumpack {
         get_last_error();
       }
       void
-      gemv_vbatched_max_nocheck(magma_trans_t trans, magma_int_t *m, magma_int_t *n, std::complex<float> alpha,
+      gemv_vbatched_max_nocheck(magma_trans_t trans, magma_int_t *m, magma_int_t *n,
+                                std::complex<float> alpha,
                                 std::complex<float> const *const *dA_array, magma_int_t *ldda,
                                 std::complex<float> const *const *dB_array, magma_int_t *lddb,
                                 std::complex<float> beta,

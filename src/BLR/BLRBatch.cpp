@@ -169,6 +169,10 @@ namespace strumpack {
         AB[i    ] = A_[i]->data();
         AB[i+  B] = Bl_[i]->data();
         AB[i+2*B] = Br_[i]->data();
+        STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::trsm_flops(A_[i]->rows(),Bl_[i]->cols(),scalar_t(1.),'L'));
+        STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::trsm_flops(A_[i]->rows(),Br_[i]->rows(),scalar_t(1.),'R'));
+        STRUMPACK_BYTES(sizeof(scalar_t)*blas::trsm_moves(A_[i]->rows(),Bl_[i]->cols()));
+        STRUMPACK_BYTES(sizeof(scalar_t)*blas::trsm_moves(A_[i]->rows(),Br_[i]->rows()));
       }
       std::size_t dmem_size =
         gpu::round_up(3*B*sizeof(int)) +
@@ -225,6 +229,13 @@ namespace strumpack {
         maxn = std::max(maxn, mn[i+B]);
         AB[i  ] = A_[i]->data();
         AB[i+B] = B_[i]->data();
+        if (left) {
+          STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::trsm_flops(A_[i]->rows(),B_[i]->cols(),scalar_t(1.),'L'));
+          STRUMPACK_BYTES(sizeof(scalar_t)*blas::trsm_moves(A_[i]->rows(),B_[i]->cols()));
+        } else {
+          STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::trsm_flops(A_[i]->rows(),B_[i]->rows(),scalar_t(1.),'R'));
+          STRUMPACK_BYTES(sizeof(scalar_t)*blas::trsm_moves(A_[i]->rows(),B_[i]->rows()));
+        }
       }
       std::size_t dmem_size =
         gpu::round_up(2*B*sizeof(int)) +
@@ -311,6 +322,8 @@ namespace strumpack {
       gpu::copy_real_to_scalar<scalar_t>(d_sval_scalar, d_sval_real, rank);
       gpu::dgmm(handle, Side::L, tV, d_sval_scalar, tV);
       t = std::move(t_lr);
+
+      // TODO flops!
     }
 
     template<typename scalar_t> void
@@ -438,14 +451,7 @@ namespace strumpack {
         DenseMW_t Ac(m, n, Acopy, m);
         gpu::copy(Ac, A);
 
-        // {
-        //   DenseM_t hA(m, n);
-        //   gpu::copy(hA, Ac);
-        //   DenseM_t hU, hV;
-        //   hA.low_rank(hU, hV, tol, 0., minmn, 0);
-        //   hU.print("hU");
-        //   hV.print("hV");
-        // }
+        // TODO flops!
 
         int info;
         std::vector<magma_int_t> jpvt(n);
@@ -467,27 +473,13 @@ namespace strumpack {
           U(m, rank, A.data(), m), V(rank, n, A.data()+m*rank, rank);
         *tile_[i] = LRTile<scalar_t>::create_as_wrapper(U, V);
         gpu::memset<scalar_t>(V.data(), 0, rank*n);
-        // std::vector<magma_int_t> ind(n);
-        // for (magma_int_t i=1; i<=magma_int_t(n); i++) {
-        //   auto j = jpvt[i-1];
-        //   while (j < i) j = jpvt[j-1];
-        //   ind[i-1] = j;
-        // }
         // TODO optimize?
         for (std::size_t i=0; i<n; i++)
           gpu::copy(V.ptr(0, jpvt[i]-1), R.ptr(0, i), std::min(rank, i+1));
         auto nb = gpu::magma::get_geqp3_nb(Ac);
-        // std::cout << "nb= " << nb << std::endl;
         gpu::magma::xxgqr(m, rank, rank, Q, tau.data(), dwork, nb, &info);
         if (info) std::cerr << "ERROR: magma_xxgqr info= " << info << std::endl;
         gpu::copy(U, Q);
-
-        // DenseM_t hdU(m, rank), hdV(rank, n);
-        // gpu::copy(hdU, U);
-        // gpu::copy(hdV, V);
-        // hdU.print("U");
-        // hdV.print("V");
-
       }
 #endif
     }
