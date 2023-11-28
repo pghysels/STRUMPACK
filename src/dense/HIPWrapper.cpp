@@ -304,7 +304,7 @@ namespace strumpack {
       gpu_check(hipMemcpy(dest, src, count, CD2hipMK(dir)));
     }
     void device_copy_async(void* dest, const void* src, std::size_t count,
-                           CopyDir dir, const Stream& s) {
+                           CopyDir dir, Stream& s) {
       gpu_check(hipMemcpyAsync(dest, src, count, CD2hipMK(dir),
                                get_hip_stream(s)));
     }
@@ -317,7 +317,7 @@ namespace strumpack {
     void device_copy_2D_async(void* dest, std::size_t dpitch,
                               const void* src, std::size_t spitch,
                               std::size_t width, std::size_t height,
-                              CopyDir dir, const Stream& s) {
+                              CopyDir dir, Stream& s) {
       gpu_check(hipMemcpy2DAsync(dest, dpitch, src, spitch, width , height,
                                  CD2hipMK(dir), get_hip_stream(s)));
     }
