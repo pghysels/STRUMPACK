@@ -391,6 +391,7 @@ namespace strumpack {
     gpu::DeviceMemory<char> work_dmem(peak_work_dmem);
     dev_factors_.reset(new gpu::DeviceMemory<char>(total_factor_dmem));
     char* factors_dptr = dev_factors_->as<char>();
+
     for (int l=lvls-1; l>=0; l--) {
       // TaskTimer tl("");
       // tl.start();

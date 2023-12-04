@@ -417,6 +417,24 @@ namespace strumpack {
     }
   }
 
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHSSMPI<scalar_t,integer_t>::
+  extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                             const FMPI_t* pa) const {
+    if (!dim_upd()) return;
+    if (Comm().is_null()) return;
+    DistM_t R(grid(), dim_upd(), dim_upd());
+    R.eye();
+    DistM_t Sr(grid(), dim_upd(), dim_upd());
+    DistM_t Sc(grid(), dim_upd(), dim_upd());
+    TIMER_TIME(TaskType::HSS_SCHUR_PRODUCT, 2, t_sprod);
+    H_->Schur_product_direct
+      (theta_, Vhat_, DUB01_, phi_, thetaVhatC_, VhatCPhiC_, R, Sr, Sc);
+    ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
+      (Sr, sbuf, pa, this->upd_to_parent(pa));
+  }
+
+
   // explicit template instantiations
   template class FrontalMatrixHSSMPI<float,int>;
   template class FrontalMatrixHSSMPI<double,int>;

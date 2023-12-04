@@ -90,6 +90,9 @@ namespace strumpack {
     void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
                    bool is_root=true, int task_depth=0) override;
 
+    void extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                                    const FMPI_t* pa) const override;
+
   private:
     std::unique_ptr<HSS::HSSMatrixMPI<scalar_t>> H_;
 
