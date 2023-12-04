@@ -537,6 +537,9 @@ namespace strumpack {
      * \param adm optional admissibility info for BLR, should be of
      * size row_tree->leaf_sizes().size() x
      * col_tree->leaf_sizes().size()
+     * \param p coordinates of geometry. Should be a matrix of size
+     * rows x d, where d is the dimension of the geometry. This is
+     * used for HSS compression, not used for HODLR/HODBF/BLR.
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -584,6 +587,9 @@ namespace strumpack {
      * \param adm optional admissibility info for BLR, should be of
      * size row_tree->leaf_sizes().size() x
      * col_tree->leaf_sizes().size()
+     * \param p coordinates of geometry. Should be a matrix of size
+     * rows x d, where d is the dimension of the geometry. This is
+     * used for HSS compression, not used for HODLR/HODBF/BLR.
      *
      * \return std::unique_ptr holding a pointer to a
      * StructuredMatrix of the requested StructuredMatrix::Type
@@ -611,6 +617,40 @@ namespace strumpack {
                             const admissibility_t* adm=nullptr,
                             const DenseMatrix<real_t>* p=nullptr);
 
+    /**
+     * Construct a StructuredMatrix and compute a factorization. For
+     * BLR, compression and factorization are combined and cannot be
+     * called separately.
+     *
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param A Input dense matrix, will not be modified
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     * \param adm optional admissibility info for BLR, should be of
+     * size row_tree->leaf_sizes().size() x
+     * col_tree->leaf_sizes().size()
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
+     */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_and_factor_from_dense(const DenseMatrix<scalar_t>& A,
                                     const StructuredOptions<scalar_t>& opts,
@@ -618,6 +658,42 @@ namespace strumpack {
                                     const structured::ClusterTree* col_tree=nullptr,
                                     const admissibility_t* adm=nullptr);
 
+    /**
+     * Construct a StructuredMatrix and compute a factorization. For
+     * BLR, compression and factorization are combined and cannot be
+     * called separately.
+     *
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param A Matrix extraction routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     * \param adm optional admissibility info for BLR, should be of
+     * size row_tree->leaf_sizes().size() x
+     * col_tree->leaf_sizes().size()
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
+     */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_and_factor_from_elements(int rows, int cols,
                                        const extract_t<scalar_t>& A,
@@ -625,6 +701,42 @@ namespace strumpack {
                                        const structured::ClusterTree* row_tree=nullptr,
                                        const structured::ClusterTree* col_tree=nullptr,
                                        const admissibility_t* adm=nullptr);
+    /**
+     * Construct a StructuredMatrix and compute a factorization. For
+     * BLR, compression and factorization are combined and cannot be
+     * called separately.
+     *
+     * \tparam scalar_t precision of input matrix, and of
+     * constructed StructuredMatrix. Note that not all types support
+     * every all precisions. See StructuredMatrix::Type.
+     *
+     * \param rows Number of rows of matrix to be constructed.
+     * \param cols Number of columns of matrix to be constructed.
+     * \param A Matrix block extraction routine.
+     * \param opts Options object
+     * \param row_tree optional clustertree for the rows, see also
+     * strumpack::binary_tree_clustering
+     * \param col_tree optional clustertree for the columns. If the
+     * matrix is square, this does not need to be specified.
+     * \param adm optional admissibility info for BLR, should be of
+     * size row_tree->leaf_sizes().size() x
+     * col_tree->leaf_sizes().size()
+     *
+     * \return std::unique_ptr holding a pointer to a
+     * StructuredMatrix of the requested StructuredMatrix::Type
+     *
+     * \throw std::invalid_argument If the operatation is not
+     * supported for the type of structured::StructuredMatrix, if the
+     * type requires a square matrix and the input is not square, if
+     * the structured::StructuredMatrix type requires MPI.
+     * \throw std::logic_error If the operation is not implemented yet
+     * \throw std::runtime_error If the operation requires a third
+     * party library which was not enabled when configuring STRUMPACK.
+     *
+     * \see strumpack::binary_tree_clustering, construct_from_dense
+     * construct_from_elements, construct_matrix_free and
+     * construct_partially_matrix_free
+     */
     template<typename scalar_t> std::unique_ptr<StructuredMatrix<scalar_t>>
     construct_and_factor_from_elements(int rows, int cols,
                                        const extract_block_t<scalar_t>& A,

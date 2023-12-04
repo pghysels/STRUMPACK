@@ -1,3 +1,14 @@
+Version 7.2.0 Released Oct 2023
+===============================
+- Fix for sparse solve with MAGMA with 1 MPI rank
+- suppress several warnings
+- small bugfix in BLR partitioning in sparse solver
+- SYCL CMake compilation fix
+- In StructuredMatrix interface, construct_from_elements now takes
+  point geometry for faster HSS compression
+- In StructuredMatrix interface, BLR compress_and_factor is now
+  supported
+
 Version 7.1.4 Released Aug 2023
 ===============================
 - Memory leak fix from MPI_Datatypes

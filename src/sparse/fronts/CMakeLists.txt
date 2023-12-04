@@ -50,12 +50,6 @@ if(STRUMPACK_USE_CUDA)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.cu)
 endif()
 
-if(STRUMPACK_USE_HIP)
-  ## this needs to be added to hip_add_library directly
-  # target_sources(strumpack PRIVATE
-  #   ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip.cpp)
-endif()
-
 if(STRUMPACK_USE_SYCL)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixSYCL.cpp)
