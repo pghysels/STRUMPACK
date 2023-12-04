@@ -61,7 +61,7 @@ if(STRUMPACK_USE_SYCL)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixSYCL.cpp)
 endif()
 
-if(STRUMPACK_USE_ZFP)
+if(STRUMPACK_USE_ZFP OR STRUMPACK_USE_SZ3)
   target_sources(strumpack
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixLossy.cpp

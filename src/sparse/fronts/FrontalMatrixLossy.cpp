@@ -27,23 +27,39 @@
  *
  */
 #include "FrontalMatrixLossy.hpp"
+
+#if defined(STRUMPACK_USE_ZFP)
 #include "zfp.h"
 #if ZFP_VERSION >= 0x1000
 #include "zfp/array2.hpp"
 #else
 #include "zfparray2.h"
 #endif
+#endif
+
+#if defined(STRUMPACK_USE_SZ3)
+#include "SZ3/api/sz.hpp"
+#endif
 
 namespace strumpack {
 
+#if defined(STRUMPACK_USE_ZFP)
   template<typename T> zfp_type get_zfp_type();
   template<> inline zfp_type get_zfp_type<float>() { return zfp_type_float; }
   template<> inline zfp_type get_zfp_type<double>() { return zfp_type_double; }
+#endif
 
   template<typename T> LossyMatrix<T>::LossyMatrix
   (const DenseMatrix<T>& F, int prec, double acc)
     : rows_(F.rows()), cols_(F.cols()), prec_(prec), acc_(acc) {
     if (!rows_ || !cols_) return;
+#if defined(STRUMPACK_USE_SZ3)
+    SZ3::Config conf(cols_, rows_);
+    conf.relErrorBound = acc;
+    conf.errorBoundMode = SZ3::EB_REL;
+    buffer_.reset(SZ_compress<T>(conf, F.data(), out_size_));
+    STRUMPACK_ADD_MEMORY(out_size_*sizeof(unsigned char));
+#else // defined(STRUMPACK_USE_ZFP)
     zfp_field* f = zfp_field_2d
       (static_cast<void*>(const_cast<T*>(F.data())),
        get_zfp_type<T>(), rows_, cols_);
@@ -68,12 +84,18 @@ namespace strumpack {
     zfp_field_free(f);
     zfp_stream_close(stream);
     stream_close(bstream);
+#endif
   }
 
   template<typename T> void LossyMatrix<T>::decompress
   (DenseMatrix<T>& F) const {
     assert(F.rows() == rows_ && F.cols() == cols_);
     if (!rows_ || !cols_) return;
+#if defined(STRUMPACK_USE_SZ3)
+    SZ3::Config conf;
+    T* out = F.data();
+    SZ_decompress<T>(conf, buffer_.get(), out_size_, out);
+#else // defined(STRUMPACK_USE_ZFP)
     zfp_field* f = zfp_field_2d
       (static_cast<void*>(F.data()), get_zfp_type<T>(), rows_, cols_);
     zfp_stream* destream = zfp_stream_open(NULL);
@@ -94,6 +116,7 @@ namespace strumpack {
     zfp_field_free(f);
     zfp_stream_close(destream);
     stream_close(bstream);
+#endif
   }
 
   template<typename T> LossyMatrix<std::complex<T>>::LossyMatrix

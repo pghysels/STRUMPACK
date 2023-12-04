@@ -17,6 +17,7 @@ option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
+option(TPL_ENABLE_SZ3        "Build with support for SZ3 compression" OFF)
 option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" OFF)
 option(TPL_ENABLE_KBLAS      "Build with support for KBLAS (requires CUDA)" OFF)
 option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
@@ -508,6 +509,15 @@ if(TPL_ENABLE_ZFP)
   endif()
 endif()
 
+if(TPL_ENABLE_SZ3)
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_SZ3_PREFIX}
+    $ENV{SZ3_ROOT} $ENV{SZ3_DIR})
+  find_package(SZ3)
+  if(SZ3_FOUND)
+    option(STRUMPACK_USE_SZ3 "" ON)
+  endif()
+endif()
+
 if(TPL_ENABLE_BPACK)
   list(APPEND CMAKE_PREFIX_PATH ${TPL_BUTTERFLYPACK_PREFIX}
     $ENV{ButterflyPACK_DIR} $ENV{ButterflyPACK_ROOT}
@@ -698,6 +708,10 @@ endif()
 
 if(ZFP_FOUND)
   target_link_libraries(strumpack PUBLIC zfp::zfp)
+endif()
+
+if(SZ3_FOUND)
+  target_link_libraries(strumpack PUBLIC SZ3::SZ3)
 endif()
 
 if(ButterflyPACK_FOUND)
