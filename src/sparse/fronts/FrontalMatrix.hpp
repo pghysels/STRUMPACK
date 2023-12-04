@@ -93,12 +93,20 @@ namespace strumpack {
                                            std::size_t& upd2sep) const;
     std::vector<std::size_t> upd_to_parent(const F_t* pa) const;
 
-    virtual void release_work_memory() = 0;
+    virtual void release_work_memory() {
+      VectorPool<scalar_t> workspace;
+      release_work_memory(workspace);
+    }
+    virtual void release_work_memory(VectorPool<scalar_t>& workspace) {
+      release_work_memory();
+    }
 
     virtual ReturnCode
     multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                               int etree_level=0, int task_depth=0) = 0;
-
+                               int etree_level=0, int task_depth=0) {
+      VectorPool<scalar_t> workspace;
+      return factor(A, opts, workspace, etree_level, task_depth);
+    }
     virtual ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
                               VectorPool<scalar_t>& workspace,
                               int etree_level=0, int task_depth=0) {
@@ -136,6 +144,44 @@ namespace strumpack {
     ReturnCode pivot_growth(scalar_t& pgL, scalar_t& pgU) const;
 
 
+    virtual std::size_t get_device_F22_worksize() {
+      return dim_upd()*dim_upd();
+    }
+    virtual scalar_t* get_device_F22(scalar_t*) {
+      std::cerr << "ERROR get_device_F22 not implemented for this front type"
+                << std::endl;;
+      assert(false);
+      return nullptr;
+    }
+
+    void extend_add(DenseM_t& F11, DenseM_t& F12,
+                    DenseM_t& F21, DenseM_t& F22,
+                    DenseM_t& CB, const F_t* p) {
+      const std::size_t pdsep = F11.rows();
+      const std::size_t dupd = CB.rows();
+      std::size_t upd2sep;
+      auto I = upd_to_parent(p, upd2sep);
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop default(shared) grainsize(64)
+#endif
+      for (std::size_t c=0; c<dupd; c++) {
+        auto pc = I[c];
+        if (pc < pdsep) {
+          for (std::size_t r=0; r<upd2sep; r++)
+            F11(I[r],pc) += CB(r,c);
+          for (std::size_t r=upd2sep; r<dupd; r++)
+            F21(I[r]-pdsep,pc) += CB(r,c);
+        } else {
+          for (std::size_t r=0; r<upd2sep; r++)
+            F12(I[r],pc-pdsep) += CB(r, c);
+          for (std::size_t r=upd2sep; r<dupd; r++)
+            F22(I[r]-pdsep,pc-pdsep) += CB(r,c);
+        }
+      }
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+      STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+    }
+
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
@@ -156,6 +202,7 @@ namespace strumpack {
     extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
                       BLRM_t& paF21, BLRM_t& paF22,
                       const FrontalMatrix<scalar_t,integer_t>* p,
+                      VectorPool<scalar_t>& workspace,
                       int task_depth, const Opts_t& opts) {}
     virtual void
     extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,
@@ -214,6 +261,7 @@ namespace strumpack {
     virtual long long dense_factor_nonzeros(int task_depth=0) const;
     virtual bool isHSS() const { return false; }
     virtual bool isMPI() const { return false; }
+    virtual bool isGPU() const { return false; }
     virtual void print_rank_statistics(std::ostream &out) const {}
     virtual std::string type() const { return "FrontalMatrix"; }
 
@@ -246,6 +294,21 @@ namespace strumpack {
 
     void get_level_fronts(std::vector<const F_t*>& ldata, int elvl, int l=0) const;
     void get_level_fronts(std::vector<F_t*>& ldata, int elvl, int l=0);
+
+    void
+    get_level_fronts_gpu(std::vector<std::vector<const F_t*>>& ldata, int l=0) const {
+      if (!isGPU()) throw std::exception();
+      if (lchild_) lchild_->get_level_fronts_gpu(ldata, l+1);
+      if (rchild_) rchild_->get_level_fronts_gpu(ldata, l+1);
+      ldata[l].push_back(this);
+    }
+    void
+    get_level_fronts_gpu(std::vector<std::vector<F_t*>>& ldata, int l=0) {
+      if (!isGPU()) throw std::exception();
+      if (lchild_) lchild_->get_level_fronts_gpu(ldata, l+1);
+      if (rchild_) rchild_->get_level_fronts_gpu(ldata, l+1);
+      ldata[l].push_back(this);
+    }
 
 #if defined(STRUMPACK_USE_MPI)
     virtual void

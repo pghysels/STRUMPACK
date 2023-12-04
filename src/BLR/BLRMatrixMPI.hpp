@@ -44,9 +44,6 @@ namespace strumpack {
 
   namespace BLR {
 
-    // forward declaration
-    //template<typename scalar_t,typename integer_t> class BLRExtendAdd;
-
     /**
      * \class ProcessorGrid2D
      *
@@ -158,13 +155,21 @@ namespace strumpack {
       void fill(scalar_t v);
       void fill_col(scalar_t v, std::size_t k, std::size_t CP);
 
+      // TODO store piv in BLRMatrixMPI class
       std::vector<int> factor(const Opts_t& opts);
       std::vector<int> factor(const adm_t& adm, const Opts_t& opts);
-      std::vector<int>
-      factor_col(const adm_t& adm, const Opts_t& opts,
-                 const std::function<void(int, bool, std::size_t)>& blockcol);
+      std::vector<int> factor_col(const adm_t& adm, const Opts_t& opts,
+                                  const std::function
+                                  <void(int, bool, std::size_t)>& blockcol);
 
       void laswp(const std::vector<int>& piv, bool fwd);
+
+#if defined(STRUMPACK_USE_GPU)
+      static std::vector<int>
+      partial_factor_gpu(BLRMPI_t& A11, BLRMPI_t& A12,
+                         BLRMPI_t& A21, BLRMPI_t& A22,
+                         const adm_t& adm, const Opts_t& opts);
+#endif
 
       static std::vector<int>
       partial_factor(BLRMPI_t& A11, BLRMPI_t& A12,
@@ -197,6 +202,8 @@ namespace strumpack {
       std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
       std::size_t tileroff(std::size_t i) const { assert(i <= rowblocks()); return roff_[i]; }
       std::size_t tilecoff(std::size_t j) const { assert(j <= colblocks()); return coff_[j]; }
+      std::size_t maxtilerows() const;
+      std::size_t maxtilecols() const;
 
       int rg2p(std::size_t i) const;
       int cg2p(std::size_t j) const;
@@ -316,6 +323,19 @@ namespace strumpack {
       bcast_col_of_tiles_along_rows(std::size_t i0, std::size_t i1,
                                     std::size_t j) const;
 
+#if defined(STRUMPACK_USE_GPU)
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      bcast_row_of_tiles_along_cols_gpu(std::size_t i,
+                                        std::size_t j0, std::size_t j1,
+                                        scalar_t* dptr, scalar_t* pinned,
+                                        bool gpu_aware) const;
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>>
+      bcast_col_of_tiles_along_rows_gpu(std::size_t i0, std::size_t i1,
+                                        std::size_t j,
+                                        scalar_t* dptr, scalar_t* pinned,
+                                        bool gpu_aware) const;
+#endif
+
       std::vector<std::unique_ptr<BLRTile<scalar_t>>>
       gather_rows(std::size_t i0, std::size_t i1,
                   std::size_t j0, std::size_t j1) const;
@@ -358,6 +378,13 @@ namespace strumpack {
       template<typename T> friend void
       gemm(Trans ta, Trans tb, T alpha, const BLRMatrixMPI<T>& a,
            const BLRMatrixMPI<T>& b, T beta, BLRMatrixMPI<T>& c);
+
+#if defined(STRUMPACK_USE_GPU)
+      void move_to_gpu(gpu::Stream& s, scalar_t* dptr, scalar_t* pinned);
+      void move_to_cpu(gpu::Stream& s, scalar_t* pinned);
+      void move_row_to_cpu(int i, gpu::Stream& s, scalar_t* pinned);
+      void move_col_to_cpu(int j, gpu::Stream& s, scalar_t* pinned);
+#endif
 
       // suppress warnings
       using structured::StructuredMatrix<scalar_t>::factor;

@@ -30,12 +30,7 @@
 #define FRONTAL_MATRIX_MAGMA_HPP
 
 #include "FrontalMatrixDense.hpp"
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
+#include "dense/GPUWrapper.hpp"
 
 
 namespace strumpack {
@@ -50,6 +45,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using LInfo_t = LevelInfoMAGMA<scalar_t,integer_t>;
 
   public:
@@ -57,36 +53,69 @@ namespace strumpack {
                      std::vector<integer_t>& upd);
     ~FrontalMatrixMAGMA();
 
-    void release_work_memory() override;
+    void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
-                             const F_t* p, int task_depth) override;
+                             const F_t* p,
+                             int task_depth) override {
+      VectorPool<scalar_t> workspace;
+      extend_add_to_dense
+        (paF11, paF12, paF21, paF22, p, workspace, task_depth);
+    }
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p,
+                             VectorPool<scalar_t>& workspace,
+                             int task_depth) override;
 
-    ReturnCode multifrontal_factorization(const SpMat_t& A,
-                                          const SPOptions<scalar_t>& opts,
-                                          int etree_level=0,
-                                          int task_depth=0) override;
+    ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
+                      VectorPool<scalar_t>& workspace,
+                      int etree_level=0, int task_depth=0) override;
+
+    void multifrontal_solve(DenseM_t& b) const override;
 
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override {}
 
     std::string type() const override { return "FrontalMatrixMAGMA"; }
+    bool isGPU() const override { return true; }
 
 #if defined(STRUMPACK_USE_MPI)
+    void multifrontal_solve(DenseM_t& bloc,
+                            DistributedMatrix<scalar_t>* bdist)
+      const override {
+      multifrontal_solve(bloc);
+    }
+
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FrontalMatrixMPI<scalar_t,integer_t>* pa)
       const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa)
+      const override;
+    void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa,
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts)
+      const override;
 #endif
 
+    std::size_t get_device_F22_worksize() override { return 0; }
+    scalar_t* get_device_F22(scalar_t* dF22) override;
+
+
   private:
-    std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
+    std::unique_ptr<scalar_t[]> host_factors_;
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
     std::unique_ptr<gpu::DeviceMemory<char>> dev_factors_ = nullptr;
+    std::unique_ptr<gpu::DeviceMemory<char>> dev_Schur_ = nullptr;
 
     FrontalMatrixMAGMA(const FrontalMatrixMAGMA&) = delete;
     FrontalMatrixMAGMA& operator=(FrontalMatrixMAGMA const&) = delete;
@@ -95,22 +124,16 @@ namespace strumpack {
                         char* hea_mem, char* dea_mem);
 
     ReturnCode
-    split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    split_smaller(const SpMat_t& A, const Opts_t& opts,
                   int etree_level=0, int task_depth=0);
     ReturnCode
-    factors_on_device(const SpMat_t& A, const SPOptions<scalar_t>& opts,
+    factors_on_device(const SpMat_t& A, const Opts_t& opts,
                       std::vector<LInfo_t>& ldata, std::size_t total_dmem);
 
-    void multifrontal_solve(DenseM_t& b) const override;
-#if defined(STRUMPACK_USE_MPI)
-    void multifrontal_solve(DenseM_t& bloc,
-                            DistributedMatrix<scalar_t>* bdist) const override;
-#endif
-
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
-                          int etree_level, int task_depth) const;
+                          int etree_level, int task_depth) const override;
 
     void gpu_solve(DenseM_t& b) const;
 

@@ -37,16 +37,7 @@
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
 #include "iterative/IterativeSolvers.hpp"
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-#include "dense/DPCPPWrapper.hpp"
-#endif
-
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
@@ -85,11 +76,8 @@ namespace strumpack {
       params::task_recursion_cutoff_level =
         std::log2(params::num_threads) + 3;
     opts_.HSS_options().set_synchronized_compression(true);
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+#if defined(STRUMPACK_USE_GPU)
     if (opts_.use_gpu()) gpu::init();
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-    if (opts_.use_gpu()) dpcpp::init();
 #endif
   }
 
@@ -352,9 +340,11 @@ namespace strumpack {
                 << equil_.rcond << " , c_cond = " << equil_.ccond
                 << " , type = " << char(equil_.type) << std::endl;
 
-    using real_t = typename RealType<scalar_t>::value_type;
-    opts_.set_pivot_threshold
-      (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
+    if (opts_.replace_tiny_pivots()) {
+      using real_t = typename RealType<scalar_t>::value_type;
+      opts_.set_pivot_threshold
+        (std::sqrt(blas::lamch<real_t>('E')) * matrix()->norm1());
+    }
 
     auto old_nnz = matrix()->nnz();
     TaskTimer t2("sparsity-symmetrization",
@@ -580,18 +570,19 @@ namespace strumpack {
         std::cout << "#   - minimum pivot, sqrt(eps)*|A|_1 = "
                   << opts_.pivot_threshold() << std::endl;
         std::cout << "#   - replacing of small pivots is "
-                  << (opts_.replace_tiny_pivots() ? "" : "not")
-                  << " enabled" << std::endl;
+                  << (opts_.replace_tiny_pivots() ? "" : "not ")
+                  << "enabled" << std::endl;
       }
     }
     perf_counters_start();
     flop_breakdown_reset();
     ReturnCode err_code;
     TaskTimer t1("Sparse-factorization", [&]() {
-      // TODO add shift if opts_.replace...
-      // auto shifted_mat = matrix_nonzero_diag();
-      // err_code = tree()->multifrontal_factorization(*shifted_mat, opts_);
-      err_code = tree()->multifrontal_factorization(*matrix(), opts_);
+      if (opts_.replace_tiny_pivots() && opts_.matching() == MatchingJob::NONE) {
+        auto shifted_mat = matrix_nonzero_diag();
+        err_code = tree()->multifrontal_factorization(*shifted_mat, opts_);
+      } else
+        err_code = tree()->multifrontal_factorization(*matrix(), opts_);
     });
     perf_counters_stop("numerical factorization");
     if (opts_.verbose()) {
@@ -683,7 +674,9 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_ZFP)
           if (opts_.compression() == CompressionType::LOSSY)
             std::cout << "#   - lossy compression precision = "
-                      << opts_.lossy_precision() << " bitplanes" << std::endl;
+                      << opts_.lossy_precision() << " bitplanes" << std::endl
+                      << "#   - lossy compression accuracy = "
+                      << opts_.lossy_accuracy() << std::endl;
 #endif
         }
       }

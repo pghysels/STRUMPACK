@@ -37,6 +37,8 @@
 #include "dense/DenseMatrix.hpp"
 #include "BLROptions.hpp"
 
+#include "dense/GPUWrapper.hpp"
+
 namespace strumpack {
   namespace BLR {
 
@@ -77,7 +79,8 @@ namespace strumpack {
       compress(const Opts_t& opts) const = 0;
 
       virtual void draw(std::ostream& of,
-                        std::size_t roff, std::size_t coff) const = 0;
+                        std::size_t roff,
+                        std::size_t coff) const = 0;
 
       virtual DenseM_t& D() = 0; //{ assert(false); }
       virtual DenseM_t& U() = 0; //{ assert(false); }
@@ -86,11 +89,14 @@ namespace strumpack {
       virtual const DenseM_t& U() const = 0; //{ assert(false); }
       virtual const DenseM_t& V() const = 0; //{ assert(false); }
 
-      virtual scalar_t* copy_to(scalar_t* ptr) const = 0;
+      virtual void copy_to(scalar_t*& ptr) const = 0;
 
-      virtual LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const = 0;
-      virtual LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const = 0;
-      virtual LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const = 0;
+      virtual
+      LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const = 0;
+      virtual
+      LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const = 0;
+      virtual
+      LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const = 0;
 
       virtual void multiply(const BLRTile<scalar_t>& a,
                             DenseM_t& b, DenseM_t& c) const = 0;
@@ -112,11 +118,27 @@ namespace strumpack {
           }
       }
 
-      virtual std::vector<int> LU() { assert(false); return std::vector<int>(); };
+      virtual std::vector<int> LU(real_t thresh=0.) {
+        assert(false); return std::vector<int>();
+      };
+
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
+#if defined(STRUMPACK_USE_GPU)
+      virtual void laswp(gpu::Handle& h, int* dpiv, bool fwd) = 0;
+
+      virtual void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) = 0;
+      virtual void move_to_gpu(gpu::Stream& s, scalar_t* dptr,
+                               scalar_t* pinned=nullptr) = 0;
+
+      virtual void copy_from_device_to(scalar_t*& ptr) const = 0;
+#endif
 
       virtual void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                           scalar_t alpha, const DenseM_t& a) = 0;
+#if defined(STRUMPACK_USE_GPU)
+      virtual void trsm_b(gpu::Handle& handle, Side s, UpLo ul,
+                          Trans ta, Diag d, scalar_t alpha, DenseM_t& a) = 0;
+#endif
       virtual void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
                           scalar_t beta, DenseM_t& y) const = 0;
       virtual void gemm_a(Trans ta, Trans tb, scalar_t alpha,

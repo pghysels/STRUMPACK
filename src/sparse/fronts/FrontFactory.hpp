@@ -56,32 +56,33 @@ namespace strumpack {
 
   template<typename scalar_t> bool is_GPU
   (const SPOptions<scalar_t>& opts) {
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
-    return opts.use_gpu() && opts.compression() == CompressionType::NONE;
+#if defined(STRUMPACK_USE_GPU)
+    return opts.use_gpu() &&
+      (opts.compression() == CompressionType::NONE ||
+       opts.compression() == CompressionType::BLR);
 #else
     return false;
 #endif
   }
+
   template<typename scalar_t> bool is_HSS
-  (int dsep, int dupd, bool compressed_parent,
-   const SPOptions<scalar_t>& opts) {
+  (int dsep, int dupd, const SPOptions<scalar_t>& opts) {
     return opts.compression() == CompressionType::HSS &&
-      compressed_parent &&
       (dsep >= opts.compression_min_sep_size() ||
        dsep + dupd >= opts.compression_min_front_size());
   }
+
   template<typename scalar_t> bool is_BLR
-  (int dsep, int dupd, bool compressed_parent,
-   const SPOptions<scalar_t>& opts, int l=0) {
+  (int dsep, int dupd, const SPOptions<scalar_t>& opts, int l=0) {
     return (opts.compression() == CompressionType::BLR ||
             opts.compression() == CompressionType::BLR_HODLR ||
             opts.compression() == CompressionType::ZFP_BLR_HODLR) &&
       (dsep >= opts.compression_min_sep_size(l) ||
        dsep + dupd >= opts.compression_min_front_size(l));
   }
+
   template<typename scalar_t> bool is_HODLR
-  (int dsep, int dupd, bool compressed_parent,
-   const SPOptions<scalar_t>& opts, int l=0) {
+  (int dsep, int dupd, const SPOptions<scalar_t>& opts, int l=0) {
 #if defined(STRUMPACK_USE_BPACK)
     return (opts.compression() == CompressionType::HODLR ||
             opts.compression() == CompressionType::BLR_HODLR ||
@@ -92,8 +93,9 @@ namespace strumpack {
     return false;
 #endif
   }
+
   template<typename scalar_t> bool is_lossy
-  (int dsep, int dupd, bool, const SPOptions<scalar_t>& opts, int l=0) {
+  (int dsep, int dupd, const SPOptions<scalar_t>& opts, int l=0) {
 #if defined(STRUMPACK_USE_ZFP)
     return (opts.compression() == CompressionType::LOSSY ||
             opts.compression() == CompressionType::LOSSLESS ||
@@ -104,14 +106,14 @@ namespace strumpack {
     return false;
 #endif
   }
+
   template<typename scalar_t> bool is_compressed
-  (int dsep, int dupd, bool compressed_parent,
-   const SPOptions<scalar_t>& opts) {
+  (int dsep, int dupd, const SPOptions<scalar_t>& opts) {
     return opts.compression() != CompressionType::NONE &&
-      (is_HSS(dsep, dupd, compressed_parent, opts) ||
-       is_BLR(dsep, dupd, compressed_parent, opts, 1) ||
-       is_HODLR(dsep, dupd, compressed_parent, opts) ||
-       is_lossy(dsep, dupd, compressed_parent, opts, 2));
+      (is_HSS(dsep, dupd, opts) ||
+       is_BLR(dsep, dupd, opts, 1) ||
+       is_HODLR(dsep, dupd, opts) ||
+       is_lossy(dsep, dupd, opts, 2));
   }
 
   // forward definition
@@ -121,7 +123,7 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t>
   std::unique_ptr<FrontalMatrix<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t s, integer_t sbegin,
-   integer_t send, std::vector<integer_t>& upd, bool compressed_parent,
+   integer_t send, std::vector<integer_t>& upd,
    int level, FrontCounter& fc, bool root=true);
 
 
@@ -130,8 +132,7 @@ namespace strumpack {
   std::unique_ptr<FrontalMatrixMPI<scalar_t,integer_t>> create_frontal_matrix
   (const SPOptions<scalar_t>& opts, integer_t s,
    integer_t sbegin, integer_t send, std::vector<integer_t>& upd,
-   bool compressed_parent, int level, FrontCounter& fc,
-   const MPIComm& comm, int P, bool root);
+   int level, FrontCounter& fc, const MPIComm& comm, int P, bool root);
 #endif
 
 } // end namespace strumpack

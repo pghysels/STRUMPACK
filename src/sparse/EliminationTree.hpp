@@ -97,8 +97,8 @@ namespace strumpack {
     std::unique_ptr<F_t>
     setup_tree(const SPOptions<scalar_t>& opts, const SpMat_t& A,
                SeparatorTree<integer_t>& sep_tree,
-               std::vector<std::vector<integer_t>>& upd, integer_t sep,
-               bool hss_parent, int level);
+               std::vector<std::vector<integer_t>>& upd,
+               integer_t sep, int level);
 
     void
     symbolic_factorization(const SpMat_t& A,

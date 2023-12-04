@@ -57,8 +57,7 @@ namespace strumpack {
     FrontalMatrixDense(integer_t sep, integer_t sep_begin, integer_t sep_end,
                        std::vector<integer_t>& upd);
 
-    void release_work_memory() override;
-    void release_work_memory(VectorPool<scalar_t>& workspace);
+    void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
@@ -69,8 +68,9 @@ namespace strumpack {
                              const F_t* p, int task_depth) override;
 
     void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21,
-                           BLRM_t& paF22, const F_t* p, int task_depth,
-                           const Opts_t& opts) override;
+                           BLRM_t& paF22, const F_t* p,
+                           VectorPool<scalar_t>& workspace,
+                           int task_depth, const Opts_t& opts) override;
     void extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21,
                                BLRM_t& paF22, const F_t* p,
                                integer_t begin_col, integer_t end_col,
@@ -126,6 +126,8 @@ namespace strumpack {
                                    const Opts_t& opts)
       const override;
 #endif
+
+    scalar_t* get_device_F22(scalar_t* dF22) override;
 
   protected:
     DenseM_t F11_, F12_, F21_;

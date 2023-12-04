@@ -64,7 +64,8 @@ namespace strumpack {
                              const F_t* p, int task_depth) override;
 
     void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21,
-                           BLRM_t& paF22, const F_t* p, int task_depth,
+                           BLRM_t& paF22, const F_t* p,
+                           VectorPool<scalar_t>& workspace, int task_depth,
                            const Opts_t& opts) override;
     void extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21,
                                BLRM_t& paF22, const F_t* p,
@@ -112,6 +113,7 @@ namespace strumpack {
                                       int task_depth) const override;
 
     void release_work_memory() override;
+    void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
     void random_sampling(const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
                          DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc,

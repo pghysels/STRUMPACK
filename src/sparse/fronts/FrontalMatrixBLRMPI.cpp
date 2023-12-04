@@ -230,19 +230,23 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
+  FrontalMatrixBLRMPI<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
+   int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (visit(lchild_)) {
-      auto el = lchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      auto el = lchild_->factor
+        (A, opts, workspace, etree_level+1, task_depth);
       if (el != ReturnCode::SUCCESS) err_code = el;
     }
     if (visit(rchild_)) {
-      auto er = rchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
+      auto er = rchild_->factor
+        (A, opts, workspace, etree_level+1, task_depth);
       if (er != ReturnCode::SUCCESS) err_code = er;
     }
+    // TODO use the existing workspace
+    // now this is cleared to save space
+    workspace.clear();
     TaskTimer t("FrontalMatrixBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     if (opts.BLR_options().BLR_factor_algorithm() ==
@@ -313,11 +317,14 @@ namespace strumpack {
         auto nF = std::sqrt(nF11*nF11 + nF12*nF12 + nF21*nF21);
         auto lopts = opts.BLR_options();
         lopts.set_abs_tol(lopts.abs_tol() * nF);
-        if (dim_upd())
+#if defined(STRUMPACK_USE_GPU)
+        if (opts.use_gpu())
+          piv_ = BLRMPI_t::partial_factor_gpu
+            (F11blr_, F12blr_, F21blr_, F22blr_, adm_, lopts);
+        else
+#endif
           piv_ = BLRMPI_t::partial_factor
             (F11blr_, F12blr_, F21blr_, F22blr_, adm_, lopts);
-        else piv_ = F11blr_.factor(adm_, lopts);
-        // TODO flops?
       }
     }
     if (opts.print_compressed_front_stats()) {
@@ -456,10 +463,22 @@ namespace strumpack {
       if (Comm().is_root()) {
         g = A.extract_graph
           (opts.separator_ordering_level(), sep_begin_, sep_end_);
+#if 1
         auto sep_tree = g.recursive_bisection
           (opts.BLR_options().leaf_size(), 0,
            sorder+sep_begin_, nullptr, 0, 0, dim_sep());
         sep_tiles_ = sep_tree.template leaf_sizes<std::size_t>();
+#else
+        int K = std::round((1.* dim_sep()) / opts.BLR_options().leaf_size());
+        if (K > 1)
+          sep_tiles_ = g.partition_K_way
+            (K, sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+        else {
+          sep_tiles_ = {std::size_t(dim_sep())};
+          for (integer_t i=sep_begin_; i<sep_end_; i++)
+            sorder[i] = i - sep_begin_;
+        }
+#endif
       }
       auto nt = sep_tiles_.size();
       Comm().broadcast(nt);

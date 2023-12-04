@@ -50,13 +50,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    laswp(BLASHandle& handle, DenseMatrix<scalar_t>& dA,
+    laswp(Handle& handle, DenseMatrix<scalar_t>& dA,
           int k1, int k2, int* dipiv, int inci) {
       if (!dA.rows() || !dA.cols()) return;
       int n = dA.cols(), nt = 256;
       int grid = (n + nt - 1) / nt;
       cudaStream_t streamId;
-      cublasGetStream(handle, &streamId);
+      cublasGetStream(get_cublas_handle(handle), &streamId);
       laswp_kernel<scalar_t><<<grid, nt, 0, streamId>>>
         (n, dA.data(), dA.ld(), k2-k1+1, dipiv+k1-1, inci);
       gpu_check(cudaPeekAtLastError());
@@ -89,7 +89,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    laswp_fwd_vbatched(BLASHandle& handle, int* dn, int max_n,
+    laswp_fwd_vbatched(Handle& handle, int* dn, int max_n,
                        scalar_t** dA, int* lddA, int** dipiv, int* npivots,
                        unsigned int batchCount) {
       if (max_n <= 0 || !batchCount) return;
@@ -105,7 +105,7 @@ namespace strumpack {
       for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
         dim3 grid(nbx, std::min(nbf-f, MAX_BLOCKS_Y));
         cudaStream_t streamId;
-        cublasGetStream(handle, &streamId);
+        cublasGetStream(get_cublas_handle(handle), &streamId);
         auto f0 = f * ops;
         laswp_vbatch_kernel<<<grid, block, 0, streamId>>>
           (dn+f0, dA+f0, lddA+f0, dipiv+f0, npivots+f0, batchCount-f0);
@@ -114,15 +114,15 @@ namespace strumpack {
     }
 
     // explicit template instantiations
-    template void laswp(BLASHandle&, DenseMatrix<float>&, int, int, int*, int);
-    template void laswp(BLASHandle&, DenseMatrix<double>&, int, int, int*, int);
-    template void laswp(BLASHandle&, DenseMatrix<std::complex<float>>&, int, int, int*, int);
-    template void laswp(BLASHandle&, DenseMatrix<std::complex<double>>&, int, int, int*, int);
+    template void laswp(Handle&, DenseMatrix<float>&, int, int, int*, int);
+    template void laswp(Handle&, DenseMatrix<double>&, int, int, int*, int);
+    template void laswp(Handle&, DenseMatrix<std::complex<float>>&, int, int, int*, int);
+    template void laswp(Handle&, DenseMatrix<std::complex<double>>&, int, int, int*, int);
 
-    template void laswp_fwd_vbatched(BLASHandle&, int*, int, float**, int*, int**, int*, unsigned int);
-    template void laswp_fwd_vbatched(BLASHandle&, int*, int, double**, int*, int**, int*, unsigned int);
-    template void laswp_fwd_vbatched(BLASHandle&, int*, int, std::complex<float>**, int*, int**, int*, unsigned int);
-    template void laswp_fwd_vbatched(BLASHandle&, int*, int, std::complex<double>**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(Handle&, int*, int, float**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(Handle&, int*, int, double**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(Handle&, int*, int, std::complex<float>**, int*, int**, int*, unsigned int);
+    template void laswp_fwd_vbatched(Handle&, int*, int, std::complex<double>**, int*, int**, int*, unsigned int);
 
   } // end namespace gpu
 } // end namespace strumpack

@@ -99,7 +99,7 @@ namespace strumpack {
       case Type::LOSSY: {
 #if defined(STRUMPACK_USE_ZFP)
         return std::unique_ptr<StructuredMatrix<scalar_t>>
-          (new LossyMatrix<scalar_t>(A, 16 /* TODO */));
+          (new LossyMatrix<scalar_t>(A, 16, 1e-3));
 #else
         throw std::runtime_error
           ("Lossy compression requires ZFP to be enabled.");
@@ -108,7 +108,7 @@ namespace strumpack {
       case Type::LOSSLESS: {
 #if defined(STRUMPACK_USE_ZFP)
         return std::unique_ptr<StructuredMatrix<scalar_t>>
-          (new LossyMatrix<scalar_t>(A, 0));
+          (new LossyMatrix<scalar_t>(A, 16, 1e-3));
 #else
         throw std::runtime_error
           ("Lossless compression requires ZFP to be enabled.");
@@ -225,7 +225,7 @@ namespace strumpack {
                   std::vector<std::size_t> J(n);
                   std::iota(J.begin(), J.end(), c);
                   DenseMW_t Rrsub(n, Rr.cols(), Rr, c, 0);
-#pragma omp taskloop firstprivate(c)
+#pragma omp taskloop firstprivate(c) shared(Rrsub)
                   for (int r=0; r<rows; r+=B) {
                     int m = std::min(B, rows - r);
                     DenseM_t Asub(m, n);
@@ -242,7 +242,7 @@ namespace strumpack {
                   std::vector<std::size_t> I(m);
                   std::iota(I.begin(), I.end(), r);
                   DenseMW_t Rcsub(m, Rc.cols(), Rc, r, 0);
-#pragma omp taskloop firstprivate(r)
+#pragma omp taskloop firstprivate(r) shared(Rcsub)
                   for (int c=0; c<cols; c+=B) {
                     int n = std::min(B, cols - c);
                     DenseM_t Asub(m, n);

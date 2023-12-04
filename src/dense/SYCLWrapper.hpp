@@ -26,65 +26,49 @@
  *             Division).
  *
  */
-#ifndef STRUMPACK_HIP_WRAPPER_HPP
-#define STRUMPACK_HIP_WRAPPER_HPP
-
-#include "GPUWrapper.hpp"
-#if defined(STRUMPACK_USE_MAGMA)
-#include <magma_v2.h>
-#endif
-#if defined(STRUMPACK_USE_KBLAS)
-#include "kblas.h"
-#endif
+#ifndef STRUMPACK_SYCL_WRAPPER_HPP
+#define STRUMPACK_SYCL_WRAPPER_HPP
 
 #include <cmath>
 #include <complex>
 #include <iostream>
 #include <cassert>
+#include <memory>
+#include <map>
 
-#include <hip/hip_runtime.h>
-#include <hipblas/hipblas.h>
-#include <rocsolver/rocsolver.h>
+#if __has_include(<sycl/sycl.hpp>)
+ #include <sycl/sycl.hpp>
+#else
+ #include <CL/sycl.hpp>
+ namespace sycl = cl::sycl;
+#endif
+// #include <CL/sycl.hpp>
+// #include "mkl.h"
+#include "oneapi/mkl.hpp"
+
+#include "GPUWrapper.hpp"
+
 
 namespace strumpack {
   namespace gpu {
 
+    // TODO get SYCL limits?
     const unsigned int MAX_BLOCKS_Y = 65535;
     const unsigned int MAX_BLOCKS_Z = 65535;
 
-#define gpu_check(err) {                                              \
-      strumpack::gpu::hip_assert((err), __FILE__, __LINE__);          \
-    }
-    void hip_assert(hipError_t code, const char *file, int line,
-                    bool abort=true);
-    void hip_assert(rocblas_status code, const char *file, int line,
-                    bool abort=true);
-    void hip_assert(hipblasStatus_t code, const char *file, int line,
-                    bool abort=true);
+    /// Util function to get the current device (in int).
+    int get_sycl_device();
 
-    const hipStream_t& get_hip_stream(const Stream& s);
-    hipStream_t& get_hip_stream(Stream& s);
+    /// Util function to get the current queue
+    sycl::queue& get_sycl_queue();
 
-    const hipblasHandle_t& get_hipblas_handle(const Handle& h);
-    hipblasHandle_t& get_hipblas_handle(Handle& s);
+    const sycl::queue& get_sycl_queue(const Stream& s);
+    sycl::queue& get_sycl_queue(Stream& s);
 
-    const rocblas_handle& get_rocblas_handle(const Handle& h);
-    rocblas_handle& get_rocblas_handle(Handle& s);
+    const sycl::queue& get_sycl_queue(const Handle& s);
+    sycl::queue& get_sycl_queue(Handle& s);
 
-#if defined(STRUMPACK_USE_MAGMA)
-    const magma_queue_t& get_magma_queue(const Handle& h);
-    magma_queue_t& get_magma_queue(Handle& s);
-#endif
-
-#if defined(STRUMPACK_USE_KBLAS)
-    const kblasHandle_t& get_kblas_handle(const Handle& h);
-    kblasHandle_t& get_kblas_handle(Handle& h);
-
-    const kblasRandState_t& get_kblas_rand_state(const Handle& h);
-    kblasRandState_t& get_kblas_rand_state(Handle& h);
-#endif
-
-  } // end namespace gpu
+  } // end namespace sycl
 } // end namespace strumpack
 
-#endif // STRUMPACK_HIP_WRAPPER_HPP
+#endif // STRUMPACK_SYCL_WRAPPER_HPP

@@ -38,17 +38,26 @@ namespace strumpack {
     : public structured::StructuredMatrix<T> {
   public:
     LossyMatrix() {}
-    LossyMatrix(const DenseMatrix<T>& F, int prec);
+    LossyMatrix(const LossyMatrix<T>& ) = delete;
+    LossyMatrix(LossyMatrix<T>&& ) = default;
+    LossyMatrix& operator=(const LossyMatrix<T>&) = delete;
+    LossyMatrix& operator=(LossyMatrix<T>&&) = default;
+
+    LossyMatrix(const DenseMatrix<T>& F, int prec, double acc);
     DenseMatrix<T> decompress() const {
       DenseMatrix<T> F(rows_, cols_);
       decompress(F);
       return F;
     }
     virtual ~LossyMatrix() {
-      STRUMPACK_SUB_MEMORY(buffer_.size()*sizeof(unsigned char));
+      STRUMPACK_SUB_MEMORY(compressed_size()*sizeof(unsigned char));
     }
     void decompress(DenseMatrix<T>& F) const;
+#if defined(STRUMPACK_USE_SZ3)
+    std::size_t compressed_size() const { return out_size_; }
+#else // defined(STRUMPACK_USE_ZFP)
     std::size_t compressed_size() const { return buffer_.size(); }
+#endif
     std::size_t memory() const override { return compressed_size(); }
     std::size_t nonzeros() const override { return rows()*cols(); }
     std::size_t rank() const override { return std::min(rows(), cols()); }
@@ -57,14 +66,21 @@ namespace strumpack {
   private:
     std::size_t rows_ = 0, cols_ = 0;
     int prec_ = 16;
+    double acc_ = 1e-3;
+
+#if defined(STRUMPACK_USE_SZ3)
+    std::size_t out_size_;
+    std::unique_ptr<char> buffer_;
+#else // defined(STRUMPACK_USE_ZFP)
     std::vector<unsigned char> buffer_;
+#endif
   };
 
   template<typename T> class LossyMatrix<std::complex<T>>
     : public structured::StructuredMatrix<std::complex<T>> {
   public:
     LossyMatrix() {}
-    LossyMatrix(const DenseMatrix<std::complex<T>>& F, int prec);
+    LossyMatrix(const DenseMatrix<std::complex<T>>& F, int prec, double acc);
     DenseMatrix<std::complex<T>> decompress() const {
       DenseMatrix<std::complex<T>> F(rows(), cols());
       decompress(F);

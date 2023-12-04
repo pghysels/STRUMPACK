@@ -54,7 +54,7 @@ namespace strumpack {
                      std::vector<integer_t>& upd);
     ~FrontalMatrixBLR() {}
 
-    void release_work_memory() override;
+    void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
     void build_front_cols(const SpMat_t& A, std::size_t i,
                           bool part, std::size_t CP,
@@ -63,11 +63,19 @@ namespace strumpack {
                           const std::vector<Triplet<scalar_t>>& e21,
                           int task_depth, const Opts_t& opts);
 
+    std::size_t get_device_F22_worksize() override { return 0; };
+    scalar_t* get_device_F22(scalar_t*) override;
+
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
+    void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
+                             DenseM_t& paF21, DenseM_t& paF22,
+                             const F_t* p, VectorPool<scalar_t>& workspace,
+                             int task_depth) override;
     void extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
                            BLRM_t& paF21, BLRM_t& paF22, const F_t* p,
+                           VectorPool<scalar_t>& workspace,
                            int task_depth, const Opts_t& opts) override;
     void extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,
                                BLRM_t& paF21, BLRM_t& paF22, const F_t* p,
@@ -76,20 +84,13 @@ namespace strumpack {
     void sample_CB(const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
                    DenseM_t& Sc, F_t* pa, int task_depth) override;
 
-    ReturnCode multifrontal_factorization(const SpMat_t& A, const Opts_t& opts,
-                                          int etree_level=0, int task_depth=0)
-      override;
+    ReturnCode factor(const SpMat_t& A, const Opts_t& opts,
+                      VectorPool<scalar_t>& workspace,
+                      int etree_level=0, int task_depth=0) override;
 
     ReturnCode factor_node(const SpMat_t& A, const Opts_t& opts,
+                           VectorPool<scalar_t>& workspace,
                            int etree_level=0, int task_depth=0);
-
-    void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
-                                    int etree_level=0, int task_depth=0)
-      const override;
-
-    void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work, int
-                                     etree_level=0, int task_depth=0)
-      const override;
 
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,
@@ -98,14 +99,17 @@ namespace strumpack {
     std::string type() const override { return "FrontalMatrixBLR"; }
 
 #if defined(STRUMPACK_USE_MPI)
-    void extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                                    const FMPI_t* pa) const override;
-    void extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                                    const FBLRMPI_t* pa) const override;
-    void extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
-                                        const FBLRMPI_t* pa,
-                                        integer_t begin_col, integer_t end_col,
-                                        const Opts_t& opts) const override;
+    void
+    extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FMPI_t* pa) const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FBLRMPI_t* pa) const override;
+    void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FBLRMPI_t* pa,
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts) const override;
 #endif
 
     void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
@@ -113,7 +117,11 @@ namespace strumpack {
 
   private:
     BLRM_t F11blr_, F12blr_, F21blr_, F22blr_;
-    DenseM_t F22_;
+    DenseMW_t F22_;
+#if defined(STRUMPACK_USE_GPU)
+    gpu::DeviceMemory<char> CBdev_;
+#endif
+    std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
     std::vector<std::size_t> sep_tiles_, upd_tiles_;
     DenseMatrix<bool> admissibility_;
 

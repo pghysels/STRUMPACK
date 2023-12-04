@@ -63,6 +63,11 @@ namespace strumpack {
       F22_.reset(nullptr);
     }
   }
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixHODLR<scalar_t,integer_t>::release_work_memory
+  (VectorPool<scalar_t>& workspace) {
+    release_work_memory();
+  }
 
   template<typename scalar_t,typename integer_t> DenseMatrix<scalar_t>
   FrontalMatrixHODLR<scalar_t,integer_t>::get_dense_CB() const {
@@ -131,7 +136,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixHODLR<scalar_t,integer_t>::extend_add_to_blr
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
-   const F_t* p, int task_depth, const Opts_t& opts) {
+   const F_t* p, VectorPool<scalar_t>& workspace,
+   int task_depth, const Opts_t& opts) {
     // extend_add from Dense to seq. BLR
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
@@ -158,7 +164,7 @@ namespace strumpack {
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
+    release_work_memory(workspace);
   }
 
   template<typename scalar_t,typename integer_t> void

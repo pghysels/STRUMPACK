@@ -113,16 +113,19 @@ namespace strumpack {
       virtual ~StructuredOptions() {}
 
       void set_rel_tol(real_t rel_tol) {
-        assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
+        // assert(rel_tol <= real_t(1.) && rel_tol >= real_t(0.));
         rel_tol_ = rel_tol;
       }
       void set_abs_tol(real_t abs_tol) {
-        assert(abs_tol >= real_t(0.));
+        // assert(abs_tol >= real_t(0.));
         abs_tol_ = abs_tol;
       }
       void set_leaf_size(int leaf_size) {
         assert(leaf_size_ > 0);
         leaf_size_ = leaf_size;
+      }
+      void set_pivot_threshold(real_t thresh) {
+        pivot_ = thresh;
       }
       void set_max_rank(int max_rank) {
         assert(max_rank > 0);
@@ -131,15 +134,18 @@ namespace strumpack {
       void set_type(Type a) {
         type_ = a;
       }
-      void set_verbose(bool verbose) { verbose_ = verbose; }
+      void set_verbose(bool verbose) {
+        verbose_ = verbose;
+      }
 
       real_t rel_tol() const { return rel_tol_; }
       real_t abs_tol() const { return abs_tol_; }
+      real_t pivot_threshold() const { return pivot_; }
       int leaf_size() const { return leaf_size_; }
       int max_rank() const { return max_rank_; }
       Type type() const { return type_; }
       bool verbose() const { return verbose_; }
-
+      bool use_gpu_aware_mpi() const { return use_gpu_aware_mpi_; }
       virtual void set_from_command_line(int argc, const char* const* cargv);
 
       virtual void describe_options() const;
@@ -148,9 +154,11 @@ namespace strumpack {
       Type type_ = Type::BLR;
       real_t rel_tol_ = default_structured_rel_tol<real_t>();
       real_t abs_tol_ = default_structured_abs_tol<real_t>();
+      real_t pivot_ = -1.;
       int leaf_size_ = 128;
       int max_rank_ = 5000;
       bool verbose_ = true;
+      bool use_gpu_aware_mpi_ = std::getenv("STRUMPACK_GPU_AWARE_MPI");
     };
 
   } // end namespace structured

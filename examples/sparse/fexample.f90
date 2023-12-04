@@ -152,4 +152,6 @@ program fexample
   end do
   write(*,*) "||b-Ax||_2/||b||_2 = ", sqrt(residual)/sqrt(real(n))
 
+  call STRUMPACK_destroy(S)
+
 end program fexample

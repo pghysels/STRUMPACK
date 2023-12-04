@@ -43,16 +43,18 @@ namespace strumpack {
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::release_work_memory() {
-    STRUMPACK_SUB_MEMORY(CBstorage_.size()*sizeof(scalar_t));
-    CBstorage_.clear();
-    F22_.clear();
-  }
-  template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
   (VectorPool<scalar_t>& workspace) {
     workspace.restore(CBstorage_);
     F22_.clear();
+  }
+
+  template<typename scalar_t,typename integer_t> scalar_t*
+  FrontalMatrixDense<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+#if defined(STRUMPACK_USE_GPU)
+    gpu::copy_host_to_device(dF22, F22_);
+#endif
+    return dF22;
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
@@ -112,37 +114,15 @@ namespace strumpack {
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
-    const std::size_t pdsep = paF11.rows();
-    const std::size_t dupd = dim_upd();
-    std::size_t upd2sep;
-    auto I = this->upd_to_parent(p, upd2sep);
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop default(shared) grainsize(64)      \
-  if(task_depth < params::task_recursion_cutoff_level)
-#endif
-    for (std::size_t c=0; c<dupd; c++) {
-      auto pc = I[c];
-      if (pc < pdsep) {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF11(I[r],pc) += F22_(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF21(I[r]-pdsep,pc) += F22_(r,c);
-      } else {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF12(I[r],pc-pdsep) += F22_(r, c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
-      }
-    }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
+    this->extend_add(paF11, paF12, paF21, paF22, F22_, p);
     release_work_memory(workspace);
   }
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
-   const F_t* p, int task_depth, const Opts_t& opts) {
+   const F_t* p, VectorPool<scalar_t>& workspace,
+   int task_depth, const Opts_t& opts) {
     // extend_add from Dense to seq. BLR
     const std::size_t pdsep = paF11.rows();
     const std::size_t dupd = dim_upd();
@@ -168,7 +148,7 @@ namespace strumpack {
     }
     STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
     STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
+    release_work_memory(workspace);
   }
 
   template<typename scalar_t,typename integer_t> void

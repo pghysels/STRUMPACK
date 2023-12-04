@@ -38,6 +38,8 @@
 #include "BLROptions.hpp"
 #include "dense/DenseMatrix.hpp"
 
+#include "dense/GPUWrapper.hpp"
+
 namespace strumpack {
   namespace BLR {
 
@@ -48,10 +50,12 @@ namespace strumpack {
       : public BLRTile<scalar_t> {
       using real_t = typename RealType<scalar_t>::value_type;
       using DenseM_t = DenseMatrix<scalar_t>;
-      using DMW_t = DenseMatrixWrapper<scalar_t>;
+      using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
 
     public:
+      LRTile();
+
       LRTile(std::size_t m, std::size_t n, std::size_t r);
 
       LRTile(const DenseM_t& T, const Opts_t& opts);
@@ -81,18 +85,55 @@ namespace strumpack {
                                       DenseMatrix<scalar_t>&)>& Tcol,
              const Opts_t& opts);
 
-      std::size_t rows() const override { return U_.rows(); }
-      std::size_t cols() const override { return V_.cols(); }
-      std::size_t rank() const override { return U_.cols(); }
+      LRTile(const DenseM_t& U, const DenseM_t& V);
+
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_wrapper(DenseMW_t& U, DenseMW_t& V) {
+        auto t = std::make_unique<LRTile<scalar_t>>();
+        t->U_.reset(new DenseMW_t(U));
+        t->V_.reset(new DenseMW_t(V));
+        return t;
+      }
+
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_wrapper(scalar_t* ptr, int m, int n, int r) {
+        auto t = std::make_unique<LRTile<scalar_t>>();
+        DenseMW_t dU(m, r, ptr,     m);
+        DenseMW_t dV(r, n, ptr+m*r, r);
+        return create_as_wrapper(dU, dV);
+      }
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_wrapper_adv(scalar_t*& ptr, int m, int n, int r) {
+        auto t = std::make_unique<LRTile<scalar_t>>();
+        DenseMW_t dU(m, r, ptr, m);  ptr += m*r;
+        DenseMW_t dV(r, n, ptr, r);  ptr += n*r;
+        return create_as_wrapper(dU, dV);
+      }
+
+#if defined(STRUMPACK_USE_GPU)
+      static std::unique_ptr<LRTile<scalar_t>>
+      create_as_device_wrapper_from_ptr
+      (scalar_t*& dptr, scalar_t*& ptr, int m, int n, int r) {
+        auto t = create_as_wrapper(dptr, m, n, r);
+        dptr += r * (m + n);
+        gpu::copy(t->U(), ptr);  ptr += m*r;
+        gpu::copy(t->V(), ptr);  ptr += r*n;
+        return t;
+      }
+#endif
+
+      std::size_t rows() const override { return U_->rows(); }
+      std::size_t cols() const override { return V_->cols(); }
+      std::size_t rank() const override { return U_->cols(); }
       int rank_1() const override { return rank(); }
       bool is_low_rank() const override { return true; };
 
-      std::size_t memory() const override { return U_.memory() + V_.memory(); }
-      std::size_t nonzeros() const override { return U_.nonzeros() + V_.nonzeros(); }
-      std::size_t maximum_rank() const override { return U_.cols(); }
+      std::size_t memory() const override { return U_->memory() + V_->memory(); }
+      std::size_t nonzeros() const override { return (rows()+cols())*rank(); }
+      std::size_t maximum_rank() const override { return U_->cols(); }
 
-      std::size_t subnormals() const override { return U_.subnormals() + V_.subnormals(); }
-      std::size_t zeros() const override { return U_.zeros() + V_.zeros(); }
+      std::size_t subnormals() const override { return U_->subnormals() + V_->subnormals(); }
+      std::size_t zeros() const override { return U_->zeros() + V_->zeros(); }
 
       void dense(DenseM_t& A) const override;
       DenseM_t dense() const override;
@@ -115,18 +156,21 @@ namespace strumpack {
       void draw(std::ostream& of, std::size_t roff,
                 std::size_t coff) const override;
 
-      DenseM_t& D() override { assert(false); return U_; }
-      DenseM_t& U() override { return U_; }
-      DenseM_t& V() override { return V_; }
-      const DenseM_t& D() const override { assert(false); return U_; }
-      const DenseM_t& U() const override { return U_; }
-      const DenseM_t& V() const override { return V_; }
+      DenseM_t& D() override { return *U_; }
+      DenseM_t& U() override { return *U_; }
+      DenseM_t& V() override { return *V_; }
+      const DenseM_t& D() const override { return *U_; }
+      const DenseM_t& U() const override { return *U_; }
+      const DenseM_t& V() const override { return *V_; }
 
-      scalar_t* copy_to(scalar_t* ptr) const override;
+      void copy_to(scalar_t*& ptr) const override;
 
-      LRTile<scalar_t> multiply(const BLRTile<scalar_t>& a) const override;
-      LRTile<scalar_t> left_multiply(const LRTile<scalar_t>& a) const override;
-      LRTile<scalar_t> left_multiply(const DenseTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      multiply(const BLRTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      left_multiply(const LRTile<scalar_t>& a) const override;
+      LRTile<scalar_t>
+      left_multiply(const DenseTile<scalar_t>& a) const override;
 
       void multiply(const BLRTile<scalar_t>& a,
                     DenseM_t& b, DenseM_t& c) const override;
@@ -142,9 +186,23 @@ namespace strumpack {
                    DenseM_t& B) const override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
+#if defined(STRUMPACK_USE_GPU)
+      void laswp(gpu::Handle& h, int* dpiv, bool fwd) override;
+
+      void move_to_cpu(gpu::Stream& s, scalar_t* pinned=nullptr) override;
+      void move_to_gpu(gpu::Stream& s, scalar_t* dptr,
+                       scalar_t* pinned=nullptr) override;
+
+      void copy_from_device_to(scalar_t*& ptr) const override;
+#endif
 
       void trsm_b(Side s, UpLo ul, Trans ta, Diag d,
                   scalar_t alpha, const DenseM_t& a) override;
+#if defined(STRUMPACK_USE_GPU)
+      void trsm_b(gpu::Handle& handle, Side s, UpLo ul,
+                  Trans ta, Diag d, scalar_t alpha,
+                  DenseM_t& a) override;
+#endif
 
       void gemv_a(Trans ta, scalar_t alpha, const DenseM_t& x,
                   scalar_t beta, DenseM_t& y) const override;
@@ -223,7 +281,7 @@ namespace strumpack {
                                scalar_t* work) const override;
 
     private:
-      DenseM_t U_, V_;
+      std::unique_ptr<DenseM_t> U_, V_;
     };
 
 

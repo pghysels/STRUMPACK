@@ -17,7 +17,9 @@ option(TPL_ENABLE_PAPI       "Build with support for PAPI monitoring" OFF)
 option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
+option(TPL_ENABLE_SZ3        "Build with support for SZ3 compression" OFF)
 option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" OFF)
+option(TPL_ENABLE_KBLAS      "Build with support for KBLAS (requires CUDA)" OFF)
 option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
 option(STRUMPACK_COUNT_FLOPS "Build with flop counters" OFF)
@@ -96,8 +98,14 @@ if(TPL_ENABLE_PTSCOTCH)
 endif()
 if(NOT (STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP))
   if(TPL_ENABLE_MAGMA)
-    message(STATUS "Disabling MAGMA, it requires CUDA or HIP to be enabled.")
+    message(STATUS "Disabling MAGMA, it requires CUDA/HIP to be enabled.")
     set(TPL_ENABLE_MAGMA OFF)
+  endif()
+endif()
+if(NOT (STRUMPACK_USE_CUDA AND TPL_ENABLE_MAGMA))
+  if(TPL_ENABLE_KBLAS)
+    message(STATUS "Disabling KBLAS, it requires CUDA and MAGMA to be enabled.")
+    set(TPL_ENABLE_KBLAS OFF)
   endif()
 endif()
 
@@ -180,6 +188,17 @@ if(TPL_ENABLE_MAGMA)
   find_package(MAGMA)
   if(MAGMA_FOUND)
     option(STRUMPACK_USE_MAGMA "" ON)
+  endif()
+endif()
+
+
+if(TPL_ENABLE_KBLAS)
+  if(MAGMA_FOUND)
+    # TODO check for KBLAS
+    message(WARNING "To use KBLAS, set TPL_KBLAS_INCLUDE_DIR and TPL_KBLAS_LIBRARIES.")
+    option(STRUMPACK_USE_KBLAS "" ON)
+  else()
+    message(STATUS "Disabling KBLAS, MAGMA not found.")
   endif()
 endif()
 
@@ -490,6 +509,15 @@ if(TPL_ENABLE_ZFP)
   endif()
 endif()
 
+if(TPL_ENABLE_SZ3)
+  list(APPEND CMAKE_PREFIX_PATH ${TPL_SZ3_PREFIX}
+    $ENV{SZ3_ROOT} $ENV{SZ3_DIR})
+  find_package(SZ3)
+  if(SZ3_FOUND)
+    option(STRUMPACK_USE_SZ3 "" ON)
+  endif()
+endif()
+
 if(TPL_ENABLE_BPACK)
   list(APPEND CMAKE_PREFIX_PATH ${TPL_BUTTERFLYPACK_PREFIX}
     $ENV{ButterflyPACK_DIR} $ENV{ButterflyPACK_ROOT}
@@ -563,7 +591,7 @@ add_subdirectory(src)
 target_sources(strumpack
   PRIVATE ${PROJECT_BINARY_DIR}/StrumpackFortranCInterface.h)
 
-target_compile_features(strumpack PUBLIC cxx_std_14)
+target_compile_features(strumpack PUBLIC cxx_std_17)
 set_target_properties(strumpack PROPERTIES CXX_EXTENSIONS OFF)
 
 target_compile_options(strumpack PRIVATE
@@ -658,6 +686,10 @@ if(ZFP_FOUND)
   target_link_libraries(strumpack PUBLIC zfp::zfp)
 endif()
 
+if(SZ3_FOUND)
+  target_link_libraries(strumpack PUBLIC SZ3::SZ3)
+endif()
+
 if(ButterflyPACK_FOUND)
   target_link_libraries(strumpack PUBLIC
     ButterflyPACK::sbutterflypack
@@ -677,6 +709,11 @@ endif()
 
 if(MAGMA_FOUND)
   target_link_libraries(strumpack PUBLIC MAGMA::magma)
+endif()
+
+if(TPL_ENABLE_KBLAS)
+  target_include_directories(strumpack PUBLIC ${TPL_KBLAS_INCLUDE_DIR})
+  target_link_libraries(strumpack PUBLIC ${TPL_KBLAS_LIBRARIES})
 endif()
 
 if(hipblas_FOUND)

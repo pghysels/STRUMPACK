@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef TOOLS_H
-#define TOOLS_H
+#ifndef STRUMPACK_TOOLS_HPP
+#define STRUMPACK_TOOLS_HPP
 
 #include <vector>
 #include <iomanip>
@@ -37,6 +37,7 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "MPIWrapper.hpp"
 #endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
@@ -68,6 +69,7 @@ namespace strumpack {
 
   template<typename scalar_t> class VectorPool {
   public:
+
 #if defined(STRUMPACK_COUNT_FLOPS)
     ~VectorPool() {
       for (auto& v : data_) {
@@ -75,23 +77,152 @@ namespace strumpack {
       }
     }
 #endif
-    std::vector<scalar_t,NoInit<scalar_t>> get() {
+
+    std::vector<scalar_t,NoInit<scalar_t>> get(std::size_t s=0) {
       std::vector<scalar_t,NoInit<scalar_t>> v;
 #pragma omp critical
       {
         if (!data_.empty()) {
-          v = std::move(data_.back());
-          data_.pop_back();
+          // find the vector with smallest capacity, but at least s
+          std::size_t pos = 0, vsize = data_[0].capacity();
+          for (std::size_t i=0; i<data_.size(); i++) {
+            auto c = data_[i].capacity();
+            if (c >= s && c < vsize) {
+              pos = i;
+              vsize = c;
+            }
+          }
+          v = std::move(data_[pos]);
+          auto os = v.size();
+          if (s != os) {
+            STRUMPACK_ADD_MEMORY((s-os)*sizeof(scalar_t));
+            v.resize(s);
+          }
+          data_.erase(data_.begin()+pos);
+        } else {
+          STRUMPACK_ADD_MEMORY(s*sizeof(scalar_t));
+          v.resize(s);
         }
       }
       return v;
     }
     void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
+      if (v.empty()) return;
 #pragma omp critical
       data_.push_back(std::move(v));
     }
+
+#if defined(STRUMPACK_USE_GPU)
+    gpu::HostMemory<scalar_t> get_pinned(std::size_t s=0) {
+      if (pinned_data_.empty() || s == 0)
+        return gpu::HostMemory<scalar_t>(s);
+      gpu::HostMemory<scalar_t> pd;
+#pragma omp critical
+      {
+        int pos = -1;
+        std::size_t smin = 0;
+        for (std::size_t i=0; i<pinned_data_.size(); i++) {
+          auto ps = pinned_data_[i].size();
+          if (ps >= s && (ps < smin || pos == -1)) {
+            pos = i;
+            smin = ps;
+          }
+        }
+        if (pos == -1)
+          pd = gpu::HostMemory<scalar_t>(s);
+        else {
+          pd = std::move(pinned_data_[pos]);
+          pinned_data_.erase(pinned_data_.begin()+pos);
+        }
+      }
+      return pd;
+    }
+
+    gpu::DeviceMemory<char> get_device_bytes(std::size_t s=0) {
+      if (device_bytes_.empty() || s == 0)
+        return gpu::DeviceMemory<char>(s);
+      gpu::DeviceMemory<char> pd;
+#pragma omp critical
+      {
+        int pos = -1;
+        std::size_t smin = 0;
+        for (std::size_t i=0; i<device_bytes_.size(); i++) {
+          auto ps = device_bytes_[i].size();
+          if (ps >= s && (ps < smin || pos == -1)) {
+            pos = i;
+            smin = ps;
+          }
+        }
+        if (pos == -1) {
+          try {
+            pd = gpu::DeviceMemory<char>(s);
+          } catch (const std::bad_alloc& e) {
+            device_bytes_.clear();
+            pd = gpu::DeviceMemory<char>(s);
+          }
+        } else {
+          pd = std::move(device_bytes_[pos]);
+          device_bytes_.erase(device_bytes_.begin()+pos);
+        }
+      }
+      return pd;
+    }
+    void restore(gpu::HostMemory<scalar_t>& m) {
+      if (m.size() == 0) return;
+#pragma omp critical
+      {
+        pinned_data_.push_back(std::move(m));
+        if (pinned_data_.size() > 4) {
+          // remove smallest??
+          int pos = 0;
+          std::size_t smin = pinned_data_[0].size();
+          for (std::size_t i=1; i<pinned_data_.size(); i++) {
+            auto ps = pinned_data_[i].size();
+            if (ps < smin) {
+              pos = i;
+              smin = ps;
+            }
+          }
+          pinned_data_.erase(pinned_data_.begin()+pos);
+        }
+      }
+    }
+    void restore(gpu::DeviceMemory<char>& m) {
+      if (m.size() == 0) return;
+#pragma omp critical
+      {
+        device_bytes_.push_back(std::move(m));
+        if (device_bytes_.size() > 4) {
+          // remove smallest??
+          int pos = 0;
+          std::size_t smin = device_bytes_[0].size();
+          for (std::size_t i=1; i<device_bytes_.size(); i++) {
+            auto ps = device_bytes_[i].size();
+            if (ps < smin) {
+              pos = i;
+              smin = ps;
+            }
+          }
+          device_bytes_.erase(device_bytes_.begin()+pos);
+        }
+      }
+    }
+#endif
+
+    void clear() {
+      data_.clear();
+      device_bytes_.clear();
+      pinned_data_.clear();
+    }
+
   private:
     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
+#if defined(STRUMPACK_USE_GPU)
+    // std::vector<gpu::DeviceMemory<scalar_t>> device_data_;
+    std::vector<gpu::DeviceMemory<char>> device_bytes_;
+    std::vector<gpu::HostMemory<scalar_t>> pinned_data_;
+    // TODO keep streams? magma queues?
+#endif
   };
 
 
@@ -123,7 +254,7 @@ namespace strumpack {
   }
 
   template<class T> std::string number_format_with_commas(T value) {
-    struct Numpunct: public std::numpunct<char>{
+    struct Numpunct : public std::numpunct<char>{
     protected:
       virtual char do_thousands_sep() const{return ',';}
       virtual std::string do_grouping() const{return "\03";}
@@ -136,4 +267,4 @@ namespace strumpack {
 
 } // end namespace strumpack
 
-#endif // TOOLS_H
+#endif // STRUMPACK_TOOLS_HPP

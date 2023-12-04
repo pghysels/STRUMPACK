@@ -89,7 +89,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> long long
   FrontalMatrixDenseMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
-#if defined(STRUMPACK_USE_ZFP)
+#if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
     if (compressed_)
       return (F11c_.compressed_size() + F12c_.compressed_size() +
               F21c_.compressed_size()) / sizeof(scalar_t);
@@ -260,13 +260,13 @@ namespace strumpack {
     if (rchild_) rchild_->release_work_memory();
     auto ef = partial_factorization(opts);
     if (ef != ReturnCode::SUCCESS) err_code = ef;
-#if defined(STRUMPACK_USE_ZFP)
+#if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
     compress(opts);
 #endif
     return err_code;
   }
 
-#if defined(STRUMPACK_USE_ZFP)
+#if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixDenseMPI<scalar_t,integer_t>::compress
   (const SPOptions<scalar_t>& opts) {
@@ -274,9 +274,10 @@ namespace strumpack {
         opts.compression() == CompressionType::LOSSLESS ||
         opts.compression() == CompressionType::ZFP_BLR_HODLR) {
       auto prec = opts.lossy_precision();
-      F11c_ = LossyMatrix<scalar_t>(F11_.dense_wrapper(), prec);
-      F12c_ = LossyMatrix<scalar_t>(F12_.dense_wrapper(), prec);
-      F21c_ = LossyMatrix<scalar_t>(F21_.dense_wrapper(), prec);
+      auto acc = opts.lossy_accuracy();
+      F11c_ = LossyMatrix<scalar_t>(F11_.dense_wrapper(), prec, acc);
+      F12c_ = LossyMatrix<scalar_t>(F12_.dense_wrapper(), prec, acc);
+      F21c_ = LossyMatrix<scalar_t>(F21_.dense_wrapper(), prec, acc);
       F11_.clear();
       F12_.clear();
       F21_.clear();
@@ -360,7 +361,7 @@ namespace strumpack {
     bupd = DistM_t(grid(), this->dim_upd(), b.cols());
     bupd.zero();
     this->extend_add_b(b, bupd, CBl, CBr, seqCBl, seqCBr);
-#if defined(STRUMPACK_USE_ZFP)
+#if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
     if (compressed_) {
       const auto dupd = this->dim_upd();
       const auto dsep = this->dim_sep();
@@ -416,7 +417,7 @@ namespace strumpack {
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t&,
    int etree_level) const {
     DistM_t& y = ydist[this->sep_];
-#if defined(STRUMPACK_USE_ZFP)
+#if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
     if (compressed_) {
       const auto dupd = this->dim_upd();
       const auto dsep = this->dim_sep();
@@ -540,7 +541,7 @@ namespace strumpack {
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     if (!this->dim_sep() || !grid()->active())
       return ReturnCode::SUCCESS;
-#if defined(STRUMPACK_USE_ZFP)
+#if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
     if (compressed_) {
       DistM_t F11(grid(), this->dim_sep(), this->dim_sep());
       auto f = F11.dense_wrapper();
@@ -557,7 +558,7 @@ namespace strumpack {
     const auto dsep = this->dim_sep();
     if (!dsep || !grid()->active())
       return ReturnCode::SUCCESS;
-#if defined(STRUMPACK_USE_ZFP)
+#if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
     if (compressed_) {
       if (dsep) {
         DistM_t F11(grid(), dsep, dsep);

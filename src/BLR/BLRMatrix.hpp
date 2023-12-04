@@ -40,6 +40,8 @@
 #include "BLROptions.hpp"
 #include "BLRTileBLAS.hpp" // TODO remove
 #include "structured/StructuredMatrix.hpp"
+#include "misc/Tools.hpp"
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
   namespace BLR {
@@ -69,7 +71,7 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using Opts_t = BLROptions<scalar_t>;
-      // template<typename T>
+      using real_t = typename RealType<scalar_t>::value_type;
       using extract_t =
         std::function<void(const std::vector<std::size_t>&,
         const std::vector<std::size_t>&, DenseMatrix<scalar_t>&)>;
@@ -77,14 +79,6 @@ namespace strumpack {
 
     public:
       BLRMatrix() = default;
-
-      // BLRMatrix(DenseM_t& A,
-      //           const std::vector<std::size_t>& rowtiles,
-      //           const std::vector<std::size_t>& coltiles,
-      //           const Opts_t& opts);
-
-      // BLRMatrix(DenseM_t& A, const std::vector<std::size_t>& tiles,
-      //           const adm_t& admissible, const Opts_t& opts);
 
       BLRMatrix(std::size_t m, const std::vector<std::size_t>& rowtiles,
                 std::size_t n, const std::vector<std::size_t>& coltiles);
@@ -105,18 +99,14 @@ namespace strumpack {
       DenseM_t dense() const;
       void dense(DenseM_t& A) const;
 
-      void compress(const DenseM_t& A,
-                    const adm_t& admissible,
+      void compress(const DenseM_t& A, const adm_t& admissible,
                     const Opts_t& opts);
-      void compress(const extract_t& Aelem,
-                    const adm_t& admissible,
+      void compress(const extract_t& Aelem, const adm_t& admissible,
                     const Opts_t& opts);
 
-      void compress_and_factor(const DenseM_t& A,
-                               const adm_t& admissible,
+      void compress_and_factor(const DenseM_t& A, const adm_t& admissible,
                                const Opts_t& opts);
-      void compress_and_factor(const extract_t& Aelem,
-                               const adm_t& admissible,
+      void compress_and_factor(const extract_t& Aelem, const adm_t& admissible,
                                const Opts_t& opts);
 
       void draw(std::ostream& of, std::size_t roff, std::size_t coff) const;
@@ -164,6 +154,8 @@ namespace strumpack {
       std::size_t tilecols(std::size_t j) const { return coff_[j+1] - coff_[j]; }
       std::size_t tileroff(std::size_t i) const { return roff_[i]; }
       std::size_t tilecoff(std::size_t j) const { return coff_[j]; }
+      std::size_t maxtilerows() const;
+      std::size_t maxtilecols() const;
 
       BLRTile<scalar_t>& tile(std::size_t i, std::size_t j);
       const BLRTile<scalar_t>& tile(std::size_t i, std::size_t j) const;
@@ -179,12 +171,23 @@ namespace strumpack {
       static void
       construct_and_partial_factor(DenseM_t& A11, DenseM_t& A12,
                                    DenseM_t& A21, DenseM_t& A22,
-                                   BLRM_t& B11, BLRM_t& B12,
-                                   BLRM_t& B21,
+                                   BLRM_t& B11, BLRM_t& B12, BLRM_t& B21,
                                    const std::vector<std::size_t>& tiles1,
                                    const std::vector<std::size_t>& tiles2,
                                    const adm_t& admissible,
                                    const Opts_t& opts);
+
+#if defined(STRUMPACK_USE_GPU)
+      static void
+      construct_and_partial_factor_gpu(DenseM_t& A11, DenseM_t& A12,
+                                       DenseM_t& A21, DenseM_t& A22,
+                                       BLRM_t& B11, BLRM_t& B12, BLRM_t& B21,
+                                       const std::vector<std::size_t>& tiles1,
+                                       const std::vector<std::size_t>& tiles2,
+                                       const adm_t& admissible,
+                                       VectorPool<scalar_t>& workspace,
+                                       const Opts_t& opts);
+#endif
 
       static void
       construct_and_partial_factor(BLRM_t& B11, BLRM_t& B12,
@@ -216,13 +219,11 @@ namespace strumpack {
                                    const BLROptions<scalar_t>& opts);
 
       static void
-      trsmLNU_gemm(const BLRM_t& F1,
-                   const BLRM_t& F2,
+      trsmLNU_gemm(const BLRM_t& F1, const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
       static void
-      gemm_trsmUNN(const BLRM_t& F1,
-                   const BLRM_t& F2,
+      gemm_trsmUNN(const BLRM_t& F1, const BLRM_t& F2,
                    DenseM_t& B1, DenseM_t& B2, int task_depth);
 
     private:
@@ -245,6 +246,11 @@ namespace strumpack {
                           DenseM_t& A, const Opts_t& opts);
       void create_LR_tile(std::size_t i, std::size_t j,
                           const extract_t& A, const Opts_t& opts);
+
+#if defined(STRUMPACK_USE_GPU)
+      void create_from_column_major_gpu(DenseM_t& A, scalar_t* work);
+#endif
+
       void create_LR_tile_left_looking(std::size_t i, std::size_t j,
                                        const extract_t& Aelem,
                                        const Opts_t& opts);
@@ -254,7 +260,6 @@ namespace strumpack {
                                        const extract_t& Aelem,
                                        const BLRM_t& B21, const BLRM_t& B12,
                                        const Opts_t& opts);
-
       void LUAR_B11(std::size_t i, std::size_t j, std::size_t kmax,
                     DenseM_t& A11, const Opts_t& opts, int* B);
       void LUAR_B12(std::size_t i, std::size_t j, std::size_t kmax,

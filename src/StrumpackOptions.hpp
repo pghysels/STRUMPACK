@@ -33,6 +33,7 @@
 #define SPOPTIONS_HPP
 
 #include <limits>
+#include <cstdlib>
 
 #include "dense/BLASLAPACKWrapper.hpp"
 #include "HSS/HSSOptions.hpp"
@@ -225,7 +226,11 @@ namespace strumpack {
      * Default constructor, initializing all options to their default
      * values.
      */
-    SPOptions() { hss_opts_.set_verbose(false); }
+    SPOptions() {
+      hss_opts_.set_verbose(false);
+      blr_opts_.set_verbose(false);
+      hodlr_opts_.set_verbose(false);
+    }
 
     /**
      * Constructor, initializing all options to their default
@@ -719,7 +724,12 @@ namespace strumpack {
      *
      * \see enable_replace_tiny_pivots()
      */
-    void set_pivot_threshold(real_t thresh) { pivot_ = thresh; }
+    void set_pivot_threshold(real_t thresh) {
+      pivot_ = thresh;
+      hss_opts_.set_pivot_threshold(thresh);
+      blr_opts_.set_pivot_threshold(thresh);
+      hodlr_opts_.set_pivot_threshold(thresh);
+    }
 
     /**
      * Dump the root front to a set of files, one for each rank. This
@@ -759,9 +769,23 @@ namespace strumpack {
     void disable_openmp_tree() { use_openmp_tree_ = false; }
 
     /**
-     * Set the precision for lossy compression.
+     * Set the precision for lossy compression. Preferred mode is
+     * accuracy. To use precision mode, set the accuracy to a negative
+     * value. For lossless compression, set both accuracy and
+     * precision to a negative value.
+     *
+     * \see set_lossy_accuracy
      */
-    void set_lossy_precision(int p) { lossy_precision_ = p; }
+    void set_lossy_precision(int p) {
+      lossy_precision_ = p;
+    }
+
+    /**
+     * Set the accuracy for lossy compression.
+     *
+     * \see set_lossy_precision
+     */
+    void set_lossy_accuracy(double a) { lossy_accuracy_ = a; }
 
     /**
      * Print statistics, about ranks, memory etc, for the root front
@@ -1137,11 +1161,24 @@ namespace strumpack {
     int gpu_streams() const { return gpu_streams_; }
 
     /**
+     * Check wheter or not to use GPU-aware MPI
+     */
+    bool use_gpu_aware_mpi() const { return use_gpu_aware_mpi_; }
+
+    /**
      * Returns the precision for lossy compression.
      */
     int lossy_precision() const {
       return (compression() == CompressionType::LOSSLESS) ?
         -1 : lossy_precision_;
+    }
+
+    /**
+     * Returns the precision for lossy compression.
+     */
+    double lossy_accuracy() const {
+      return (compression() == CompressionType::LOSSLESS) ?
+        -1 : lossy_accuracy_;
     }
 
     /**
@@ -1261,11 +1298,12 @@ namespace strumpack {
     bool use_openmp_tree_ = true;
 
     /** GPU options */
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
+#if defined(STRUMPACK_USE_GPU)
     bool use_gpu_ = true;
 #else
     bool use_gpu_ = false;
 #endif
+    bool use_gpu_aware_mpi_ = std::getenv("STRUMPACK_GPU_AWARE_MPI");
     int gpu_streams_ = default_gpu_streams();
 
     /** compression options */
@@ -1292,6 +1330,7 @@ namespace strumpack {
     int lossy_min_front_size_ = 100000;
     int lossy_min_sep_size_ = 8;
     int lossy_precision_ = 16;
+    double lossy_accuracy_ = 1e-3;
 
     // ordering::NDOptions nd_opts_;
 

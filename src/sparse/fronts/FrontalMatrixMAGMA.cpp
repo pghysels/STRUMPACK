@@ -36,8 +36,8 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
+#include "FrontalMatrixBLRMPI.hpp"
 #endif
-
 
 namespace strumpack {
 
@@ -49,8 +49,7 @@ namespace strumpack {
   public:
     LevelInfoMAGMA() {}
     LevelInfoMAGMA(const std::vector<F_t*>& fronts,
-                   gpu::SOLVERHandle& handle,
-                   const SpMat_t* A=nullptr) {
+                   gpu::Handle& handle, const SpMat_t* A=nullptr) {
       auto N = fronts.size();
       f.reserve(N);
       for (auto& F : fronts)
@@ -118,15 +117,16 @@ namespace strumpack {
       }
 
       if (A) { // not needed for the solve
-        int getrf_work_cusolver =
-          sizeof(scalar_t) * gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
+        // TODO not needed when always using MAGMA? also should now be
+        // std::int64_t, and work for getrs as well?
+        int getrf_work_cusolver = sizeof(scalar_t) *
+          gpu::getrf_buffersize<scalar_t>(handle, max_dsep);
         getrf_work_bytes = -1;
-        magma_queue_t magma_q = nullptr;
         gpu::magma::getrf_vbatched_max_nocheck_work
           (nullptr, nullptr, max_d1_small, max_d1_small,
            max_d1_small, max_d1_small*max_d1_small,
            (scalar_t**)nullptr, nullptr, nullptr, nullptr, nullptr,
-           &getrf_work_bytes, Nsmall, magma_q);
+           &getrf_work_bytes, Nsmall, handle);
         getrf_work_bytes = std::max(getrf_work_bytes, getrf_work_cusolver);
         factor_bytes = gpu::round_up(sizeof(scalar_t)*factor_size);
         factor_bytes += gpu::round_up(sizeof(int)*piv_size);
@@ -225,9 +225,8 @@ namespace strumpack {
         F_batch[i + 3*Nsmall] = f[i]->F22_.data();
         ipiv_batch[i] = f[i]->piv_;
       }
-      gpu_check(gpu::copy_host_to_device<char>
-                (gpu::aligned_ptr<char>(mem), dev_batch_meta,
-                 batch_meta_bytes));
+      gpu::copy_host_to_device<char>
+        (gpu::aligned_ptr<char>(mem), dev_batch_meta, batch_meta_bytes);
     }
 
     // static const int FRONT_SMALL = 10000000;
@@ -269,10 +268,15 @@ namespace strumpack {
 #endif
   }
 
+  template<typename scalar_t,typename integer_t> scalar_t*
+  FrontalMatrixMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+    return F22_.data();
+  }
+
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::release_work_memory() {
-    F22_.clear();
-    host_Schur_.release();
+  FrontalMatrixMAGMA<scalar_t,integer_t>::
+  release_work_memory(VectorPool<scalar_t>& workspace) {
+    if (dev_Schur_) workspace.restore(*dev_Schur_);
   }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -280,40 +284,41 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
-    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
-      (F22_, sbuf, pa, this);
+    DenseM_t F22(dim_upd(), dim_upd());
+    gpu::copy_device_to_host(F22, F22_);
+    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf,
+   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa) const {
+    DenseM_t F22(dim_upd(), dim_upd());
+    gpu::copy_device_to_host(F22, F22_);
+    BLR::BLRExtendAdd<scalar_t,integer_t>::seq_copy_to_buffers(F22, sbuf, pa, this);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  FrontalMatrixMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  (std::vector<std::vector<scalar_t>>& sbuf,
+   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa,
+   integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
+    DenseM_t F22(dim_upd(), dim_upd());
+    gpu::copy_device_to_host(F22, F22_);
+    BLR::BLRExtendAdd<scalar_t,integer_t>::
+      seq_copy_to_buffers_col(F22, sbuf, pa, this, begin_col, end_col);
   }
 #endif
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const F_t* p, int task_depth) {
-    const std::size_t pdsep = paF11.rows();
+   const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     const std::size_t dupd = dim_upd();
-    std::size_t upd2sep;
-    auto I = this->upd_to_parent(p, upd2sep);
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop default(shared) grainsize(64)      \
-  if(task_depth < params::task_recursion_cutoff_level)
-#endif
-    for (std::size_t c=0; c<dupd; c++) {
-      auto pc = I[c];
-      if (pc < pdsep) {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF11(I[r],pc) += F22_(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF21(I[r]-pdsep,pc) += F22_(r,c);
-      } else {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF12(I[r],pc-pdsep) += F22_(r, c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
-      }
-    }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
+    DenseM_t F22(dupd, dupd);
+    gpu::copy_device_to_host(F22, F22_);
+    this->extend_add(paF11, paF12, paF21, paF22, F22, p);
+    release_work_memory(workspace);
   }
 
   template<typename scalar_t, typename integer_t> void
@@ -359,8 +364,7 @@ namespace strumpack {
         c->upd_to_parent(&f, fIptr);
       }
     }
-    gpu_check(gpu::copy_host_to_device<char>
-              (dea_mem, hea_mem, L.ea_bytes));
+    gpu::copy_host_to_device<char>(dea_mem, hea_mem, L.ea_bytes);
     gpu::assemble(N, hasmbl, dasmbl);
   }
 
@@ -372,9 +376,7 @@ namespace strumpack {
     ReturnCode err_code = ReturnCode::SUCCESS;
     int lvls = ldata.size();
     gpu::Stream comp_stream, copy_stream;
-    gpu::BLASHandle blas_handle(comp_stream);
-    gpu::SOLVERHandle solver_handle(comp_stream);
-    gpu::magma::MAGMAQueue magma_q(comp_stream, blas_handle);
+    gpu::Handle handle(comp_stream);
     std::size_t peak_ea_hmem = 0, total_factor_dmem = 0,
       peak_work_dmem = 0;
     for (int l=0; l<lvls; l++) {
@@ -389,6 +391,7 @@ namespace strumpack {
     gpu::DeviceMemory<char> work_dmem(peak_work_dmem);
     dev_factors_.reset(new gpu::DeviceMemory<char>(total_factor_dmem));
     char* factors_dptr = dev_factors_->as<char>();
+
     for (int l=lvls-1; l>=0; l--) {
       // TaskTimer tl("");
       // tl.start();
@@ -403,8 +406,8 @@ namespace strumpack {
           work_dptr = work_dmem + peak_work_dmem - L.work_bytes;
           ea_dptr = work_dptr - L.ea_bytes;
         }
-        gpu_check(gpu::memset<scalar_t>(work_dptr, 0, L.Schur_size));
-        gpu_check(gpu::memset<scalar_t>(factors_dptr, 0, L.factor_size));
+        gpu::memset<scalar_t>(work_dptr, 0, L.Schur_size);
+        gpu::memset<scalar_t>(factors_dptr, 0, L.factor_size);
         L.set_factor_pointers(factors_dptr);
         factors_dptr += L.factor_bytes;
         L.set_work_pointers(work_dptr);
@@ -422,15 +425,16 @@ namespace strumpack {
           (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
            L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dev_getrf_err, L.dev_getrf_work, &L.getrf_work_bytes,
-           Nsmall, magma_q);
+           Nsmall, handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
-            (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
+            (handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
+             L.getrf_work_bytes / sizeof(scalar_t),
              L.f[i]->piv_, L.dev_getrf_err+i);
         // TODO check error code
         if (opts.replace_tiny_pivots()) {
           gpu::replace_pivots_vbatched
-            (blas_handle, d1, L.max_d1_small, F11, ld1,
+            (handle, d1, L.max_d1_small, F11, ld1,
              opts.pivot_threshold(), Nsmall);
           for (std::size_t i=Nsmall; i<N; i++)
             gpu::replace_pivots
@@ -438,27 +442,27 @@ namespace strumpack {
                opts.pivot_threshold());
         }
         gpu::laswp_fwd_vbatched
-          (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
+          (handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, handle);
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrs
-            (solver_handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
+            (handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
              L.f[i]->F12_, L.dev_getrf_err+i);
         gpu::magma::gemm_vbatched_max_nocheck
           (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
            F21, ld2, F12, ld1, scalar_t(1.), F22, ld2, Nsmall,
-           L.max_d2_small, L.max_d2_small, L.max_d1_small, magma_q);
+           L.max_d2_small, L.max_d2_small, L.max_d1_small, handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::gemm
-            (blas_handle, Trans::N, Trans::N, scalar_t(-1.),
+            (handle, Trans::N, Trans::N, scalar_t(-1.),
              L.f[i]->F21_, L.f[i]->F12_, scalar_t(1.), L.f[i]->F22_);
       } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory" << std::endl;
@@ -484,9 +488,6 @@ namespace strumpack {
   FrontalMatrixMAGMA<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
-    if (opts.verbose())
-      std::cout << "# Factorization does not fit in GPU memory, "
-        "splitting in smaller traversals." << std::endl;
     const std::size_t dupd = dim_upd(), dsep = dim_sep();
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (lchild_) {
@@ -502,63 +503,61 @@ namespace strumpack {
     STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
     STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
     host_factors_.reset(new scalar_t[dsep*(dsep+2*dupd)]);
-    host_Schur_.reset(new scalar_t[dupd*dupd]);
     {
       auto fmem = host_factors_.get();
       F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
       F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
       F21_ = DenseMW_t(dupd, dsep, fmem, dupd);
     }
-    F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
+    DenseM_t F22(dupd, dupd);
     F11_.zero(); F12_.zero();
-    F21_.zero(); F22_.zero();
+    F21_.zero(); F22.zero();
     A.extract_front
       (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
        this->upd_, task_depth);
     if (lchild_) {
 #pragma omp parallel
 #pragma omp single
-      lchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+      lchild_->extend_add_to_dense(F11_, F12_, F21_, F22, this, 0);
     }
     if (rchild_) {
 #pragma omp parallel
 #pragma omp single
-      rchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+      rchild_->extend_add_to_dense(F11_, F12_, F21_, F22, this, 0);
     }
     // TaskTimer tl("");
     // tl.start();
     if (dsep) {
-      gpu::SOLVERHandle sh;
-      gpu::DeviceMemory<scalar_t> dm11
-        (dsep*dsep + gpu::getrf_buffersize<scalar_t>(sh, dsep));
+      gpu::Handle h;
+      auto lwork = gpu::getrf_buffersize<scalar_t>(h, dsep);
+      gpu::DeviceMemory<scalar_t> dm11(dsep*dsep + lwork);
       gpu::DeviceMemory<int> dpiv(dsep+1); // and ierr
       DenseMW_t dF11(dsep, dsep, dm11, dsep);
-      gpu_check(gpu::copy_host_to_device(dF11, F11_));
-      gpu::getrf(sh, dF11, dm11 + dsep*dsep, dpiv, dpiv+dsep);
+      gpu::copy_host_to_device(dF11, F11_);
+      gpu::getrf(h, dF11, dm11 + dsep*dsep, lwork, dpiv, dpiv+dsep);
       // TODO check return code!
       if (opts.replace_tiny_pivots())
         gpu::replace_pivots
           (F11_.rows(), dF11.data(), opts.pivot_threshold());
       pivot_mem_.resize(dsep);
       piv_ = pivot_mem_.data();
-      gpu_check(gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep));
-      gpu_check(gpu::copy_device_to_host(F11_, dF11));
+      gpu::copy_device_to_host(piv_, dpiv.as<int>(), dsep);
+      gpu::copy_device_to_host(F11_, dF11);
       if (dupd) {
         gpu::DeviceMemory<scalar_t> dm12(dsep*dupd);
         DenseMW_t dF12(dsep, dupd, dm12, dsep);
-        gpu_check(gpu::copy_host_to_device(dF12, F12_));
-        gpu::getrs(sh, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
-        gpu_check(gpu::copy_device_to_host(F12_, dF12));
+        gpu::copy_host_to_device(dF12, F12_);
+        gpu::getrs(h, Trans::N, dF11, dpiv, dF12, dpiv+dsep);
+        gpu::copy_device_to_host(F12_, dF12);
         dm11.release();
-        gpu::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd);
-        DenseMW_t dF21(dupd, dsep, dm2122, dupd);
-        DenseMW_t dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
-        gpu_check(gpu::copy_host_to_device(dF21, F21_));
-        gpu_check(gpu::copy_host_to_device(dF22, host_Schur_.get()));
-        gpu::BLASHandle bh;
-        gpu::gemm(bh, Trans::N, Trans::N, scalar_t(-1.),
-                  dF21, dF12, scalar_t(1.), dF22);
-        gpu_check(gpu::copy_device_to_host(host_Schur_.get(), dF22));
+        gpu::DeviceMemory<scalar_t> dm21(dsep*dupd);
+        DenseMW_t dF21(dupd, dsep, dm21, dupd);
+        gpu::copy_host_to_device(dF21, F21_);
+        dev_Schur_.reset(new gpu::DeviceMemory<char>(dupd*dupd*sizeof(scalar_t)));
+        F22_ = DenseMW_t(dupd, dupd, dev_Schur_->template as<scalar_t>(), dupd);
+        gpu::copy_host_to_device(F22_, F22);
+        gpu::gemm(h, Trans::N, Trans::N, scalar_t(-1.),
+                  dF21, dF12, scalar_t(1.), F22_);
       }
     }
     // count flops
@@ -618,49 +617,56 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
+  FrontalMatrixMAGMA<scalar_t,integer_t>::factor
+  (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     gpu::Stream comp_stream, copy_stream;
-    gpu::SOLVERHandle solver_handle(comp_stream);
+    gpu::Handle handle(comp_stream);
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
-    for (int l=lvls-1; l>=0; l--) {
-      std::vector<F_t*> fp;
-      this->get_level_fronts(fp, l);
-      ldata[l] = LInfo_t(fp, solver_handle, &A);
+    {
+      std::vector<std::vector<F_t*>> fp(lvls);
+      try {
+        this->get_level_fronts_gpu(fp);
+      } catch (...) {
+        return split_smaller(A, opts, etree_level, task_depth);
+      }
+      for (int l=lvls-1; l>=0; l--)
+        ldata[l] = LInfo_t(fp[l], handle, &A);
     }
 
 #if 1 // enable for solve on GPU (if factors fit on device)
-    auto total_dmem = total_peak_device_memory_MAGMA(ldata);
-    if (opts.verbose())
-      std::cout << "# Need " << total_dmem / 1.e6 << " MB "
-                << "of device mem, "
-                << gpu::available_memory() / 1.e6
-                << " MB available" << std::endl;
-    if (etree_level == 0 &&
-        total_dmem < 0.9 * gpu::available_memory())
-      return factors_on_device(A, opts, ldata, total_dmem);
+    if (etree_level == 0) {
+      auto total_dmem = total_peak_device_memory_MAGMA(ldata);
+      if (opts.verbose())
+        std::cout << "# Need " << total_dmem / 1.e6 << " MB "
+                  << "of device mem, "
+                  << gpu::available_memory() / 1.e6
+                  << " MB available" << std::endl;
+      if (total_dmem < 0.9 * gpu::available_memory())
+        return factors_on_device(A, opts, ldata, total_dmem);
+    }
 #endif
 
     auto peak_dmem = level_peak_device_memory_MAGMA(ldata);
-    if (peak_dmem >= 0.9 * gpu::available_memory())
+    if (peak_dmem >= 0.9 * gpu::available_memory()) {
+      if (opts.verbose())
+        std::cout << "# Factorization does not fit in GPU memory, "
+          "splitting in smaller traversals." << std::endl;
       return split_smaller(A, opts, etree_level, task_depth);
-
-    gpu::BLASHandle blas_handle(comp_stream);
-    gpu::magma::MAGMAQueue magma_q(comp_stream, blas_handle);
+    }
 
     std::size_t pinned_size = 0;
     for (int l=lvls-1; l>=0; l--)
       pinned_size = std::max(pinned_size, ldata[l].factor_size);
-    gpu::HostMemory<scalar_t> pinned(pinned_size);
+    auto pinned = workspace.get_pinned(pinned_size);
 
     std::size_t peak_hea_mem = 0;
     for (int l=lvls-1; l>=0; l--)
       peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
     gpu::HostMemory<char> hea_mem(peak_hea_mem);
-    gpu::DeviceMemory<char> all_dmem(peak_dmem);
+    auto all_dmem = workspace.get_device_bytes(peak_dmem);
     char* old_work = nullptr;
 
     for (int l=lvls-1; l>=0; l--) {
@@ -680,8 +686,8 @@ namespace strumpack {
           dea_mem = work_mem - L.ea_bytes;
           dev_factors = gpu::aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
         }
-        gpu_check(gpu::memset<scalar_t>(work_mem, 0, L.Schur_size));
-        gpu_check(gpu::memset<scalar_t>(dev_factors, 0, L.factor_size));
+        gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
+        gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
         L.set_factor_pointers(dev_factors);
         L.set_work_pointers(work_mem);
         old_work = work_mem;
@@ -699,15 +705,16 @@ namespace strumpack {
           (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
            L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dev_getrf_err, L.dev_getrf_work, &L.getrf_work_bytes,
-           Nsmall, magma_q);
+           Nsmall, handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrf
-            (solver_handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
+            (handle, L.f[i]->F11_, (scalar_t*)L.dev_getrf_work,
+             L.getrf_work_bytes / sizeof(scalar_t),
              L.f[i]->piv_, L.dev_getrf_err+i);
         // TODO check error code
         if (opts.replace_tiny_pivots()) {
           gpu::replace_pivots_vbatched
-            (blas_handle, d1, L.max_d1_small, F11, ld1,
+            (handle, d1, L.max_d1_small, F11, ld1,
              opts.pivot_threshold(), Nsmall);
           for (std::size_t i=Nsmall; i<N; i++)
             gpu::replace_pivots
@@ -715,19 +722,19 @@ namespace strumpack {
                opts.pivot_threshold());
         }
         gpu::laswp_fwd_vbatched
-          (blas_handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
+          (handle, d2, L.max_d2_small, F12, ld1, L.dev_ipiv_batch,
            d1, Nsmall);
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, handle);
         gpu::magma::trsm_vbatched_max_nocheck
           (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            L.max_d1_small, L.max_d2_small, d1, d2, scalar_t(1.),
-           F11, ld1, F12, ld1, Nsmall, magma_q);
+           F11, ld1, F12, ld1, Nsmall, handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::getrs
-            (solver_handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
+            (handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_,
              L.f[i]->F12_, L.dev_getrf_err+i);
 
         STRUMPACK_ADD_MEMORY(L.factor_bytes);
@@ -735,17 +742,17 @@ namespace strumpack {
         L.f[0]->pivot_mem_.resize(L.piv_size);
 
         comp_stream.synchronize();
-        gpu_check(gpu::copy_device_to_host_async<scalar_t>
-                  (pinned, dev_factors, L.factor_size, copy_stream));
+        gpu::copy_device_to_host_async<scalar_t>
+          (pinned, dev_factors, L.factor_size, copy_stream);
 
         // use max_nocheck to overlap this with copy above
         gpu::magma::gemm_vbatched_max_nocheck
           (MagmaNoTrans, MagmaNoTrans, d2, d2, d1, scalar_t(-1.),
            F21, ld2, F12, ld1, scalar_t(1.), F22, ld2, Nsmall,
-           L.max_d2_small, L.max_d2_small, L.max_d1_small, magma_q);
+           L.max_d2_small, L.max_d2_small, L.max_d1_small, handle);
         for (std::size_t i=Nsmall; i<N; i++)
           gpu::gemm
-            (blas_handle, Trans::N, Trans::N, scalar_t(-1.),
+            (handle, Trans::N, Trans::N, scalar_t(-1.),
              L.f[i]->F21_, L.f[i]->F12_, scalar_t(1.), L.f[i]->F22_);
         copy_stream.synchronize();
         auto host_factors = L.f[0]->host_factors_.get();
@@ -753,8 +760,8 @@ namespace strumpack {
         for (std::size_t i=0; i<L.factor_size; i++)
           host_factors[i] = pinned[i];
 
-        gpu_check(gpu::copy_device_to_host<int>
-                  (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size));
+        gpu::copy_device_to_host<int>
+          (L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
         L.set_factor_pointers
           (L.f[0]->host_factors_.get(), L.f[0]->pivot_mem_.data());
         comp_stream.synchronize();
@@ -777,11 +784,15 @@ namespace strumpack {
     }
     const std::size_t dupd = dim_upd();
     if (dupd) { // get the contribution block from the device
-      host_Schur_.reset(new scalar_t[dupd*dupd]);
-      gpu_check(gpu::copy_device_to_host
-                (host_Schur_.get(), (scalar_t*)(old_work), dupd*dupd));
-      F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
+      dev_Schur_.reset(new gpu::DeviceMemory<char>
+                       (workspace.get_device_bytes
+                        (dupd*dupd*sizeof(scalar_t))));
+      auto dF22 = dev_Schur_->template as<scalar_t>();
+      gpu::copy_device_to_device(dF22, (scalar_t*)(old_work), dupd*dupd);
+      F22_ = DenseMW_t(dupd, dupd, dF22, dupd);
     }
+    workspace.restore(all_dmem);
+    workspace.restore(pinned);
     return err_code;
   }
 
@@ -792,14 +803,6 @@ namespace strumpack {
     else // factors are not on the device, solve on CPU
       FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
   }
-
-#if defined(STRUMPACK_USE_MPI)
-  template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_solve
-  (DenseM_t& b, DistributedMatrix<scalar_t>* bdist) const {
-    multifrontal_solve(b);
-  }
-#endif
 
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::fwd_solve_phase2
@@ -838,15 +841,13 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontalMatrixMAGMA<scalar_t,integer_t>::gpu_solve(DenseM_t& b) const {
     gpu::Stream comp_stream;
-    gpu::SOLVERHandle solver_handle(comp_stream);
-    gpu::BLASHandle blas_handle(comp_stream);
-    gpu::magma::MAGMAQueue magma_q(comp_stream, blas_handle);
+    gpu::Handle handle(comp_stream);
     const int lvls = this->levels();
     std::vector<LInfo_t> ldata(lvls);
     for (int l=lvls-1; l>=0; l--) {
       std::vector<F_t*> fp;
       const_cast<FM_t*>(this)->get_level_fronts(fp, l);
-      ldata[l] = LInfo_t(fp, solver_handle);
+      ldata[l] = LInfo_t(fp, handle);
     }
     int nrhs = b.cols();
     std::vector<std::size_t> l_off(lvls, 0);
@@ -944,43 +945,43 @@ namespace strumpack {
       Ipos += L.Isize.back();
     }
     // copy all meta-data at once, from pinned memory
-    gpu_check(gpu::copy_host_to_device<char>(d_mem, h_mem, h_mem_bytes));
+    gpu::copy_host_to_device<char>(d_mem, h_mem, h_mem_bytes);
     // copy rhs, from pageable memory (input)
-    gpu_check(gpu::copy_host_to_device<scalar_t>(d_b, b));
+    gpu::copy_host_to_device<scalar_t>(d_b, b);
 
     // forward solve
     for (int l=lvls-1; l>=0; l--) {
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       auto& L = ldata[l];
       std::size_t N = L.f.size(), Nsmall = L.Nsmall;
       L.set_batch_data(dwork_mem);
       auto d1 = L.dev_d1_batch;   auto d2 = L.dev_d2_batch;
       auto ld1 = L.dev_ld1_batch; auto ld2 = L.dev_ld2_batch;
       auto F11 = L.dev_F_batch;   auto F21 = F11 + 2*Nsmall;
-      gpu_check(gpu::memset<scalar_t>
-                ((l % 2) ? d_bupd_odd : d_bupd_even, 0,
-                 L.total_upd_size*nrhs));
+      gpu::memset<scalar_t>
+        ((l % 2) ? d_bupd_odd : d_bupd_even, 0, L.total_upd_size*nrhs);
       if (l != lvls-1)
         gpu::extend_add_rhs
           (b.rows(), nrhs, N, &h_asmbl[l_off[l]], d_asmbl+l_off[l]);
       // TODO remove?
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       gpu::laswp_fwd_vbatched
-        (blas_handle, nrhs_batch+Nmax-Nsmall, nrhs,
+        (handle, nrhs_batch+Nmax-Nsmall, nrhs,
          d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall,
          L.dev_ipiv_batch, d1, Nsmall);
       gpu::magma::trsm_vbatched_max_nocheck
         (MagmaLeft, MagmaLower, MagmaNoTrans, MagmaUnit,
          L.max_d1_small, nrhs, d1, nrhs_batch+Nmax-Nsmall, scalar_t(1.),
-         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall, Nsmall, magma_q);
+         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-
+         Nsmall, Nsmall, handle);
       gpu::magma::trsm_vbatched_max_nocheck
         (MagmaLeft, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
          L.max_d1_small, nrhs, d1, nrhs_batch+Nmax-Nsmall, scalar_t(1.),
-         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall, Nsmall, magma_q);
+         F11, ld1, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall,
+         Nsmall, handle);
       for (std::size_t i=Nsmall; i<N; i++) {
         DenseMW_t fb(L.f[i]->dim_sep(), nrhs, h_rhs_batch[l][i], b.rows());
-        gpu::getrs(solver_handle, Trans::N, L.f[i]->F11_,
-                   L.f[i]->piv_, fb, getrs_err);
+        gpu::getrs(handle, Trans::N, L.f[i]->F11_, L.f[i]->piv_, fb, getrs_err);
       }
       if (l == 0) break;
       if (nrhs == 1)
@@ -988,25 +989,26 @@ namespace strumpack {
           (MagmaNoTrans, d2, d1, scalar_t(-1.),
            F21, ld2, d_rhs_batch[l], inc_batch+Nmax-Nsmall, scalar_t(1.),
            d_bupd_batch[l], inc_batch+Nmax-Nsmall, Nsmall,
-           L.max_d2_small, L.max_d1_small, magma_q);
+           L.max_d2_small, L.max_d1_small, handle);
       else
         gpu::magma::gemm_vbatched_max_nocheck
           (MagmaNoTrans, MagmaNoTrans, d2, nrhs_batch+Nmax-Nsmall, d1,
            scalar_t(-1.), F21, ld2, d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall,
            scalar_t(1.), d_bupd_batch[l], ld2, Nsmall,
-           L.max_d2_small, nrhs, L.max_d1_small, magma_q);
+           L.max_d2_small, nrhs, L.max_d1_small, handle);
       for (std::size_t i=Nsmall; i<N; i++) {
         DenseMW_t fb(L.f[i]->dim_sep(), nrhs, h_rhs_batch[l][i], b.rows()),
           fbu(L.f[i]->dim_upd(), nrhs, h_bupd_batch[l][i], L.f[i]->dim_upd());
         if (nrhs == 1)
-          gpu::gemv(blas_handle, Trans::N, scalar_t(-1.),
+          gpu::gemv(handle, Trans::N, scalar_t(-1.),
                     L.f[i]->F21_, fb, scalar_t(1.), fbu);
         else
-          gpu::gemm(blas_handle, Trans::N, Trans::N, scalar_t(-1.),
+          gpu::gemm(handle, Trans::N, Trans::N, scalar_t(-1.),
                     L.f[i]->F21_, fb, scalar_t(1.), fbu);
       }
     }
-    gpu::synchronize();
+    gpu::synchronize_default_stream();
+
 
     // backward solve
     for (int l=0; l<lvls; l++) {
@@ -1016,37 +1018,37 @@ namespace strumpack {
       auto d1 = L.dev_d1_batch;   auto d2 = L.dev_d2_batch;
       auto ld1 = L.dev_ld1_batch; auto ld2 = L.dev_ld2_batch;
       auto F12 = L.dev_F_batch + Nsmall;
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       if (l != 0) {
         if (nrhs == 1)
           gpu::magma::gemv_vbatched_max_nocheck
             (MagmaNoTrans, d1, d2, scalar_t(-1.), F12, ld1,
              d_bupd_batch[l], inc_batch+Nmax-Nsmall, scalar_t(1.),
              d_rhs_batch[l], inc_batch+Nmax-Nsmall, Nsmall,
-             L.max_d1_small, L.max_d2_small, magma_q);
+             L.max_d1_small, L.max_d2_small, handle);
         else
           gpu::magma::gemm_vbatched_max_nocheck
             (MagmaNoTrans, MagmaNoTrans, d1, nrhs_batch+Nmax-Nsmall, d2,
              scalar_t(-1.), F12, ld1, d_bupd_batch[l], ld2, scalar_t(1.),
              d_rhs_batch[l], ldrhs_batch+Nmax-Nsmall, Nsmall,
-             L.max_d1_small, nrhs, L.max_d2_small, magma_q);
+             L.max_d1_small, nrhs, L.max_d2_small, handle);
         for (std::size_t i=Nsmall; i<N; i++) {
           DenseMW_t fb(L.f[i]->dim_sep(), nrhs, h_rhs_batch[l][i], b.rows()),
             fbu(L.f[i]->dim_upd(), nrhs, h_bupd_batch[l][i], L.f[i]->dim_upd());
           if (nrhs == 1)
-            gpu::gemv(blas_handle, Trans::N, scalar_t(-1.),
+            gpu::gemv(handle, Trans::N, scalar_t(-1.),
                       L.f[i]->F12_, fbu, scalar_t(1.), fb);
           else
-            gpu::gemm(blas_handle, Trans::N, Trans::N, scalar_t(-1.),
+            gpu::gemm(handle, Trans::N, Trans::N, scalar_t(-1.),
                       L.f[i]->F12_, fbu, scalar_t(1.), fb);
         }
       }
-      gpu::synchronize();
+      gpu::synchronize_default_stream();
       if (l != lvls-1)
         gpu::extract_rhs
           (b.rows(), nrhs, N, &h_asmbl[l_off[l]], d_asmbl+l_off[l]);
     }
-    gpu_check(gpu::copy_device_to_host<scalar_t>(b, d_b));
+    gpu::copy_device_to_host<scalar_t>(b, d_b);
   }
 
   // explicit template instantiations

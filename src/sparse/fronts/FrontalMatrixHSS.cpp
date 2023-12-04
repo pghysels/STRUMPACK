@@ -54,11 +54,6 @@ namespace strumpack {
   FrontalMatrixHSS<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
-    const std::size_t pdsep = p->dim_sep();
-    const std::size_t dupd = dim_upd();
-    std::size_t upd2sep;
-    auto I = this->upd_to_parent(p, upd2sep);
-
     auto F22 = H_.child(1)->dense();
     if (Theta_.cols() < Phi_.cols())
       // S = F22 - Theta_ * ThetaVhatC_or_VhatCPhiC_
@@ -70,25 +65,7 @@ namespace strumpack {
       gemm(Trans::N, Trans::C, scalar_t(-1.),
            ThetaVhatC_or_VhatCPhiC_, Phi_,
            scalar_t(1.), F22, task_depth);
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop default(shared)                            \
-  if(task_depth < params::task_recursion_cutoff_level)
-#endif
-    for (std::size_t c=0; c<dupd; c++) {
-      std::size_t pc = I[c];
-      if (pc < pdsep) {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF11(I[r],pc) += F22(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF21(I[r]-pdsep,pc) += F22(r,c);
-      } else {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF12(I[r],pc-pdsep) += F22(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF22(I[r]-pdsep,pc-pdsep) += F22(r,c);
-      }
-    }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*static_cast<long long int>(dupd*dupd));
+    this->extend_add(paF11, paF12, paF21, paF22, F22, p);
     release_work_memory();
   }
 

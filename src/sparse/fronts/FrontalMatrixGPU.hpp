@@ -30,16 +30,7 @@
 #define FRONTAL_MATRIX_GPU_HPP
 
 #include "FrontalMatrixDense.hpp"
-
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-#include "dense/DPCPPWrapper.hpp"
-#endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
@@ -58,6 +49,7 @@ namespace strumpack {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
+    using Opts_t = SPOptions<scalar_t>;
     using LInfo_t = LevelInfo<scalar_t,integer_t>;
 
   public:
@@ -81,13 +73,26 @@ namespace strumpack {
                                DenseM_t& B, int task_depth) const override {}
 
     std::string type() const override { return "FrontalMatrixGPU"; }
+    bool isGPU() const override { return true; }
 
 #if defined(STRUMPACK_USE_MPI)
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FrontalMatrixMPI<scalar_t,integer_t>* pa)
       const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa)
+      const override;
+    void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, 
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts)
+      const override;
 #endif
+
+    scalar_t* get_device_F22(scalar_t* dF22) override;
 
   private:
     std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
