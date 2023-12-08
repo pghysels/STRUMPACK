@@ -211,17 +211,17 @@ namespace strumpack {
 
     void clear() {
       data_.clear();
+#if defined(STRUMPACK_USE_GPU)
       device_bytes_.clear();
       pinned_data_.clear();
+#endif
     }
 
   private:
     std::vector<std::vector<scalar_t,NoInit<scalar_t>>> data_;
 #if defined(STRUMPACK_USE_GPU)
-    // std::vector<gpu::DeviceMemory<scalar_t>> device_data_;
     std::vector<gpu::DeviceMemory<char>> device_bytes_;
     std::vector<gpu::HostMemory<scalar_t>> pinned_data_;
-    // TODO keep streams? magma queues?
 #endif
   };
 
