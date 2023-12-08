@@ -578,11 +578,7 @@ namespace strumpack {
     flop_breakdown_reset();
     ReturnCode err_code;
     TaskTimer t1("Sparse-factorization", [&]() {
-      if (opts_.replace_tiny_pivots() && opts_.matching() == MatchingJob::NONE) {
-        auto shifted_mat = matrix_nonzero_diag();
-        err_code = tree()->multifrontal_factorization(*shifted_mat, opts_);
-      } else
-        err_code = tree()->multifrontal_factorization(*matrix(), opts_);
+      err_code = tree()->multifrontal_factorization(*matrix(), opts_);
     });
     perf_counters_stop("numerical factorization");
     if (opts_.verbose()) {
