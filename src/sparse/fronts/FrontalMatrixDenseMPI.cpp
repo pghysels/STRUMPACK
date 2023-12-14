@@ -155,11 +155,14 @@ namespace strumpack {
     TaskTimer pf("FrontalMatrixDenseMPI_factor");
     pf.start();
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-    if (opts.use_gpu())
+    if (opts.use_gpu()) {
       slate_opts_.insert({slate::Option::Target, slate::Target::Devices});
+      slate_opts_.insert({slate::Option::MethodLU, slate::MethodLU::CALU});
+    }
     auto slateF11 = slate_matrix(F11_);
     // TODO get return value
-    slate::getrf(slateF11, slate_piv_, slate_opts_);
+    if (!this->dim_upd())
+      slate::getrf(slateF11, slate_piv_, slate_opts_);
 #else
     if (F11_.LU(piv))
       err_code = ReturnCode::ZERO_PIVOT;
@@ -183,7 +186,8 @@ namespace strumpack {
       auto slateF12 = slate_matrix(F12_);
       auto slateF21 = slate_matrix(F21_);
       auto slateF22 = slate_matrix(F22_);
-      slate::getrs(slateF11, slate_piv_, slateF12, slate_opts_);
+      /// slate::getrs(slateF11, slate_piv_, slateF12, slate_opts_);
+      slate::gesv(slateF11, slate_piv_, slateF12, slate_opts_);
       slate::gemm(scalar_t(-1.), slateF21, slateF12,
                   scalar_t(1.), slateF22, slate_opts_);
 #else
