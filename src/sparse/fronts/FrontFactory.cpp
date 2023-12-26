@@ -51,6 +51,7 @@
 #endif
 #if defined(STRUMPACK_USE_GPU)
 #include "FrontalMatrixGPU.hpp"
+#include "FrontalMatrixGPUSymmetric.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"
@@ -142,9 +143,14 @@ namespace strumpack {
       front.reset
         (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
 #else
-#if defined(STRUMPACK_USE_GPU)
-      front.reset
-        (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+        if (is_symmetric(opts)){
+            front.reset
+                    (new FrontalMatrixGPUSymmetric<scalar_t,integer_t>(s, sbegin, send, upd));
+        } else {
+            front.reset
+                    (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
+        }
 #endif
 #endif
       if (root) fc.dense++;

@@ -82,7 +82,8 @@ namespace strumpack {
    */
   enum class UpLo : char {
     U='U',  /*!< Upper triangle    */
-    L='L'   /*!< Lower triangle    */
+    L='L',   /*!< Lower triangle    */
+    F='F'   /*!< Full matrix    */
   };
 
   /**

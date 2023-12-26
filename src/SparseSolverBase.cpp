@@ -333,8 +333,11 @@ namespace strumpack {
       }
     }
 
-    equil_ = matrix()->equilibration();
-    matrix()->equilibrate(equil_);
+    // TODO(Jie): disable equilibration for sym temperately
+    if (!matrix()->symm_sparse()){
+      equil_ = matrix()->equilibration();
+      matrix()->equilibrate(equil_);
+    }
     if (opts_.verbose() && is_root_)
       std::cout << "# matrix equilibration, r_cond = "
                 << equil_.rcond << " , c_cond = " << equil_.ccond

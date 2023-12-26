@@ -83,9 +83,17 @@ namespace strumpack {
     template<typename T> void
     assemble(unsigned int, AssembleData<T>*, AssembleData<T>*);
 
+    template<typename T> void
+    assemble_symmetric(unsigned int, AssembleData<T>*, AssembleData<T>*);
+
     template<typename T, int NT=32,
              typename real_t = typename RealType<T>::value_type>
     void factor_block_batch(unsigned int, FrontData<T>*, bool, real_t, int*);
+
+    template<typename T, int NT=32,
+          typename real_t = typename RealType<T>::value_type>
+    void factor_symmetric_block_batch(unsigned int count, FrontData<T>* dat,
+                                        bool replace, real_t thresh, int* dinfo);
 
     template<typename T,
              typename real_t = typename RealType<T>::value_type>

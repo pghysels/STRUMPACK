@@ -749,7 +749,17 @@ namespace strumpack {
      */
     void disable_gpu() { use_gpu_ = false; }
 
-    /**
+//      /**
+//     * Disable symmetric solver.
+//     */
+//      void disable_symmetric() { use_symmetric_ = false; }
+      /**
+      * Disable symmetric solver.
+      */
+      void enable_symmetric() { use_symmetric_ = true; }
+
+
+      /**
      * Set the number of (CUDA) streams to be used in the code.
      */
     void set_gpu_streams(int s) { gpu_streams_ = s; }
@@ -1150,6 +1160,11 @@ namespace strumpack {
     bool use_gpu() const { return use_gpu_; }
 
     /**
+     * Check wheter or not to use symmetric solver.
+     */
+    bool use_symmetric() const { return use_symmetric_; }
+
+    /**
      * Check wheter or not to use OpenMP tree traversal is the sparse
      * solver.
      */
@@ -1296,6 +1311,7 @@ namespace strumpack {
     bool print_comp_front_stats_ = false;
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
     bool use_openmp_tree_ = true;
+    bool use_symmetric_ = false;
 
     /** GPU options */
 #if defined(STRUMPACK_USE_GPU)

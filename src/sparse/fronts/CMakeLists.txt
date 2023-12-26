@@ -36,7 +36,12 @@ if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP OR STRUMPACK_USE_SYCL)
     PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.cpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUSymmetric.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUSymmetric.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUKernels.hpp)
+
+  find_package(Eigen3 REQUIRED)
+  target_link_libraries(strumpack PRIVATE Eigen3::Eigen)
 endif()
 
 if(STRUMPACK_USE_MAGMA)
@@ -47,7 +52,8 @@ endif()
 
 if(STRUMPACK_USE_CUDA)
   target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.cu)
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.cu
+    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUSymmetric.cu)
 endif()
 
 if(STRUMPACK_USE_SYCL)

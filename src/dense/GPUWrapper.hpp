@@ -393,7 +393,19 @@ namespace strumpack {
           DenseMatrix<scalar_t>& B, int *dinfo,
           scalar_t* work=nullptr, std::int64_t lwork=0);
 
+    template<typename scalar_t>
+    int potrf_buffersize(Handle& handle, UpLo uplo, int n);
+
     template<typename scalar_t> void
+    potrf(Handle& handle, UpLo uplo, DenseMatrix<scalar_t>& A,
+          scalar_t* Workspace, int Lwork, int* devInfo);
+
+    template<typename scalar_t> void
+    syrk(Handle& handle, UpLo uplo, Trans ta,
+         scalar_t alpha, const DenseMatrix<scalar_t>& a,
+         scalar_t beta, DenseMatrix<scalar_t>& c);
+
+        template<typename scalar_t> void
     trsm(Handle& handle, Side side, UpLo uplo,
          Trans trans, Diag diag, const scalar_t alpha,
          DenseMatrix<scalar_t>& A, DenseMatrix<scalar_t>& B);
