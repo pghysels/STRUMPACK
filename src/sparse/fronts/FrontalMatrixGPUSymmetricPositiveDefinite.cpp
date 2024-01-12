@@ -31,7 +31,7 @@
  */
 #include <array>
 
-#include "FrontalMatrixGPUSymmetric.hpp"
+#include "FrontalMatrixGPUSymmetricPositiveDefinite.hpp"
 #include "FrontalMatrixGPUKernels.hpp"
 
 #if defined(STRUMPACK_USE_MPI)
@@ -43,7 +43,7 @@ namespace strumpack {
 
     template<typename scalar_t, typename integer_t> class LevelInfoUnified {
         using F_t = FrontalMatrix<scalar_t,integer_t>;
-        using FG_t = FrontalMatrixGPUSymmetric<scalar_t,integer_t>;
+        using FG_t = FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>;
         using DenseMW_t = DenseMatrixWrapper<scalar_t>;
         using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
 
@@ -310,13 +310,13 @@ namespace strumpack {
 
 
     template<typename scalar_t,typename integer_t>
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::FrontalMatrixGPUSymmetric
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::FrontalMatrixGPUSymmetricPositiveDefinite
             (integer_t sep, integer_t sep_begin, integer_t sep_end,
              std::vector<integer_t>& upd)
             : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
     template<typename scalar_t,typename integer_t>
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::~FrontalMatrixGPUSymmetric() {
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::~FrontalMatrixGPUSymmetricPositiveDefinite() {
 #if defined(STRUMPACK_COUNT_FLOPS)
         const std::size_t dupd = dim_upd();
     const std::size_t dsep = dim_sep();
@@ -325,14 +325,14 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t> void
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::release_work_memory() {
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::release_work_memory() {
         F22_.clear();
         host_Schur_.reset(nullptr);
     }
 
 #if defined(STRUMPACK_USE_MPI)
     template<typename scalar_t,typename integer_t> void
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::extend_add_copy_to_buffers
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::extend_add_copy_to_buffers
             (std::vector<std::vector<scalar_t>>& sbuf,
              const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
         ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
@@ -342,7 +342,7 @@ namespace strumpack {
 
 
     template<typename scalar_t,typename integer_t> void
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::extend_add_to_dense
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::extend_add_to_dense
             (DenseM_t& paF11, DenseM_t& paF21, DenseM_t& paF22,
              const F_t* p, int task_depth) {
         const std::size_t pdsep = paF11.rows();
@@ -390,7 +390,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t, typename integer_t> void
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::front_assembly
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::front_assembly
             (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
         using Trip_t = Triplet<scalar_t>;
         auto N = L.f.size();
@@ -436,13 +436,13 @@ namespace strumpack {
 
     // TODO(Jie): fix for un-symmetric
     template<typename scalar_t, typename integer_t> long long
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::dense_node_factor_nonzeros() const {
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::dense_node_factor_nonzeros() const {
         long long dsep = dim_sep(), dupd = dim_upd();
         return dsep * (dsep + dupd);
     }
 
     template<typename scalar_t, typename integer_t> void
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::factor_small_fronts
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::factor_small_fronts
             (LInfo_t& L, gpu::FrontData<scalar_t>* fdata, int* dinfo,
              const SPOptions<scalar_t>& opts) {
         if (!L.small_fronts) return;
@@ -468,7 +468,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t> ReturnCode
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::split_smaller
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::split_smaller
             (const SpMat_t& A, const SPOptions<scalar_t>& opts,
              int etree_level, int task_depth) {
         if (opts.verbose())
@@ -566,7 +566,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t>
-    ReturnCode FrontalMatrixGPUSymmetric<scalar_t, integer_t>::multifrontal_factorization_symmetric(
+    ReturnCode FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t, integer_t>::multifrontal_factorization_symmetric(
             const SpMat_t& A,
             const SPOptions<scalar_t>& opts,
             int etree_level, int task_depth) {
@@ -858,7 +858,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t> ReturnCode
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::multifrontal_factorization
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::multifrontal_factorization
             (const SpMat_t& A, const SPOptions<scalar_t>& opts,
              int etree_level, int task_depth) {
         if (!A.symm_sparse()) {
@@ -870,7 +870,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t> void
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::fwd_solve_phase2
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::fwd_solve_phase2
             (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
         if (dim_sep()) {
             DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
@@ -888,7 +888,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t> void
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::bwd_solve_phase1
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::bwd_solve_phase1
             (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
         if (dim_sep()) {
             DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
@@ -906,7 +906,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t,typename integer_t> ReturnCode
-    FrontalMatrixGPUSymmetric<scalar_t,integer_t>::node_inertia
+    FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>::node_inertia
             (integer_t& neg, integer_t& zero, integer_t& pos) const {
         using real_t = typename RealType<scalar_t>::value_type;
         for (std::size_t i=0; i<F11_.rows(); i++) {
@@ -1076,19 +1076,19 @@ namespace strumpack {
     };
 
     // explicit template instantiations
-    template class FrontalMatrixGPUSymmetric<float,int>;
-    template class FrontalMatrixGPUSymmetric<double,int>;
-    template class FrontalMatrixGPUSymmetric<std::complex<float>,int>;
-    template class FrontalMatrixGPUSymmetric<std::complex<double>,int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<float,int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<double,int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<std::complex<float>,int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<std::complex<double>,int>;
 
-    template class FrontalMatrixGPUSymmetric<float,long int>;
-    template class FrontalMatrixGPUSymmetric<double,long int>;
-    template class FrontalMatrixGPUSymmetric<std::complex<float>,long int>;
-    template class FrontalMatrixGPUSymmetric<std::complex<double>,long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<float,long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<double,long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<std::complex<float>,long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<std::complex<double>,long int>;
 
-    template class FrontalMatrixGPUSymmetric<float,long long int>;
-    template class FrontalMatrixGPUSymmetric<double,long long int>;
-    template class FrontalMatrixGPUSymmetric<std::complex<float>,long long int>;
-    template class FrontalMatrixGPUSymmetric<std::complex<double>,long long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<float,long long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<double,long long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<std::complex<float>,long long int>;
+    template class FrontalMatrixGPUSymmetricPositiveDefinite<std::complex<double>,long long int>;
 
 } // end namespace strumpack

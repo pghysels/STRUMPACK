@@ -2,8 +2,8 @@ add_executable(testPoisson2d      EXCLUDE_FROM_ALL testPoisson2d.cpp)
 add_executable(testMMdouble       EXCLUDE_FROM_ALL testMMdouble.cpp)
 add_executable(testPoisson3d      EXCLUDE_FROM_ALL testPoisson3d.cpp)
 add_executable(testMixedPrecision EXCLUDE_FROM_ALL testMixedPrecision.cpp)
-add_executable(testMixedPrecisionSymmetric EXCLUDE_FROM_ALL testMixedPrecisionSymmetric.cpp)
-add_executable(testSymmetric EXCLUDE_FROM_ALL testSymmetric.cpp)
+add_executable(testMixedPrecisionSymmetricPositiveDefinite EXCLUDE_FROM_ALL testMixedPrecisionSymmetricPositiveDefinite.cpp)
+add_executable(testSymmetricPositiveDefinite EXCLUDE_FROM_ALL testSymmetricPositiveDefinite.cpp)
 add_executable(sexample           EXCLUDE_FROM_ALL sexample.c)
 add_executable(dexample           EXCLUDE_FROM_ALL dexample.c)
 add_executable(cexample           EXCLUDE_FROM_ALL cexample.c)
@@ -15,8 +15,8 @@ target_link_libraries(testPoisson2d strumpack)
 target_link_libraries(testMMdouble strumpack)
 target_link_libraries(testPoisson3d strumpack)
 target_link_libraries(testMixedPrecision strumpack)
-target_link_libraries(testMixedPrecisionSymmetric strumpack)
-target_link_libraries(testSymmetric strumpack)
+target_link_libraries(testMixedPrecisionSymmetricPositiveDefinite strumpack)
+target_link_libraries(testSymmetricPositiveDefinite strumpack)
 target_link_libraries(sexample strumpack)
 target_link_libraries(dexample strumpack)
 target_link_libraries(cexample strumpack)
@@ -28,8 +28,8 @@ add_dependencies(examples
   testMMdouble
   testPoisson3d
   testMixedPrecision
-  testMixedPrecisionSymmetric
-  testSymmetric
+  testMixedPrecisionSymmetricPositiveDefinite
+  testSymmetricPositiveDefinite
   sexample
   dexample
   cexample

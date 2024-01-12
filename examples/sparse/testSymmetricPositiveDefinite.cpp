@@ -116,16 +116,17 @@ void test(CSRMatrix<working_t,int>& A,
 
 int main(int argc, char* argv[]) {
 
-    std::cout << "long double size in bytes: "
-              << sizeof(long double) << " "
-              << std::endl;
-
-    std::string f="/home/tingxuan/CLionProjects/nd6k/matrix.mtx";
-    if (argc > 1) f = std::string(argv[1]);
-
     CSRMatrix<double,int> A_d;
-    A_d.read_matrix_market(f);
-//    auto A_f = cast_matrix<double,int,float>(A_d);
+    if(argc > 1){
+        A_d.read_matrix_market(argv[1]);
+    }else{
+        int n =3;
+        int ptr[4] = {0,2,3,5};
+        int Index[5] = {0,2,1,0,2};
+        double val[5] = {2.1,1,3.5,1,5.2};
+        A_d = CSRMatrix<double,int>(n, ptr, Index, val);
+    }
+
 
     int N = A_d.size();
     int m = 1; // nr of RHSs

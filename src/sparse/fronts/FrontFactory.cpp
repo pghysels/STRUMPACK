@@ -51,7 +51,7 @@
 #endif
 #if defined(STRUMPACK_USE_GPU)
 #include "FrontalMatrixGPU.hpp"
-#include "FrontalMatrixGPUSymmetric.hpp"
+#include "FrontalMatrixGPUSymmetricPositiveDefinite.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"
@@ -146,7 +146,7 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_GPU)
         if (is_symmetric(opts) && is_positive_definite(opts)){
             front.reset
-                    (new FrontalMatrixGPUSymmetric<scalar_t,integer_t>(s, sbegin, send, upd));
+                    (new FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>(s, sbegin, send, upd));
         } else {
             front.reset
                     (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));

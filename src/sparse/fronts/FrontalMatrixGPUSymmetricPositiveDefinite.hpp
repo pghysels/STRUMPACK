@@ -26,19 +26,19 @@ namespace strumpack {
     }
 
 
-    template<typename scalar_t,typename integer_t> class FrontalMatrixGPUSymmetric
+    template<typename scalar_t,typename integer_t> class FrontalMatrixGPUSymmetricPositiveDefinite
             : public FrontalMatrix<scalar_t,integer_t> {
         using F_t = FrontalMatrix<scalar_t,integer_t>;
-        using FG_t = FrontalMatrixGPUSymmetric<scalar_t,integer_t>;
+        using FG_t = FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>;
         using DenseM_t = DenseMatrix<scalar_t>;
         using DenseMW_t = DenseMatrixWrapper<scalar_t>;
         using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
         using LInfo_t = LevelInfoUnified<scalar_t,integer_t>;
 
     public:
-        FrontalMatrixGPUSymmetric(integer_t sep, integer_t sep_begin, integer_t sep_end,
+        FrontalMatrixGPUSymmetricPositiveDefinite(integer_t sep, integer_t sep_begin, integer_t sep_end,
                          std::vector<integer_t>& upd);
-        ~FrontalMatrixGPUSymmetric();
+        ~FrontalMatrixGPUSymmetricPositiveDefinite();
 
         long long dense_node_factor_nonzeros() const override;
 
@@ -78,8 +78,8 @@ namespace strumpack {
         std::vector<int> pivot_mem_;
         int* piv_ = nullptr;
 
-        FrontalMatrixGPUSymmetric(const FrontalMatrixGPUSymmetric&) = delete;
-        FrontalMatrixGPUSymmetric& operator=(FrontalMatrixGPUSymmetric const&) = delete;
+        FrontalMatrixGPUSymmetricPositiveDefinite(const FrontalMatrixGPUSymmetricPositiveDefinite&) = delete;
+        FrontalMatrixGPUSymmetricPositiveDefinite& operator=(FrontalMatrixGPUSymmetricPositiveDefinite const&) = delete;
 
         void front_assembly(const SpMat_t& A, LInfo_t& L,
                             char* hea_mem, char* dea_mem);
