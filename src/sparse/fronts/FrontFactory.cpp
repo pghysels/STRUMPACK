@@ -143,8 +143,8 @@ namespace strumpack {
       front.reset
         (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
 #else
-#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
-        if (is_symmetric(opts)){
+#if defined(STRUMPACK_USE_GPU)
+        if (is_symmetric(opts) && is_positive_definite(opts)){
             front.reset
                     (new FrontalMatrixGPUSymmetric<scalar_t,integer_t>(s, sbegin, send, upd));
         } else {

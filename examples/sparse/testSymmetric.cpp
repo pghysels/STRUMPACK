@@ -33,7 +33,6 @@
 #include <type_traits>
 #include <random>
 #include <cmath>
-#include <eigen3/Eigen/Dense>
 
 #include "StrumpackSparseSolver.hpp"
 #include "StrumpackSparseSolverMixedPrecision.hpp"
@@ -94,7 +93,9 @@ void test(CSRMatrix<working_t,int>& A,
         spss.options().set_matching(strumpack::MatchingJob::NONE);
         spss.solver().options().set_matching(strumpack::MatchingJob::NONE);
         spss.options().enable_symmetric();
+        spss.options().enable_positive_definite();
         spss.solver().options().enable_symmetric();
+        spss.solver().options().enable_positive_definite();
 
         spss.set_matrix(A);
         spss.reorder();
@@ -152,16 +153,27 @@ int main(int argc, char* argv[]) {
         SparseSolver<double,int> spss;
         // SparseSolverMixedPrecision<double,long double,int> spss;
         spss.options().enable_symmetric();
+        spss.options().enable_positive_definite();
         spss.set_matrix(A_d);
         spss.options().set_matching(strumpack::MatchingJob::NONE);
         spss.options().set_Krylov_solver(KrylovSolver::DIRECT);
         spss.solve(b_d, x);
 
-        Eigen::Map<Eigen::MatrixXd> vec_true(x_true_d.data(), N, m);
-        std::cout<<"x_true_d="<<vec_true<<std::endl;
+        std::cout<<"x_true_d=";
+        for(int r=0; r<N; r++){
+            for(int c=0; c<m; c++){
+                std::cout<<x_true_d.data()[r+m*c];
+            }
+            std::cout<<std::endl;
+        }
 
-        Eigen::Map<Eigen::MatrixXd> vec(x.data(), N, m);
-        std::cout<<"x_solve="<<vec<<std::endl;
+        std::cout<<"x_solve=";
+        for(int r=0; r<N; r++){
+            for(int c=0; c<m; c++){
+                std::cout<<x.data()[r+m*c];
+            }
+            std::cout<<std::endl;
+        }
 
     }
     return 0;

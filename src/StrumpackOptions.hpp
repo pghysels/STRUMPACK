@@ -753,10 +753,21 @@ namespace strumpack {
 //     * Disable symmetric solver.
 //     */
 //      void disable_symmetric() { use_symmetric_ = false; }
+//
+//      /**
+//   * Disable positive_definite solver.
+//   */
+//      void disable_positive_definite() { use_positive_definite_ = false; }
       /**
-      * Disable symmetric solver.
+      * Enable symmetric solver.
       */
       void enable_symmetric() { use_symmetric_ = true; }
+
+
+      /**
+      * Enable positive_definite solver.
+      */
+      void enable_positive_definite() { use_positive_definite_ = true; }
 
 
       /**
@@ -1164,6 +1175,11 @@ namespace strumpack {
      */
     bool use_symmetric() const { return use_symmetric_; }
 
+   /**
+    * Check wheter or not to use symmetric solver.
+    */
+    bool use_positive_definite() const { return use_positive_definite_; }
+
     /**
      * Check wheter or not to use OpenMP tree traversal is the sparse
      * solver.
@@ -1312,6 +1328,7 @@ namespace strumpack {
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
     bool use_openmp_tree_ = true;
     bool use_symmetric_ = false;
+    bool use_positive_definite_ = false;
 
     /** GPU options */
 #if defined(STRUMPACK_USE_GPU)

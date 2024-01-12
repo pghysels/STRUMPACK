@@ -40,8 +40,6 @@ if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP OR STRUMPACK_USE_SYCL)
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUSymmetric.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUKernels.hpp)
 
-  find_package(Eigen3 REQUIRED)
-  target_link_libraries(strumpack PRIVATE Eigen3::Eigen)
 endif()
 
 if(STRUMPACK_USE_MAGMA)

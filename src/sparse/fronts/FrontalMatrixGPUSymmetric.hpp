@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <Eigen/Sparse>
 #include "FrontalMatrixDense.hpp"
 
 #if defined(STRUMPACK_USE_CUDA)
@@ -76,8 +75,6 @@ namespace strumpack {
         std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
         std::unique_ptr<scalar_t[], std::function<void(scalar_t*)>> host_factors_diagonal_{nullptr, std::default_delete<scalar_t[]>{}}, host_factors_off_diagonal_{nullptr, std::default_delete<scalar_t[]>{}};
         DenseMW_t F11_, F12_, F21_, F22_;
-        Eigen::SparseMatrix<scalar_t,Eigen::ColMajor,integer_t> F11L_sparse_{};
-        Eigen::SparseMatrix<scalar_t,Eigen::ColMajor,integer_t> F11U_sparse_{};
         std::vector<int> pivot_mem_;
         int* piv_ = nullptr;
 

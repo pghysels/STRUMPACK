@@ -93,7 +93,9 @@ void test(CSRMatrix<working_t,int>& A,
         spss.options().set_matching(strumpack::MatchingJob::NONE);
         spss.solver().options().set_matching(strumpack::MatchingJob::NONE);
         spss.options().enable_symmetric();
+        spss.options().enable_positive_definite();
         spss.solver().options().enable_symmetric();
+        spss.solver().options().enable_positive_definite();
 
         spss.set_matrix(A);
         spss.reorder();
@@ -123,7 +125,7 @@ int main(int argc, char* argv[]) {
 
     CSRMatrix<double,int> A_d;
     A_d.read_matrix_market(f);
-//    auto A_f = cast_matrix<double,int,float>(A_d);
+    auto A_f = cast_matrix<double,int,float>(A_d);
 
     int N = A_d.size();
     int m = 1; // nr of RHSs
@@ -151,6 +153,7 @@ int main(int argc, char* argv[]) {
         SparseSolver<double,int> spss;
         // SparseSolverMixedPrecision<double,long double,int> spss;
         spss.options().enable_symmetric();
+        spss.options().enable_positive_definite();
         spss.set_matrix(A_d);
         spss.options().set_matching(strumpack::MatchingJob::NONE);
         spss.options().set_Krylov_solver(KrylovSolver::DIRECT);
@@ -172,7 +175,7 @@ int main(int argc, char* argv[]) {
     copy(b_d, b_f);
 
     test<double>(A_d, b_d, x_true_d, argc, argv);
-//  test<float >(A_f, b_f, x_true_f, argc, argv);
+    test<float >(A_f, b_f, x_true_f, argc, argv);
 
     return 0;
 }
