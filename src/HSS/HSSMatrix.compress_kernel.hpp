@@ -119,7 +119,7 @@ namespace strumpack {
         //if (this->is_untouched()) {
         B01_ = DenseM_t(child(0)->U_rank(), child(1)->V_rank());
         Aelem(w.c[0].Ir, w.c[1].Ic, B01_);
-        B10_ = B01_.transpose();
+        B10_ = B01_.conj_transpose();
         //}
       }
       if (w.lvl == 0)

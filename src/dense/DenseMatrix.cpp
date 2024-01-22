@@ -270,7 +270,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t> DenseMatrix<scalar_t>
-  DenseMatrix<scalar_t>::transpose() const {
+  DenseMatrix<scalar_t>::conj_transpose() const {
     DenseMatrix<scalar_t> tmp(cols(), rows());
     blas::omatcopy
       ('C', rows(), cols(), data(), ld(), tmp.data(), tmp.ld());
@@ -278,7 +278,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
-  DenseMatrix<scalar_t>::transpose(DenseMatrix<scalar_t>& X) const {
+  DenseMatrix<scalar_t>::conj_transpose(DenseMatrix<scalar_t>& X) const {
     assert(rows() == X.cols() && cols() == X.rows());
     blas::omatcopy
       ('C', rows(), cols(), data(), ld(), X.data(), X.ld());
@@ -750,8 +750,8 @@ namespace strumpack {
     // TODO optimize by implementing by row directly, avoiding transposes
     TIMER_TIME(TaskType::HSS_SEQHQRINTERPOL, 1, t_hss_seq_hqr);
     DenseMatrix<scalar_t> Xt;
-    transpose().ID_column(Xt, piv, ind, rel_tol, abs_tol, max_rank, depth);
-    X = Xt.transpose();
+    conj_transpose().ID_column(Xt, piv, ind, rel_tol, abs_tol, max_rank, depth);
+    X = Xt.conj_transpose();
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::ID_column

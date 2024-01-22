@@ -108,7 +108,7 @@ namespace strumpack {
     //      DW_t(n, rank, V_, 0, 0), scalar_t(0.), V);
 
     U = D_t(m, rank); U.copy(U_, 0, 0);
-    V = DW_t(n, rank, V_, 0, 0).transpose();
+    V = DW_t(n, rank, V_, 0, 0).conj_transpose();
   }
 
 

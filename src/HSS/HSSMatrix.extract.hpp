@@ -54,7 +54,7 @@ namespace strumpack {
     (WorkExtract<scalar_t>& w, bool odiag, int depth) const {
       if (w.J.empty()) return;
       if (this->leaf()) {
-        if (odiag) w.y = V_.extract_rows(w.J).transpose();
+        if (odiag) w.y = V_.extract_rows(w.J).conj_transpose();
         else w.ycols.clear();
       } else {
         w.split_extraction_sets(child(0)->dims());
