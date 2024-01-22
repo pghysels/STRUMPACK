@@ -297,9 +297,6 @@ namespace strumpack {
     MPIComm comm_;
 
     SpMat_t* matrix() override { return mat_mpi_.get(); }
-    std::unique_ptr<SpMat_t> matrix_nonzero_diag() override {
-      return mat_mpi_->add_missing_diagonal(opts_.pivot_threshold());
-    }
     Reord_t* reordering() override;
     Tree_t* tree() override { return tree_mpi_dist_.get(); }
     const SpMat_t* matrix() const override { return mat_mpi_.get(); }

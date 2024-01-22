@@ -399,7 +399,6 @@ namespace strumpack {
     virtual void separator_reordering() = 0;
 
     virtual SpMat_t* matrix() = 0;
-    virtual std::unique_ptr<SpMat_t> matrix_nonzero_diag() = 0;
     virtual Reord_t* reordering() = 0;
     virtual Tree_t* tree() = 0;
     virtual const SpMat_t* matrix() const = 0;
