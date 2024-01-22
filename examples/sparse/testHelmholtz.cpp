@@ -88,13 +88,13 @@ CSRMatrixMPI<std::complex<realt>,std::int64_t> Helmholtz3D(std::int64_t nx) {
     ind_loc[i] = colind[i] - 1;
     val_loc[i] = val[i];
   }
-  ptr_loc[0]=0;
+  ptr_loc[0] = 0;
   for (std::int64_t i=0; i<nnz-1; i++)
     if (rowind[i] != rowind[i+1])
       ptr_loc[rowind[i]-is+1] = i + 1;
   ptr_loc[lrows] = nnz;
 
-  dist[0]=0;
+  dist[0] = 0;
   dist[rank+1] = lrows;
   c.all_gather(dist.data()+1, 1);
   for (int p=0; p<P; p++) dist[p+1] += dist[p];
