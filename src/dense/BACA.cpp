@@ -166,7 +166,7 @@ namespace strumpack {
       V.extract_cols(J, VJ);                           // VJ = V(:,J)
       gemm(Trans::N, Trans::N, scalar_t(-1.), U,       // C -= U*V(:,J)
            VJ, scalar_t(1.), C, task_depth);
-      C.transpose(Ct);
+      C.conj_transpose(Ct);
       ID(Ct, piv, tau, I);
       Arow(I, R);                                      // R = A(I,:)
       U.extract_rows(I, UI);                           // UI = U(I,:)
@@ -260,7 +260,7 @@ namespace strumpack {
       V.extract_cols(J, VJ);
       gemm(Trans::N, Trans::N, scalar_t(-1.), U,       // C -= U*V(:,J)
            VJ, scalar_t(1.), C, task_depth);
-      C.transpose(Ct);
+      C.conj_transpose(Ct);
       for (auto j : rowids)
         for (std::size_t i=0; i<d; i++)
           Ct(i, j) = scalar_t(0.);

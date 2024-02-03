@@ -56,7 +56,7 @@ test(int argc, char* argv[], CSRMatrix<scalar_t,integer_t>& A) {
   }
   if (spss.factor() != ReturnCode::SUCCESS) {
     std::cout << "problem during factorization of the matrix." << std::endl;
-    return;
+    // return;
   }
   spss.solve(b.data(), x.data());
 

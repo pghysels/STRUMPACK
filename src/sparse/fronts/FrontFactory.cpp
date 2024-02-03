@@ -73,75 +73,78 @@ namespace strumpack {
     } break;
     case CompressionType::HSS: {
       if (is_HSS(dsep, dupd, opts)) {
-        front.reset
-          (new FrontalMatrixHSS<scalar_t,integer_t>(s, sbegin, send, upd));
+        front = std::make_unique<FrontalMatrixHSS<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
         if (root) fc.HSS++;
       }
     } break;
     case CompressionType::BLR: {
       if (is_BLR(dsep, dupd, opts)) {
-        front.reset
-          (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
+        front = std::make_unique<FrontalMatrixBLR<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
         if (root) fc.BLR++;
       }
     } break;
     case CompressionType::HODLR: {
-      if (is_HODLR(dsep, dupd, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
+      if (is_HODLR(dsep, dupd, opts)) {
+        front = std::make_unique<FrontalMatrixHODLR<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
         if (root) fc.HODLR++;
-#endif
       }
+#endif
     } break;
     case CompressionType::BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
+      if (is_HODLR(dsep, dupd, opts, 0)) {
+        front = std::make_unique<FrontalMatrixHODLR<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
         if (root) fc.HODLR++;
+      }
 #endif
-      } else if (is_BLR(dsep, dupd, opts, 1)) {
-        front.reset
-          (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
+      if (!front && is_BLR(dsep, dupd, opts, 1)) {
+        front = std::make_unique<FrontalMatrixBLR<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
         if (root) fc.BLR++;
       }
     } break;
     case CompressionType::ZFP_BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLR<scalar_t,integer_t>(s, sbegin, send, upd));
+      if (is_HODLR(dsep, dupd, opts, 0)) {
+        front = std::make_unique<FrontalMatrixHODLR<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
         if (root) fc.HODLR++;
+      }
 #endif
-      } else if (is_BLR(dsep, dupd, opts, 1)) {
+      if (!front && is_BLR(dsep, dupd, opts, 1)) {
         front.reset
           (new FrontalMatrixBLR<scalar_t,integer_t>(s, sbegin, send, upd));
         if (root) fc.BLR++;
-      } else if (is_lossy(dsep, dupd, opts, 2)) {
-#if defined(STRUMPACK_USE_ZFP)
-        front.reset
-          (new FrontalMatrixLossy<scalar_t,integer_t>(s, sbegin, send, upd));
-        if (root) fc.lossy++;
-#endif
       }
+#if defined(STRUMPACK_USE_ZFP)
+      if (!front && is_lossy(dsep, dupd, opts, 2)) {
+        front = std::make_unique<FrontalMatrixLossy<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
+        if (root) fc.lossy++;
+      }
+#endif
     } break;
     case CompressionType::LOSSLESS:
     case CompressionType::LOSSY: {
-      if (is_lossy(dsep, dupd, opts)) {
 #if defined(STRUMPACK_USE_ZFP)
-        front.reset
-          (new FrontalMatrixLossy<scalar_t,integer_t>(s, sbegin, send, upd));
+      if (is_lossy(dsep, dupd, opts)) {
+        front = std::make_unique<FrontalMatrixLossy<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
         if (root) fc.lossy++;
-#endif
       }
+#endif
     } break;
     };
     if (front) return front;
     if (is_GPU(opts)) {
 #if defined(STRUMPACK_USE_MAGMA)
-      front.reset
-        (new FrontalMatrixMAGMA<scalar_t,integer_t>(s, sbegin, send, upd));
+      front = std::make_unique<FrontalMatrixMAGMA<scalar_t,integer_t>>
+        (s, sbegin, send, upd);
 #else
 #if defined(STRUMPACK_USE_GPU)
         if (is_symmetric(opts) && is_positive_definite(opts)){
@@ -157,8 +160,8 @@ namespace strumpack {
     }
     if (front) return front;
     // fallback in case support for cublas/zfp/hodlr is missing
-    front.reset
-      (new FrontalMatrixDense<scalar_t,integer_t>(s, sbegin, send, upd));
+    front = std::make_unique<FrontalMatrixDense<scalar_t,integer_t>>
+      (s, sbegin, send, upd);
     if (root) fc.dense++;
     return front;
   }
@@ -224,55 +227,52 @@ namespace strumpack {
     switch (opts.compression()) {
     case CompressionType::HSS: {
       if (is_HSS(dsep, dupd, opts)) {
-        front.reset
-          (new FrontalMatrixHSSMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P));
+        front = std::make_unique<FrontalMatrixHSSMPI<scalar_t,integer_t>>
+          (s, sbegin, send, upd, comm, P);
         if (root) fc.HSS++;
       }
     } break;
     case CompressionType::BLR: {
       if (is_BLR(dsep, dupd, opts)) {
-        front.reset
-          (new FrontalMatrixBLRMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
+        front = std::make_unique<FrontalMatrixBLRMPI<scalar_t,integer_t>>
+          (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size());
         if (root) fc.BLR++;
       }
     } break;
     case CompressionType::HODLR: {
-      if (is_HODLR(dsep, dupd, opts)) {
 #if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLRMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P));
+      if (is_HODLR(dsep, dupd, opts)) {
+        front = std::make_unique<FrontalMatrixHODLRMPI<scalar_t,integer_t>>
+          (s, sbegin, send, upd, comm, P);
         if (root) fc.HODLR++;
-#endif
       }
+#endif
     } break;
     case CompressionType::BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLRMPI<scalar_t,integer_t>(s, sbegin, send, upd, comm, P));
+      if (is_HODLR(dsep, dupd, opts, 0)) {
+        front = std::make_unique<FrontalMatrixHODLRMPI<scalar_t,integer_t>>
+          (s, sbegin, send, upd, comm, P);
         if (root) fc.HODLR++;
+      }
 #endif
-      } else if (is_BLR(dsep, dupd, opts, 1)) {
-        front.reset
-          (new FrontalMatrixBLRMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
+      if (!front && is_BLR(dsep, dupd, opts, 1)) {
+        front = std::make_unique<FrontalMatrixBLRMPI<scalar_t,integer_t>>
+          (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size());
         if (root) fc.BLR++;
       }
     } break;
     case CompressionType::ZFP_BLR_HODLR: {
-      if (is_HODLR(dsep, dupd, opts, 0)) {
 #if defined(STRUMPACK_USE_BPACK)
-        front.reset
-          (new FrontalMatrixHODLRMPI<scalar_t,integer_t>(s, sbegin, send, upd, comm, P));
+      if (is_HODLR(dsep, dupd, opts, 0)) {
+        front = std::make_unique<FrontalMatrixHODLRMPI<scalar_t,integer_t>>
+          (s, sbegin, send, upd, comm, P);
         if (root) fc.HODLR++;
+      }
 #endif
-      } else if (is_BLR(dsep, dupd, opts, 1)) {
-        front.reset
-          (new FrontalMatrixBLRMPI<scalar_t,integer_t>
-           (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size()));
+      if (!front && is_BLR(dsep, dupd, opts, 1)) {
+        front = std::make_unique<FrontalMatrixBLRMPI<scalar_t,integer_t>>
+          (s, sbegin, send, upd, comm, P, opts.BLR_options().leaf_size());
         if (root) fc.BLR++;
       }
     } break;
@@ -282,9 +282,8 @@ namespace strumpack {
     };
     // (NONE, LOSSLESS, LOSSY or not compiled with HODLR)
     if (!front) {
-      front.reset
-        (new FrontalMatrixDenseMPI<scalar_t,integer_t>
-         (s, sbegin, send, upd, comm, P));
+      front = std::make_unique<FrontalMatrixDenseMPI<scalar_t,integer_t>>
+        (s, sbegin, send, upd, comm, P);
       if (root) fc.dense++;
     }
     return front;

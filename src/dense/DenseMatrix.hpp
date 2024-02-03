@@ -427,13 +427,13 @@ namespace strumpack {
      */
     void copy(const scalar_t* B, std::size_t ldb);
 
-    /** Return the transpose of this matrix */
-    DenseMatrix<scalar_t> transpose() const;
+    /** Return the conjugate transpose of this matrix */
+    DenseMatrix<scalar_t> conj_transpose() const;
 
     /**
-     * Set X to the transpose of this matrix.
+     * Set X to the conjugate transpose of this matrix.
      */
-    void transpose(DenseMatrix<scalar_t>& X) const;
+    void conj_transpose(DenseMatrix<scalar_t>& X) const;
 
     /**
      * Apply the LAPACK routine xLASWP to the matrix. xLASWP performs

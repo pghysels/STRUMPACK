@@ -48,7 +48,7 @@ namespace strumpack {
       STRUMPACK_SCHUR_FLOPS
         (ch0->U_.apply_flops(B01_.cols()) +
          blas::getrs_flops(ch0->ULV_.D_.rows(), B01_.cols()));
-      auto _phi = DUB01.transpose();
+      auto _phi = DUB01.conj_transpose();
       auto ch1 = child(1);
       Theta = DenseM_t(ch1->rows(), _theta.cols());
       Phi = DenseM_t(ch1->cols(), _phi.cols());

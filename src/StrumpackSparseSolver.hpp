@@ -212,9 +212,6 @@ namespace strumpack {
     void separator_reordering() override;
 
     SpMat_t* matrix() override { return mat_.get(); }
-    std::unique_ptr<SpMat_t> matrix_nonzero_diag() override {
-      return mat_->add_missing_diagonal(opts_.pivot_threshold());
-    }
     Reord_t* reordering() override { return nd_.get(); }
     Tree_t* tree() override { return tree_.get(); }
     const SpMat_t* matrix() const override { return mat_.get(); }
