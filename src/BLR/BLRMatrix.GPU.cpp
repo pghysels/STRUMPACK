@@ -216,15 +216,21 @@ namespace strumpack {
             b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
           }
           if (i > 0) {
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop
+#endif
               for (std::size_t j=0; j<rb; j++)
                 B11.tile(j, i-1).move_to_cpu
                   (copy_stream, pinned+B11.tileroff(j)*B11.tilecols(i-1));
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop
+#endif
               for (std::size_t j=0; j<rb2; j++)
                 B12.tile(i-1, j).move_to_cpu
                   (copy_stream, pinned+B12.tilecoff(j)*B12.tilerows(i-1));
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop
+#endif
               for (std::size_t j=0; j<rb2; j++)
                 B21.tile(j, i-1).move_to_cpu
                   (copy_stream, pinned+B21.tileroff(j)*B21.tilecols(i-1));

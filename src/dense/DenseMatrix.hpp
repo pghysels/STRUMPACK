@@ -1032,7 +1032,7 @@ namespace strumpack {
      * \param ld leading dimension of matrix allocated at D. ld >= m
      */
     DenseMatrixWrapper(std::size_t m, std::size_t n,
-                       scalar_t* D, std::size_t ld) {
+                       scalar_t* D, std::size_t ld) noexcept {
       this->data_ = D; this->rows_ = m; this->cols_ = n;
       this->ld_ = std::max(std::size_t(1), ld);
     }
@@ -1051,13 +1051,13 @@ namespace strumpack {
      * submatrix
      */
     DenseMatrixWrapper(std::size_t m, std::size_t n, DenseMatrix<scalar_t>& D,
-                       std::size_t i, std::size_t j)
+                       std::size_t i, std::size_t j) noexcept
       : DenseMatrixWrapper<scalar_t>(m, n, &D(i, j), D.ld()) {
       assert(i+m <= D.rows());
       assert(j+n <= D.cols());
     }
 
-    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>& D) {
+    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>& D) noexcept {
       this->data_ = D.data();
       this->rows_ = D.rows();
       this->cols_ = D.cols();
@@ -1067,7 +1067,7 @@ namespace strumpack {
     /**
      * Default move constructor.
      */
-    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>&& D) {
+    DenseMatrixWrapper(DenseMatrixWrapper<scalar_t>&& D) noexcept {
       this->data_ = D.data();
       this->rows_ = D.rows();
       this->cols_ = D.cols();
