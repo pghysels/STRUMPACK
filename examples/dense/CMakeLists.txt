@@ -24,17 +24,21 @@ if(STRUMPACK_USE_MPI)
     testStructuredMPI.cpp)
   add_executable(dstructured_mpi       EXCLUDE_FROM_ALL
     dstructured_mpi.c)
+  add_executable(testQCMPI             EXCLUDE_FROM_ALL
+    testQCMPI.cpp)
 
   target_link_libraries(KernelRegressionMPI strumpack)
   target_link_libraries(testBLRMPI strumpack)
   target_link_libraries(testStructuredMPI strumpack)
   target_link_libraries(dstructured_mpi strumpack)
+  target_link_libraries(testQCMPI strumpack)
 
   add_dependencies(examples
     KernelRegressionMPI
     testBLRMPI
     testStructuredMPI
-    dstructured_mpi)
+    dstructured_mpi
+    testQCMPI)
 
   if(STRUMPACK_USE_BPACK)
     add_executable(testHODLR             EXCLUDE_FROM_ALL
