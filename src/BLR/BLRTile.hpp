@@ -123,6 +123,7 @@ namespace strumpack {
       };
 
       virtual void laswp(const std::vector<int>& piv, bool fwd) = 0;
+      virtual void laswp(const int* piv, bool fwd) = 0;
 #if defined(STRUMPACK_USE_GPU)
       virtual void laswp(gpu::Handle& h, int* dpiv, bool fwd) = 0;
 

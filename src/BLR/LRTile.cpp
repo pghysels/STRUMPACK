@@ -246,6 +246,10 @@ namespace strumpack {
     LRTile<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
       U().laswp(piv, fwd);
     }
+    template<typename scalar_t> void
+    LRTile<scalar_t>::laswp(const int* piv, bool fwd) {
+      U().laswp(piv, fwd);
+    }
 #if defined(STRUMPACK_USE_GPU)
     template<typename scalar_t> void
     LRTile<scalar_t>::laswp(gpu::Handle& h, int* dpiv, bool fwd) {

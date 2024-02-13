@@ -144,6 +144,7 @@ namespace strumpack {
       std::vector<int> LU(real_t thresh=0.) override;
 
       void laswp(const std::vector<int>& piv, bool fwd) override;
+      void laswp(const int* piv, bool fwd) override;
 #if defined(STRUMPACK_USE_GPU)
       void laswp(gpu::Handle& h, int* dpiv, bool fwd) override;
 

@@ -118,8 +118,12 @@ namespace strumpack {
       return piv;
     }
 
-    template<typename scalar_t> void DenseTile<scalar_t>::laswp
-    (const std::vector<int>& piv, bool fwd) {
+    template<typename scalar_t> void
+    DenseTile<scalar_t>::laswp(const std::vector<int>& piv, bool fwd) {
+      D().laswp(piv, fwd);
+    }
+    template<typename scalar_t> void
+    DenseTile<scalar_t>::laswp(const int* piv, bool fwd) {
       D().laswp(piv, fwd);
     }
 #if defined(STRUMPACK_USE_GPU)

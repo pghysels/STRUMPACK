@@ -290,10 +290,8 @@ namespace strumpack {
             gpu::copy<int>(dpiv, piv_tile.data(), mi);
             if (!gpu_aware) Tii->move_to_gpu(copy_stream, dcol1);
           }
-          int r0 = A11.tileroff(i);
-          std::transform
-            (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
-             [r0](int p) -> int { return p + r0; });
+          std::copy(piv_tile.begin(), piv_tile.end(),
+                    std::back_inserter(piv));
         }
         if (g->is_local_col(i)) {
           g->col_comm().broadcast_from(Tii->D().data(), mi*mi, i % g->nprows());
@@ -453,6 +451,17 @@ namespace strumpack {
         }
       }
       A22.move_to_cpu(copy_stream, pinned);
+      for (std::size_t i=0, r0=0; i<rb; i++) {
+        if (g->is_local_row(i)) {
+          auto m = A11.tilerows(i);
+          for (std::size_t j=0; j<i; j++)
+            if (g->is_local_col(j))
+              A11.tile(i, j).laswp(piv.data() + r0, true);
+          for (std::size_t j=0; j<m; j++)
+            piv[r0+j] += A11.tileroff(i);
+          r0 += m;
+        }
+      }
       return piv;
     }
 

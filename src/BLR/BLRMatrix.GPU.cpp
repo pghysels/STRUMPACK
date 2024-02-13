@@ -247,9 +247,13 @@ namespace strumpack {
             (copy_stream, pinned+B21.tileroff(j)*B21.tilecols(rb-1));
       }
       gpu::copy_device_to_host(B11.piv_.data(), dpiv, dsep);
-      for (std::size_t i=0; i<rb; i++)
-        for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
-          B11.piv_[l] += B11.tileroff(i);
+      for (std::size_t i=0; i<rb; i++) {
+        auto oi = B11.tileroff(i), oi1 = B11.tileroff(i+1);
+        for (std::size_t j=0; j<i; j++)
+          B11.tile(i, j).laswp(B11.piv_.data()+oi, true);
+        for (std::size_t l=oi; l<oi1; l++)
+          B11.piv_[l] += oi;
+      }
       workspace.restore(pinned);
       workspace.restore(d_batch_matrix_mem);
       workspace.restore(dmem);
