@@ -189,25 +189,29 @@ namespace strumpack {
       }
       TIMER_STOP(t_redist);
       DistElemMult<scalar_t> Afunc(A);
-      switch (opts.compression_algorithm()) {
-      case CompressionAlgorithm::ORIGINAL:
-        if (opts.synchronized_compression())
-          compress_original_sync(Afunc, Afunc, opts);
-        else compress_original_nosync(Afunc, Afunc, opts);
-        break;
-      case CompressionAlgorithm::STABLE:
-        if (opts.synchronized_compression())
-          compress_stable_sync(Afunc, Afunc, opts);
-        else compress_stable_nosync(Afunc, Afunc, opts);
-        break;
-      case CompressionAlgorithm::HARD_RESTART:
-        if (opts.synchronized_compression())
-          compress_hard_restart_sync(Afunc, Afunc, opts);
-        else compress_hard_restart_nosync(Afunc, Afunc, opts);
-        break;
-      default:
-        std::cout << "Compression algorithm not recognized!" << std::endl;
-      };
+      if (opts.compression_sketch() == CompressionSketch::SJLT) {
+        compress_stable_sync_SJLT(A, Afunc, opts);
+      } else {
+        switch (opts.compression_algorithm()) {
+        case CompressionAlgorithm::ORIGINAL:
+          if (opts.synchronized_compression())
+            compress_original_sync(Afunc, Afunc, opts);
+          else compress_original_nosync(Afunc, Afunc, opts);
+          break;
+        case CompressionAlgorithm::STABLE:
+          if (opts.synchronized_compression())
+            compress_stable_sync(Afunc, Afunc, opts);
+          else compress_stable_nosync(Afunc, Afunc, opts);
+          break;
+        case CompressionAlgorithm::HARD_RESTART:
+          if (opts.synchronized_compression())
+            compress_hard_restart_sync(Afunc, Afunc, opts);
+          else compress_hard_restart_nosync(Afunc, Afunc, opts);
+          break;
+        default:
+          std::cout << "Compression algorithm not recognized!" << std::endl;
+        };
+      }
       delete_redistributed_input();
     }
 

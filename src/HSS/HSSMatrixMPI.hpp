@@ -271,6 +271,9 @@ namespace strumpack {
       void compress_hard_restart_sync(const dmult_t& Amult,
                                       const delem_blocks_t& Aelem,
                                       const opts_t& opts);
+      void compress_stable_sync_SJLT(const DistM_t& A,
+                                     const delemw_t& Aelem,
+                                     const opts_t& opts);
 
       void compress_recursive_ann(DenseMatrix<std::uint32_t>& ann,
                                   DenseMatrix<real_t>& scores,

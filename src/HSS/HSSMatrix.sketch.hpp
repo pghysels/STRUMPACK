@@ -569,12 +569,12 @@ namespace strumpack {
       std::size_t get_n_rows() const { return n_rows_; }
       std::size_t get_n_cols() const { return n_cols_; }
       std::size_t get_nnz() const { return nnz_; }
-      SJLTGenerator<scalar_t,integer_t> & get_g() { return *g_; }
+      SJLTGenerator<scalar_t,integer_t>& get_g() { return *g_; }
 
-      bool get_chunk(){ return chunk_; }
+      bool get_chunk() { return chunk_; }
 
       // convert SJLT class to densematrix
-      DenseMatrix<scalar_t> SJLT_to_dense() {
+      DenseMatrix<scalar_t> to_dense() {
         DenseMatrix<scalar_t> S(n_rows_, n_cols_);
         const auto rows_A = A_.get_row_ptr();
         const auto col_A = A_.get_col_inds();

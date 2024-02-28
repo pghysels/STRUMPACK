@@ -58,8 +58,8 @@ namespace strumpack {
           DenseMW_t Sr_new(n, d-d_old, Sr, 0, d_old);
           DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
           if (d_old == 0) {
-            S.add_columns(d,opts.nnz0());
-            Rr_new.copy(S.SJLT_to_dense());
+            S.add_columns(d, opts.nnz0());
+            Rr_new.copy(S.to_dense());
             matrix_times_SJLT(A, S, Sr_new);
             matrixT_times_SJLT(A, S, Sc_new);
             total_nnz += opts.nnz0();
@@ -69,7 +69,7 @@ namespace strumpack {
             total_nnz += nnz_cur;
             nnz_cur *= 2;
             S.append_sjlt_matrix(temp);
-            Rr_new.copy(temp.SJLT_to_dense());
+            Rr_new.copy(temp.to_dense());
             matrix_times_SJLT(A, temp, Sr_new);
             matrixT_times_SJLT(A, temp, Sc_new);
           }
@@ -126,13 +126,13 @@ namespace strumpack {
           } else if (opts.compression_sketch() == CompressionSketch::SJLT) {
             if (d_old == 0) {
               S.add_columns(d, opts.nnz0());
-              Rr_new.copy(S.SJLT_to_dense());
+              Rr_new.copy(S.to_dense());
               total_nnz += opts.nnz0();
             } else{
               SJLTMatrix<scalar_t,int> temp
                 (S.get_g(), opts.nnz(), n, d-d_old, chunk);
               S.append_sjlt_matrix(temp);
-              Rr_new.copy(temp.SJLT_to_dense());
+              Rr_new.copy(temp.to_dense());
               total_nnz += opts.nnz();
             }
           }
@@ -193,14 +193,14 @@ namespace strumpack {
           DenseMW_t Sc_new(n, d-d_old, Sc, 0, d_old);
           if (d_old == 0) {
             S.add_columns(d, opts.nnz0());
-            Rr_new.copy(S.SJLT_to_dense());
+            Rr_new.copy(S.to_dense());
             matrix_times_SJLT(A, S, Sr_new);
             matrixT_times_SJLT(A, S, Sc_new);
           } else {
             SJLTMatrix<scalar_t, int> temp
               (S.get_g(), opts.nnz(), n, d-d_old, chunk);
             S.append_sjlt_matrix(temp);
-            Rr_new.copy(temp.SJLT_to_dense());
+            Rr_new.copy(temp.to_dense());
             total_nnz += opts.nnz();
             matrix_times_SJLT(A, temp, Sr_new);
             matrixT_times_SJLT(A, temp, Sc_new);

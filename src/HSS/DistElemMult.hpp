@@ -35,30 +35,24 @@ namespace strumpack {
       using DistM_t = DistributedMatrix<scalar_t>;
       using DenseM_t = DenseMatrix<scalar_t>;
     public:
-      DistElemMult(const DistM_t& A) : _A(A) {}
-      const DistM_t& _A;
+      DistElemMult(const DistM_t& A) : A_(A) {}
+      const DistM_t& A_;
       void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
-        gemm(Trans::N, Trans::N, scalar_t(1.), _A, R, scalar_t(0.), Sr);
-        gemm(Trans::C, Trans::N, scalar_t(1.), _A, R, scalar_t(0.), Sc);
+        gemm(Trans::N, Trans::N, scalar_t(1.), A_, R, scalar_t(0.), Sr);
+        gemm(Trans::C, Trans::N, scalar_t(1.), A_, R, scalar_t(0.), Sc);
       }
-      void operator()
-      (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
-       DistM_t& B, DistM_t& A, std::size_t rlo, std::size_t clo, MPI_Comm c) {
+      void operator()(const std::vector<std::size_t>& I,
+                      const std::vector<std::size_t>& J,
+                      DistM_t& B, DistM_t& A,
+                      std::size_t rlo, std::size_t clo, MPI_Comm c) {
         if (!B.active()) return;
         assert(int(I.size()) == B.rows() && int(J.size()) == B.cols());
-        std::vector<std::size_t> lI(I);
-        std::vector<std::size_t> lJ(J);
+        std::vector<std::size_t> lI(I), lJ(J);
         for (auto& i : lI) i -= rlo;
         for (auto& j : lJ) j -= clo;
         auto Asub = A.extract(lI, lJ);
         assert(Asub.ctxt() == B.ctxt());
         B = Asub;
-        // TODO: if I do
-        // B = A.extract(lI, lJ);
-        // it compiles, but doesn't work correctly.
-        // This should not be able to compile, since B
-        // is a DistMWrapper, and the move constructor is
-        // deleted explicitly???
       }
     };
 

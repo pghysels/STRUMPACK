@@ -29,6 +29,7 @@
 #define DIST_SAMPLES_HPP
 
 #include "HSSOptions.hpp"
+#include "HSS/HSSMatrix.sketch.hpp"
 
 namespace strumpack {
   namespace HSS {
@@ -44,60 +45,108 @@ namespace strumpack {
       using dmult_t = typename std::function
         <void(DistM_t& R, DistM_t& Sr, DistM_t& Sc)>;
       using opts_t = HSSOptions<scalar_t>;
-    private:
-      const dmult_t& _Amult;
-      const HSSMatrixMPI<scalar_t>& _hss;
-      std::unique_ptr<random::RandomGeneratorBase<real_t>> _rgen;
-      bool _hard_restart = false;
+
     public:
-      DistM_t R, Sr, Sc, leaf_R, leaf_Sr, leaf_Sc;
-      DenseM_t sub_Rr, sub_Rc, sub_Sr, sub_Sc;
-      DenseM_t sub_R2, sub_Sr2, sub_Sc2;
       DistSamples(int d, const BLACSGrid* g, HSSMatrixMPI<scalar_t>& hss,
                   const dmult_t& Amult, const opts_t& opts,
                   bool hard_restart=false)
-        : _Amult(Amult), _hss(hss),
-          _rgen(random::make_random_generator<real_t>
-                (opts.random_engine(), opts.random_distribution())),
-          _hard_restart(hard_restart),
-          R(g, _hss.cols(), d), Sr(g, _hss.cols(), d),
-          Sc(g, _hss.cols(), d) {
-        _rgen->seed(R.prow(), R.pcol());
-        R.random(*_rgen);
-        STRUMPACK_RANDOM_FLOPS
-          (_rgen->flops_per_prng() * R.lrows() * R.lcols());
-        _Amult(R, Sr, Sc);
-        _hss.to_block_row(R,  sub_Rr, leaf_R);
-        sub_Rc = DenseM_t(sub_Rr);
-        _hss.to_block_row(Sr, sub_Sr, leaf_Sr);
-        _hss.to_block_row(Sc, sub_Sc, leaf_Sc);
-        if (_hard_restart) { // copies for when doing a hard restart
+        : DistSamples(d, g, hss, opts, hard_restart) {
+        Amult_ = &Amult;
+        init(opts);
+      }
+
+      DistSamples(int d, const DistM_t& A, HSSMatrixMPI<scalar_t>& hss,
+                  const opts_t& opts, bool hard_restart=false)
+        : DistSamples(d, A.grid(), hss, opts, hard_restart) {
+        A_= &A;
+        init(opts);
+      }
+
+      void init(const opts_t& opts) {
+        if (Amult_) {
+          std::cout << "PDGEMM/Amult sampling" << std::endl;
+          rgen_->seed(R.prow(), R.pcol());
+          R.random(*rgen_);
+          STRUMPACK_RANDOM_FLOPS
+            (rgen_->flops_per_prng() * R.lrows() * R.lcols());
+          (*Amult_)(R, Sr, Sc);
+          hss_.to_block_row(R,  sub_Rr, leaf_R);
+          sub_Rc = sub_Rr;
+          hss_.to_block_row(Sr, sub_Sr, leaf_Sr);
+          hss_.to_block_row(Sc, sub_Sc, leaf_Sc);
+        } else {
+          std::cout << "block row sampling!!" << std::endl;
+          DenseM_t sub_A;
+          DistM_t leaf_A;
+          hss_.to_block_row(*A_, sub_A, leaf_A);
+          if (leaf_A.rows())
+            std::cout << "ERROR: Not supported. "
+                      << " Make sure there are more MPI ranks than HSS leafs."
+                      << std::endl;
+
+          auto n = R.rows();
+          auto d = R.cols();
+
+          sub_Sr = DenseM_t(sub_A.rows(), d);
+#if 1
+          bool chunk = opts.SJLT_algo() == SJLTAlgo::CHUNK;
+          SJLTGenerator<scalar_t,int> g;
+          SJLTMatrix<scalar_t,int> S_sjlt(g, 0, n, 0, chunk);
+          S_sjlt.add_columns(d, opts.nnz0());
+          auto dup_R = S_sjlt.to_dense();
+          matrix_times_SJLT(sub_A, S_sjlt, sub_Sr);
+          // TODO transpose!
+          // matrixT_times_SJLT(sub_A, S, Sc_new);
+#else
+          DenseM_t dup_R(n, d);
+          rgen_->seed(0, 0);
+          dup_R.random(*rgen_);
+          // use regular gemm
+          gemm(Trans::N, Trans::N, scalar_t(1.), sub_A, dup_R, scalar_t(0.), sub_Sr);
+#endif
+
+          // TODO transpose, assume for now matrix is symmetric
+          sub_Sc = sub_Sr;
+
+          auto rank = hss_.Comm().rank();
+          auto r0 = hss_.tree_ranges().clo(rank);
+          auto r1 = hss_.tree_ranges().chi(rank);
+          sub_Rr = DenseM_t(r1-r0, d, dup_R, r0, 0);
+          sub_Rc = sub_Rr;
+        }
+        if (hard_restart_) { // copies for when doing a hard restart
           sub_R2 = sub_Rr;
           sub_Sr2 = sub_Sr;
           sub_Sc2 = sub_Sc;
         }
       }
-      const HSSMatrixMPI<scalar_t>& HSS() const { return _hss; }
+
+      const HSSMatrixMPI<scalar_t>& HSS() const { return hss_; }
+
       void add_columns(int d, const opts_t& opts) {
+
         auto n = R.rows();
         auto d_old = R.cols();
         auto dd = d-d_old;
         DistM_t Rnew(R.grid(), n, dd);
-        Rnew.random(*_rgen);
+        Rnew.random(*rgen_);
         STRUMPACK_RANDOM_FLOPS
-          (_rgen->flops_per_prng() * Rnew.lrows() * Rnew.lcols());
+          (rgen_->flops_per_prng() * Rnew.lrows() * Rnew.lcols());
         DistM_t Srnew(Sr.grid(), n, dd);
         DistM_t Scnew(Sc.grid(), n, dd);
-        _Amult(Rnew, Srnew, Scnew);
+
+        // sample(Rnew, Srnew, Scnew);
+        std::cout << "TODO Adding cols" << std::endl;
+
         R.hconcat(Rnew);
         Sr.hconcat(Srnew);
         Sc.hconcat(Scnew);
         DenseM_t subRnew, subSrnew, subScnew;
         DistM_t leafRnew, leafSrnew, leafScnew;
-        _hss.to_block_row(Rnew,  subRnew, leafRnew);
-        _hss.to_block_row(Srnew, subSrnew, leafSrnew);
-        _hss.to_block_row(Scnew, subScnew, leafScnew);
-        if (_hard_restart) {
+        hss_.to_block_row(Rnew,  subRnew, leafRnew);
+        hss_.to_block_row(Srnew, subSrnew, leafSrnew);
+        hss_.to_block_row(Scnew, subScnew, leafScnew);
+        if (hard_restart_) {
           sub_Rr = hconcat(sub_R2,  subRnew);
           sub_Rc = hconcat(sub_R2,  subRnew);
           sub_Sr = hconcat(sub_Sr2, subSrnew);
@@ -115,7 +164,31 @@ namespace strumpack {
         leaf_Sr.hconcat(leafSrnew);
         leaf_Sc.hconcat(leafScnew);
       }
+
+      // no need to store all these?
+      DistM_t R, Sr, Sc, leaf_R, leaf_Sr, leaf_Sc;
+      DenseM_t sub_Rr, sub_Rc, sub_Sr, sub_Sc;
+      DenseM_t sub_R2, sub_Sr2, sub_Sc2;
+
+    private:
+      DistSamples(int d, const BLACSGrid* g, HSSMatrixMPI<scalar_t>& hss,
+                  const opts_t& opts, bool hard_restart) :
+        // TODO no need to construct R, Sr, and Sc when doing block
+        // row multiply with SJLT
+        R(g, hss.cols(), d), Sr(g, hss.cols(), d), Sc(g, hss.cols(), d),
+        hss_(hss),
+        rgen_(random::make_random_generator<real_t>
+              (opts.random_engine(), opts.random_distribution())),
+        hard_restart_(hard_restart) { }
+
+      const dmult_t* Amult_ = nullptr;
+      const DistM_t* A_ = nullptr;
+
+      const HSSMatrixMPI<scalar_t>& hss_;
+      std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen_;
+      bool hard_restart_ = false;
     };
+
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
   } // end namespace HSS
