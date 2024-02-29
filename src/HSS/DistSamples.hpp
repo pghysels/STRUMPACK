@@ -93,7 +93,7 @@ namespace strumpack {
           SJLTGenerator<scalar_t,int> g;
           SJLTMatrix<scalar_t,int> S_sjlt(g, 0, n, 0, chunk);
           S_sjlt.add_columns(d, opts.nnz0());
-          auto dup_R = S_sjlt.to_dense();
+          // auto dup_R = S_sjlt.to_dense();
           matrix_times_SJLT(sub_A, S_sjlt, sub_Sr);
           // TODO transpose!
           // matrixT_times_SJLT(sub_A, S, Sc_new);
@@ -111,7 +111,8 @@ namespace strumpack {
           auto rank = hss_.Comm().rank();
           auto r0 = hss_.tree_ranges().clo(rank);
           auto r1 = hss_.tree_ranges().chi(rank);
-          sub_Rr = DenseM_t(r1-r0, d, dup_R, r0, 0);
+          sub_Rr = S_sjlt.to_dense_sub_block(r1-r0, d, r0, 0);
+          // sub_Rr = DenseM_t(r1-r0, d, dup_R, r0, 0);
           sub_Rc = sub_Rr;
         }
         if (hard_restart_) { // copies for when doing a hard restart
@@ -128,12 +129,14 @@ namespace strumpack {
         auto n = R.rows();
         auto d_old = R.cols();
         auto dd = d-d_old;
+        
         DistM_t Rnew(R.grid(), n, dd);
         Rnew.random(*rgen_);
         STRUMPACK_RANDOM_FLOPS
           (rgen_->flops_per_prng() * Rnew.lrows() * Rnew.lcols());
         DistM_t Srnew(Sr.grid(), n, dd);
         DistM_t Scnew(Sc.grid(), n, dd);
+        (*Amult_)(Rnew, Srnew, Scnew);
 
         // sample(Rnew, Srnew, Scnew);
         std::cout << "TODO Adding cols" << std::endl;
