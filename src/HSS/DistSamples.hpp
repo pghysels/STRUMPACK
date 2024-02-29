@@ -90,7 +90,7 @@ namespace strumpack {
           sub_Sr = DenseM_t(sub_A.rows(), d);
 #if 1
           bool chunk = opts.SJLT_algo() == SJLTAlgo::CHUNK;
-          SJLTGenerator<scalar_t,int> g;
+          SJLTGenerator<scalar_t,int> g(0);
           SJLTMatrix<scalar_t,int> S_sjlt(g, 0, n, 0, chunk);
           S_sjlt.add_columns(d, opts.nnz0());
           auto dup_R = S_sjlt.to_dense();

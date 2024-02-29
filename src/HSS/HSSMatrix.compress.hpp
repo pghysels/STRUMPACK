@@ -547,7 +547,7 @@ namespace strumpack {
             // doing SJLT case here
             // wSr = -D_ S(i:i+m,j:j+n) + wSr
             matrix_times_SJLT
-              (D_, *S, wSr, this->rows(), d,w.offset.second, d0,
+              (D_, *S, wSr, this->rows(), d, w.offset.second, d0,
                scalar_t(-1.), scalar_t(1.));
           }
         } else {
