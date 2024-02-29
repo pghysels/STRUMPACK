@@ -334,7 +334,7 @@ namespace strumpack {
     }
 
     // TODO(Jie): disable equilibration for sym temperately
-    if (!matrix()->symm_sparse()){
+    if (!is_symmetric(opts_)){
       equil_ = matrix()->equilibration();
       matrix()->equilibrate(equil_);
     }
