@@ -111,6 +111,9 @@ namespace strumpack {
     void set_matrix(const CSRMatrix<refine_t,integer_t>& A);
     void set_matrix(const CSRMatrix<factor_t,integer_t>& A);
 
+    void set_lower_triangle_matrix(const CSRMatrix<refine_t,integer_t>& A);
+    void set_lower_triangle_matrix(const CSRMatrix<factor_t,integer_t>& A);
+
     void update_matrix_values(const CSRMatrix<refine_t,integer_t>& A);
     void update_matrix_values(const CSRMatrix<factor_t,integer_t>& A);
 

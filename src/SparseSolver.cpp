@@ -88,6 +88,32 @@ namespace strumpack {
     factored_ = reordered_ = false;
   }
 
+  template <typename scalar_t, typename integer_t>
+  void SparseSolver<scalar_t, integer_t>::set_lower_triangle_matrix
+  (const CSRMatrix<scalar_t, integer_t> &A) {
+    auto ptr = A.ptr();
+    auto index = A.ind();
+    auto value = A.val();
+    std::vector<integer_t> mat_ptr = {0};
+    std::vector<integer_t> mat_ind;
+    std::vector<scalar_t> mat_val;
+    for (int row = 0; row < A.size(); ++row) {
+      mat_ptr.push_back(integer_t(0));
+      for (int j = ptr[row]; j < ptr[row + 1]; ++j) {
+        if (index[j] <= row) {
+          mat_ind.push_back(index[j]);
+          mat_val.push_back(value[j]);
+          mat_ptr[row + 1]++;
+        }
+      }
+      mat_ptr[row + 1] += mat_ptr[row];
+    }
+    mat_.reset(new CSRMatrix<scalar_t, integer_t>(
+        integer_t(mat_ptr.size() - 1), mat_ptr.data(), mat_ind.data(),
+        mat_val.data()));
+    factored_ = reordered_ = false;
+  }
+
   template<typename scalar_t,typename integer_t> void
   SparseSolver<scalar_t,integer_t>::update_matrix_values
   (const CSRMatrix<scalar_t,integer_t>& A) {

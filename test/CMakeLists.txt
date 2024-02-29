@@ -2,17 +2,25 @@ add_executable(test_HSS_seq    test_HSS_seq.cpp)
 add_executable(test_sparse_seq test_sparse_seq.cpp)
 add_executable(test_BLR_seq    test_BLR_seq.cpp)
 add_executable(test_matrix_IO  test_matrix_IO.cpp)
+add_executable(test_SPD_seq test_SPD_seq.cpp)
+add_executable(test_SPD_mixedPrecision test_SPD_mixedPrecision.cpp)
 
 target_link_libraries(test_HSS_seq strumpack)
 target_link_libraries(test_sparse_seq strumpack)
 target_link_libraries(test_BLR_seq strumpack)
 target_link_libraries(test_matrix_IO strumpack)
+target_link_libraries(test_SPD_seq strumpack)
+target_link_libraries(test_SPD_mixedPrecision strumpack)
 
 add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_sparse_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
   ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx)
 add_test("user_matrix_IO" ${CMAKE_CURRENT_BINARY_DIR}/test_matrix_IO T 1000)
 add_test("user_test_BLR_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300)
+add_test("user_test_SPD_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_seq
+        ${PROJECT_SOURCE_DIR}/examples/sparse/data/bcsstm08.mtx)
+add_test("user_test_SPD_mixedPrecision" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_mixedPrecision
+        ${PROJECT_SOURCE_DIR}/examples/sparse/data/bcsstm08.mtx)
 
 if(STRUMPACK_USE_MPI)
   add_executable(test_HSS_mpi             test_HSS_mpi.cpp)

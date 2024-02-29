@@ -208,6 +208,20 @@ namespace strumpack {
 
   template<typename factor_t,typename refine_t,typename integer_t> void
   SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  set_lower_triangle_matrix(const CSRMatrix<refine_t,integer_t>& A) {
+    mat_ = A;
+    solver_.set_lower_triangle_matrix(cast_matrix<refine_t,integer_t,factor_t>(A));
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> void
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
+  set_lower_triangle_matrix(const CSRMatrix<factor_t,integer_t>& A) {
+    mat_ = cast_matrix<factor_t,integer_t,refine_t>(A);
+    solver_.set_lower_triangle_matrix(A);
+  }
+
+  template<typename factor_t,typename refine_t,typename integer_t> void
+  SparseSolverMixedPrecision<factor_t,refine_t,integer_t>::
   update_matrix_values(const CSRMatrix<refine_t,integer_t>& A) {
     mat_ = A;
     solver_.update_matrix_values(cast_matrix<refine_t,integer_t,factor_t>(A));
