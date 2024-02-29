@@ -598,7 +598,31 @@ namespace strumpack {
         }
         return S;
       }
-
+      // returns an m by n dense sub-block of SJLT starting in the top left: (i,j)
+      DenseMatrix<scalar_t> to_dense_sub_block(std::size_t m, std::size_t n, std::size_t i, std::size_t j) {
+        DenseMatrix<scalar_t> S(m, n);
+        const auto rows_A = A_.get_row_ptr();
+        const auto col_A = A_.get_col_inds();
+        const auto rows_B = B_.get_row_ptr();
+        const auto col_B = B_.get_col_inds();
+        for (std::size_t _i=0; _i<std::min(n_rows_-i, m); _i++) {
+          std::size_t startA = rows_A[_i+i], endA = rows_A[_i+i+1];
+          std::size_t startB = rows_B[_i+i], endB = rows_B[_i+i+1];
+          for (std::size_t _j=0; _j<std::min(n_cols_-j, n); _j++) {
+            if (std::find(col_A.begin()+startA,
+                          col_A.begin()+endA, _j+j) !=
+                col_A.begin() + endA)
+              S(_i, _j) = 1;
+            else if (std::find(col_B.begin()+startB,
+                               col_B.begin()+endB, _j+j) !=
+                     col_B.begin()+endB)
+              S(_i, _j) = -1;
+            else
+              S(_i, _j) = 0;
+          }
+        }
+        return S;
+      }
     private:
       SJLTGenerator<scalar_t,integer_t>* g_ = nullptr;
       std::size_t nnz_, n_rows_, n_cols_;
