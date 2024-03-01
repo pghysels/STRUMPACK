@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     std::vector<int> ranks;
     std::vector<double> times, errors;
 
-    for (int r=0; r<3; r++) {
+    for (int r=0; r<10; r++) {
       auto begin = std::chrono::steady_clock::now();
       strumpack::HSS::HSSMatrixMPI<double> H(A, hss_opts);
       auto end = std::chrono::steady_clock::now();
@@ -86,15 +86,15 @@ int main(int argc, char* argv[]) {
 
     if (c.is_root())
       std::cout << "min, median, max" << std::endl
-                << "ranks: " << ranks[ranks.size()/2] << " "
-                << ranks[ranks.size()/2]-ranks[0] << " "
-                << ranks.back() - ranks[ranks.size()/2] << std::endl
-                << "times: " << times[times.size()/2] << " "
-                << times[times.size()/2]-times[0] << " "
-                << times.back() - times[times.size()/2] << std::endl
-                << "errors: " << errors[errors.size()/2] << " "
-                << errors[errors.size()/2]-errors[0] << " "
-                << errors.back() - errors[errors.size()/2] << std::endl;
+                << "ranks: " << ranks[0] << " "
+                << ranks[ranks.size()/2] << " "
+                << ranks[ranks.size()-1] << std::endl
+                << "times: " << times[0] << " "
+                << times[times.size()/2] << " "
+                << times[times.size()-1] << std::endl
+                << "errors: " << errors[0] << " "
+                << errors[errors.size()/2] << " "
+                << errors[errors.size()-1] << std::endl;
 
     // strumpack::TimerList::Finalize();
   }
