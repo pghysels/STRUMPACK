@@ -244,36 +244,33 @@ namespace strumpack {
       void setup_local_context();
       void setup_ranges(std::size_t roff, std::size_t coff);
 
-      void compress_original_nosync(const dmult_t& Amult,
+      void compress_original_nosync(DistSamples<scalar_t>& RS,
                                     const delemw_t& Aelem,
                                     const opts_t& opts);
-      void compress_original_sync(const dmult_t& Amult,
+      void compress_original_sync(DistSamples<scalar_t>& RS,
                                   const delemw_t& Aelem,
                                   const opts_t& opts);
-      void compress_original_sync(const dmult_t& Amult,
+      void compress_original_sync(DistSamples<scalar_t>& RS,
                                   const delem_blocks_t& Aelem,
                                   const opts_t& opts);
-      void compress_stable_nosync(const dmult_t& Amult,
+      void compress_stable_nosync(DistSamples<scalar_t>& RS,
                                   const delemw_t& Aelem,
                                   const opts_t& opts);
-      void compress_stable_sync(const dmult_t& Amult,
+      void compress_stable_sync(DistSamples<scalar_t>& RS,
                                 const delemw_t& Aelem,
                                 const opts_t& opts);
-      void compress_stable_sync(const dmult_t& Amult,
+      void compress_stable_sync(DistSamples<scalar_t>& RS,
                                 const delem_blocks_t& Aelem,
                                 const opts_t& opts);
-      void compress_hard_restart_nosync(const dmult_t& Amult,
+      void compress_hard_restart_nosync(DistSamples<scalar_t>& RS,
                                         const delemw_t& Aelem,
                                         const opts_t& opts);
-      void compress_hard_restart_sync(const dmult_t& Amult,
+      void compress_hard_restart_sync(DistSamples<scalar_t>& RS,
                                       const delemw_t& Aelem,
                                       const opts_t& opts);
-      void compress_hard_restart_sync(const dmult_t& Amult,
+      void compress_hard_restart_sync(DistSamples<scalar_t>& RS,
                                       const delem_blocks_t& Aelem,
                                       const opts_t& opts);
-      void compress_stable_sync_SJLT(const DistM_t& A,
-                                     const delemw_t& Aelem,
-                                     const opts_t& opts);
 
       void compress_recursive_ann(DenseMatrix<std::uint32_t>& ann,
                                   DenseMatrix<real_t>& scores,

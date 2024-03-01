@@ -37,10 +37,10 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_nosync
-    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
+    (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
-      DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
+      RS.add_columns(d+dd, opts);
       WorkCompressMPI<scalar_t> w;
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
@@ -54,37 +54,13 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
-    HSSMatrixMPI<scalar_t>::compress_stable_sync_SJLT
-    (const DistM_t& A, const delemw_t& Aelem, const opts_t& opts) {
-      auto d = opts.d0();
-      auto dd = opts.dd();
-      assert(dd <= d);
-      WorkCompressMPI<scalar_t> w;
-      // DistSamplesSJLT<scalar_t> RS(d+dd, A, *this, opts);
-      DistSamples<scalar_t> RS(d+dd, A, *this, opts);
-      const auto nr_lvls = this->max_levels();
-      while (!this->is_compressed()) {
-        if (d != opts.d0()) RS.add_columns(d+dd, opts);
-        if (opts.verbose() && Comm().is_root())
-          std::cout << "# compressing with SJLT d+dd = " << d << "+" << dd
-                    << " (stable)" << std::endl;
-        for (int lvl=nr_lvls-1; lvl>=0; lvl--) {
-          extract_level(Aelem, opts, w, lvl);
-          compress_level_stable(RS, opts, w, d, dd, lvl);
-        }
-        d += dd;
-        dd = std::min(dd, opts.max_rank()-d);
-      }
-    }
-
-    template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_sync
-    (const dmult_t& Amult, const delemw_t& Aelem, const opts_t& opts) {
+    (DistSamples<scalar_t>& RS, const delemw_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
       assert(dd <= d);
       WorkCompressMPI<scalar_t> w;
-      DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
+      RS.add_columns(d+dd, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
@@ -102,12 +78,12 @@ namespace strumpack {
 
     template<typename scalar_t> void
     HSSMatrixMPI<scalar_t>::compress_stable_sync
-    (const dmult_t& Amult, const delem_blocks_t& Aelem, const opts_t& opts) {
+    (DistSamples<scalar_t>& RS, const delem_blocks_t& Aelem, const opts_t& opts) {
       auto d = opts.d0();
       auto dd = opts.dd();
       assert(dd <= d);
       WorkCompressMPI<scalar_t> w;
-      DistSamples<scalar_t> RS(d+dd, grid(), *this, Amult, opts);
+      RS.add_columns(d+dd, opts);
       const auto nr_lvls = this->max_levels();
       while (!this->is_compressed()) {
         if (d != opts.d0()) RS.add_columns(d+dd, opts);
