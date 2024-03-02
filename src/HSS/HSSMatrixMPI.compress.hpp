@@ -27,7 +27,7 @@
  */
 #ifndef HSS_MATRIX_MPI_COMPRESS_HPP
 #define HSS_MATRIX_MPI_COMPRESS_HPP
-
+#include <chrono>
 
 namespace strumpack {
   namespace HSS {
@@ -179,6 +179,7 @@ namespace strumpack {
     HSSMatrixMPI<scalar_t>::compress(const DistM_t& A, const opts_t& opts) {
       TIMER_TIME(TaskType::HSS_COMPRESS, 0, t_compress);
       TIMER_TIME(TaskType::REDIST_2D_TO_HSS, 0, t_redist);
+      auto begin = std::chrono::steady_clock::now();
       {
         std::vector<std::vector<scalar_t>> sbuf(Comm().size());
         redistribute_to_tree_to_buffers(A, 0, 0, sbuf);
@@ -187,6 +188,11 @@ namespace strumpack {
         Comm().all_to_all_v(sbuf, rbuf, pbuf);
         redistribute_to_tree_from_buffers(A, 0, 0, pbuf);
       }
+      auto end = std::chrono::steady_clock::now();
+      auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+      if(Comm().is_root())
+      std::cout << "# total 2dbc to HSS redistribution = " << T << " [10e-3s]" << std::endl;
+      
       TIMER_STOP(t_redist);
       DistElemMult<scalar_t> Afunc(A);
 

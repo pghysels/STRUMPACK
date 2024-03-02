@@ -30,6 +30,8 @@
 
 #include "HSSOptions.hpp"
 #include "HSS/HSSMatrix.sketch.hpp"
+#include <chrono>
+
 
 namespace strumpack {
   namespace HSS {
@@ -57,7 +59,14 @@ namespace strumpack {
                   const opts_t& opts)
         : DistSamples(A.grid(), hss, opts) {
         A_= &A;
+        auto begin = std::chrono::steady_clock::now();
         hss.to_block_row(A, sub_A, leaf_A);
+        
+        auto end = std::chrono::steady_clock::now();
+        auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        if(hss_ -> Comm().is_root())
+        std::cout << "# total 2dbc to block row redistribution = " << T << " [10e-3s]" << std::endl;
+      
         if (leaf_A.rows())
           std::cout << "ERROR: Not supported. "
                     << " Make sure there are more MPI ranks than HSS leafs."
