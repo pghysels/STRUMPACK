@@ -134,6 +134,7 @@ namespace strumpack {
           if (opts.verbose() && hss_->Comm().is_root())
             std::cout << "# sampling with 1DBR matrix" << std::endl;
           auto rank = hss_->Comm().rank();
+
           auto r0 = hss_->tree_ranges().clo(rank);
           auto r1 = hss_->tree_ranges().chi(rank);
           bool chunk = opts.SJLT_algo() == SJLTAlgo::CHUNK;
@@ -143,13 +144,33 @@ namespace strumpack {
             sub_Sr = DenseM_t(sub_A.rows(), d_);
             if (opts.compression_sketch() == CompressionSketch::SJLT) {
               S_sjlt.add_columns(d_, opts.nnz0());
+      
+              auto begin = std::chrono::steady_clock::now();
               matrix_times_SJLT(sub_A, S_sjlt, sub_Sr);
+      
+              auto end = std::chrono::steady_clock::now();
+              auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+              
+              if(rank == 0)
+              std::cout << "# SJLT init multiplies = " << T << " [10e-3s]" << std::endl;
+      
+      
               sub_Rr = S_sjlt.to_dense_sub_block(r1-r0, d_, r0, 0);
             } else {
               DenseM_t dup_R(n_, d_);
               rgen_->seed(0, 0);
               dup_R.random(*rgen_);
+
+              auto begin = std::chrono::steady_clock::now();
               gemm(Trans::N, Trans::N, scalar_t(1.), sub_A, dup_R, scalar_t(0.), sub_Sr);
+              
+              auto end = std::chrono::steady_clock::now();
+              auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+              
+              if(rank == 0)
+              std::cout << "# Gaussian init multiplies = " << T << " [10e-3s]" << std::endl;
+      
+      
               sub_Rr = DenseM_t(r1-r0, d_, dup_R, r0, 0);
             }
             // TODO transpose, assume for now matrix is symmetric
@@ -161,13 +182,30 @@ namespace strumpack {
               SJLTGenerator<scalar_t,int> g(d_);
               SJLTMatrix<scalar_t,int> S_sjlt(g, 0, n_, 0, chunk);
               S_sjlt.add_columns(dd, opts.nnz0());
+              auto begin = std::chrono::steady_clock::now();
               matrix_times_SJLT(sub_A, S_sjlt, subSrnew);
+              
+              auto end = std::chrono::steady_clock::now();
+              auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+              
+              if(rank == 0)
+              std::cout << "# SJLT add_cols multiplies = " << T << " [10e-3s]" << std::endl;
+      
               subRnew = S_sjlt.to_dense_sub_block(r1-r0, dd, r0, 0);
             } else {
               DenseM_t dup_R(n_, dd);
               rgen_->seed(0, 0);
               dup_R.random(*rgen_);
+      
+              auto begin = std::chrono::steady_clock::now();
               gemm(Trans::N, Trans::N, scalar_t(1.), sub_A, dup_R, scalar_t(0.), subSrnew);
+            
+              auto end = std::chrono::steady_clock::now();
+              auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+              
+              if(rank == 0)
+              std::cout << "# Gaussian add_cols multiplies = " << T << " [10e-3s]" << std::endl;
+      
               subRnew = DenseM_t(r1-r0, dd, dup_R, r0, 0);
             }
             // TODO transpose, assume for now matrix is symmetric
