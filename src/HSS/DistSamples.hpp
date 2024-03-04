@@ -151,8 +151,15 @@ namespace strumpack {
               auto end = std::chrono::steady_clock::now();
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
-              if(rank == 0)
-              std::cout << "# SJLT init multiplies = " << T << " [10e-3s]" << std::endl;
+              int minT, maxT;
+              MPI_Reduce(&T, &minT, 1, MPI_INT, MPI_MIN, 0, hss_->comm());
+              MPI_Reduce(&T, &maxT, 1, MPI_INT, MPI_MAX, 0, hss_->comm());
+              if(rank == 0){
+                std::cout << "# SJLT init multiplies min= " << minT << " [10e-3s]" << std::endl;
+                std::cout << "# SJLT init multiplies max= " << maxT << " [10e-3s]" << std::endl;
+ 
+              }
+              
       
       
               sub_Rr = S_sjlt.to_dense_sub_block(r1-r0, d_, r0, 0);
@@ -167,9 +174,15 @@ namespace strumpack {
               auto end = std::chrono::steady_clock::now();
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
-              if(rank == 0)
-              std::cout << "# Gaussian init multiplies = " << T << " [10e-3s]" << std::endl;
-      
+              int minT, maxT;
+              MPI_Reduce(&T, &minT, 1, MPI_INT, MPI_MIN, 0, hss_->comm());
+              MPI_Reduce(&T, &maxT, 1, MPI_INT, MPI_MAX, 0, hss_->comm());
+              if(rank == 0){
+                std::cout << "# Gaussian init multiplies min= " << minT << " [10e-3s]" << std::endl;
+                std::cout << "# Gaussian init multiplies max= " << maxT << " [10e-3s]" << std::endl;
+ 
+              }
+              
       
               sub_Rr = DenseM_t(r1-r0, d_, dup_R, r0, 0);
             }
@@ -188,9 +201,15 @@ namespace strumpack {
               auto end = std::chrono::steady_clock::now();
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
-              if(rank == 0)
-              std::cout << "# SJLT add_cols multiplies = " << T << " [10e-3s]" << std::endl;
-      
+              int minT, maxT;
+              MPI_Reduce(&T, &minT, 1, MPI_INT, MPI_MIN, 0, hss_->comm());
+              MPI_Reduce(&T, &maxT, 1, MPI_INT, MPI_MAX, 0, hss_->comm());
+              if(rank == 0){
+                std::cout << "# SJLT add_cols multiplies min= " << minT << " [10e-3s]" << std::endl;
+                std::cout << "# SJLT add_cols multiplies max= " << maxT << " [10e-3s]" << std::endl;
+ 
+              }
+
               subRnew = S_sjlt.to_dense_sub_block(r1-r0, dd, r0, 0);
             } else {
               DenseM_t dup_R(n_, dd);
@@ -203,9 +222,14 @@ namespace strumpack {
               auto end = std::chrono::steady_clock::now();
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
-              if(rank == 0)
-              std::cout << "# Gaussian add_cols multiplies = " << T << " [10e-3s]" << std::endl;
-      
+              int minT, maxT;
+              MPI_Reduce(&T, &minT, 1, MPI_INT, MPI_MIN, 0, hss_->comm());
+              MPI_Reduce(&T, &maxT, 1, MPI_INT, MPI_MAX, 0, hss_->comm());
+              if(rank == 0){
+                std::cout << "# Gaussian add_cols multiplies min= " << minT << " [10e-3s]" << std::endl;
+                std::cout << "# Gaussian add_cols multiplies max= " << maxT << " [10e-3s]" << std::endl;
+ 
+              }
               subRnew = DenseM_t(r1-r0, dd, dup_R, r0, 0);
             }
             // TODO transpose, assume for now matrix is symmetric
