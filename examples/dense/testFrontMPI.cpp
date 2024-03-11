@@ -19,16 +19,8 @@ MPI_Init(&argc, &argv);
   int m = 0;
 
   if (!strumpack::mpi_rank()) {
-    std::string filename;
-    if (argc > 2) filename = argv[2];
-    else {
-      std::cout << "# specify a filename" << std::endl;
-    }
-    std::cout << "Opening file " << filename << std::endl;
-    std::ifstream file(filename, std::ifstream::binary);
-    file.read(reinterpret_cast<char*>(&m), sizeof(int));
-    Aseq = strumpack::DenseMatrix<double>(m, m);
-    file.read(reinterpret_cast<char*>(Aseq.data()), sizeof(double)*m*m);  
+    Aseq = strumpack::DenseMatrix<double>::read(argv[1]);
+    m = Aseq.rows();
     std::cout << "# Matrix dimension read from file: " << m << std::endl;
   }
 
