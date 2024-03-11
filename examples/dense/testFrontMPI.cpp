@@ -13,8 +13,10 @@ MPI_Init(&argc, &argv);
 
 {
   strumpack::MPIComm c;
+  strumpack::BLACSGrid grid(c);
   strumpack::DenseMatrix<double> Aseq;
   strumpack::DistributedMatrix<double> A;
+  int m = 0;
 
   if (!strumpack::mpi_rank()) {
     std::string filename;
@@ -26,10 +28,12 @@ MPI_Init(&argc, &argv);
     std::ifstream file(filename, std::ifstream::binary);
     file.read(reinterpret_cast<char*>(&m), sizeof(int));
     Aseq = strumpack::DenseMatrix<double>(m, m);
-    file.read(reinterpret_cast<char*>(Aseq.data()), sizeof(double)*m*m);
+    file.read(reinterpret_cast<char*>(Aseq.data()), sizeof(double)*m*m);  
+    std::cout << "# Matrix dimension read from file: " << m << std::endl;
   }
 
   MPI_Bcast(&m, 1, strumpack::mpi_type<int>(), 0, MPI_COMM_WORLD);
+  
   A = strumpack::DistributedMatrix<double>(&grid, m, m);
   A.scatter(Aseq);
 
