@@ -1401,7 +1401,7 @@ namespace strumpack {
 #endif
         {
           for (std::size_t i=0; i<rb; i+=CP) { // F11 and F21
-#pragma omp taskwait
+	    // #pragma omp taskwait
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             [[maybe_unused]] std::size_t ifirst = lrb*i;
 #pragma omp task default(shared) firstprivate(i,ifirst) \
@@ -1534,9 +1534,10 @@ namespace strumpack {
                 }
               }
             }
-          }
-          for (std::size_t i=0; i<rb2; i+=CP) { // F12 and F22
 #pragma omp taskwait
+	  }
+          for (std::size_t i=0; i<rb2; i+=CP) { // F12 and F22
+	    // #pragma omp taskwait
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
             [[maybe_unused]] std::size_t ifirst = lrb*(i+rb);
 #pragma omp task default(shared) firstprivate(i,ifirst) \
@@ -1603,7 +1604,8 @@ namespace strumpack {
                 }
               }
             }
-          }
+#pragma omp taskwait
+	  }
         }
       }
       for (std::size_t i=0; i<rb; i++)
