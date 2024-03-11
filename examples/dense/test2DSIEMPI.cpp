@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
 
   for (int r=0; r<10; r++) {
     auto begin = std::chrono::steady_clock::now();
-    strumpack::HSS::HSSMatrixMPI<double> H(A, hss_opts);
+    strumpack::HSS::HSSMatrixMPI<std::complex<double>> H(A, hss_opts);
     auto end = std::chrono::steady_clock::now();
     if (H.is_compressed()) {
       auto max_levels = H.max_levels();
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
 
     // H.print_info();
     auto Hdense = H.dense();
-    Hdense.scaled_add(std::complex<double>(-1.,0.), A);
+    Hdense.scaled_add(-1., A);
     auto rel_err = Hdense.normF() / A.normF();
     errors.push_back(rel_err);
     auto Hdnorm = Hdense.normF();
