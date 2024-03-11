@@ -16,21 +16,21 @@ MPI_Init(&argc, &argv);
   strumpack::DenseMatrix<double> Aseq;
   strumpack::DistributedMatrix<double> A;
 
-  if (!mpi_rank()) {
-    string filename;
+  if (!strumpack::mpi_rank()) {
+    std::string filename;
     if (argc > 2) filename = argv[2];
     else {
-      cout << "# specify a filename" << endl;
+      std::cout << "# specify a filename" << std::endl;
     }
-    cout << "Opening file " << filename << endl;
-    ifstream file(filename, ifstream::binary);
+    std::cout << "Opening file " << filename << std::endl;
+    std::ifstream file(filename, std::ifstream::binary);
     file.read(reinterpret_cast<char*>(&m), sizeof(int));
-    Aseq = DenseMatrix<double>(m, m);
+    Aseq = strumpack::DenseMatrix<double>(m, m);
     file.read(reinterpret_cast<char*>(Aseq.data()), sizeof(double)*m*m);
   }
 
-  MPI_Bcast(&m, 1, mpi_type<int>(), 0, MPI_COMM_WORLD);
-  A = DistributedMatrix<double>(&grid, m, m);
+  MPI_Bcast(&m, 1, strumpack::mpi_type<int>(), 0, MPI_COMM_WORLD);
+  A = strumpack::DistributedMatrix<double>(&grid, m, m);
   A.scatter(Aseq);
 
 
