@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
 
   double a = 0.5, b = 0.5, dt = M_PI * 2 / (N - 1);
   std::vector<double> dl(N);
-  DenseMatrix<double> pn0(2, N), pn1(2, N), xyz(2, N), pnrms(2, N);
+  strumpack::DenseMatrix<double> pn0(2, N), pn1(2, N), xyz(2, N), pnrms(2, N);
   double z[] = {0., 0., 1.}, tmp1[3];
 #pragma omp parallel for
   for (int i=0; i<N; i++) {
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
     std::cout << "ppw: " << ppw << std::endl;
   }
 
-  DenseMatrix<std::complex<double>> B(N, 1);
+  strumpack::DenseMatrix<std::complex<double>> B(N, 1);
   // #pragma omp parallel for
   for (int i=0; i<N; i++) {
     double p[] = {xyz(0,i), xyz(1,i)};
@@ -97,8 +97,7 @@ int main(int argc, char* argv[]) {
   }
 
 
-  TaskTimer tassmbly("");
-  tassmbly.start();
+  auto begin = std::chrono::steady_clock::now();
   auto Lelem = [&](int i, int j) {
       double p[] = {xyz(0,i), xyz(1,i)};
       double k = w * n_num(p[0], p[1]);
@@ -120,14 +119,15 @@ int main(int argc, char* argv[]) {
             Lij += dl[j] / nquad * (G - G0);
           }
         }
-      }
       return Lij;
   }
   strumpack::BLACSGrid grid(c);
   strumpack::DistributedMatrix<std::complex<double>> A(&grid, N, N);
   A.fill(Lelem);
+  auto end = std::chrono::steady_clock::now();
+  auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
   if (c.is_root())
-  std::cout << "# SIE assembly time: " << tassmbly.elapsed() << std::endl;
+  std::cout << "# SIE assembly time: " << T << " [10e-3s]" << std::endl
 
 
 
@@ -199,6 +199,6 @@ int main(int argc, char* argv[]) {
 }
 
 MPI_Finalize();
-  return 0;
+return 0;
 
 }
