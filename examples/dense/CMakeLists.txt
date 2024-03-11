@@ -28,6 +28,8 @@ if(STRUMPACK_USE_MPI)
     testQCMPI.cpp)
   add_executable(test2DSIEMPI             EXCLUDE_FROM_ALL
   test2DSIEMPI.cpp)
+  add_executable(testFrontMPI             EXCLUDE_FROM_ALL
+  testFrontMPI.cpp)
 
   target_link_libraries(KernelRegressionMPI strumpack)
   target_link_libraries(testBLRMPI strumpack)
@@ -35,6 +37,7 @@ if(STRUMPACK_USE_MPI)
   target_link_libraries(dstructured_mpi strumpack)
   target_link_libraries(testQCMPI strumpack)
   target_link_libraries(test2DSIEMPI strumpack)
+  target_link_libraries(testFrontMPI strumpack)
 
   add_dependencies(examples
     KernelRegressionMPI
@@ -42,7 +45,8 @@ if(STRUMPACK_USE_MPI)
     testStructuredMPI
     dstructured_mpi
     testQCMPI
-    test2DSIEMPI)
+    test2DSIEMPI
+    testFrontMPI)
 
   if(STRUMPACK_USE_BPACK)
     add_executable(testHODLR             EXCLUDE_FROM_ALL
