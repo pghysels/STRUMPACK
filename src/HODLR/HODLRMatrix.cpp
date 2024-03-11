@@ -62,7 +62,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HODLR_kernel_block_evaluation
-    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+    (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
      C2Fptr KC) {
@@ -96,7 +96,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void HODLR_block_evaluation
-    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+    (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
      C2Fptr AC) {
@@ -125,13 +125,14 @@ namespace strumpack {
         if (rank == p0) data += m*n;
       }
       ExtractionMeta e
-        {nullptr, *Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
-            allrows, allcols, rowids, colids, pgids, *Npmap, pmaps};
+        {nullptr, *Ninter, *Nallrows, *Nallcols,
+         allrows, allcols, rowids, colids, pgids, *Npmap, pmaps,
+         *Nalldat_loc};
       temp->Aelem->operator()(I, J, B, e);
     }
 
     template<typename scalar_t> void HODLR_block_evaluation_seq
-    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+    (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
      C2Fptr f) {
@@ -154,8 +155,9 @@ namespace strumpack {
         data += m*n;
       }
       ExtractionMeta e
-        {nullptr, *Ninter, *Nallrows, *Nallcols, *Nalldat_loc,
-            allrows, allcols, rowids, colids, pgids, *Npmap, pmaps};
+        {nullptr, *Ninter, *Nallrows, *Nallcols,
+         allrows, allcols, rowids, colids, pgids, *Npmap, pmaps,
+         *Nalldat_loc};
       static_cast<typename HODLRMatrix<scalar_t>::elem_blocks_t*>
         (f)->operator()(I, J, B, e);
     }

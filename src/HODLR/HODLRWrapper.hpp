@@ -34,6 +34,7 @@
 
 #include <cassert>
 #include <complex>
+#include <cstdint>
 
 #include "dense/DenseMatrix.hpp"
 #include "misc/MPIWrapper.hpp"
@@ -97,7 +98,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, scalar_t*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, scalar_t* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata);
@@ -107,7 +108,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, scalar_t*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, scalar_t* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr K);
@@ -136,21 +137,21 @@ namespace strumpack {
     template<typename scalar_t> void LRBF_construct_element_compute
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*element)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, scalar_t* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata);
 
     template<typename scalar_t> void HODLR_extract_elements
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
-     int* allrows, int* allcols, scalar_t* alldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols,
+     std::int64_t Nalldat_loc, int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps);
 
     template<typename scalar_t> void LRBF_extract_elements
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
-     int* allrows, int* allcols, scalar_t* alldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols,
+     std::int64_t Nalldat_loc, int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps);
 
     template<typename scalar_t> void HODLR_deletestats(F2Cptr&);

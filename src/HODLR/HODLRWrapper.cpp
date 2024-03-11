@@ -247,7 +247,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, float*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, float* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -265,7 +265,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, double* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -279,7 +279,7 @@ namespace strumpack {
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<float>*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, std::complex<float>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -293,7 +293,7 @@ namespace strumpack {
            reinterpret_cast<
            void(*)(int*, int*, _Complex float*, C2Fptr)>(C_FuncZmn),
            reinterpret_cast<
-           void(*)(int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+           void(*)(int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
                    int* allrows, int* allcols, _Complex float* alldat_loc,
                    int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
                    C2Fptr elems)>(C_FuncZmnBlock), fdata);
@@ -304,7 +304,7 @@ namespace strumpack {
      F2Cptr& stats, F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, std::complex<double>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -314,7 +314,7 @@ namespace strumpack {
          reinterpret_cast<
          void(*)(int*, int*, _Complex double*, C2Fptr)>(C_FuncZmn),
          reinterpret_cast<
-         void(*)(int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+         void(*)(int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
                  int* allrows, int* allcols, _Complex double* alldat_loc,
                  int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
                  C2Fptr elems)>(C_FuncZmnBlock), fdata);
@@ -326,7 +326,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, float*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, float* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -339,7 +339,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, double*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, double* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -352,7 +352,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<float>*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, std::complex<float>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -361,7 +361,7 @@ namespace strumpack {
          reinterpret_cast<
          void(*)(int*, int*, _Complex float*, C2Fptr)>(C_FuncZmn),
          reinterpret_cast<
-         void(*)(int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+         void(*)(int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
                  int* allrows, int* allcols, _Complex float* alldat_loc,
                  int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
                  C2Fptr elems)>(C_FuncZmnBlock),
@@ -372,7 +372,7 @@ namespace strumpack {
      F2Cptr& msh, F2Cptr& kerquant, F2Cptr& ptree,
      void (*C_FuncZmn)(int*, int*, std::complex<double>*, C2Fptr),
      void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, std::complex<double>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -381,7 +381,7 @@ namespace strumpack {
          reinterpret_cast<
          void(*)(int*, int*, _Complex double*, C2Fptr)>(C_FuncZmn),
          reinterpret_cast<
-         void(*)(int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+         void(*)(int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
                  int* allrows, int* allcols, _Complex double* alldat_loc,
                  int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
                  C2Fptr elems)>(C_FuncZmnBlock),
@@ -520,7 +520,7 @@ namespace strumpack {
     template<> void LRBF_construct_element_compute<float>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, float* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -531,7 +531,7 @@ namespace strumpack {
     template<> void LRBF_construct_element_compute<double>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, double* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
@@ -542,33 +542,33 @@ namespace strumpack {
     template<> void LRBF_construct_element_compute<std::complex<float>>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, std::complex<float>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
       c_c_bf_construct_element_compute
         (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
          nullptr, reinterpret_cast<void(*)
-         (int*, int*, int*, int*, int*, int*, _Complex float*,
+         (int*, int*, int*, std::int64_t*, int*, int*, _Complex float*,
           int*, int*, int*, int*, int*, C2Fptr)>(C_FuncZmnBlock), fdata);
     }
     template<> void LRBF_construct_element_compute<std::complex<double>>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& stats, F2Cptr& msh,
      F2Cptr& kerquant, F2Cptr& ptree, void (*C_FuncZmnBlock)
-     (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+     (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
       int* allrows, int* allcols, std::complex<double>* alldat_loc,
       int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
       C2Fptr elems), C2Fptr fdata) {
       z_c_bf_construct_element_compute
         (&lr_bf, &options, &stats, &msh, &kerquant, &ptree,
          nullptr, reinterpret_cast<void(*)
-         (int*, int*, int*, int*, int*, int*, _Complex double*,
+         (int*, int*, int*, std::int64_t*, int*, int*, _Complex double*,
           int*, int*, int*, int*, int*, C2Fptr)>(C_FuncZmnBlock), fdata);
     }
 
     template<> void HODLR_extract_elements<float>
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, float* alldat_loc, int* rowidx, int* colidx,
      int* pgidx, int Npmap, int* pmaps) {
       s_c_bpack_extractelement
@@ -583,7 +583,7 @@ namespace strumpack {
     }
     template<> void HODLR_extract_elements<double>
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, double* alldat_loc, int* rowidx, int* colidx,
      int* pgidx, int Npmap, int* pmaps) {
       d_c_bpack_extractelement
@@ -598,7 +598,7 @@ namespace strumpack {
     }
     template<> void HODLR_extract_elements<std::complex<float>>
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, std::complex<float>* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
       c_c_bpack_extractelement
@@ -614,7 +614,7 @@ namespace strumpack {
     }
     template<> void HODLR_extract_elements<std::complex<double>>
     (F2Cptr& ho_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, std::complex<double>* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
       z_c_bpack_extractelement
@@ -631,7 +631,7 @@ namespace strumpack {
 
     template<> void LRBF_extract_elements<float>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, float* alldat_loc, int* rowidx, int* colidx,
      int* pgidx, int Npmap, int* pmaps) {
       s_c_bf_extractelement
@@ -647,7 +647,7 @@ namespace strumpack {
     }
     template<> void LRBF_extract_elements<double>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, double* alldat_loc, int* rowidx, int* colidx,
      int* pgidx, int Npmap, int* pmaps) {
       d_c_bf_extractelement
@@ -663,7 +663,7 @@ namespace strumpack {
     }
     template<> void LRBF_extract_elements<std::complex<float>>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, std::complex<float>* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
       c_c_bf_extractelement
@@ -679,7 +679,7 @@ namespace strumpack {
     }
     template<> void LRBF_extract_elements<std::complex<double>>
     (F2Cptr& lr_bf, F2Cptr& options, F2Cptr& msh, F2Cptr& stats,
-     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, int Nalldat_loc,
+     F2Cptr& ptree, int Ninter, int Nallrows, int Nallcols, std::int64_t Nalldat_loc,
      int* allrows, int* allcols, std::complex<double>* alldat_loc,
      int* rowidx, int* colidx, int* pgidx, int Npmap, int* pmaps) {
       z_c_bf_extractelement

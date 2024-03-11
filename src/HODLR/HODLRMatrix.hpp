@@ -53,8 +53,9 @@ namespace strumpack {
 
     struct ExtractionMeta {
       std::unique_ptr<int[]> iwork;
-      int Ninter, Nallrows, Nallcols, Nalldat_loc,
+      int Ninter, Nallrows, Nallcols,
         *allrows, *allcols, *rowids, *colids, *pgids, Npmap, *pmaps;
+      std::int64_t Nalldat_loc;
     };
 
     /**
@@ -594,13 +595,13 @@ namespace strumpack {
     };
 
     template<typename scalar_t> void HODLR_block_evaluation
-    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+    (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
      void* AC);
 
     template<typename scalar_t> void HODLR_block_evaluation_seq
-    (int* Ninter, int* Nallrows, int* Nallcols, int* Nalldat_loc,
+    (int* Ninter, int* Nallrows, int* Nallcols, std::int64_t* Nalldat_loc,
      int* allrows, int* allcols, scalar_t* alldat_loc,
      int* rowids, int* colids, int* pgids, int* Npmap, int* pmaps,
      void* f);
