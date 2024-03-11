@@ -196,7 +196,7 @@ namespace strumpack {
       TIMER_STOP(t_redist);
       DistElemMult<scalar_t> Afunc(A);
 
-#if 1
+#if 0
       // always use 1D block row sampling (does not perform transpose mult)
       DistSamples<scalar_t> RS(A, *this, opts);
 #else
