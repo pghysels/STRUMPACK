@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
 
   strumpack::MPIComm c;
 
-  HSSOptions<std::complex<double>> hss_opts;
+  strumpack::HSS::HSSOptions<std::complex<double>> hss_opts;
   hss_opts.set_from_command_line(argc, argv);
 
   int shape = 1;
@@ -120,14 +120,15 @@ int main(int argc, char* argv[]) {
           }
         }
       return Lij;
-  }
+  };
+
   strumpack::BLACSGrid grid(c);
   strumpack::DistributedMatrix<std::complex<double>> A(&grid, N, N);
   A.fill(Lelem);
   auto end = std::chrono::steady_clock::now();
   auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
   if (c.is_root())
-  std::cout << "# SIE assembly time: " << T << " [10e-3s]" << std::endl
+  std::cout << "# SIE assembly time: " << T << " [10e-3s]" << std::endl;
 
 
 
@@ -169,7 +170,7 @@ int main(int argc, char* argv[]) {
 
     // H.print_info();
     auto Hdense = H.dense();
-    Hdense.scaled_add(-1., A);
+    Hdense.scaled_add(std::complex<double>(-1.,0.), A);
     auto rel_err = Hdense.normF() / A.normF();
     errors.push_back(rel_err);
     auto Hdnorm = Hdense.normF();
