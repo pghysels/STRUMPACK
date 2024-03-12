@@ -65,6 +65,22 @@ namespace strumpack {
 #endif
   }
 
+    template<typename scalar_t> bool is_symmetric
+            (const SPOptions<scalar_t>& opts) {
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
+        return opts.use_symmetric() && opts.compression() == CompressionType::NONE;
+#endif
+        return false;
+    }
+
+    template<typename scalar_t> bool is_positive_definite
+            (const SPOptions<scalar_t>& opts) {
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
+        return opts.use_positive_definite();
+#endif
+        return false;
+    }
+
   template<typename scalar_t> bool is_HSS
   (int dsep, int dupd, const SPOptions<scalar_t>& opts) {
     return opts.compression() == CompressionType::HSS &&

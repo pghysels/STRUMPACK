@@ -205,6 +205,17 @@ namespace strumpack {
       }
     }
 
+        cublasFillMode_t F2cuOp(UpLo op) {
+            switch (op) {
+                case UpLo::U: return CUBLAS_FILL_MODE_UPPER;
+                case UpLo::L: return CUBLAS_FILL_MODE_LOWER;
+                case UpLo::F: return CUBLAS_FILL_MODE_FULL;
+                default:
+                    assert(false);
+                    return CUBLAS_FILL_MODE_LOWER;
+            }
+        }
+
     cublasSideMode_t S2cuOp(Side op) {
       switch (op) {
       case Side::L: return CUBLAS_SIDE_LEFT;
@@ -446,7 +457,77 @@ namespace strumpack {
                        const DenseMatrix<std::complex<double>>&, const DenseMatrix<std::complex<double>>&,
                        std::complex<double>, DenseMatrix<std::complex<double>>&);
 
-    void getrf_buffersize(cusolverDnHandle_t& handle, int m, int n, float* A, int lda, int* Lwork) {
+    void syrk(Handle& handle, cublasFillMode_t uplo,
+                  cublasOperation_t transa, int n, int k,
+                  float alpha, const float* A, int lda,
+                  float beta, float* C, int ldc) {
+            STRUMPACK_FLOPS(blas::gemm_flops(n,n,k,alpha,beta));
+            STRUMPACK_BYTES(4*blas::gemm_moves(n,n,k));
+            gpu_check(cublasSsyrk_v2(get_cublas_handle(handle), uplo, transa, n, k, &alpha, A, lda, &beta, C, ldc));
+        }
+        void syrk(Handle& handle, cublasFillMode_t uplo,
+                  cublasOperation_t transa, int n, int k,
+                  double alpha, const double* A, int lda,
+                  double beta, double* C, int ldc) {
+            STRUMPACK_FLOPS(blas::gemm_flops(n,n,k,alpha,beta));
+            STRUMPACK_BYTES(8*blas::gemm_moves(n,n,k));
+            gpu_check(cublasDsyrk_v2(get_cublas_handle(handle), uplo, transa, n, k, &alpha, A, lda, &beta, C, ldc));
+        }
+        void syrk(Handle& handle, cublasFillMode_t uplo,
+                  cublasOperation_t transa, int n, int k,
+                  std::complex<float> alpha,
+                  const std::complex<float>* A, int lda,
+                  std::complex<float> beta, std::complex<float> *C,
+                  int ldc) {
+            STRUMPACK_FLOPS(4*blas::gemm_flops(n,n,k,alpha,beta));
+            STRUMPACK_BYTES(2*4*blas::gemm_moves(n,n,k));
+            gpu_check(cublasCsyrk_v2(get_cublas_handle(handle), uplo, transa, n, k,
+                                     reinterpret_cast<cuComplex*>(&alpha),
+                                     reinterpret_cast<const cuComplex*>(A), lda,
+                                     reinterpret_cast<cuComplex*>(&beta),
+                                     reinterpret_cast<cuComplex*>(C), ldc));
+        }
+        void syrk(Handle& handle, cublasFillMode_t uplo,
+                  cublasOperation_t transa, int n, int k,
+                  std::complex<double> alpha,
+                  const std::complex<double> *A, int lda,
+                  std::complex<double> beta,
+                  std::complex<double> *C, int ldc) {
+            STRUMPACK_FLOPS(4*blas::gemm_flops(n,n,k,alpha,beta));
+            STRUMPACK_BYTES(2*8*blas::gemm_moves(n,n,k));
+            gpu_check(cublasZsyrk_v2(get_cublas_handle(handle), uplo, transa, n, k,
+                                     reinterpret_cast<cuDoubleComplex*>(&alpha),
+                                     reinterpret_cast<const cuDoubleComplex*>(A), lda,
+                                     reinterpret_cast<cuDoubleComplex*>(&beta),
+                                     reinterpret_cast<cuDoubleComplex*>(C), ldc));
+        }
+
+        template<typename scalar_t> void
+        syrk(Handle& handle, UpLo uplo, Trans ta,
+             scalar_t alpha, const DenseMatrix<scalar_t>& a,
+             scalar_t beta, DenseMatrix<scalar_t>& c) {
+            assert((ta==Trans::N && a.rows()==c.rows()) ||
+                   (ta!=Trans::N && a.cols()==c.rows()));
+            syrk(handle, F2cuOp(uplo), T2cuOp(ta), c.rows(),
+                 (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
+                 beta, c.data(), c.ld());
+        }
+        template void syrk(Handle&, UpLo, Trans,
+                           float, const DenseMatrix<float>&,
+                           float, DenseMatrix<float>&);
+        template void syrk(Handle&, UpLo, Trans,
+                           double, const DenseMatrix<double>&,
+                           double, DenseMatrix<double>&);
+        template void syrk(Handle&, UpLo, Trans, std::complex<float>,
+                           const DenseMatrix<std::complex<float>>&,
+                           std::complex<float>,
+                           DenseMatrix<std::complex<float>>&);
+        template void syrk(Handle&, UpLo, Trans, std::complex<double>,
+                           const DenseMatrix<std::complex<double>>&,
+                           std::complex<double>,
+                           DenseMatrix<std::complex<double>>&);
+
+        void getrf_buffersize(cusolverDnHandle_t& handle, int m, int n, float* A, int lda, int* Lwork) {
       gpu_check(cusolverDnSgetrf_bufferSize(handle, m, n, A, lda, Lwork));
     }
     void getrf_buffersize(cusolverDnHandle_t& handle, int m, int n, double *A, int lda, int* Lwork) {
@@ -569,7 +650,75 @@ namespace strumpack {
     template void getrs(Handle&, Trans, const DenseMatrix<std::complex<double>>&, const int*,
                         DenseMatrix<std::complex<double>>&, int*, std::complex<double>*, std::int64_t);
 
-    void trsm(cublasHandle_t& handle, cublasSideMode_t side,
+        void potrf_buffersize
+                (Handle& handle, cublasFillMode_t uplo, int m, float* A, int lda, int* Lwork) {
+            gpu_check(cusolverDnSpotrf_bufferSize(get_cusolver_handle(handle), uplo, m, A, lda, Lwork));
+        }
+        void potrf_buffersize
+                (Handle& handle, cublasFillMode_t uplo, int m, double * A, int lda, int* Lwork) {
+            gpu_check(cusolverDnDpotrf_bufferSize(get_cusolver_handle(handle), uplo, m, A, lda, Lwork));
+        }
+        void potrf_buffersize
+                (Handle& handle, cublasFillMode_t uplo, int m, std::complex<float>* A, int lda,
+                 int *Lwork) {
+            gpu_check(cusolverDnCpotrf_bufferSize(get_cusolver_handle(handle), uplo, m, reinterpret_cast<cuComplex*>(A), lda, Lwork));
+        }
+        void potrf_buffersize
+                (Handle& handle, cublasFillMode_t uplo, int m, std::complex<double>* A, int lda,
+                 int *Lwork) {
+            gpu_check(cusolverDnZpotrf_bufferSize(get_cusolver_handle(handle), uplo, m, reinterpret_cast<cuDoubleComplex*>(A), lda, Lwork));
+        }
+
+        template<typename scalar_t>
+        int potrf_buffersize(Handle& handle, UpLo uplo, int n) {
+            int Lwork;
+            potrf_buffersize(handle, F2cuOp(uplo), n, static_cast<scalar_t*>(nullptr), n, &Lwork);
+            return Lwork;
+        }
+        template int potrf_buffersize<float>(Handle&, UpLo, int);
+        template int potrf_buffersize<double>(Handle&, UpLo, int);
+        template int potrf_buffersize<std::complex<float>>(Handle&, UpLo, int);
+        template int potrf_buffersize<std::complex<double>>(Handle&, UpLo, int);
+
+
+        void potrf(Handle& handle, cublasFillMode_t uplo, int m, float* A, int lda,
+                   float* Workspace, int Lwork, int* devInfo) {
+            STRUMPACK_FLOPS(blas::potrf_flops(m));
+            gpu_check(cusolverDnSpotrf(get_cusolver_handle(handle), uplo, m, A, lda, Workspace, Lwork, devInfo));
+        }
+        void potrf(Handle& handle, cublasFillMode_t uplo, int m, double* A, int lda,
+                   double* Workspace, int Lwork, int* devInfo) {
+            STRUMPACK_FLOPS(blas::potrf_flops(m));
+            gpu_check(cusolverDnDpotrf(get_cusolver_handle(handle), uplo, m, A, lda, Workspace, Lwork, devInfo));
+        }
+        void potrf(Handle& handle, cublasFillMode_t uplo, int m, std::complex<float>* A, int lda,
+                   std::complex<float>* Workspace, int Lwork, int* devInfo) {
+            STRUMPACK_FLOPS(4*blas::potrf_flops(m));
+            gpu_check(cusolverDnCpotrf(get_cusolver_handle(handle), uplo, m, reinterpret_cast<cuComplex*>(A), lda,
+                                       reinterpret_cast<cuComplex*>(Workspace), Lwork, devInfo));
+        }
+        void potrf(Handle& handle, cublasFillMode_t uplo, int m, std::complex<double>* A, int lda,
+                   std::complex<double>* Workspace, int Lwork, int* devInfo) {
+            STRUMPACK_FLOPS(4*blas::potrf_flops(m));
+            gpu_check(cusolverDnZpotrf(get_cusolver_handle(handle), uplo, m, reinterpret_cast<cuDoubleComplex*>(A), lda,
+                                       reinterpret_cast<cuDoubleComplex*>(Workspace), Lwork, devInfo));
+        }
+
+        template<typename scalar_t> void
+        potrf(Handle& handle, UpLo uplo, DenseMatrix<scalar_t>& A,
+              scalar_t* Workspace, int Lwork, int* devInfo) {
+            potrf(handle, F2cuOp(uplo), A.rows(), A.data(), A.ld(), Workspace, Lwork, devInfo);
+        }
+        template void potrf(Handle&, UpLo, DenseMatrix<float>&,
+                            float*, int, int*);
+        template void potrf(Handle&, UpLo, DenseMatrix<double>&,
+                            double*, int, int*);
+        template void potrf(Handle&, UpLo, DenseMatrix<std::complex<float>>&,
+                            std::complex<float>*, int, int*);
+        template void potrf(Handle&, UpLo, DenseMatrix<std::complex<double>>&,
+                            std::complex<double>*, int, int*);
+
+        void trsm(cublasHandle_t& handle, cublasSideMode_t side,
               cublasFillMode_t uplo, cublasOperation_t trans,
               cublasDiagType_t diag, int m, int n, const float* alpha,
               const float* A, int lda, float* B, int ldb) {

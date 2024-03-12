@@ -503,6 +503,40 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::set_front_elements_symmetric
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   Triplet<scalar_t>* e11, Triplet<scalar_t>* e21) const {
+    integer_t ds = shi - slo, du = upd.size();
+    for (integer_t row=0; row<ds; row++) { // separator rows
+        integer_t upd_ptr = 0;
+        const auto hij = ptr_[row+slo+1];
+        for (integer_t j=ptr_[row+slo]; j<hij; j++) {
+            integer_t col = ind_[j];
+            if (col >= slo) {
+                if (col < shi)
+                    *e11++ = Triplet<scalar_t>(row, col-slo, val_[j]);
+                else {
+                    while (upd_ptr<du && upd[upd_ptr]<col) upd_ptr++;
+                    if (upd_ptr == du) break;
+          }
+        }
+      }
+    }
+    for (integer_t i=0; i<du; i++) { // update rows
+        auto row = upd[i];
+        const auto hij = ptr_[row+1];
+        for (integer_t j=ptr_[row]; j<hij; j++) {
+            integer_t col = ind_[j];
+            if (col >= slo) {
+                if (col < shi)
+                    *e21++ = Triplet<scalar_t>(i, col-slo, val_[j]);
+                else break;
+        }
+      }
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   CSRMatrix<scalar_t,integer_t>::count_front_elements
   (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
    std::size_t& e11, std::size_t& e12, std::size_t& e21) const {
@@ -533,6 +567,38 @@ namespace strumpack {
         }
       }
     }
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  CSRMatrix<scalar_t,integer_t>::count_front_elements_symmetric
+  (integer_t slo, integer_t shi, const std::vector<integer_t>& upd,
+   std::size_t& e11, std::size_t& e21) const {
+    integer_t ds = shi - slo, du = upd.size();
+    for (integer_t row=0; row<ds; row++) { // separator rows
+        integer_t upd_ptr = 0;
+        const auto hij = ptr_[row+slo+1];
+        for (integer_t j=ptr_[row+slo]; j<hij; j++) {
+            integer_t col = ind_[j];
+            if (col >= slo) {
+                if (col < shi) e11++;
+                else {
+                    while (upd_ptr<du && upd[upd_ptr]<col) upd_ptr++;
+                    if (upd_ptr == du) break;
+                }
+            }
+        }
+    }
+    for (integer_t i=0; i<du; i++) { // update rows
+        auto row = upd[i];
+        const auto hij = ptr_[row+1];
+        for (integer_t j=ptr_[row]; j<hij; j++) {
+            integer_t col = ind_[j];
+            if (col >= slo) {
+                if (col < shi) e21++;
+                else break;
+           }
+        }
+     }
   }
 
   // TODO parallel -> will be hard to do efficiently

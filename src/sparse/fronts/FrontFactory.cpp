@@ -51,6 +51,7 @@
 #endif
 #if defined(STRUMPACK_USE_GPU)
 #include "FrontalMatrixGPU.hpp"
+#include "FrontalMatrixGPUSymmetricPositiveDefinite.hpp"
 #endif
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontalMatrixLossy.hpp"
@@ -146,8 +147,13 @@ namespace strumpack {
         (s, sbegin, send, upd);
 #else
 #if defined(STRUMPACK_USE_GPU)
-      front = std::make_unique<FrontalMatrixGPU<scalar_t,integer_t>>
-        (s, sbegin, send, upd);
+        if (is_symmetric(opts) && is_positive_definite(opts)){
+            front.reset
+                    (new FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>(s, sbegin, send, upd));
+        } else {
+            front.reset
+                    (new FrontalMatrixGPU<scalar_t,integer_t>(s, sbegin, send, upd));
+        }
 #endif
 #endif
       if (root) fc.dense++;
