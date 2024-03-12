@@ -12,15 +12,15 @@ target_link_libraries(test_matrix_IO strumpack)
 target_link_libraries(test_SPD_seq strumpack)
 target_link_libraries(test_SPD_mixedPrecision strumpack)
 
+add_test(NAME "Download_sparse_test_matrices" COMMAND /bin/sh ${CMAKE_SOURCE_DIR}/test/download_mtx.sh)
+
 add_test("user_test_HSS_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_HSS_seq T 100)
 add_test("user_test_sparse_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq
   ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx)
 add_test("user_matrix_IO" ${CMAKE_CURRENT_BINARY_DIR}/test_matrix_IO T 1000)
 add_test("user_test_BLR_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300)
-add_test("user_test_SPD_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_seq
-        ${PROJECT_SOURCE_DIR}/examples/sparse/data/bcsstm08.mtx)
-add_test("user_test_SPD_mixedPrecision" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_mixedPrecision
-        ${PROJECT_SOURCE_DIR}/examples/sparse/data/bcsstm08.mtx)
+add_test("user_test_SPD_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_seq bcsstm08/bcsstm08.mtx)
+add_test("user_test_SPD_mixedPrecision" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_mixedPrecision bcsstm08/bcsstm08.mtx)
 
 if(STRUMPACK_USE_MPI)
   add_executable(test_HSS_mpi             test_HSS_mpi.cpp)
@@ -478,9 +478,6 @@ if(STRUMPACK_USE_MPI)
   # set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
 endif()
-
-
-add_test(NAME "Download_sparse_test_matrices" COMMAND /bin/sh ${CMAKE_SOURCE_DIR}/test/download_mtx.sh)
 
 
 set(test_name "SPARSE_seq_3")
