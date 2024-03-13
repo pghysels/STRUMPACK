@@ -37,7 +37,7 @@ namespace strumpack {
   // forward declarations
   template<typename scalar_t,typename integer_t> class FrontalMatrix;
   template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
-  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
+  template<typename scalar_t,typename integer_t> class FrontBLRMPI;
 
   namespace BLR {
 
@@ -48,7 +48,7 @@ namespace strumpack {
       using BLRMPI_t = BLRMatrixMPI<scalar_t>;
       using F_t = FrontalMatrix<scalar_t,integer_t>;
       using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
-      using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
+      using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
       using VI_t = std::vector<std::size_t>;
       using VVS_t = std::vector<std::vector<scalar_t>>;
 

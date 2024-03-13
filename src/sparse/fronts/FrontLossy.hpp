@@ -100,7 +100,7 @@ namespace strumpack {
   };
 
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixLossy
+  template<typename scalar_t,typename integer_t> class FrontLossy
     : public FrontalMatrixDense<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
@@ -111,14 +111,14 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontalMatrixLossy(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                       std::vector<integer_t>& upd);
+    FrontLossy(integer_t sep, integer_t sep_begin, integer_t sep_end,
+               std::vector<integer_t>& upd);
 
     ReturnCode factor(const SpMat_t& A, const SPOptions<scalar_t>& opts,
                       VectorPool<scalar_t>& workspace,
                       int etree_level=0, int task_depth=0) override;
 
-    std::string type() const override { return "FrontalMatrixLossy"; }
+    std::string type() const override { return "FrontLossy"; }
 
     void compress(const Opts_t& opts);
     void decompress(DenseM_t& F11, DenseM_t& F12, DenseM_t& F21) const;
@@ -138,8 +138,8 @@ namespace strumpack {
                                     integer_t& zero,
                                     integer_t& pos) const override;
 
-    FrontalMatrixLossy(const FrontalMatrixLossy&) = delete;
-    FrontalMatrixLossy& operator=(FrontalMatrixLossy const&) = delete;
+    FrontLossy(const FrontLossy&) = delete;
+    FrontLossy& operator=(FrontLossy const&) = delete;
   };
 
 } // end namespace strumpack

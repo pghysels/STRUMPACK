@@ -26,7 +26,7 @@
  *             Division).
  *
  */
-#include "FrontalMatrixLossy.hpp"
+#include "FrontLossy.hpp"
 
 #if defined(STRUMPACK_USE_ZFP)
 #include "zfp.h"
@@ -151,19 +151,19 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixLossy<scalar_t,integer_t>::FrontalMatrixLossy
+  FrontLossy<scalar_t,integer_t>::FrontLossy
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : FD_t(sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixLossy<scalar_t,integer_t>::node_factor_nonzeros() const {
+  FrontLossy<scalar_t,integer_t>::node_factor_nonzeros() const {
     return (F11c_.compressed_size() + F12c_.compressed_size() +
             F21c_.compressed_size()) / sizeof(scalar_t);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::compress(const Opts_t& opts) {
+  FrontLossy<scalar_t,integer_t>::compress(const Opts_t& opts) {
     auto prec = opts.lossy_precision();
     auto acc = opts.lossy_accuracy();
     F11c_ = LossyMatrix<scalar_t>(this->F11_, prec, acc);
@@ -175,7 +175,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::decompress
+  FrontLossy<scalar_t,integer_t>::decompress
   (DenseM_t& F11, DenseM_t& F12, DenseM_t& F21) const {
     F11 = F11c_.decompress();
     F12 = F12c_.decompress();
@@ -183,7 +183,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixLossy<scalar_t,integer_t>::factor
+  FrontLossy<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     auto e = FD_t::factor(A, opts, workspace, etree_level, task_depth);
@@ -192,7 +192,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::fwd_solve_phase2
+  FrontLossy<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
@@ -215,7 +215,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixLossy<scalar_t,integer_t>::bwd_solve_phase1
+  FrontLossy<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     DenseM_t F11, F12, F21;
     decompress(F11, F12, F21);
@@ -237,25 +237,25 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixLossy<scalar_t,integer_t>::node_inertia
+  FrontLossy<scalar_t,integer_t>::node_inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     return this->matrix_inertia(F11c_.decompress(), neg, zero, pos);
   }
 
   // explicit template instantiations
-  template class FrontalMatrixLossy<float,int>;
-  template class FrontalMatrixLossy<double,int>;
-  template class FrontalMatrixLossy<std::complex<float>,int>;
-  template class FrontalMatrixLossy<std::complex<double>,int>;
+  template class FrontLossy<float,int>;
+  template class FrontLossy<double,int>;
+  template class FrontLossy<std::complex<float>,int>;
+  template class FrontLossy<std::complex<double>,int>;
 
-  template class FrontalMatrixLossy<float,long int>;
-  template class FrontalMatrixLossy<double,long int>;
-  template class FrontalMatrixLossy<std::complex<float>,long int>;
-  template class FrontalMatrixLossy<std::complex<double>,long int>;
+  template class FrontLossy<float,long int>;
+  template class FrontLossy<double,long int>;
+  template class FrontLossy<std::complex<float>,long int>;
+  template class FrontLossy<std::complex<double>,long int>;
 
-  template class FrontalMatrixLossy<float,long long int>;
-  template class FrontalMatrixLossy<double,long long int>;
-  template class FrontalMatrixLossy<std::complex<float>,long long int>;
-  template class FrontalMatrixLossy<std::complex<double>,long long int>;
+  template class FrontLossy<float,long long int>;
+  template class FrontLossy<double,long long int>;
+  template class FrontLossy<std::complex<float>,long long int>;
+  template class FrontLossy<std::complex<double>,long long int>;
 
 } // end namespace strumpack

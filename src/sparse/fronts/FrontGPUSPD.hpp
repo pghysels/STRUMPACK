@@ -26,19 +26,19 @@ namespace strumpack {
   }
 
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixGPUSymmetricPositiveDefinite
+  template<typename scalar_t,typename integer_t> class FrontGPUSPD
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FG_t = FrontalMatrixGPUSymmetricPositiveDefinite<scalar_t,integer_t>;
+    using FG_t = FrontGPUSPD<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using LInfo_t = LevelInfoUnified<scalar_t,integer_t>;
 
   public:
-    FrontalMatrixGPUSymmetricPositiveDefinite(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                                              std::vector<integer_t>& upd);
-    ~FrontalMatrixGPUSymmetricPositiveDefinite();
+    FrontGPUSPD(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                std::vector<integer_t>& upd);
+    ~FrontGPUSPD();
 
     long long dense_node_factor_nonzeros() const override;
 
@@ -73,13 +73,15 @@ namespace strumpack {
 
   private:
     std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
-    std::unique_ptr<scalar_t[], std::function<void(scalar_t*)>> host_factors_diagonal_{nullptr, std::default_delete<scalar_t[]>{}}, host_factors_off_diagonal_{nullptr, std::default_delete<scalar_t[]>{}};
+    std::unique_ptr<scalar_t[], std::function<void(scalar_t*)>>
+    host_factors_diagonal_{nullptr, std::default_delete<scalar_t[]>{}},
+      host_factors_off_diagonal_{nullptr, std::default_delete<scalar_t[]>{}};
     DenseMW_t F11_, F12_, F21_, F22_;
     std::vector<int> pivot_mem_;
     int* piv_ = nullptr;
 
-    FrontalMatrixGPUSymmetricPositiveDefinite(const FrontalMatrixGPUSymmetricPositiveDefinite&) = delete;
-    FrontalMatrixGPUSymmetricPositiveDefinite& operator=(FrontalMatrixGPUSymmetricPositiveDefinite const&) = delete;
+    FrontGPUSPD(const FrontGPUSPD&) = delete;
+    FrontGPUSPD& operator=(FrontGPUSPD const&) = delete;
 
     void front_assembly(const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);

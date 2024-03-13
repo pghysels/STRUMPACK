@@ -29,7 +29,7 @@
 #include <fstream>
 
 #include "FrontalMatrixDenseMPI.hpp"
-#include "FrontalMatrixBLRMPI.hpp"
+#include "FrontBLRMPI.hpp"
 #include "ExtendAdd.hpp"
 #include "BLR/BLRExtendAdd.hpp"
 

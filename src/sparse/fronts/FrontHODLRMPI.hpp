@@ -38,11 +38,11 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  class FrontalMatrixHODLRMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+  class FrontHODLRMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
-    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
@@ -51,15 +51,15 @@ namespace strumpack {
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
   public:
-    FrontalMatrixHODLRMPI(integer_t sep, integer_t sep_begin,
-                          integer_t sep_end, std::vector<integer_t>& upd,
-                          const MPIComm& comm, int _total_procs);
+    FrontHODLRMPI(integer_t sep, integer_t sep_begin,
+                  integer_t sep_end, std::vector<integer_t>& upd,
+                  const MPIComm& comm, int _total_procs);
 
-    ~FrontalMatrixHODLRMPI();
+    ~FrontHODLRMPI();
 
-    FrontalMatrixHODLRMPI(const FrontalMatrixHODLRMPI&) = delete;
+    FrontHODLRMPI(const FrontHODLRMPI&) = delete;
 
-    FrontalMatrixHODLRMPI& operator=(FrontalMatrixHODLRMPI const&) = delete;
+    FrontHODLRMPI& operator=(FrontHODLRMPI const&) = delete;
 
     void release_work_memory() override;
 
@@ -106,7 +106,7 @@ namespace strumpack {
 
     long long node_factor_nonzeros() const override;
     integer_t front_rank(int task_depth=0) const override;
-    std::string type() const override { return "FrontalMatrixHODLRMPI"; }
+    std::string type() const override { return "FrontHODLRMPI"; }
 
     void extract_CB_sub_matrix_2d(const VecVec_t& I, const VecVec_t& J,
                                   std::vector<DistM_t>& B) const override;

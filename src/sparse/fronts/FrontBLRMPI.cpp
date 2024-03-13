@@ -31,7 +31,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "FrontalMatrixBLRMPI.hpp"
+#include "FrontBLRMPI.hpp"
 #include "sparse/CSRGraph.hpp"
 #include "ExtendAdd.hpp"
 #include "BLR/BLRExtendAdd.hpp"
@@ -39,7 +39,7 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::FrontalMatrixBLRMPI
+  FrontBLRMPI<scalar_t,integer_t>::FrontBLRMPI
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd, const MPIComm& comm, int P, int leaf)
     : FrontalMatrixMPI<scalar_t,integer_t>
@@ -47,12 +47,12 @@ namespace strumpack {
       pgrid_(Comm(), P), leaf_(leaf) {}
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::release_work_memory() {
+  FrontBLRMPI<scalar_t,integer_t>::release_work_memory() {
     F22blr_ = BLRMPI_t(); // remove the update block
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add() {
+  FrontBLRMPI<scalar_t,integer_t>::extend_add() {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
@@ -75,7 +75,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_cols
+  FrontBLRMPI<scalar_t,integer_t>::extend_add_cols
   (std::size_t i, bool part, std::size_t CP, const Opts_t& opts) {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
@@ -118,7 +118,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontBLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     DistM_t F22(grid(), dim_upd(), dim_upd());
     F22blr_.to_ScaLAPACK(F22);
@@ -127,14 +127,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  FrontBLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
       (F22blr_, sbuf, pa, this->upd_to_parent(pa));
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  FrontBLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
@@ -142,7 +142,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  FrontBLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
@@ -150,7 +150,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  FrontBLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa,
    integer_t begin_col, integer_t end_col) const {
@@ -159,7 +159,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front
+  FrontBLRMPI<scalar_t,integer_t>::build_front
   (const SpMat_t& A) {
     const auto dupd = dim_upd();
     const auto dsep = dim_sep();
@@ -203,7 +203,7 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::build_front_cols
+  FrontBLRMPI<scalar_t,integer_t>::build_front_cols
   (const SpMat_t& A, std::size_t i, bool part, std::size_t CP,
    const std::vector<Triplet<scalar_t>>& r1buf,
    const std::vector<Triplet<scalar_t>>& r2buf,
@@ -230,7 +230,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::factor
+  FrontBLRMPI<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
@@ -247,7 +247,7 @@ namespace strumpack {
     // TODO use the existing workspace
     // now this is cleared to save space
     workspace.clear();
-    TaskTimer t("FrontalMatrixBLRMPI_factor");
+    TaskTimer t("FrontBLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     if (opts.BLR_options().BLR_factor_algorithm() ==
         BLR::BLRFactorAlgorithm::COLWISE) {
@@ -372,7 +372,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontBLRMPI<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
    int etree_level) const {
     DistM_t CBl, CBr;
@@ -412,7 +412,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontBLRMPI<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
    int etree_level) const {
     DistM_t& y = ydist[this->sep_];
@@ -449,12 +449,12 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+  FrontBLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
     return F11blr_.nonzeros() + F12blr_.nonzeros() + F21blr_.nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::partition
+  FrontBLRMPI<scalar_t,integer_t>::partition
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
@@ -514,7 +514,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixBLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
+  FrontBLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
     auto nB = I.size();
     std::vector<std::vector<std::size_t>> lI(nB), lJ(nB), oI(nB), oJ(nB);
@@ -539,19 +539,19 @@ namespace strumpack {
 
 
   // explicit template instantiations
-  template class FrontalMatrixBLRMPI<float,int>;
-  template class FrontalMatrixBLRMPI<double,int>;
-  template class FrontalMatrixBLRMPI<std::complex<float>,int>;
-  template class FrontalMatrixBLRMPI<std::complex<double>,int>;
+  template class FrontBLRMPI<float,int>;
+  template class FrontBLRMPI<double,int>;
+  template class FrontBLRMPI<std::complex<float>,int>;
+  template class FrontBLRMPI<std::complex<double>,int>;
 
-  template class FrontalMatrixBLRMPI<float,long int>;
-  template class FrontalMatrixBLRMPI<double,long int>;
-  template class FrontalMatrixBLRMPI<std::complex<float>,long int>;
-  template class FrontalMatrixBLRMPI<std::complex<double>,long int>;
+  template class FrontBLRMPI<float,long int>;
+  template class FrontBLRMPI<double,long int>;
+  template class FrontBLRMPI<std::complex<float>,long int>;
+  template class FrontBLRMPI<std::complex<double>,long int>;
 
-  template class FrontalMatrixBLRMPI<float,long long int>;
-  template class FrontalMatrixBLRMPI<double,long long int>;
-  template class FrontalMatrixBLRMPI<std::complex<float>,long long int>;
-  template class FrontalMatrixBLRMPI<std::complex<double>,long long int>;
+  template class FrontBLRMPI<float,long long int>;
+  template class FrontBLRMPI<double,long long int>;
+  template class FrontBLRMPI<std::complex<float>,long long int>;
+  template class FrontBLRMPI<std::complex<double>,long long int>;
 
 } // end namespace strumpack

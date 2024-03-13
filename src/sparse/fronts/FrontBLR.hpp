@@ -34,9 +34,9 @@
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
+  template<typename scalar_t,typename integer_t> class FrontBLRMPI;
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixBLR
+  template<typename scalar_t,typename integer_t> class FrontBLR
     : public FrontalMatrix<scalar_t,integer_t> {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -46,13 +46,13 @@ namespace strumpack {
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
-    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
 #endif
 
   public:
-    FrontalMatrixBLR(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                     std::vector<integer_t>& upd);
-    ~FrontalMatrixBLR() {}
+    FrontBLR(integer_t sep, integer_t sep_begin, integer_t sep_end,
+             std::vector<integer_t>& upd);
+    ~FrontBLR() {}
 
     void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
@@ -96,7 +96,7 @@ namespace strumpack {
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override;
 
-    std::string type() const override { return "FrontalMatrixBLR"; }
+    std::string type() const override { return "FrontBLR"; }
 
 #if defined(STRUMPACK_USE_MPI)
     void
@@ -125,8 +125,8 @@ namespace strumpack {
     std::vector<std::size_t> sep_tiles_, upd_tiles_;
     DenseMatrix<bool> admissibility_;
 
-    FrontalMatrixBLR(const FrontalMatrixBLR&) = delete;
-    FrontalMatrixBLR& operator=(FrontalMatrixBLR const&) = delete;
+    FrontBLR(const FrontBLR&) = delete;
+    FrontBLR& operator=(FrontBLR const&) = delete;
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const override;

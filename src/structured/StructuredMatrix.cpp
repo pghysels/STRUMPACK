@@ -34,7 +34,7 @@
 #include "StructuredMatrix.hpp"
 #include "HSS/HSSMatrix.hpp"
 #if defined(STRUMPACK_USE_ZFP)
-#include "sparse/fronts/FrontalMatrixLossy.hpp"
+#include "sparse/fronts/FrontLossy.hpp"
 #endif
 #include "BLR/BLRMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)

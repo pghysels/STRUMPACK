@@ -38,10 +38,10 @@ namespace strumpack {
   template<typename scalar_t, typename integer_t> class LevelInfoMAGMA;
 
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixMAGMA
+  template<typename scalar_t,typename integer_t> class FrontMAGMA
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FM_t = FrontalMatrixMAGMA<scalar_t,integer_t>;
+    using FM_t = FrontMAGMA<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
@@ -49,9 +49,9 @@ namespace strumpack {
     using LInfo_t = LevelInfoMAGMA<scalar_t,integer_t>;
 
   public:
-    FrontalMatrixMAGMA(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                     std::vector<integer_t>& upd);
-    ~FrontalMatrixMAGMA();
+    FrontMAGMA(integer_t sep, integer_t sep_begin, integer_t sep_end,
+               std::vector<integer_t>& upd);
+    ~FrontMAGMA();
 
     void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
@@ -79,7 +79,7 @@ namespace strumpack {
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override {}
 
-    std::string type() const override { return "FrontalMatrixMAGMA"; }
+    std::string type() const override { return "FrontMAGMA"; }
     bool isGPU() const override { return true; }
 
 #if defined(STRUMPACK_USE_MPI)
@@ -95,11 +95,11 @@ namespace strumpack {
       const override;
     void
     extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                               const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa)
+                               const FrontBLRMPI<scalar_t,integer_t>* pa)
       const override;
     void
     extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
-                                   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa,
+                                   const FrontBLRMPI<scalar_t,integer_t>* pa,
                                    integer_t begin_col, integer_t end_col,
                                    const Opts_t& opts)
       const override;
@@ -117,8 +117,8 @@ namespace strumpack {
     std::unique_ptr<gpu::DeviceMemory<char>> dev_factors_ = nullptr;
     std::unique_ptr<gpu::DeviceMemory<char>> dev_Schur_ = nullptr;
 
-    FrontalMatrixMAGMA(const FrontalMatrixMAGMA&) = delete;
-    FrontalMatrixMAGMA& operator=(FrontalMatrixMAGMA const&) = delete;
+    FrontMAGMA(const FrontMAGMA&) = delete;
+    FrontMAGMA& operator=(FrontMAGMA const&) = delete;
 
     void front_assembly(const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);

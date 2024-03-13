@@ -36,28 +36,28 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  class FrontalMatrixBLRMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+  class FrontBLRMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
-    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
   public:
-    FrontalMatrixBLRMPI
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd, const MPIComm& comm, int P,
-     int leaf);
+    FrontBLRMPI(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                std::vector<integer_t>& upd, const MPIComm& comm, int P,
+                int leaf);
 
     void release_work_memory() override;
 
     void build_front(const SpMat_t& A);
-    void build_front_cols(const SpMat_t& A, std::size_t i, bool part, std::size_t CP,
+    void build_front_cols(const SpMat_t& A, std::size_t i,
+                          bool part, std::size_t CP,
                           const std::vector<Triplet<scalar_t>>& r1buf,
                           const std::vector<Triplet<scalar_t>>& r2buf,
                           const std::vector<Triplet<scalar_t>>& r3buf,
@@ -99,13 +99,13 @@ namespace strumpack {
 
     void sample_CB(const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
                    F_t* pa) const override {
-      std::cout << "FrontalMatrixBLRMPI::sample_CB TODO" << std::endl;
+      std::cout << "FrontBLRMPI::sample_CB TODO" << std::endl;
     }
 
     void extract_CB_sub_matrix_2d(const VecVec_t& I, const VecVec_t& J,
                                   std::vector<DistM_t>& B) const override;
 
-    std::string type() const override { return "FrontalMatrixBLRMPI"; }
+    std::string type() const override { return "FrontBLRMPI"; }
 
     void partition(const Opts_t& opts, const SpMat_t& A,
                    integer_t* sorder, bool is_root, int task_depth) override;

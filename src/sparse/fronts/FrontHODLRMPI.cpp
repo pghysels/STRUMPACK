@@ -27,15 +27,15 @@
  *
  */
 #include "StrumpackParameters.hpp"
-#include "FrontalMatrixHODLRMPI.hpp"
-#include "FrontalMatrixBLRMPI.hpp"
+#include "FrontHODLRMPI.hpp"
+#include "FrontBLRMPI.hpp"
 #include "ExtendAdd.hpp"
 #include "BLR/BLRExtendAdd.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::FrontalMatrixHODLRMPI
+  FrontHODLRMPI<scalar_t,integer_t>::FrontHODLRMPI
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd, const MPIComm& comm, int total_procs)
     : FrontalMatrixMPI<scalar_t,integer_t>
@@ -43,7 +43,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::~FrontalMatrixHODLRMPI() {
+  FrontHODLRMPI<scalar_t,integer_t>::~FrontHODLRMPI() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     auto HOD_mem =
       F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
@@ -54,7 +54,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::release_work_memory() {
+  FrontHODLRMPI<scalar_t,integer_t>::release_work_memory() {
     if (F22_) {
       TaskTimer t_traverse(TaskType::BF_EXTRACT_TRAVERSE, 3),
         t_bf(TaskType::BF_EXTRACT_ENTRY, 3),
@@ -68,7 +68,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> DistributedMatrix<scalar_t>
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::get_dense_CB() const {
+  FrontHODLRMPI<scalar_t,integer_t>::get_dense_CB() const {
     auto dupd = dim_upd();
     DistM_t dF22(grid(), dupd, dupd), eye(grid(), dupd, dupd);
     eye.eye();
@@ -77,7 +77,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontHODLRMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
@@ -87,7 +87,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  FrontHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
@@ -97,7 +97,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  FrontHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
   integer_t begin_col, integer_t end_col, const SPOptions<scalar_t>& opts) const {
     if (!dim_upd()) return;
@@ -108,7 +108,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  FrontHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
@@ -116,7 +116,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  FrontHODLRMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa,
    integer_t begin_col, integer_t end_col) const {
@@ -125,7 +125,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_CB
+  FrontHODLRMPI<scalar_t,integer_t>::sample_CB
   (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
@@ -135,7 +135,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::sample_children_CB
+  FrontHODLRMPI<scalar_t,integer_t>::sample_children_CB
   (Trans op, const DistM_t& R, DistM_t& S) {
     if (!lchild_ && !rchild_) return;
     DistM_t Sl, Sr, Rl, Rr;
@@ -166,7 +166,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
+  FrontHODLRMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
     if (Comm().is_null() || !dim_upd()) return;
     // TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
@@ -204,7 +204,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
+  FrontHODLRMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (visit(lchild_)) {
@@ -218,7 +218,7 @@ namespace strumpack {
       if (er != ReturnCode::SUCCESS) err_code = er;
     }
     if (!dim_blk()) return err_code;
-    TaskTimer t("FrontalMatrixHODLRMPI_factor");
+    TaskTimer t("FrontHODLRMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     construct_hierarchy(A, opts);
     switch (opts.HODLR_options().compression_algorithm()) {
@@ -293,7 +293,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_extraction
+  FrontHODLRMPI<scalar_t,integer_t>::compress_extraction
   (const SpMat_t& A, const Opts_t& opts) {
     F11_.set_sampling_parameter(1.2);
     auto extract_F11 =
@@ -394,7 +394,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_sampling
+  FrontHODLRMPI<scalar_t,integer_t>::compress_sampling
   (const SpMat_t& A, const Opts_t& opts) {
     const auto dsep = dim_sep();
     const auto dupd = dim_upd();
@@ -503,7 +503,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_F11() {
+  FrontHODLRMPI<scalar_t,integer_t>::compress_flops_F11() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f11_fill_flops = F11_.get_stat("Flop_Fill");
     long long int f11_factor_flops = F11_.get_stat("Flop_Factor");
@@ -514,7 +514,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_F12_F21() {
+  FrontHODLRMPI<scalar_t,integer_t>::compress_flops_F12_F21() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f12_fill_flops = F12_.get_stat("Flop_Fill");
     long long int f21_fill_flops = F21_.get_stat("Flop_Fill");
@@ -525,7 +525,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_F22() {
+  FrontHODLRMPI<scalar_t,integer_t>::compress_flops_F22() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f22_fill_flops = F22_->get_stat("Flop_Fill");
     STRUMPACK_HODLR_F22_FILL_FLOPS(f22_fill_flops);
@@ -534,7 +534,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::compress_flops_Schur
+  FrontHODLRMPI<scalar_t,integer_t>::compress_flops_Schur
   (long long int invf11_mult_flops) {
 #if defined(STRUMPACK_COUNT_FLOPS)
     long long int f21_mult_flops = F21_.get_stat("Flop_C_Mult"),
@@ -550,7 +550,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontHODLRMPI<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
    int etree_level) const {
     DistM_t CBl, CBr;
@@ -593,7 +593,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontHODLRMPI<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
    int etree_level) const {
     DistM_t& y = ydist[this->sep_];
@@ -632,7 +632,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::front_rank
+  FrontHODLRMPI<scalar_t,integer_t>::front_rank
   (int task_depth) const {
     return std::max(F11_.get_stat("Rank_max"),
                     std::max(F12_.get_stat("Rank_max"),
@@ -640,14 +640,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+  FrontHODLRMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
     return (F11_.get_stat("Mem_Fill") + F11_.get_stat("Mem_Factor")
             + F12_.get_stat("Mem_Fill") + F21_.get_stat("Mem_Fill"))
       * 1.0e6 / sizeof(scalar_t);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::partition
+  FrontHODLRMPI<scalar_t,integer_t>::partition
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
@@ -665,7 +665,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHODLRMPI<scalar_t,integer_t>::construct_hierarchy
+  FrontHODLRMPI<scalar_t,integer_t>::construct_hierarchy
   (const SpMat_t& A, const Opts_t& opts) {
     TIMER_TIME(TaskType::CONSTRUCT_HIERARCHY, 0, t_construct_h);
     TIMER_TIME(TaskType::EXTRACT_GRAPH, 0, t_graph_11);
@@ -726,19 +726,19 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class FrontalMatrixHODLRMPI<float,int>;
-  template class FrontalMatrixHODLRMPI<double,int>;
-  template class FrontalMatrixHODLRMPI<std::complex<float>,int>;
-  template class FrontalMatrixHODLRMPI<std::complex<double>,int>;
+  template class FrontHODLRMPI<float,int>;
+  template class FrontHODLRMPI<double,int>;
+  template class FrontHODLRMPI<std::complex<float>,int>;
+  template class FrontHODLRMPI<std::complex<double>,int>;
 
-  template class FrontalMatrixHODLRMPI<float,long int>;
-  template class FrontalMatrixHODLRMPI<double,long int>;
-  template class FrontalMatrixHODLRMPI<std::complex<float>,long int>;
-  template class FrontalMatrixHODLRMPI<std::complex<double>,long int>;
+  template class FrontHODLRMPI<float,long int>;
+  template class FrontHODLRMPI<double,long int>;
+  template class FrontHODLRMPI<std::complex<float>,long int>;
+  template class FrontHODLRMPI<std::complex<double>,long int>;
 
-  template class FrontalMatrixHODLRMPI<float,long long int>;
-  template class FrontalMatrixHODLRMPI<double,long long int>;
-  template class FrontalMatrixHODLRMPI<std::complex<float>,long long int>;
-  template class FrontalMatrixHODLRMPI<std::complex<double>,long long int>;
+  template class FrontHODLRMPI<float,long long int>;
+  template class FrontHODLRMPI<double,long long int>;
+  template class FrontHODLRMPI<std::complex<float>,long long int>;
+  template class FrontHODLRMPI<std::complex<double>,long long int>;
 
 } // end namespace strumpack

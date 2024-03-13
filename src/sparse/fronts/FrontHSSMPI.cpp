@@ -26,14 +26,14 @@
  *             Division).
  *
  */
-#include "FrontalMatrixHSSMPI.hpp"
+#include "FrontHSSMPI.hpp"
 #include "ExtendAdd.hpp"
 #include "sparse/CSRGraph.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::FrontalMatrixHSSMPI
+  FrontHSSMPI<scalar_t,integer_t>::FrontHSSMPI
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd, const MPIComm& comm, int total_procs)
     : FrontalMatrixMPI<scalar_t,integer_t>
@@ -41,7 +41,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::release_work_memory() {
+  FrontHSSMPI<scalar_t,integer_t>::release_work_memory() {
     thetaVhatC_.clear();
     VhatCPhiC_.clear();
     Vhat_.clear();
@@ -50,7 +50,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::random_sampling
+  FrontHSSMPI<scalar_t,integer_t>::random_sampling
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    const DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
     Sr.zero();
@@ -64,7 +64,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_CB
+  FrontHSSMPI<scalar_t,integer_t>::sample_CB
   (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const {
     if (!dim_upd()) return;
     if (Comm().is_null()) return;
@@ -77,7 +77,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::sample_children_CB
+  FrontHSSMPI<scalar_t,integer_t>::sample_children_CB
   (const SPOptions<scalar_t>& opts, const DistM_t& R,
    DistM_t& Sr, DistM_t& Sc) {
     if (!lchild_ && !rchild_) return;
@@ -126,7 +126,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::multifrontal_factorization
+  FrontHSSMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts, int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (visit(lchild_)) {
@@ -140,7 +140,7 @@ namespace strumpack {
       if (er != ReturnCode::SUCCESS) err_code = er;
     }
     if (!dim_blk()) return err_code;
-    TaskTimer t("FrontalMatrixHSSMPI_factor");
+    TaskTimer t("FrontHSSMPI_factor");
     if (opts.print_compressed_front_stats()) t.start();
     auto mult = [&](DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
       TIMER_TIME(TaskType::RANDOM_SAMPLING, 0, t_sampling);
@@ -209,7 +209,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontHSSMPI<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
    int etree_level) const {
     DistM_t CBl, CBr;
@@ -251,7 +251,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontHSSMPI<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
    int etree_level) const {
     DistM_t& y = ydist[this->sep_];
@@ -295,7 +295,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::element_extraction
+  FrontHSSMPI<scalar_t,integer_t>::element_extraction
   (const SpMat_t& A, const std::vector<std::vector<std::size_t>>& I,
    const std::vector<std::vector<std::size_t>>& J,
    std::vector<DistMW_t>& B) const {
@@ -324,7 +324,7 @@ namespace strumpack {
    * communication pattern would be hard to figure out.
    */
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
+  FrontHSSMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const std::vector<std::vector<std::size_t>>& I,
    const std::vector<std::vector<std::size_t>>& J,
    std::vector<DistM_t>& B) const {
@@ -373,19 +373,19 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+  FrontHSSMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
     // TODO does this return only when root??
     return (H_ ? H_->nonzeros() : 0) + H_->factor_nonzeros()
       + theta_.nonzeros() + phi_.nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::front_rank(int task_depth) const {
+  FrontHSSMPI<scalar_t,integer_t>::front_rank(int task_depth) const {
     return H_->max_rank();
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::partition
+  FrontHSSMPI<scalar_t,integer_t>::partition
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
     if (Comm().is_null()) return;
@@ -418,7 +418,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSSMPI<scalar_t,integer_t>::
+  FrontHSSMPI<scalar_t,integer_t>::
   extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                              const FMPI_t* pa) const {
     if (!dim_upd()) return;
@@ -436,19 +436,19 @@ namespace strumpack {
 
 
   // explicit template instantiations
-  template class FrontalMatrixHSSMPI<float,int>;
-  template class FrontalMatrixHSSMPI<double,int>;
-  template class FrontalMatrixHSSMPI<std::complex<float>,int>;
-  template class FrontalMatrixHSSMPI<std::complex<double>,int>;
+  template class FrontHSSMPI<float,int>;
+  template class FrontHSSMPI<double,int>;
+  template class FrontHSSMPI<std::complex<float>,int>;
+  template class FrontHSSMPI<std::complex<double>,int>;
 
-  template class FrontalMatrixHSSMPI<float,long int>;
-  template class FrontalMatrixHSSMPI<double,long int>;
-  template class FrontalMatrixHSSMPI<std::complex<float>,long int>;
-  template class FrontalMatrixHSSMPI<std::complex<double>,long int>;
+  template class FrontHSSMPI<float,long int>;
+  template class FrontHSSMPI<double,long int>;
+  template class FrontHSSMPI<std::complex<float>,long int>;
+  template class FrontHSSMPI<std::complex<double>,long int>;
 
-  template class FrontalMatrixHSSMPI<float,long long int>;
-  template class FrontalMatrixHSSMPI<double,long long int>;
-  template class FrontalMatrixHSSMPI<std::complex<float>,long long int>;
-  template class FrontalMatrixHSSMPI<std::complex<double>,long long int>;
+  template class FrontHSSMPI<float,long long int>;
+  template class FrontHSSMPI<double,long long int>;
+  template class FrontHSSMPI<std::complex<float>,long long int>;
+  template class FrontHSSMPI<std::complex<double>,long long int>;
 
 } // end namespace strumpack

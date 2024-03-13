@@ -31,7 +31,7 @@
 
 #include "FrontalMatrixMPI.hpp"
 #if defined(STRUMPACK_USE_ZFP)
-#include "FrontalMatrixLossy.hpp"
+#include "FrontLossy.hpp"
 #endif
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
 #define LAPACK_COMPLEX_CPP
@@ -40,7 +40,7 @@
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
+  template<typename scalar_t,typename integer_t> class FrontBLRMPI;
   namespace BLR {
     template<typename scalar_t> class BLRMatrixMPI;
   }
@@ -54,14 +54,15 @@ namespace strumpack {
     using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
     using FDMPI_t = FrontalMatrixDenseMPI<scalar_t,integer_t>;
-    using FBLRMPI_t = FrontalMatrixBLRMPI<scalar_t,integer_t>;
+    using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
   public:
-    FrontalMatrixDenseMPI
-    (integer_t sep, integer_t sep_begin, integer_t sep_end,
-     std::vector<integer_t>& upd, const MPIComm& comm, int P);
+    FrontalMatrixDenseMPI(integer_t sep,
+                          integer_t sep_begin, integer_t sep_end,
+                          std::vector<integer_t>& upd,
+                          const MPIComm& comm, int P);
     FrontalMatrixDenseMPI(const FDMPI_t&) = delete;
     FrontalMatrixDenseMPI& operator=(FDMPI_t const&) = delete;
 
@@ -170,7 +171,7 @@ namespace strumpack {
     // suppress warnings
     using F_t::sample_CB;
     using F_t::fwd_solve_phase2;
-    using F_t::bwd_solve_phase1; 
+    using F_t::bwd_solve_phase1;
     using F_t::forward_multifrontal_solve;
     using F_t::backward_multifrontal_solve;
     using FMPI_t::extract_CB_sub_matrix_2d;

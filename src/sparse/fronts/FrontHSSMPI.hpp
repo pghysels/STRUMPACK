@@ -35,7 +35,7 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  class FrontalMatrixHSSMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+  class FrontHSSMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
@@ -45,11 +45,11 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontalMatrixHSSMPI(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                        std::vector<integer_t>& upd, const MPIComm& comm,
-                        int _total_procs);
-    FrontalMatrixHSSMPI(const FrontalMatrixHSSMPI&) = delete;
-    FrontalMatrixHSSMPI& operator=(FrontalMatrixHSSMPI const&) = delete;
+    FrontHSSMPI(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                std::vector<integer_t>& upd, const MPIComm& comm,
+                int _total_procs);
+    FrontHSSMPI(const FrontHSSMPI&) = delete;
+    FrontHSSMPI& operator=(FrontHSSMPI const&) = delete;
 
     void release_work_memory() override;
 
@@ -85,7 +85,7 @@ namespace strumpack {
     long long node_factor_nonzeros() const override;
     integer_t front_rank(int task_depth=0) const override;
     bool isHSS() const override { return true; };
-    std::string type() const override { return "FrontalMatrixHSSMPI"; }
+    std::string type() const override { return "FrontHSSMPI"; }
 
     void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
                    bool is_root=true, int task_depth=0) override;

@@ -27,13 +27,13 @@
  *
  */
 
-#include "FrontalMatrixHSS.hpp"
+#include "FrontHSS.hpp"
 #include "sparse/CSRGraph.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixHSS<scalar_t,integer_t>::FrontalMatrixHSS
+  FrontHSS<scalar_t,integer_t>::FrontHSS
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : FrontalMatrix<scalar_t,integer_t>
@@ -41,7 +41,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::release_work_memory() {
+  FrontHSS<scalar_t,integer_t>::release_work_memory() {
     ThetaVhatC_or_VhatCPhiC_.clear();
     H_.delete_trailing_block();
     R1.clear();
@@ -51,7 +51,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::extend_add_to_dense
+  FrontHSS<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
     auto F22 = H_.child(1)->dense();
@@ -70,7 +70,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::extract_CB_sub_matrix
+  FrontHSS<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
     std::vector<std::size_t> lJ, oJ;
@@ -125,7 +125,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::sample_CB
+  FrontHSS<scalar_t,integer_t>::sample_CB
   (const Opts_t& opts, const DenseM_t& R,
    DenseM_t& Sr, DenseM_t& Sc, F_t* pa, int task_depth) {
     if (!dim_upd()) return;
@@ -156,7 +156,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::sample_CB_direct
+  FrontHSS<scalar_t,integer_t>::sample_CB_direct
   (const DenseM_t& cR, DenseM_t& Sr, DenseM_t& Sc,
    const std::vector<std::size_t>& I, int task_depth) {
 #if 0
@@ -201,7 +201,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization
+  FrontHSS<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     ReturnCode e = ReturnCode::SUCCESS;
@@ -214,7 +214,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::random_sampling
+  FrontHSS<scalar_t,integer_t>::random_sampling
   (const SpMat_t& A, const Opts_t& opts, DenseM_t& Rr,
    DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc, int etree_level,
    int task_depth) {
@@ -283,7 +283,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::element_extraction
+  FrontHSS<scalar_t,integer_t>::element_extraction
   (const SpMat_t& A, const std::vector<std::size_t>& I,
    const std::vector<std::size_t>& J, DenseM_t& B, int task_depth) {
     std::vector<std::size_t> gI, gJ;
@@ -308,7 +308,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixHSS<scalar_t,integer_t>::multifrontal_factorization_node
+  FrontHSS<scalar_t,integer_t>::multifrontal_factorization_node
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
@@ -336,7 +336,7 @@ namespace strumpack {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (el != ReturnCode::SUCCESS) err_code = el;
     if (er != ReturnCode::SUCCESS) err_code = er;
-    TaskTimer t("FrontalMatrixHSS_factor");
+    TaskTimer t("FrontHSS_factor");
     if (opts.print_compressed_front_stats()) t.start();
     H_.set_openmp_task_depth(task_depth);
     auto mult = [&](DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
@@ -410,7 +410,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontHSS<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
@@ -420,7 +420,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::fwd_solve_node
+  FrontHSS<scalar_t,integer_t>::fwd_solve_node
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
@@ -446,7 +446,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontHSS<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     if (task_depth == 0)
 #pragma omp parallel if(!omp_in_parallel())
@@ -456,7 +456,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::bwd_solve_node
+  FrontHSS<scalar_t,integer_t>::bwd_solve_node
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (etree_level) {
@@ -477,12 +477,12 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrixHSS<scalar_t,integer_t>::front_rank(int task_depth) const {
+  FrontHSS<scalar_t,integer_t>::front_rank(int task_depth) const {
     return H_.rank();
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::print_rank_statistics
+  FrontHSS<scalar_t,integer_t>::print_rank_statistics
   (std::ostream &out) const {
     if (lchild_) lchild_->print_rank_statistics(out);
     if (rchild_) rchild_->print_rank_statistics(out);
@@ -491,20 +491,20 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixHSS<scalar_t,integer_t>::node_factor_nonzeros() const {
+  FrontHSS<scalar_t,integer_t>::node_factor_nonzeros() const {
     return H_.nonzeros() + H_.factor_nonzeros() + Theta_.nonzeros()
       + Phi_.nonzeros() + ThetaVhatC_or_VhatCPhiC_.nonzeros();
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::draw_node
+  FrontHSS<scalar_t,integer_t>::draw_node
   (std::ostream& of, bool is_root) const {
     if (is_root) H_.draw(of, sep_begin_, sep_begin_);
     else H_.child(0)->draw(of, sep_begin_, sep_begin_);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixHSS<scalar_t,integer_t>::partition
+  FrontHSS<scalar_t,integer_t>::partition
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
     auto g = A.extract_graph
@@ -527,19 +527,19 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class FrontalMatrixHSS<float,int>;
-  template class FrontalMatrixHSS<double,int>;
-  template class FrontalMatrixHSS<std::complex<float>,int>;
-  template class FrontalMatrixHSS<std::complex<double>,int>;
+  template class FrontHSS<float,int>;
+  template class FrontHSS<double,int>;
+  template class FrontHSS<std::complex<float>,int>;
+  template class FrontHSS<std::complex<double>,int>;
 
-  template class FrontalMatrixHSS<float,long int>;
-  template class FrontalMatrixHSS<double,long int>;
-  template class FrontalMatrixHSS<std::complex<float>,long int>;
-  template class FrontalMatrixHSS<std::complex<double>,long int>;
+  template class FrontHSS<float,long int>;
+  template class FrontHSS<double,long int>;
+  template class FrontHSS<std::complex<float>,long int>;
+  template class FrontHSS<std::complex<double>,long int>;
 
-  template class FrontalMatrixHSS<float,long long int>;
-  template class FrontalMatrixHSS<double,long long int>;
-  template class FrontalMatrixHSS<std::complex<float>,long long int>;
-  template class FrontalMatrixHSS<std::complex<double>,long long int>;
+  template class FrontHSS<float,long long int>;
+  template class FrontHSS<double,long long int>;
+  template class FrontHSS<std::complex<float>,long long int>;
+  template class FrontHSS<std::complex<double>,long long int>;
 
 } // end namespace strumpack

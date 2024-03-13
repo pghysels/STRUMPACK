@@ -34,7 +34,7 @@
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixHSS
+  template<typename scalar_t,typename integer_t> class FrontHSS
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -43,8 +43,8 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontalMatrixHSS(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                     std::vector<integer_t>& upd);
+    FrontHSS(integer_t sep, integer_t sep_begin, integer_t sep_end,
+             std::vector<integer_t>& upd);
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
@@ -84,7 +84,7 @@ namespace strumpack {
     integer_t front_rank(int task_depth=0) const override;
     void print_rank_statistics(std::ostream &out) const override;
     bool isHSS() const override { return true; };
-    std::string type() const override { return "FrontalMatrixHSS"; }
+    std::string type() const override { return "FrontHSS"; }
 
     int random_samples() const override { return R1.cols(); };
 
@@ -113,8 +113,8 @@ namespace strumpack {
     std::uint32_t sampled_columns_ = 0;
 
   private:
-    FrontalMatrixHSS(const FrontalMatrixHSS&) = delete;
-    FrontalMatrixHSS& operator=(FrontalMatrixHSS const&) = delete;
+    FrontHSS(const FrontHSS&) = delete;
+    FrontHSS& operator=(FrontHSS const&) = delete;
 
     void draw_node(std::ostream& of, bool is_root) const override;
 

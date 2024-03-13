@@ -40,7 +40,7 @@ namespace strumpack {
 
   // forward declaration
   template<typename scalar_t,typename integer_t> class ExtendAdd;
-  template<typename scalar_t,typename integer_t> class FrontalMatrixBLRMPI;
+  template<typename scalar_t,typename integer_t> class FrontBLRMPI;
 
   namespace BLR {
 

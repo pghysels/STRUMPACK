@@ -28,7 +28,7 @@
  */
 
 #include "BLRExtendAdd.hpp"
-#include "sparse/fronts/FrontalMatrixBLRMPI.hpp"
+#include "sparse/fronts/FrontBLRMPI.hpp"
 
 namespace strumpack {
   namespace BLR {

@@ -30,7 +30,7 @@
 #define FRONTAL_MATRIX_HODLR_HPP
 
 #include "FrontalMatrix.hpp"
-#include "FrontalMatrixBLRMPI.hpp"
+#include "FrontBLRMPI.hpp"
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/ButterflyMatrix.hpp"
 
@@ -38,7 +38,7 @@
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixHODLR
+  template<typename scalar_t,typename integer_t> class FrontHODLR
     : public FrontalMatrix<scalar_t,integer_t> {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
@@ -50,14 +50,14 @@ namespace strumpack {
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
 
   public:
-    FrontalMatrixHODLR(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                       std::vector<integer_t>& upd);
+    FrontHODLR(integer_t sep, integer_t sep_begin, integer_t sep_end,
+               std::vector<integer_t>& upd);
 
-    ~FrontalMatrixHODLR();
+    ~FrontHODLR();
 
-    FrontalMatrixHODLR(const FrontalMatrixHODLR&) = delete;
+    FrontHODLR(const FrontHODLR&) = delete;
 
-    FrontalMatrixHODLR& operator=(FrontalMatrixHODLR const&) = delete;
+    FrontHODLR& operator=(FrontHODLR const&) = delete;
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
@@ -77,11 +77,11 @@ namespace strumpack {
                                const FMPI_t* pa) const override;
     void
     extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                               const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa)
+                               const FrontBLRMPI<scalar_t,integer_t>* pa)
       const override;
     void
     extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
-                                   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa, 
+                                   const FrontBLRMPI<scalar_t,integer_t>* pa,
                                    integer_t begin_col, integer_t end_col,
                                    const Opts_t& opts)
       const override;
@@ -133,7 +133,7 @@ namespace strumpack {
 
     integer_t front_rank(int task_depth=0) const override;
     void print_rank_statistics(std::ostream &out) const override;
-    std::string type() const override { return "FrontalMatrixHODLR"; }
+    std::string type() const override { return "FrontHODLR"; }
 
     void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
                    bool is_root=true, int task_depth=0) override;

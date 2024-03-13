@@ -29,21 +29,21 @@
 #include <array>
 #include <fstream>
 
-#include "FrontalMatrixMAGMA.hpp"
+#include "FrontMAGMA.hpp"
 #include "FrontalMatrixGPUKernels.hpp"
 #include "dense/MAGMAWrapper.hpp"
 
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
-#include "FrontalMatrixBLRMPI.hpp"
+#include "FrontBLRMPI.hpp"
 #endif
 
 namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfoMAGMA {
     using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FM_t = FrontalMatrixMAGMA<scalar_t,integer_t>;
+    using FM_t = FrontMAGMA<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
   public:
@@ -254,13 +254,13 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixMAGMA<scalar_t,integer_t>::FrontalMatrixMAGMA
+  FrontMAGMA<scalar_t,integer_t>::FrontMAGMA
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixMAGMA<scalar_t,integer_t>::~FrontalMatrixMAGMA() {
+  FrontMAGMA<scalar_t,integer_t>::~FrontMAGMA() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     const std::size_t dupd = dim_upd();
     const std::size_t dsep = dim_sep();
@@ -269,39 +269,41 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> scalar_t*
-  FrontalMatrixMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+  FrontMAGMA<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
     return F22_.data();
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::
+  FrontMAGMA<scalar_t,integer_t>::
   release_work_memory(VectorPool<scalar_t>& workspace) {
     if (dev_Schur_) workspace.restore(*dev_Schur_);
   }
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontMAGMA<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
     DenseM_t F22(dim_upd(), dim_upd());
     gpu::copy_device_to_host(F22, F22_);
-    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
+    ExtendAdd<scalar_t,integer_t>::
+      extend_add_seq_copy_to_buffers(F22, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  FrontMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa) const {
+   const FrontBLRMPI<scalar_t,integer_t>* pa) const {
     DenseM_t F22(dim_upd(), dim_upd());
     gpu::copy_device_to_host(F22, F22_);
-    BLR::BLRExtendAdd<scalar_t,integer_t>::seq_copy_to_buffers(F22, sbuf, pa, this);
+    BLR::BLRExtendAdd<scalar_t,integer_t>::
+      seq_copy_to_buffers(F22, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  FrontMAGMA<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixBLRMPI<scalar_t,integer_t>* pa,
+   const FrontBLRMPI<scalar_t,integer_t>* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
     DenseM_t F22(dim_upd(), dim_upd());
     gpu::copy_device_to_host(F22, F22_);
@@ -311,7 +313,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::extend_add_to_dense
+  FrontMAGMA<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     const std::size_t dupd = dim_upd();
@@ -322,7 +324,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t, typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::front_assembly
+  FrontMAGMA<scalar_t,integer_t>::front_assembly
   (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
@@ -369,7 +371,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixMAGMA<scalar_t,integer_t>::factors_on_device
+  FrontMAGMA<scalar_t,integer_t>::factors_on_device
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    std::vector<LevelInfoMAGMA<scalar_t,integer_t>>& ldata,
    std::size_t total_dmem) {
@@ -485,7 +487,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixMAGMA<scalar_t,integer_t>::split_smaller
+  FrontMAGMA<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     const std::size_t dupd = dim_upd(), dsep = dim_sep();
@@ -617,7 +619,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixMAGMA<scalar_t,integer_t>::factor
+  FrontMAGMA<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
@@ -797,7 +799,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::multifrontal_solve
+  FrontMAGMA<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& b) const {
     if (dev_factors_) gpu_solve(b);
     else // factors are not on the device, solve on CPU
@@ -805,7 +807,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::fwd_solve_phase2
+  FrontMAGMA<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
@@ -822,7 +824,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::bwd_solve_phase1
+  FrontMAGMA<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
@@ -839,7 +841,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixMAGMA<scalar_t,integer_t>::gpu_solve(DenseM_t& b) const {
+  FrontMAGMA<scalar_t,integer_t>::gpu_solve(DenseM_t& b) const {
     gpu::Stream comp_stream;
     gpu::Handle handle(comp_stream);
     const int lvls = this->levels();
@@ -1052,19 +1054,19 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class FrontalMatrixMAGMA<float,int>;
-  template class FrontalMatrixMAGMA<double,int>;
-  template class FrontalMatrixMAGMA<std::complex<float>,int>;
-  template class FrontalMatrixMAGMA<std::complex<double>,int>;
+  template class FrontMAGMA<float,int>;
+  template class FrontMAGMA<double,int>;
+  template class FrontMAGMA<std::complex<float>,int>;
+  template class FrontMAGMA<std::complex<double>,int>;
 
-  template class FrontalMatrixMAGMA<float,long int>;
-  template class FrontalMatrixMAGMA<double,long int>;
-  template class FrontalMatrixMAGMA<std::complex<float>,long int>;
-  template class FrontalMatrixMAGMA<std::complex<double>,long int>;
+  template class FrontMAGMA<float,long int>;
+  template class FrontMAGMA<double,long int>;
+  template class FrontMAGMA<std::complex<float>,long int>;
+  template class FrontMAGMA<std::complex<double>,long int>;
 
-  template class FrontalMatrixMAGMA<float,long long int>;
-  template class FrontalMatrixMAGMA<double,long long int>;
-  template class FrontalMatrixMAGMA<std::complex<float>,long long int>;
-  template class FrontalMatrixMAGMA<std::complex<double>,long long int>;
+  template class FrontMAGMA<float,long long int>;
+  template class FrontMAGMA<double,long long int>;
+  template class FrontMAGMA<std::complex<float>,long long int>;
+  template class FrontMAGMA<std::complex<double>,long long int>;
 
 } // end namespace strumpack
