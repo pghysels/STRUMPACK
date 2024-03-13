@@ -149,6 +149,22 @@ namespace strumpack {
                         const scalar_t* values, bool symmetric_pattern=false);
 
     /**
+     * Associate the lower triangle from a (sequential) NxN CSR matrix
+     * with this solver.
+     *
+     * This matrix will not be modified. An internal copy will be
+     * made, so it is safe to delete the data immediately after
+     * calling this function. See the manual for a description of the
+     * CSR format. You can also use the CSRMatrix class.
+     *
+     * \param A A CSRMatrix<scalar_t,integer_t> object, will
+     * internally be duplicated
+     *
+     * \see set_matrix
+     */
+    void set_lower_triangle_matrix(const CSRMatrix<scalar_t,integer_t>& A);
+
+    /**
      * This can only be used to UPDATE the nonzero values of the
      * matrix. So it should be called with exactly the same sparsity
      * pattern (row_ptr and col_ind) as used to set the initial matrix
@@ -176,26 +192,6 @@ namespace strumpack {
      * the matrix __values__ to be symmetric
      *
      * \see set_csr_matrix, set_matrix
-     */
-    void set_lower_triangle_matrix(const CSRMatrix<scalar_t,integer_t>& A);
-    /**
-     * Associate the lower triangle from a (sequential) NxN CSR matrix with this solver.
-     *
-     * This matrix will not be modified. An internal copy will be
-     * made, so it is safe to delete the data immediately after
-     * calling this function. See the manual for a description of the
-     * CSR format. You can also use the CSRMatrix class.
-     *
-     * \param N number of rows and columns of the full CSR input matrix.
-     * \param row_ptr indices in col_ind and values for the start of
-     * each row. Nonzeros for row r are in [row_ptr[r],row_ptr[r+1])
-     * \param col_ind column indices of each nonzero
-     * \param values nonzero values
-     * \param symmetric_pattern denotes whether the sparsity
-     * __pattern__ of the input matrix is symmetric, does not require
-     * the matrix __values__ to be symmetric
-     *
-     * \see set_matrix
      */
     void update_matrix_values(integer_t N,
                               const integer_t* row_ptr,
