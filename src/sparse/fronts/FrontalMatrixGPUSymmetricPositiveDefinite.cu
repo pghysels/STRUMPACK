@@ -107,23 +107,23 @@ namespace strumpack {
       }
     }
 
-      template<typename T, int unroll> __global__ void
-      assemble_symmetric_kernel(unsigned int nf, AssembleData<T>* dat) {
-          int idx = blockIdx.x * blockDim.x * unroll + threadIdx.x,
-                  op = blockIdx.y * blockDim.y + threadIdx.y;
-          if (op >= nf) return;
-          auto& F = dat[op];
-          for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
-              if (j >= F.n11) break;
-              auto& t = F.e11[j];
-              F.F11[t.r + t.c*F.d1] = t.v;
-          }
-          for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
-              if (j >= F.n21) break;
-              auto& t = F.e21[j];
-              F.F21[t.r + t.c*F.d2] = t.v;
-          }
+    template<typename T, int unroll> __global__ void
+    assemble_symmetric_kernel(unsigned int nf, AssembleData<T>* dat) {
+      int idx = blockIdx.x * blockDim.x * unroll + threadIdx.x,
+        op = blockIdx.y * blockDim.y + threadIdx.y;
+      if (op >= nf) return;
+      auto& F = dat[op];
+      for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
+        if (j >= F.n11) break;
+        auto& t = F.e11[j];
+        F.F11[t.r + t.c*F.d1] = t.v;
       }
+      for (int i=0, j=idx; i<unroll; i++, j+=blockDim.x) {
+        if (j >= F.n21) break;
+        auto& t = F.e21[j];
+        F.F21[t.r + t.c*F.d2] = t.v;
+      }
+    }
 
     /**
      * Single extend-add operation from one contribution block into
@@ -165,44 +165,44 @@ namespace strumpack {
       }
     }
 
-      template<typename T, unsigned int unroll, bool left>
-      __global__ void extend_add_symmetric_kernel
-              (unsigned int by0, unsigned int nf, AssembleData<T>* dat) {
-          int y = blockIdx.x * blockDim.x + threadIdx.x,
-                  x0 = (blockIdx.y + by0) * unroll,
-                  z = blockIdx.z * blockDim.z + threadIdx.z;
-          if (z >= nf) return;
-          auto& f = dat[z];
-          auto CB = left ? f.CB1 : f.CB2;
-          if (!CB) return;
-          auto dCB = left ? f.dCB1 : f.dCB2;
-          if (y >= dCB) return;
-          auto I = left ? f.I1 : f.I2;
-          auto Iy = I[y];
-          int d1 = f.d1, d2 = f.d2;
-          int ld;
-          T* F[2];
-          if (Iy < d1) {
-              ld = d1;
-              F[0] = f.F11+Iy;
-              F[1] = nullptr;
-          } else {
-              ld = d2;
-              F[0] = f.F21+Iy-d1;
-              F[1] = f.F22+Iy-d1-d1*d2;
-          }
-#pragma unroll
-          for (int i=0; i<unroll; i++) {
-              int row = y, col = x0 + i;
-              if (row < col) {
-                  continue;
-              }
-              int x = x0 + i;
-              if (x >= dCB) break;
-              auto Ix = I[x];
-              F[Ix >= d1][Ix*ld] += CB[row + col*dCB];
-          }
+    template<typename T, unsigned int unroll, bool left>
+    __global__ void extend_add_symmetric_kernel
+    (unsigned int by0, unsigned int nf, AssembleData<T>* dat) {
+      int y = blockIdx.x * blockDim.x + threadIdx.x,
+        x0 = (blockIdx.y + by0) * unroll,
+        z = blockIdx.z * blockDim.z + threadIdx.z;
+      if (z >= nf) return;
+      auto& f = dat[z];
+      auto CB = left ? f.CB1 : f.CB2;
+      if (!CB) return;
+      auto dCB = left ? f.dCB1 : f.dCB2;
+      if (y >= dCB) return;
+      auto I = left ? f.I1 : f.I2;
+      auto Iy = I[y];
+      int d1 = f.d1, d2 = f.d2;
+      int ld;
+      T* F[2];
+      if (Iy < d1) {
+        ld = d1;
+        F[0] = f.F11+Iy;
+        F[1] = nullptr;
+      } else {
+        ld = d2;
+        F[0] = f.F21+Iy-d1;
+        F[1] = f.F22+Iy-d1-d1*d2;
       }
+#pragma unroll
+      for (int i=0; i<unroll; i++) {
+        int row = y, col = x0 + i;
+        if (row < col) {
+          continue;
+        }
+        int x = x0 + i;
+        if (x >= dCB) break;
+        auto Ix = I[x];
+        F[Ix >= d1][Ix*ld] += CB[row + col*dCB];
+      }
+    }
 
     template<typename T> void
     assemble(unsigned int nf, AssembleData<T>* dat,
@@ -263,64 +263,64 @@ namespace strumpack {
       gpu_check(cudaPeekAtLastError());
     }
 
-      template<typename T> void
-      assemble_symmetric(unsigned int nf, AssembleData<T>* dat,
-                         AssembleData<T>* ddat) {
-          { // front assembly from sparse matrix
-              std::size_t nnz = 0;
-              for (unsigned int f=0; f<nf; f++)
-                  nnz = std::max
-                          (nnz, std::max(dat[f].n11, std::max(dat[f].n12, dat[f].n21)));
-              if (nnz) {
-                  unsigned int nt = 512, ops = 1;
-                  const int unroll = 8;
-                  while (nt*unroll > nnz && nt > 8 && ops < 64) {
-                      nt /= 2;
-                      ops *= 2;
-                  }
-                  ops = std::min(ops, nf);
-                  unsigned int nb = (nnz + nt*unroll - 1) / (nt*unroll),
-                          nbf = (nf + ops - 1) / ops;
-                  dim3 block(nt, ops);
-                  for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
-                      dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Y));
-                      assemble_symmetric_kernel<T,unroll><<<grid,block>>>(nf-f*ops, ddat+f*ops);
-                  }
-              }
+    template<typename T> void
+    assemble_symmetric(unsigned int nf, AssembleData<T>* dat,
+                       AssembleData<T>* ddat) {
+      { // front assembly from sparse matrix
+        std::size_t nnz = 0;
+        for (unsigned int f=0; f<nf; f++)
+          nnz = std::max
+            (nnz, std::max(dat[f].n11, std::max(dat[f].n12, dat[f].n21)));
+        if (nnz) {
+          unsigned int nt = 512, ops = 1;
+          const int unroll = 8;
+          while (nt*unroll > nnz && nt > 8 && ops < 64) {
+            nt /= 2;
+            ops *= 2;
           }
-          gpu_check(cudaPeekAtLastError());
-          { // extend-add
-              int du = 0;
-              for (unsigned int f=0; f<nf; f++)
-                  du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
-              if (du) {
-                  const unsigned int unroll = 16;
-                  unsigned int nt = 512, ops = 1;
-                  while (nt > du && ops < 64) {
-                      nt /= 2;
-                      ops *= 2;
-                  }
-                  ops = std::min(ops, nf);
-                  unsigned int nbx = (du + nt - 1) / nt,
-                          nby = (du + unroll - 1) / unroll,
-                          nbf = (nf + ops - 1) / ops;
-                  dim3 block(nt, 1, ops);
-                  using T_ = typename cuda_type<T>::value_type;
-                  auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
-                  for (unsigned int y=0; y<nby; y+=MAX_BLOCKS_Y) {
-                      unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
-                      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
-                          dim3 grid(nbx, ny, std::min(nbf-f, MAX_BLOCKS_Z));
-                          extend_add_symmetric_kernel<T_,unroll, true><<<grid, block>>>
-                                  (y, nf-f*ops, dat_+f*ops);
-                          extend_add_symmetric_kernel<T_,unroll, false><<<grid, block>>>
-                                  (y, nf-f*ops, dat_+f*ops);
-                      }
-                  }
-              }
+          ops = std::min(ops, nf);
+          unsigned int nb = (nnz + nt*unroll - 1) / (nt*unroll),
+            nbf = (nf + ops - 1) / ops;
+          dim3 block(nt, ops);
+          for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+            dim3 grid(nb, std::min(nbf-f, MAX_BLOCKS_Y));
+            assemble_symmetric_kernel<T,unroll><<<grid,block>>>(nf-f*ops, ddat+f*ops);
           }
-          gpu_check(cudaPeekAtLastError());
+        }
       }
+      gpu_check(cudaPeekAtLastError());
+      { // extend-add
+        int du = 0;
+        for (unsigned int f=0; f<nf; f++)
+          du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
+        if (du) {
+          const unsigned int unroll = 16;
+          unsigned int nt = 512, ops = 1;
+          while (nt > du && ops < 64) {
+            nt /= 2;
+            ops *= 2;
+          }
+          ops = std::min(ops, nf);
+          unsigned int nbx = (du + nt - 1) / nt,
+            nby = (du + unroll - 1) / unroll,
+            nbf = (nf + ops - 1) / ops;
+          dim3 block(nt, 1, ops);
+          using T_ = typename cuda_type<T>::value_type;
+          auto dat_ = reinterpret_cast<AssembleData<T_>*>(ddat);
+          for (unsigned int y=0; y<nby; y+=MAX_BLOCKS_Y) {
+            unsigned int ny = std::min(nby-y, MAX_BLOCKS_Y);
+            for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
+              dim3 grid(nbx, ny, std::min(nbf-f, MAX_BLOCKS_Z));
+              extend_add_symmetric_kernel<T_,unroll, true><<<grid, block>>>
+                (y, nf-f*ops, dat_+f*ops);
+              extend_add_symmetric_kernel<T_,unroll, false><<<grid, block>>>
+                (y, nf-f*ops, dat_+f*ops);
+            }
+          }
+        }
+      }
+      gpu_check(cudaPeekAtLastError());
+    }
 
 
     // /**
@@ -362,20 +362,20 @@ namespace strumpack {
       __syncthreads();
 
       for (int k=0; k<n; k++) {
-          auto diagonal = M[k + k * NT];
-          if (absolute_value(diagonal) <= 0) {
-              *info = k;
-              return;
-          }
-          diagonal = sqrt(diagonal);
-          // divide by the pivot element
-          if (j == k && i >= k && i < n)
-            M[i+k*NT] /= diagonal;
-          __syncthreads();
-          // Schur update
-          if (j > k && i > k && j < n && i < n)
-            M[i+j*NT] -= M[i+k*NT] * M[j+k*NT];
-          __syncthreads();
+        auto diagonal = M[k + k * NT];
+        if (absolute_value(diagonal) <= 0) {
+          *info = k;
+          return;
+        }
+        diagonal = sqrt(diagonal);
+        // divide by the pivot element
+        if (j == k && i >= k && i < n)
+          M[i+k*NT] /= diagonal;
+        __syncthreads();
+        // Schur update
+        if (j > k && i > k && j < n && i < n)
+          M[i+j*NT] -= M[i+k*NT] * M[j+k*NT];
+        __syncthreads();
       }
       // write back from shared to global device memory
       if (i < n && j < n)
@@ -384,7 +384,7 @@ namespace strumpack {
 
     template<typename T, int NT, typename real_t> __global__ void
     LLT_block_kernel_batched(FrontData<T>* dat, bool replace,
-                            real_t thresh, int* dinfo) {
+                             real_t thresh, int* dinfo) {
       FrontData<T>& A = dat[blockIdx.x];
       LLT_block_kernel<T,NT>(A.n1, A.F11, &dinfo[blockIdx.x]);
       if (replace) {
@@ -467,10 +467,10 @@ namespace strumpack {
 
         // solve with L (unit diagonal)
         for (int k=0; k<n; k++) {
-            if (i == k) {
-                B[k + j * NT] /= A[k + k * NT];
-            }
-            __syncthreads();
+          if (i == k) {
+            B[k + j * NT] /= A[k + k * NT];
+          }
+          __syncthreads();
           if (i > k && i < n && c < m)
             B[i + j * NT] -= A[i + k * NT] * B[k + j * NT];
           __syncthreads();
@@ -534,7 +534,7 @@ namespace strumpack {
 
     template<typename T, int NT, typename real_t>
     void factor_symmetric_block_batch(unsigned int count, FrontData<T>* dat,
-                            bool replace, real_t thresh, int* dinfo) {
+                                      bool replace, real_t thresh, int* dinfo) {
       if (!count) return;
       using T_ = typename cuda_type<T>::value_type;
       auto dat_ = reinterpret_cast<FrontData<T_>*>(dat);
@@ -677,16 +677,16 @@ namespace strumpack {
 
 
 
-      // explicit template instantiations
+    // explicit template instantiations
     template void assemble(unsigned int, AssembleData<float>*, AssembleData<float>*);
     template void assemble(unsigned int, AssembleData<double>*, AssembleData<double>*);
     template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
     template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-      template void assemble_symmetric(unsigned int, AssembleData<float>*, AssembleData<float>*);
-      template void assemble_symmetric(unsigned int, AssembleData<double>*, AssembleData<double>*);
-      template void assemble_symmetric(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
-      template void assemble_symmetric(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
+    template void assemble_symmetric(unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void assemble_symmetric(unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void assemble_symmetric(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void assemble_symmetric(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
     template void extend_add_rhs(int, int, unsigned int, AssembleData<float>*, AssembleData<float>*);
     template void extend_add_rhs(int, int, unsigned int, AssembleData<double>*, AssembleData<double>*);
