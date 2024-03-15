@@ -146,16 +146,16 @@ namespace strumpack {
     if (is_GPU(opts)) {
 #if defined(STRUMPACK_USE_CUDA)
       if (is_symmetric(opts) && is_positive_definite(opts))
-        front = std::make_unique<FrontGPUSPD<scalar_t,integer_t>
-	  (s, sbegin, send, upd);
+        front = std::make_unique<FrontGPUSPD<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
       else
 #endif
 #if defined(STRUMPACK_USE_MAGMA)
-	front = std::make_unique<FrontMAGMA<scalar_t,integer_t>>
-	  (s, sbegin, send, upd);
+        front = std::make_unique<FrontMAGMA<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
 #else
       front = std::make_unique<FrontalMatrixGPU<scalar_t,integer_t>>
-	(s, sbegin, send, upd);
+        (s, sbegin, send, upd);
 #endif
       if (root) fc.dense++;
     }
