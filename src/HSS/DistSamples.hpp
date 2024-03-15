@@ -96,9 +96,8 @@ namespace strumpack {
 
         if (Amult_) {
           int rank = g_ -> Comm().rank();
-          std::cout << rank;
 
-          if (rank == 0) {
+          if (!rank) {
             if (opts.verbose())
               std::cout << "# sampling with 2DBC matrix" << std::endl;
             if (opts.compression_sketch() == CompressionSketch::SJLT)
@@ -125,6 +124,7 @@ namespace strumpack {
             auto end = std::chrono::steady_clock::now();
             auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
             
+            if (!rank)
             std::cout << "# Gaussian init multiplies = " << T << " [10e-3s]" << std::endl;
 
 
@@ -152,8 +152,9 @@ namespace strumpack {
             auto end = std::chrono::steady_clock::now();
             auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
             
+            if (!rank)
             std::cout << "# Gaussian add_cols multiplies = " << T << " [10e-3s]" << std::endl;
-                        
+
                         
             Scnew = Srnew;
 
