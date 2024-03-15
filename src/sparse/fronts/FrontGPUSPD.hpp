@@ -5,16 +5,7 @@
 #pragma once
 
 #include "FrontalMatrixDense.hpp"
-
-#if defined(STRUMPACK_USE_CUDA)
-#include "dense/CUDAWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_HIP)
-#include "dense/HIPWrapper.hpp"
-#endif
-#if defined(STRUMPACK_USE_SYCL)
-#include "dense/DPCPPWrapper.hpp"
-#endif
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
@@ -24,7 +15,6 @@ namespace strumpack {
     template<typename scalar_t> struct FrontData;
     // template<typename scalar_t> struct FwdSolveData;
   }
-
 
   template<typename scalar_t,typename integer_t> class FrontGPUSPD
     : public FrontalMatrix<scalar_t,integer_t> {
@@ -55,7 +45,7 @@ namespace strumpack {
     ReturnCode multifrontal_factorization_symmetric(const SpMat_t& A,
                                                     const SPOptions<scalar_t>& opts,
                                                     int etree_level=0,
-                                                    int task_depth=0);
+                                                    int task_depth=0) override;
 
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,

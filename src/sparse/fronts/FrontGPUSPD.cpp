@@ -30,6 +30,7 @@
  *
  */
 #include <array>
+#include <cstring>
 
 #include "FrontGPUSPD.hpp"
 #include "FrontalMatrixGPUKernels.hpp"
@@ -655,11 +656,13 @@ namespace strumpack {
         old_work = work_mem;
 
         // default stream
-        gpu_check(cudaDeviceSynchronize());
+        // gpu_check(cudaDeviceSynchronize());
+	gpu::synchronize_default_stream();
         front_assembly(A, L, hea_mem, dea_mem);
         gpu::Event e_assemble;
         e_assemble.record();
-        gpu_check(cudaDeviceSynchronize());
+	gpu::synchronize_default_stream();
+	// gpu_check(cudaDeviceSynchronize());
 
         // default stream
         factor_small_fronts(L, fdata, L.dev_getrf_err, opts);
@@ -726,8 +729,8 @@ namespace strumpack {
         //                for (std::size_t i=0; i<L.factors_small; i++)
         //                    host_factors[i] = pinned[i];
         //                host_factors += L.factors_small;
-        memcpy(host_factors_diagonal, pinned, L.factors_diagonal_small * sizeof(scalar_t));
-        memcpy(host_factors_off_diagonal, pinned + L.factors_diagonal_small, L.factors_off_diagonal_small * sizeof(scalar_t));
+	std::memcpy(host_factors_diagonal, pinned, L.factors_diagonal_small * sizeof(scalar_t));
+	std::memcpy(host_factors_off_diagonal, pinned + L.factors_diagonal_small, L.factors_off_diagonal_small * sizeof(scalar_t));
         host_factors_diagonal += L.factors_diagonal_small;
         host_factors_off_diagonal += L.factors_off_diagonal_small;
 
@@ -754,10 +757,10 @@ namespace strumpack {
                   //                                    host_factors += fc;
                   auto fdc = factors_diagonal_chunk[c-1];
                   auto fodc = factors_off_diagonal_chunk[c-1];
-                  memcpy(host_factors_diagonal,
-                         pin[(c-1) % 2], fdc * sizeof(scalar_t));
-                  memcpy(host_factors_off_diagonal,
-                         pin[(c-1) % 2] + fdc, fodc * sizeof(scalar_t));
+		  std::memcpy(host_factors_diagonal,
+			      pin[(c-1) % 2], fdc * sizeof(scalar_t));
+		  std::memcpy(host_factors_off_diagonal,
+			      pin[(c-1) % 2] + fdc, fodc * sizeof(scalar_t));
                   host_factors_diagonal += fdc;
                   host_factors_off_diagonal += fodc;
                 }
@@ -809,8 +812,8 @@ namespace strumpack {
           //                        host_factors[i] = pin[(chunks.size()-1) % 2][i];
           auto fdc = factors_diagonal_chunk.back();
           auto fodc = factors_off_diagonal_chunk.back();
-          memcpy(host_factors_diagonal, pin[(chunks.size()-1) % 2], fdc * sizeof(scalar_t));
-          memcpy(host_factors_off_diagonal, pin[(chunks.size()-1) % 2] + fdc, fodc * sizeof(scalar_t));
+	  std::memcpy(host_factors_diagonal, pin[(chunks.size()-1) % 2], fdc * sizeof(scalar_t));
+	  std::memcpy(host_factors_off_diagonal, pin[(chunks.size()-1) % 2] + fdc, fodc * sizeof(scalar_t));
         }
 
         //                L.f[0]->pivot_mem_.resize(L.piv_size);
@@ -862,11 +865,11 @@ namespace strumpack {
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     if (!A.symm_sparse()) {
-      std::cerr << "The Matrix is not symmetric, please unable_symmetric in option settings" << std::endl;
-      exit(EXIT_FAILURE); // stop
-    }else{
-      return multifrontal_factorization_symmetric(A, opts, etree_level, task_depth);
+      std::cerr << "The Matrix is not symmetric, please use enable_symmetric in option settings" << std::endl;
+      // TODO return something?
+      exit(EXIT_FAILURE);
     }
+    return multifrontal_factorization_symmetric(A, opts, etree_level, task_depth);
   }
 
   template<typename scalar_t,typename integer_t> void
