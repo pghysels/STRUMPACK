@@ -92,14 +92,20 @@ namespace strumpack {
         auto dd = d - d_old;
         d_ = d;
         DenseM_t subRnew, subSrnew, subScnew;
+        
+
         if (Amult_) {
-          if (hss_->Comm().is_root()) {
+          int rank = g_ -> Comm().rank();
+          std::cout << rank;
+
+          if (rank == 0) {
             if (opts.verbose())
               std::cout << "# sampling with 2DBC matrix" << std::endl;
             if (opts.compression_sketch() == CompressionSketch::SJLT)
               std::cout << "WARNING: SJLT sampling is not supported for 2DBC layout"
                         << std::endl;
           }
+          
           if (!d_old) {
             R = DistM_t(g_, n_, d_);
             Sr = DistM_t(g_, n_, d_);
@@ -107,8 +113,24 @@ namespace strumpack {
             rgen_->seed(R.prow(), R.pcol());
             R.random(*rgen_);
             STRUMPACK_RANDOM_FLOPS
-              (rgen_->flops_per_prng() * R.lrows() * R.lcols());
+            (rgen_->flops_per_prng() * R.lrows() * R.lcols());
+            
+
+            g_->Comm().barrier();
+            
+             auto begin = std::chrono::steady_clock::now();
             (*Amult_)(R, Sr, Sc);
+            
+            g_->Comm().barrier();
+            auto end = std::chrono::steady_clock::now();
+            auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+            
+            std::cout << "# Gaussian init multiplies = " << T << " [10e-3s]" << std::endl;
+
+
+
+            Sc = Sr;
+            
             hss_->to_block_row(R,  sub_Rr, leaf_R);
             hss_->to_block_row(Sr, sub_Sr, leaf_Sr);
             hss_->to_block_row(Sc, sub_Sc, leaf_Sc);
@@ -118,7 +140,24 @@ namespace strumpack {
             Rnew.random(*rgen_);
             STRUMPACK_RANDOM_FLOPS
               (rgen_->flops_per_prng() * Rnew.lrows() * Rnew.lcols());
+            
+
+
+            g_->Comm().barrier();
+            
+            auto begin = std::chrono::steady_clock::now();
             (*Amult_)(Rnew, Srnew, Scnew);
+            
+            g_->Comm().barrier();
+            auto end = std::chrono::steady_clock::now();
+            auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+            
+            std::cout << "# Gaussian add_cols multiplies = " << T << " [10e-3s]" << std::endl;
+                        
+                        
+            Scnew = Srnew;
+
+
             R.hconcat(Rnew);
             Sr.hconcat(Srnew);
             Sc.hconcat(Scnew);
@@ -131,9 +170,10 @@ namespace strumpack {
             leaf_Sc.hconcat(leafScnew);
           }
         } else {
+
+          auto rank = hss_->Comm().rank();
           if (opts.verbose() && hss_->Comm().is_root())
             std::cout << "# sampling with 1DBR matrix" << std::endl;
-          auto rank = hss_->Comm().rank();
 
           auto r0 = hss_->tree_ranges().clo(rank);
           auto r1 = hss_->tree_ranges().chi(rank);

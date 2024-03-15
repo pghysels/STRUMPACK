@@ -39,7 +39,7 @@ namespace strumpack {
       const DistM_t& A_;
       void operator()(DistM_t& R, DistM_t& Sr, DistM_t& Sc) {
         gemm(Trans::N, Trans::N, scalar_t(1.), A_, R, scalar_t(0.), Sr);
-        gemm(Trans::C, Trans::N, scalar_t(1.), A_, R, scalar_t(0.), Sc);
+      //  gemm(Trans::C, Trans::N, scalar_t(1.), A_, R, scalar_t(0.), Sc);
       }
       void operator()(const std::vector<std::size_t>& I,
                       const std::vector<std::size_t>& J,
