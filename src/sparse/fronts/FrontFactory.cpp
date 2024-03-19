@@ -150,14 +150,16 @@ namespace strumpack {
           (s, sbegin, send, upd);
       else
 #endif
+        {
 #if defined(STRUMPACK_USE_MAGMA)
         front = std::make_unique<FrontMAGMA<scalar_t,integer_t>>
           (s, sbegin, send, upd);
-#else
+#elif defined(STRUMPACK_USE_GPU)
       front = std::make_unique<FrontalMatrixGPU<scalar_t,integer_t>>
         (s, sbegin, send, upd);
 #endif
-      if (root) fc.dense++;
+        }
+      if (root && front) fc.dense++;
     }
     if (front) return front;
     // fallback in case support for cublas/zfp/hodlr is missing
