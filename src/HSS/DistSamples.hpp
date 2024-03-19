@@ -186,9 +186,11 @@ namespace strumpack {
             if (opts.compression_sketch() == CompressionSketch::SJLT) {
               S_sjlt.add_columns(d_, opts.nnz0());
       
+              hss_->Comm().barrier();
               auto begin = std::chrono::steady_clock::now();
               matrix_times_SJLT(sub_A, S_sjlt, sub_Sr);
-      
+
+              hss_->Comm().barrier();
               auto end = std::chrono::steady_clock::now();
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
@@ -236,10 +238,15 @@ namespace strumpack {
               SJLTGenerator<scalar_t,int> g(d_);
               SJLTMatrix<scalar_t,int> S_sjlt(g, 0, n_, 0, chunk);
               S_sjlt.add_columns(dd, opts.nnz0());
+              
+              hss_->Comm().barrier();
               auto begin = std::chrono::steady_clock::now();
+        
               matrix_times_SJLT(sub_A, S_sjlt, subSrnew);
               
+              hss_->Comm().barrier();
               auto end = std::chrono::steady_clock::now();
+              
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
               int minT, maxT;
