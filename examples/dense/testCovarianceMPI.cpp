@@ -367,14 +367,14 @@ MPI_Init(&argc, &argv);
       Aseq(i, j) = C(P[i]-1, P[j]-1);
 
   m = Aseq.rows();
-  cout << "# matrix generated with " << m << " rows" << std::endl;
+  std::cout << "# matrix generated with " << m << " rows" << std::endl;
   }
 
   MPI_Bcast(&m, 1, strumpack::mpi_type<int>(), 0, MPI_COMM_WORLD);
   
   A = strumpack::DistributedMatrix<double>(&grid, m, m);
   A.scatter(Aseq);
-  
+
 
    strumpack::HSS::HSSOptions<double> hss_opts;
    hss_opts.set_from_command_line(argc, argv);
@@ -445,7 +445,6 @@ MPI_Init(&argc, &argv);
     // strumpack::TimerList::Finalize();
   }
 
-}
 MPI_Finalize();
 
   return 0;
