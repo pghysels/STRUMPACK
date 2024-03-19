@@ -6,9 +6,7 @@
 #include <random>
 #include <chrono>
 
-#include "HSS/HSSMatrix.hpp"
-#define ERROR_TOLERANCE 1e2
-#define SOLVE_TOLERANCE 1e-12
+#include "HSS/HSSMatrixMPI.hpp"
 
 #include "mfem.hpp"
 using namespace mfem;
@@ -319,6 +317,9 @@ std::vector<int> generatePermutation(int dim, int k) {
 
 
 int main(int argc, char* argv[]) {
+
+MPI_Init(&argc, &argv);
+
   int ndim = 2, nx = 16;
   double corlen = 0.2;
   switch(argc) {
@@ -337,6 +338,18 @@ int main(int argc, char* argv[]) {
   // default:
   //   std::cout << "Wrong Number of parameters.\n Usage:\n";
   }
+
+{
+  strumpack::MPIComm c;
+  strumpack::BLACSGrid grid(c);
+  strumpack::DenseMatrix<double> Aseq;
+  strumpack::DistributedMatrix<double> A;
+  int m = 0;
+
+
+  if(!strumpack::mpi_rank()){
+
+  
   auto C = generateMatrix(ndim, nx, corlen);
   auto P = generatePermutation(ndim, nx);
 
@@ -348,70 +361,92 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  strumpack::DenseMatrix<double> M(C);
-  for (int j=0; j<M.cols(); j++)
-    for (int i=0; i<M.rows(); i++)
-      M(i, j) = C(P[i]-1, P[j]-1);
+  Aseq = C;
+  for (int j=0; j<Aseq.cols(); j++)
+    for (int i=0; i<Aseq.rows(); i++)
+      Aseq(i, j) = C(P[i]-1, P[j]-1);
 
-  strumpack::HSS::HSSOptions<double> hss_opts;
-  hss_opts.set_from_command_line(argc, argv);
-
-
-  std::vector<int> ranks;
-  std::vector<double> times, errors;
-
-  for (int r=0; r<5; r++) {
-    auto begin = std::chrono::steady_clock::now();
-    strumpack::HSS::HSSMatrix<double> H(M, hss_opts);
-    auto end = std::chrono::steady_clock::now();
-    if (H.is_compressed()) {
-      std::cout << "# created M matrix of dimension "
-                << H.rows() << " x " << H.cols()
-                << " with " << H.levels() << " levels" << std::endl;
-      auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-      times.push_back(T);
-      std::cout << "# total compression time = " << T << " [10e-3s]" << std::endl;
-      std::cout << "# compression succeeded!" << std::endl;
-    } else {
-      std::cout << "# compression failed!!!!!!!!" << std::endl;
-      return 1;
-    }
-    std::cout << "# rank(H) = " << H.rank() << std::endl;
-    ranks.push_back(H.rank());
-    std::cout << "# memory(H) = " << H.memory()/1e6 << " MB, "
-              << 100. * H.memory() / M.memory() << "% of dense" << std::endl;
-
-    // H.print_info();
-    auto Hdense = H.dense();
-    Hdense.scaled_add(-1., M);
-    auto rel_err = Hdense.normF() / M.normF();
-    errors.push_back(rel_err);
-    std::cout << "# relative error = ||A-H*I||_F/||A||_F = "
-              << rel_err << std::endl;
-    std::cout << "# absolute error = ||A-H*I||_F = " << Hdense.normF() << std::endl;
-    // if (Hdense.normF() / M.normF() > ERROR_TOLERANCE
-    //     * std::max(hss_opts.rel_tol(),hss_opts.abs_tol())) {
-    //   std::cout << "ERROR: compression error too big!!" << std::endl;
-    //   return 1;
-    // }
+  m = Aseq.rows();
+  cout << "# matrix generated with " << m << " rows" << std::endl;
   }
 
-  std::sort(ranks.begin(), ranks.end());
-  std::sort(times.begin(), times.end());
-  std::sort(errors.begin(), errors.end());
+  MPI_Bcast(&m, 1, strumpack::mpi_type<int>(), 0, MPI_COMM_WORLD);
+  
+  A = strumpack::DistributedMatrix<double>(&grid, m, m);
+  A.scatter(Aseq);
+  
 
-  std::cout << "min, median, max" << std::endl;
-  std::cout << "ranks: " << ranks[ranks.size()/2] << " "
-            << ranks[ranks.size()/2]-ranks[0] << " "
-            << ranks.back() - ranks[ranks.size()/2] << std::endl;
-  std::cout << "times: " << times[times.size()/2] << " "
-            << times[times.size()/2]-times[0] << " "
-            << times.back() - times[times.size()/2] << std::endl;
-  std::cout << "errors: " << errors[errors.size()/2] << " "
-            << errors[errors.size()/2]-errors[0] << " "
-            << errors.back() - errors[errors.size()/2] << std::endl;
+   strumpack::HSS::HSSOptions<double> hss_opts;
+   hss_opts.set_from_command_line(argc, argv);
 
-  // strumpack::TimerList::Finalize();
+
+    std::vector<int> ranks;
+    std::vector<double> times, errors;
+
+    for (int r=0; r<10; r++) {
+      auto begin = std::chrono::steady_clock::now();
+      strumpack::HSS::HSSMatrixMPI<double> H(A, hss_opts);
+      auto end = std::chrono::steady_clock::now();
+      if (H.is_compressed()) {
+        auto max_levels = H.max_levels();
+        if (c.is_root())
+          std::cout << "# created M matrix of dimension "
+                    << H.rows() << " x " << H.cols()
+                    << " with " << max_levels << " levels" << std::endl;
+        auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        times.push_back(T);
+        if (c.is_root())
+          std::cout << "# total compression time = " << T << " [10e-3s]" << std::endl
+                    << "# compression succeeded!" << std::endl;
+      } else {
+        if (c.is_root())
+          std::cout << "# compression failed!!!!!!!!" << std::endl;
+        return 1;
+      }
+      auto rk = H.max_rank();
+      if (c.is_root())
+        std::cout << "# rank(H) = " << rk << std::endl;
+      ranks.push_back(rk);
+
+      auto tot_mem_H = H.total_memory();
+      if (c.is_root())
+        std::cout << "# memory(H) = " << tot_mem_H/1e6 << " MB, "
+                  << 100. * tot_mem_H / A.total_memory() << "% of dense" << std::endl;
+
+      // H.print_info();
+      auto Hdense = H.dense();
+      Hdense.scaled_add(-1., A);
+      auto rel_err = Hdense.normF() / A.normF();
+      errors.push_back(rel_err);
+      auto Hdnorm = Hdense.normF();
+      if (c.is_root())
+        std::cout << "# relative error = ||A-H*I||_F/||A||_F = "
+                  << rel_err << std::endl
+                  << "# absolute error = ||A-H*I||_F = "
+                  << Hdnorm << std::endl;
+    }
+
+    std::sort(ranks.begin(), ranks.end());
+    std::sort(times.begin(), times.end());
+    std::sort(errors.begin(), errors.end());
+
+    if (c.is_root())
+      std::cout << "min, median, max" << std::endl
+                << "ranks: " << ranks[0] << " "
+                << ranks[ranks.size()/2] << " "
+                << ranks[ranks.size()-1] << std::endl
+                << "times: " << times[0] << " "
+                << times[times.size()/2] << " "
+                << times[times.size()-1] << std::endl
+                << "errors: " << errors[0] << " "
+                << errors[errors.size()/2] << " "
+                << errors[errors.size()-1] << std::endl;
+
+    // strumpack::TimerList::Finalize();
+  }
+
+}
+MPI_Finalize();
 
   return 0;
 }
