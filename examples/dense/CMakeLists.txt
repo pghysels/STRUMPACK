@@ -30,7 +30,9 @@ if(STRUMPACK_USE_MPI)
   test2DSIEMPI.cpp)
   add_executable(testFrontMPI             EXCLUDE_FROM_ALL
   testFrontMPI.cpp)
-
+  add_executable(testCovarianceMPI       EXCLUDE_FROM_ALL
+  testCovarianceMPI.cpp)
+  
   target_link_libraries(KernelRegressionMPI strumpack)
   target_link_libraries(testBLRMPI strumpack)
   target_link_libraries(testStructuredMPI strumpack)
@@ -38,6 +40,11 @@ if(STRUMPACK_USE_MPI)
   target_link_libraries(testQCMPI strumpack)
   target_link_libraries(test2DSIEMPI strumpack)
   target_link_libraries(testFrontMPI strumpack)
+  target_link_libraries(testCovarianceMPI strumpack)
+
+  target_include_directories(testCovarianceMPI PRIVATE /global/cfs/projectdirs/m2957/yotam/mfem-4.6)  
+  target_link_libraries(testCovarianceMPI /global/cfs/projectdirs/m2957/yotam/mfem-4.6/libmfem.a)
+
 
   add_dependencies(examples
     KernelRegressionMPI
@@ -45,6 +52,7 @@ if(STRUMPACK_USE_MPI)
     testStructuredMPI
     dstructured_mpi
     testQCMPI
+    testCovarianceMPI
     test2DSIEMPI
     testFrontMPI)
 
