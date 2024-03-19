@@ -194,12 +194,8 @@ namespace strumpack {
               auto end = std::chrono::steady_clock::now();
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
-              int minT, maxT;
-              MPI_Reduce(&T, &minT, 1, MPI_INT, MPI_MIN, 0, hss_->comm());
-              MPI_Reduce(&T, &maxT, 1, MPI_INT, MPI_MAX, 0, hss_->comm());
-              if(rank == 0){
-                std::cout << "# SJLT init multiplies min= " << minT << " [10e-3s]" << std::endl;
-                std::cout << "# SJLT init multiplies max= " << maxT << " [10e-3s]" << std::endl;
+              if(!rank){
+                std::cout << "# SJLT init multiplies = " << T << " [10e-3s]" << std::endl;
  
               }
               
@@ -220,7 +216,7 @@ namespace strumpack {
               int minT, maxT;
               MPI_Reduce(&T, &minT, 1, MPI_INT, MPI_MIN, 0, hss_->comm());
               MPI_Reduce(&T, &maxT, 1, MPI_INT, MPI_MAX, 0, hss_->comm());
-              if(rank == 0){
+              if(!rank == 0){
                 std::cout << "# Gaussian init multiplies min= " << minT << " [10e-3s]" << std::endl;
                 std::cout << "# Gaussian init multiplies max= " << maxT << " [10e-3s]" << std::endl;
  
@@ -246,16 +242,11 @@ namespace strumpack {
               
               hss_->Comm().barrier();
               auto end = std::chrono::steady_clock::now();
-              
+
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
-              int minT, maxT;
-              MPI_Reduce(&T, &minT, 1, MPI_INT, MPI_MIN, 0, hss_->comm());
-              MPI_Reduce(&T, &maxT, 1, MPI_INT, MPI_MAX, 0, hss_->comm());
-              if(rank == 0){
-                std::cout << "# SJLT add_cols multiplies min= " << minT << " [10e-3s]" << std::endl;
-                std::cout << "# SJLT add_cols multiplies max= " << maxT << " [10e-3s]" << std::endl;
- 
+              if(!rank){
+                std::cout << "# SJLT add_cols multiplies = " << T << " [10e-3s]" << std::endl;
               }
 
               subRnew = S_sjlt.to_dense_sub_block(r1-r0, dd, r0, 0);
