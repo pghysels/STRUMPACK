@@ -47,6 +47,9 @@ int main(int argc, char* argv[]) {
   if (N == 5000) kk = 64;
   if (N == 10000) kk = 128;
   if (N == 20000) kk = 256;
+  if (N == 40000) kk = 512;
+  if (N == 80000) kk = 1024;
+  
   double w = M_PI * kk;
 
   int center[] = {1, 1};
