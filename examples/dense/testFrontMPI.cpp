@@ -28,6 +28,7 @@ MPI_Init(&argc, &argv);
   
   A = strumpack::DistributedMatrix<double>(&grid, m, m);
   A.scatter(Aseq);
+  std::cout << "# scatter success" << std::endl;
   Aseq.clear();
 
   
