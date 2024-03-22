@@ -28,7 +28,7 @@ MPI_Init(&argc, &argv);
   
   A = strumpack::DistributedMatrix<double>(&grid, m, m);
   A.scatter(Aseq);
-
+  Aseq.clear();
 
   
 
