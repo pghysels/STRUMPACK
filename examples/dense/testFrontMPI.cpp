@@ -27,7 +27,14 @@ MPI_Init(&argc, &argv);
   MPI_Bcast(&m, 1, strumpack::mpi_type<int>(), 0, MPI_COMM_WORLD);
   
   A = strumpack::DistributedMatrix<double>(&grid, m, m);
-  A.scatter(Aseq);
+  // A.scatter(Aseq);
+  std::size_t B = 10000;
+  for (std::size_t r=0; r<m; r+=B) {
+    auto nr = std::min(B, m-r);
+    strumpack::DenseMatrixWrapper<double> Ar(nr, m, Aseq, r, 0);
+    strumpack::copy(nr, m, Ar, 0, A, r, 0, grid.ctxt_all());
+  }
+  
   std::cout << "# scatter success" << std::endl;
   Aseq.clear();
 
