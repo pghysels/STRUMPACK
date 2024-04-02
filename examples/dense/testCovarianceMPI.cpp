@@ -374,7 +374,7 @@ MPI_Init(&argc, &argv);
   
   A = strumpack::DistributedMatrix<double>(&grid, m, m);
   // A.scatter(Aseq);
-  std::size_t B = 10000;
+  std::size_t B = 5000;
   for (std::size_t r=0; r<m; r+=B) {
     auto nr = std::min(B, m-r);
     strumpack::DenseMatrixWrapper<double> Ar(nr, m, Aseq, r, 0);
