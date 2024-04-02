@@ -107,7 +107,7 @@ generateMatrix(int ndim, int nx, double corlen=0.2)
   //5. Build the covariance matrix
   ExponentialKernel k(corlen, mesh->Dimension());
   int n = fespace->GetNDofs();
-  DenseMatrix G(new double[n*n], n,n);
+  DenseMatrix G(new double[std::size_t(n)*n], n,n);
   k.Eval(X,G);
 
   // 6. Set up the bilinear form a(.,.) on the finite element space
@@ -144,7 +144,7 @@ generateMatrix(int ndim, int nx, double corlen=0.2)
 
 /* Modified to not do dissection, but bisection. */
 void ND1D(int bx, int ex, int by, int ey, int bz, int ez,
-          int nx, int ny, int nz, int offset, std::int64_t* order) {
+          int nx, int ny, int nz, std::int64_t offset, std::int64_t* order) {
   /* 1D Nested Dissection of a line of an nx x ny x nz cuboid mesh                  */
   /* Ordering is written in array order with starting positing "offset".            */
   int sx = ex-bx+1, sy = ey-by+1, sz = ez-bz+1;
@@ -176,7 +176,7 @@ void ND1D(int bx, int ex, int by, int ey, int bz, int ez,
 }
 
 void ND2D(int bx, int ex, int by, int ey, int bz, int ez,
-          int nx, int ny, int nz, int offset, int cut, std::int64_t* order) {
+          int nx, int ny, int nz, std::int64_t offset, int cut, std::int64_t* order) {
   /* 2D Nested Dissection of a rectangle of an nx x ny x nz rectangular mesh       */
   /* Cut defines how to cut the domain (e.g., if constant z, 0: x-wise, 1: y-wise) */
   /* Ordering is written in array order with starting positing "offset".           */
@@ -251,7 +251,7 @@ void ND2D(int bx, int ex, int by, int ey, int bz, int ez,
 }
 
 void ND3D(int bx, int ex, int by, int ey, int bz, int ez,
-          int nx, int ny, int nz, int offset, int cut, std::int64_t* order) {
+          int nx, int ny, int nz, std::int64_t offset, int cut, std::int64_t* order) {
   /* 3D Nested Dissection of subdomain [bx:ex]x[by:ey]x[bz:ez] of an nx x ny x nz rectangular mesh */
   /* Cut defines how to cut the domain (0: x-wise, 1: y-wise, 2: z-wise)                           */
   /* Points of the domain are assumed to be numbered y-wise.                                       */
