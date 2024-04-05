@@ -6,6 +6,7 @@
 #include <random>
 #include <chrono>
 
+#include "misc/TaskTimer.hpp"
 #include "HSS/HSSMatrixMPI.hpp"
 
 int main(int argc, char* argv[]) {
@@ -106,7 +107,7 @@ MPI_Init(&argc, &argv);
                 << errors[errors.size()/2] << " "
                 << errors[errors.size()-1] << std::endl;
 
-    // strumpack::TimerList::Finalize();
+    strumpack::TimerList::Finalize();
   }
 
   return 0;
