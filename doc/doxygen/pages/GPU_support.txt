@@ -55,7 +55,8 @@ There is also support for AMD GPUs through HIP and the ROCm libraries,
 rocSOLVER and hipBLAS.
 Support for HIP can be enabled through the CMake build using:
 \code {.bash}
-> cmake ../ -DSTRUMPACK_USE_HIP=ON -DHIP_HIPCC_FLAGS=--amdgpu-target=gfx906
+ > export HIP_DIR=....
+ > cmake ../ -DSTRUMPACK_USE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_CXX_COMPILER=hipcc
 \endcode
 where the user can specify the specific GPU architecture.
 If the CMake build system detects CUDA support, then HIP will be

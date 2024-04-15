@@ -112,9 +112,9 @@ export METIS_DIR=`pwd`/install
 \code {.bash}
  > cmake ../ -DSTRUMPACK_USE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="75"
 \endcode
-  which is enabled by default, and will look for the CUDA compiler and
-  libraries in the default locations. Additionally, one can specify
-  the CUDAToolkit_ROOT path to the CUDA libraries:
+  which will look for the CUDA compiler and libraries in the default
+  locations. Additionally, one can specify the CUDAToolkit_ROOT path
+  to the CUDA libraries:
 \code {.bash}
  > cmake ../ -DSTRUMPACK_USE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="75" -DCUDAToolkit_ROOT=/some/path
 \endcode
@@ -127,6 +127,16 @@ or
   See the page on \link GPU_Support GPU Support \endlink for more
   details.
 
+- __HIP__ and __ROCm__ can be used to accelerate the sparse direct
+  solver on AMD GPUs:
+\code {.bash}
+ > export HIP_DIR=....
+ > cmake ../ -DSTRUMPACK_USE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_CXX_COMPILER=hipcc
+\endcode
+  For full GPU support in the distributed memory sparse direct solver,
+  one should also compile with support for SLATE with the HIP backend,
+  see below. \n See the page on \link GPU_Support GPU Support \endlink
+  for more details.
 
 - __MPI__ (Message Passing Interface) library. Support for MPI is
   enabled by default in STRUMPACK, but can be disabled by adding
