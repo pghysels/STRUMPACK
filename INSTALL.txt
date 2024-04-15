@@ -138,8 +138,6 @@ the approximate factorizations.
 
 > cmake ../ -DSTRUMPACK_USE_CUDA=ON
 
-Enabled by default, but turned off if CUDA cannot be found.
-
 CMake will look for the CUDA compiler and libraries (cuBLAS and
 cuSOLVER) in the default location or at CUDAToolkit_ROOT, which can be
 set as
@@ -149,6 +147,26 @@ or passed directly to CMake
 
 For full GPU support in the distributed memory sparse direct solver,
 one should also compile with support for SLATE, see below.
+
+
+
+HIP (optional)
+===============
+To enable support for HIP in the sparse solver:
+
+> export HIP_DIR=...
+> cmake ../ \
+      -DSTRUMPACK_USE_HIP=ON \
+      -DCMAKE_HIP_ARCHITECTURES=gfx90a \
+      -DCMAKE_CXX_COMPILER=hipcc
+
+In the above, adjust the HIP_DIR, the GPU architecture, and the HIP
+compiler.
+
+For full GPU support in the distributed memory sparse direct solver,
+one should also compile with support for SLATE, with the HIP backend,
+see below.
+
 
 
 SLATE (optional) for GPU accelerated ScaLAPACK
@@ -161,6 +179,16 @@ Support for SLATE in STRUMPACK can be enabled with for instance:
 > cmake ../ -DTPLE_ENABLE_SLATE=ON \
 >   -DTPL_SLATE_INCLUDE_DIRS="$SLATEHOME/include/;$SLATEHOME/blaspp/include;$SLATEHOME/lapackpp/include" \
 >   -DTPL_SLATE_LIBRARIES="$SLATEHOME/lib/libslate_scalapack_api.so;$SLATEHOME/lib/libslate.so;$SLATEHOME/blaspp/lib/libblaspp.so;$SLATEHOME/lapackpp/lib/liblapackpp.so"
+
+Or if you simply define SLATE_DIR to point to the SLATE and blas++ and
+lapack++ installation directories, STRUMPACK's CMake should find them
+and you do not need to specify TPL_SLATE_INCLUDE_DIRS and
+TPL_SLATE_LIBRARIES.
+
+Note that SLATE requires MPI_THREAD_MULTIPLE. So you need to
+initialize MPI with MPI_Init_thread with the required argument set to
+MPI_THREAD_MULTIPLE.
+
 
 
 ParMETIS and (PT)Scotch (optional)
