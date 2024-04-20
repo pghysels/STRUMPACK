@@ -88,8 +88,7 @@ namespace strumpack {
     {
       std::vector<integer_t> local_order(local_rows);
       int ierr = WRAPPER_ParMETIS_V32_NodeND
-        (A.dist(), xadj, adjncy, numflag,
-         local_order, sizes, comm);
+        (A.dist(), xadj, adjncy, numflag, local_order, sizes, comm);
       if (ierr != METIS_OK) {
         if (!mpi_rank(comm))
           std::cerr << "ParMETIS_V32_NodeND failed with ierr="

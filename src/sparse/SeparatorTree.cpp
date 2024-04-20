@@ -380,11 +380,14 @@ namespace strumpack {
   separators_from_etree(std::vector<integer_t>& etree,
                         std::vector<integer_t>& post) {
     integer_t dofs = etree.size(), n = dofs;
+    // count number of root nodes (parent in etree == n)
     if (std::count(etree.begin(), etree.end(), dofs) != 1)
       etree.push_back(++n);
+    // use -1 to denote root node, instead of n
     std::replace(etree.begin(), etree.end(), n, integer_t(-1));
     integer_t root = n - 1;
     std::vector<integer_t> kid0(n), kids(n), nch(n), w(n, 1);
+    // count nodes in subtree (w), and number of children (nch)
     for (integer_t i=0; i<n; i++) {
       auto p = etree[i];
       if (p == -1) continue;
@@ -399,6 +402,7 @@ namespace strumpack {
       if (p == -1) continue;
       kids[kid0[p]+nch[p]++] = i;
     }
+    // convert to binary tree, as balanced as possible
     integer_t node = 0;
     while (node < n) {
       auto nc = nch[node];
@@ -445,6 +449,7 @@ namespace strumpack {
       sib[v] = kid[dad];
       kid[dad] = v;
     }
+    // construct postordering
     integer_t current = root, postnum = 0;
     while (postnum < dofs) {
       auto first = kid[current];
@@ -473,6 +478,8 @@ namespace strumpack {
     s.push(root);
     integer_t prev = -1;
 
+    // find supernodes
+
     // TODO merge this traversal with the traversal to get the
     // postordering
     while (!s.empty()) {
@@ -487,7 +494,7 @@ namespace strumpack {
         }
       } else {
         // skip nodes that have only one child, this will group nodes
-        // in fronts
+        // in fronts/supernodes
         if ((erc[i] == -1 && elc[i] == -1) ||
             (erc[i] != -1 && elc[i] != -1)) {
           integer_t pid = seps.size();
@@ -523,7 +530,7 @@ namespace strumpack {
     auto seps = separators_from_etree(etree, post);
     for (std::size_t i=0; i<n; i++)
       iperm[i] = post[perm[i]];
-    for (std::size_t i=0; i<perm.size(); i++)
+    for (std::size_t i=0; i<n; i++)
       perm[iperm[i]] = i;
     std::swap(perm, iperm);
     return SeparatorTree<integer_t>(seps);
