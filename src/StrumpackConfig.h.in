@@ -64,6 +64,7 @@
 #cmakedefine STRUMPACK_USE_GETOPT
 #cmakedefine STRUMPACK_USE_MAGMA
 #cmakedefine STRUMPACK_USE_KBLAS
+#cmakedefine STRUMPACK_USE_H2OPUS
 
 #cmakedefine STRUMPACK_USE_MATLAB
 

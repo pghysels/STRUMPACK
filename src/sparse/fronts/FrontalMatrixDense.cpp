@@ -34,6 +34,10 @@
 #include "FrontBLRMPI.hpp"
 #endif
 
+#include <h2opus.h>
+#include <h2opus/core/hara_sketching.h>
+#include <h2opus/core/h2gen_atomic_wrappers.h>
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
@@ -256,11 +260,151 @@ namespace strumpack {
     return err_code;
   }
 
+  template<typename scalar_t>
+  class DenseCPUSampler : public HMatrixSampler {
+  private:
+    const DenseMatrix<scalar_t>& M_;
+  public:
+    DenseCPUSampler(const DenseMatrix<scalar_t>& M) : M_(M) {}
+    void sample(H2Opus_Real *input, H2Opus_Real *output, int samples) {
+      auto n = M_.rows();
+      DenseMatrixWrapper<scalar_t>
+        R(n, samples, reinterpret_cast<scalar_t*>(input), n),
+        S(n, samples, reinterpret_cast<scalar_t*>(output), n);
+      gemm(Trans::N, Trans::N, scalar_t(1.), M_, R, scalar_t(0.), S);
+    }
+  };
+
+  template<typename scalar_t>
+  class DenseCPUEntryGen :
+    public H2OpusBatchedEntryGen<typename RealType<H2Opus_Real>::value_type> {
+  private:
+    const DenseMatrix<scalar_t>& M_;
+  public:
+    DenseCPUEntryGen(const DenseMatrix<scalar_t>& M) : M_(M) {}
+    void batch_entry_gen
+    (H2Opus_Real* baseptr, std::size_t *block_offsets, int* block_ld, std::size_t base_allocation,
+     std::size_t *I_set_offsets, int *I_lens, int max_I_len, std::size_t *J_set_offsets, int *J_lens, int max_J_len,
+     int *I_set, std::size_t I_set_size, int *J_set, std::size_t J_set_size, int batchCount,
+     h2opusComputeStream_t stream) {
+      // TODO
+    }
+  };
+
+  template <class T> class PointCloud : public H2OpusDataSet<T> {
+  public:
+    int dimension;
+    std::size_t num_points;
+    std::vector<std::vector<T>> pts;
+
+    PointCloud() {
+      this->dimension = 0;
+      this->num_points = 0;
+    }
+
+    PointCloud(int dim, std::size_t num_pts) {
+      this->dimension = dim;
+      this->num_points = num_pts;
+
+      pts.resize(dim);
+      for (int i = 0; i < dim; i++)
+        pts[i].resize(num_points);
+    }
+
+    int getDimension() const {
+      return dimension;
+    }
+
+    std::size_t getDataSetSize() const {
+      return num_points;
+    }
+
+    T getDataPoint(std::size_t idx, int dim) const {
+      assert(dim < dimension && idx < num_points);
+      return pts[dim][idx];
+    }
+  };
+
+  template <typename T>
+  void generate2DGrid(PointCloud<T> &pt_cloud, int grid_x, int grid_y, T min_x, T max_x, T min_y, T max_y) {
+    T hx = (max_x - min_x) / (grid_x - 1);
+    T hy = (max_y - min_y) / (grid_y - 1);
+    for (size_t i = 0; i < (std::size_t)grid_x; i++) {
+      for (size_t j = 0; j < (std::size_t)grid_y; j++) {
+        pt_cloud.pts[0][i + j * grid_x] = min_x + i * hx;
+        pt_cloud.pts[1][i + j * grid_x] = min_y + j * hy;
+      }
+    }
+  }
+
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
+
+    ////////////////////////////////////////////////////////
+    /// H2Opus test ////////////////////////////////////////
+    ////////////////////////////////////////////////////////
+
+    if (etree_level == 0 &&
+        opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
+      // assume regular cube mesh
+      int k = opts.nx();
+      int n = k*k, dim = 2;
+      assert(F11_.rows() == (std::size_t)n);
+      const int max_samples = 512, bs = 64,
+        leaf_size = 64, hw = H2OPUS_HWTYPE_CPU;
+      const double eta = 1.;
+
+      std::cout << "k= " << k
+                << " n= " << n
+                << " dim= " << dim
+                << " max_samples= " << max_samples
+                << " bs= " << bs
+                << " leaf_size= " << leaf_size
+                << " hw= " << hw
+                << " eta= " << eta
+                << std::endl;
+
+      h2opusHandle_t handle;
+      h2opusCreateHandle(&handle);
+
+      PointCloud<H2Opus_Real> pt_cloud(dim, n);
+      generate2DGrid<H2Opus_Real>(pt_cloud, k, k, 0, 1, 0, 1);
+
+      H2OpusBoxCenterAdmissibility admissibility(eta);
+      HMatrix hmatrix(n, true);
+      buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
+
+      DenseCPUSampler<scalar_t> sampler(F11_);
+      // DenseCPUEntryGen<scalar_t> gen(F11_);
+      typedef typename
+        HaraSketchSimpleBatchGenSelect<hw,H2Opus_Real,DenseMatrix<H2Opus_Real>>::type
+        BatchEntryGenHost;
+      BatchEntryGenHost gen(*reinterpret_cast<DenseMatrix<H2Opus_Real>*>(&F11_));
+
+      H2Opus_Real approx_norm = sampler_norm<H2Opus_Real, hw>(&sampler, n, 10, handle);
+      H2Opus_Real trunc_eps = opts.HODLR_options().abs_tol();
+      H2Opus_Real abs_trunc_tol = trunc_eps * approx_norm;
+
+      hara_sketch_batchgen<hw, H2Opus_Real>
+        (hmatrix, &sampler, &gen, max_samples, bs, abs_trunc_tol, handle);
+      H2Opus_Real approx_H2_error =
+        sampler_difference<H2Opus_Real, hw>(&sampler, hmatrix, 40, handle)
+        / approx_norm;
+
+      std::cout << "H2Opus approximate matrix norm = "
+                << approx_norm << std::endl
+                << " trunc_eps = " << trunc_eps << std::endl
+                << " abs_trunc_tol = " << abs_trunc_tol << std::endl
+                << " H2Opus approximation error = "
+                << approx_H2_error << std::endl;
+    }
+
+    ////////////////////////////////////////////////////////
+
+
     if (dim_sep()) {
       if (F11_.LU(piv_, task_depth))
         err_code = ReturnCode::ZERO_PIVOT;
