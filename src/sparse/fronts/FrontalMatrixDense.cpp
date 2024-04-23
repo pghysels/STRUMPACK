@@ -260,38 +260,109 @@ namespace strumpack {
     return err_code;
   }
 
-  template<typename scalar_t>
-  class DenseCPUSampler : public HMatrixSampler {
+  // template<typename scalar_t>
+  // class DenseCPUSampler : public HMatrixSampler {
+  // private:
+  //   const DenseMatrix<scalar_t>& M_;
+  // public:
+  //   DenseCPUSampler(const DenseMatrix<scalar_t>& M) : M_(M) {}
+  //   void sample(H2Opus_Real *input, H2Opus_Real *output, int samples) {
+  //     auto n = M_.rows();
+  //     DenseMatrixWrapper<scalar_t>
+  //       R(n, samples, reinterpret_cast<scalar_t*>(input), n),
+  //       S(n, samples, reinterpret_cast<scalar_t*>(output), n);
+  //     gemm(Trans::N, Trans::N, scalar_t(1.), M_, R, scalar_t(0.), S);
+  //   }
+  // };
+
+  template<int hw>
+  class DenseSampler : public /*Basic*/HMatrixSampler {
   private:
-    const DenseMatrix<scalar_t>& M_;
+    typedef typename VectorContainer<hw, int>::type IntVector;
+    typedef typename VectorContainer<hw, H2Opus_Real>::type RealVector;
+
+    H2Opus_Real *M;
+    int ldm, n;
+    H2Opus_Real alpha, one_norm_A;
+
+    IntVector index_map;
+    RealVector temp_buffer_A, temp_buffer_B;
+
+    h2opusHandle_t h2opus_handle;
+    h2opusComputeStream_t main_stream;
+
   public:
-    DenseCPUSampler(const DenseMatrix<scalar_t>& M) : M_(M) {}
+    // Index map is assumed to be on the CPU
+    DenseSampler(H2Opus_Real *M, int ldm, int n,
+                 H2Opus_Real alpha, int *index_map,
+                 h2opusHandle_t h2opus_handle) {
+      this->M = M;
+      this->ldm = ldm;
+      this->n = n;
+      this->alpha = alpha;
+      if (index_map)
+        copyVector(this->index_map, index_map, n, H2OPUS_HWTYPE_CPU);
+      this->h2opus_handle = h2opus_handle;
+      this->main_stream = h2opus_handle->getMainStream();
+      const int ONE_NORM_EST_MAX_SAMPLES = 20;
+      this->one_norm_A = sampler_1_norm<H2Opus_Real, hw>
+        (this, n, ONE_NORM_EST_MAX_SAMPLES, h2opus_handle);
+    }
+
     void sample(H2Opus_Real *input, H2Opus_Real *output, int samples) {
-      auto n = M_.rows();
-      DenseMatrixWrapper<scalar_t>
-        R(n, samples, reinterpret_cast<scalar_t*>(input), n),
-        S(n, samples, reinterpret_cast<scalar_t*>(output), n);
-      gemm(Trans::N, Trans::N, scalar_t(1.), M_, R, scalar_t(0.), S);
+      if (temp_buffer_A.size() < (size_t)n * samples)
+        temp_buffer_A.resize(n * samples);
+      if (temp_buffer_B.size() < (size_t)n * samples)
+        temp_buffer_B.resize(n * samples);
+      // output = P*(M + alpha * I)*P^t*input
+      // ta = P^t*input
+      H2Opus_Real *permuted_input = input;
+      H2Opus_Real *permuted_output = output;
+      if (index_map.size() != 0) {
+        permute_vectors
+          (input, vec_ptr(temp_buffer_A), n, samples,
+           vec_ptr(index_map), 1, hw, main_stream);
+        permuted_input = vec_ptr(temp_buffer_A);
+        permuted_output = vec_ptr(temp_buffer_B);
+      }
+      // tb = M * ta
+      blas_gemm<H2Opus_Real, hw>
+        (main_stream, H2Opus_NoTrans, H2Opus_NoTrans, n, samples, n, 1,
+         M, ldm, permuted_input, n, 0, permuted_output, n);
+      // tb = ta * alpha + tb
+      if (alpha != 0)
+        blas_axpy<H2Opus_Real, hw>
+          (main_stream, n * samples, alpha, permuted_input, 1,
+           permuted_output, 1);
+      // output = P * tb
+      if (index_map.size() != 0)
+        permute_vectors
+          (permuted_output, output, n, samples, vec_ptr(index_map),
+           0, hw, main_stream);
     }
+
+    int getMatrixDim() { return n; }
+    H2Opus_Real get1Norm() { return one_norm_A; }
   };
 
-  template<typename scalar_t>
-  class DenseCPUEntryGen :
-    public H2OpusBatchedEntryGen<typename RealType<H2Opus_Real>::value_type> {
-  private:
-    const DenseMatrix<scalar_t>& M_;
-  public:
-    DenseCPUEntryGen(const DenseMatrix<scalar_t>& M) : M_(M) {}
-    void batch_entry_gen
-    (H2Opus_Real* baseptr, std::size_t *block_offsets, int* block_ld, std::size_t base_allocation,
-     std::size_t *I_set_offsets, int *I_lens, int max_I_len, std::size_t *J_set_offsets, int *J_lens, int max_J_len,
-     int *I_set, std::size_t I_set_size, int *J_set, std::size_t J_set_size, int batchCount,
-     h2opusComputeStream_t stream) {
-      // TODO
-    }
-  };
 
-  template <class T> class PointCloud : public H2OpusDataSet<T> {
+  // template<typename scalar_t>
+  // class DenseCPUEntryGen :
+  //   public H2OpusBatchedEntryGen<typename RealType<H2Opus_Real>::value_type> {
+  // private:
+  //   const DenseMatrix<scalar_t>& M_;
+  // public:
+  //   DenseCPUEntryGen(const DenseMatrix<scalar_t>& M) : M_(M) {}
+  //   void batch_entry_gen
+  //   (H2Opus_Real* baseptr, std::size_t *block_offsets, int* block_ld, std::size_t base_allocation,
+  //    std::size_t *I_set_offsets, int *I_lens, int max_I_len, std::size_t *J_set_offsets, int *J_lens, int max_J_len,
+  //    int *I_set, std::size_t I_set_size, int *J_set, std::size_t J_set_size, int batchCount,
+  //    h2opusComputeStream_t stream) {
+  //     // TODO
+  //   }
+  // };
+
+  template<class T> class PointCloud : public H2OpusDataSet<T> {
   public:
     int dimension;
     std::size_t num_points;
@@ -311,13 +382,9 @@ namespace strumpack {
         pts[i].resize(num_points);
     }
 
-    int getDimension() const {
-      return dimension;
-    }
+    int getDimension() const { return dimension; }
 
-    std::size_t getDataSetSize() const {
-      return num_points;
-    }
+    std::size_t getDataSetSize() const { return num_points; }
 
     T getDataPoint(std::size_t idx, int dim) const {
       assert(dim < dimension && idx < num_points);
@@ -326,7 +393,8 @@ namespace strumpack {
   };
 
   template <typename T>
-  void generate2DGrid(PointCloud<T> &pt_cloud, int grid_x, int grid_y, T min_x, T max_x, T min_y, T max_y) {
+  void generate2DGrid(PointCloud<T> &pt_cloud, int grid_x, int grid_y,
+                      T min_x, T max_x, T min_y, T max_y) {
     T hx = (max_x - min_x) / (grid_x - 1);
     T hy = (max_y - min_y) / (grid_y - 1);
     for (size_t i = 0; i < (std::size_t)grid_x; i++) {
@@ -349,6 +417,9 @@ namespace strumpack {
 
     if (etree_level == 0 &&
         opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
+
+      F11_.write("Froot");
+
       // assume regular cube mesh
       int k = opts.nx();
       int n = k*k, dim = 2;
@@ -377,7 +448,11 @@ namespace strumpack {
       HMatrix hmatrix(n, true);
       buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
 
-      DenseCPUSampler<scalar_t> sampler(F11_);
+      // DenseCPUSampler<scalar_t> sampler(F11_);
+      int* index_map = hmatrix.u_basis_tree.index_map.data();
+      DenseSampler<hw> sampler
+        (reinterpret_cast<H2Opus_Real*>(F11_.data()), F11_.ld(), F11_.rows(),
+         H2Opus_Real(0.), index_map, handle);
       // DenseCPUEntryGen<scalar_t> gen(F11_);
       typedef typename
         HaraSketchSimpleBatchGenSelect<hw,H2Opus_Real,DenseMatrix<H2Opus_Real>>::type
