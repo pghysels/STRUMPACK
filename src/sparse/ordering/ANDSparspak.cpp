@@ -203,7 +203,7 @@ namespace strumpack {
         auto s = ndstack.top();
         ndstack.pop();
         if (s.ncomps == 1) {
-          auto& c = C.back();
+          auto c = C.back();
           C.pop_back();
           auto nsep = fndsep(c.root, xadj, adjncy, mask, perm+num, xls, ls);
           if (nsep == c.size || c.size <= 8) { // TODO get from options?
