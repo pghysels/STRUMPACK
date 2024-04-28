@@ -554,6 +554,7 @@ namespace strumpack {
     auto level_flops = LU_flops(F11_) +
       gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
       trsm_flops(Side::L, scalar_t(1.), F11_, F21_);
+    (void)level_flops;
     STRUMPACK_FULL_RANK_FLOPS(level_flops);
     // if (opts.verbose()) {
     //   auto level_time = tl.elapsed();
