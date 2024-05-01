@@ -103,7 +103,8 @@ namespace strumpack {
                     fronts and Hierarchically Off-diagonal
                     Low-Rank compression of large fronts  */
     LOSSLESS,  /*!< Lossless cmpresssion                  */
-    LOSSY      /*!< Lossy cmpresssion                     */
+    LOSSY,     /*!< Lossy cmpresssion                     */
+    H2         /*!< H2, strong admissibility, H2Opus      */
   };
 
   /**
@@ -970,6 +971,7 @@ namespace strumpack {
       case CompressionType::BLR:
         return blr_opts_.rel_tol();
       case CompressionType::HODLR:
+      case CompressionType::H2:
         return hodlr_opts_.rel_tol();
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_opts_.rel_tol();
@@ -999,6 +1001,7 @@ namespace strumpack {
       case CompressionType::BLR:
         return blr_opts_.abs_tol();
       case CompressionType::HODLR:
+      case CompressionType::H2:
         return hodlr_opts_.abs_tol();
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_opts_.abs_tol();
@@ -1027,6 +1030,7 @@ namespace strumpack {
       case CompressionType::BLR:
         return blr_min_sep_size_;
       case CompressionType::HODLR:
+      case CompressionType::H2:
         return hodlr_min_sep_size_;
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_min_sep_size_;
@@ -1047,6 +1051,9 @@ namespace strumpack {
       return hss_min_sep_size_;
     }
     int hodlr_min_sep_size() const {
+      return hodlr_min_sep_size_;
+    }
+    int h2_min_sep_size() const {
       return hodlr_min_sep_size_;
     }
     int blr_min_sep_size() const {
@@ -1070,6 +1077,7 @@ namespace strumpack {
       case CompressionType::BLR:
         return blr_min_front_size_;
       case CompressionType::HODLR:
+      case CompressionType::H2:
         return hodlr_min_front_size_;
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_min_front_size_;
@@ -1090,6 +1098,9 @@ namespace strumpack {
       return hss_min_front_size_;
     }
     int hodlr_min_front_size() const {
+      return hodlr_min_front_size_;
+    }
+    int h2_min_front_size() const {
       return hodlr_min_front_size_;
     }
     int blr_min_front_size() const {
@@ -1114,6 +1125,7 @@ namespace strumpack {
       case CompressionType::BLR:
         return blr_opts_.leaf_size();
       case CompressionType::HODLR:
+      case CompressionType::H2:
         return hodlr_opts_.leaf_size();
       case CompressionType::BLR_HODLR:
         if (l==0) return hodlr_opts_.leaf_size();

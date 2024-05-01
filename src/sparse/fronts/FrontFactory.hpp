@@ -41,15 +41,17 @@
 namespace strumpack {
 
   struct FrontCounter {
-    int dense, HSS, BLR, HODLR, lossy;
-    FrontCounter() : dense(0), HSS(0), BLR(0), HODLR(0), lossy(0) {}
-    FrontCounter(int* c) :
-      dense(c[0]), HSS(c[1]), BLR(c[2]), HODLR(c[3]), lossy(c[4]) {}
+    int dense, HSS, BLR, HODLR, lossy, H2;
+    FrontCounter() :
+      dense(0), HSS(0), BLR(0), HODLR(0), lossy(0), H2(0) {}
+    FrontCounter(std::array<int,6>& c) :
+      dense(c[0]), HSS(c[1]), BLR(c[2]),
+      HODLR(c[3]), lossy(c[4]), H2(c[5]) {}
 #if defined(STRUMPACK_USE_MPI)
     FrontCounter reduce(const MPIComm& comm) const {
-      std::array<int,5> w = {dense, HSS, BLR, HODLR, lossy};
+      std::array<int,6> w = {dense, HSS, BLR, HODLR, lossy, H2};
       comm.reduce(w.data(), w.size(), MPI_SUM);
-      return FrontCounter(w.data());
+      return FrontCounter(w);
     }
 #endif
   };
@@ -66,20 +68,20 @@ namespace strumpack {
   }
 
     template<typename scalar_t> bool is_symmetric
-            (const SPOptions<scalar_t>& opts) {
+    (const SPOptions<scalar_t>& opts) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
-        return opts.use_symmetric() && opts.compression() == CompressionType::NONE;
+      return opts.use_symmetric() && opts.compression() == CompressionType::NONE;
 #endif
-        return false;
+      return false;
     }
 
-    template<typename scalar_t> bool is_positive_definite
-            (const SPOptions<scalar_t>& opts) {
+  template<typename scalar_t> bool is_positive_definite
+  (const SPOptions<scalar_t>& opts) {
 #if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP) || defined(STRUMPACK_USE_SYCL)
-        return opts.use_positive_definite();
+    return opts.use_positive_definite();
 #endif
-        return false;
-    }
+    return false;
+  }
 
   template<typename scalar_t> bool is_HSS
   (int dsep, int dupd, const SPOptions<scalar_t>& opts) {
@@ -95,6 +97,13 @@ namespace strumpack {
             opts.compression() == CompressionType::ZFP_BLR_HODLR) &&
       (dsep >= opts.compression_min_sep_size(l) ||
        dsep + dupd >= opts.compression_min_front_size(l));
+  }
+
+  template<typename scalar_t> bool is_H2
+  (int dsep, int dupd, const SPOptions<scalar_t>& opts, int l=0) {
+    return opts.compression() == CompressionType::H2 &&
+      (dsep >= opts.compression_min_sep_size() ||
+       dsep + dupd >= opts.compression_min_front_size());
   }
 
   template<typename scalar_t> bool is_HODLR

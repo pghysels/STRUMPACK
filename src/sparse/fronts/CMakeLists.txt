@@ -74,3 +74,10 @@ if(STRUMPACK_USE_BPACK)
     ${CMAKE_CURRENT_LIST_DIR}/FrontHODLRMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontHODLRMPI.hpp)
 endif()
+
+if(STRUMPACK_USE_H2OPUS)
+  target_sources(strumpack
+    PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/FrontH2Opus.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontH2Opus.hpp)
+endif()

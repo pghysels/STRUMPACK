@@ -58,6 +58,9 @@
 #if defined(STRUMPACK_USE_ZFP)
 #include "FrontLossy.hpp"
 #endif
+#if defined(STRUMPACK_USE_H2OPUS)
+#include "FrontH2Opus.hpp"
+#endif
 
 namespace strumpack {
 
@@ -93,6 +96,15 @@ namespace strumpack {
         front = std::make_unique<FrontHODLR<scalar_t,integer_t>>
           (s, sbegin, send, upd);
         if (root) fc.HODLR++;
+      }
+#endif
+    } break;
+    case CompressionType::H2: {
+#if defined(STRUMPACK_USE_H2OPUS)
+      if (is_H2(dsep, dupd, opts)) {
+        front = std::make_unique<FrontH2Opus<scalar_t,integer_t>>
+          (s, sbegin, send, upd);
+        if (root) fc.H2++;
       }
 #endif
     } break;
@@ -280,6 +292,7 @@ namespace strumpack {
         if (root) fc.BLR++;
       }
     } break;
+    case CompressionType::H2: // not supported, add warning?
     case CompressionType::LOSSY: // handled in DenseMPI
     case CompressionType::LOSSLESS: // handled in DenseMPI
     case CompressionType::NONE: break;

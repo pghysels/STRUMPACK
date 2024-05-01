@@ -27,30 +27,34 @@
  *
  */
 
-#include "FrontalMatrixDense.hpp"
+#include "FrontH2Opus.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
 #include "FrontalMatrixMPI.hpp"
 #include "FrontBLRMPI.hpp"
 #endif
 
+#include <h2opus.h>
+#include <h2opus/core/hara_sketching.h>
+#include <h2opus/core/h2gen_atomic_wrappers.h>
+
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixDense<scalar_t,integer_t>::FrontalMatrixDense
+  FrontH2Opus<scalar_t,integer_t>::FrontH2Opus
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
+  FrontH2Opus<scalar_t,integer_t>::release_work_memory
   (VectorPool<scalar_t>& workspace) {
     workspace.restore(CBstorage_);
     F22_.clear();
   }
 
   template<typename scalar_t,typename integer_t> scalar_t*
-  FrontalMatrixDense<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+  FrontH2Opus<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
 #if defined(STRUMPACK_USE_GPU)
     gpu::copy_host_to_device(dF22, F22_);
 #endif
@@ -58,7 +62,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::matrix_inertia
+  FrontH2Opus<scalar_t,integer_t>::matrix_inertia
   (const DenseM_t& F, integer_t& neg, integer_t& zero, integer_t& pos) const {
     using real_t = typename RealType<scalar_t>::value_type;
     for (std::size_t i=0; i<F.rows(); i++) {
@@ -73,13 +77,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::node_inertia
+  FrontH2Opus<scalar_t,integer_t>::node_inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     return matrix_inertia(F11_, neg, zero, pos);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::node_subnormals
+  FrontH2Opus<scalar_t,integer_t>::node_subnormals
   (std::size_t& ns, std::size_t& nz) const {
     auto dns = F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
     auto dnz = F11_.zeros() + F12_.zeros() + F21_.zeros();
@@ -94,7 +98,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::node_pivot_growth
+  FrontH2Opus<scalar_t,integer_t>::node_pivot_growth
   (scalar_t& pgL, scalar_t& pgU) const {
     for (std::size_t i=0; i<F11_.rows(); i++)
       pgU = std::max(std::abs(pgU), std::abs(F11_(i, i)));
@@ -103,7 +107,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
+  FrontH2Opus<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
     VectorPool<scalar_t> workspace;
@@ -111,7 +115,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
+  FrontH2Opus<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     this->extend_add(paF11, paF12, paF21, paF22, F22_, p);
@@ -119,7 +123,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr
+  FrontH2Opus<scalar_t,integer_t>::extend_add_to_blr
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace,
    int task_depth, const Opts_t& opts) {
@@ -152,7 +156,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr_col
+  FrontH2Opus<scalar_t,integer_t>::extend_add_to_blr_col
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
    const F_t* p, integer_t begin_col, integer_t end_col, int task_depth,
    const Opts_t& opts) {
@@ -186,7 +190,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::factor
+  FrontH2Opus<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode e1, e2;
@@ -205,7 +209,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::factor_phase1
+  FrontH2Opus<scalar_t,integer_t>::factor_phase1
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
@@ -256,11 +260,135 @@ namespace strumpack {
     return err_code;
   }
 
+  template<typename scalar_t>
+  class DenseCPUSampler : public HMatrixSampler {
+  private:
+    const DenseMatrix<scalar_t>& M_;
+  public:
+    DenseCPUSampler(const DenseMatrix<scalar_t>& M) : M_(M) {}
+    void sample(H2Opus_Real *input, H2Opus_Real *output, int samples) {
+      auto n = M_.rows();
+      DenseMatrixWrapper<scalar_t>
+        R(n, samples, reinterpret_cast<scalar_t*>(input), n),
+        S(n, samples, reinterpret_cast<scalar_t*>(output), n);
+      gemm(Trans::N, Trans::N, scalar_t(1.), M_, R, scalar_t(0.), S);
+    }
+  };
+
+  template<class T> class PointCloud : public H2OpusDataSet<T> {
+  public:
+    int dimension;
+    std::size_t num_points;
+    std::vector<std::vector<T>> pts;
+
+    PointCloud() {
+      this->dimension = 0;
+      this->num_points = 0;
+    }
+
+    PointCloud(int dim, std::size_t num_pts) {
+      this->dimension = dim;
+      this->num_points = num_pts;
+
+      pts.resize(dim);
+      for (int i = 0; i < dim; i++)
+        pts[i].resize(num_points);
+    }
+
+    int getDimension() const { return dimension; }
+
+    std::size_t getDataSetSize() const { return num_points; }
+
+    T getDataPoint(std::size_t idx, int dim) const {
+      assert(dim < dimension && idx < num_points);
+      return pts[dim][idx];
+    }
+  };
+
+  template <typename T>
+  void generate2DGrid(PointCloud<T> &pt_cloud, int grid_x, int grid_y,
+                      T min_x, T max_x, T min_y, T max_y) {
+    T hx = (max_x - min_x) / (grid_x - 1);
+    T hy = (max_y - min_y) / (grid_y - 1);
+    for (size_t i = 0; i < (std::size_t)grid_x; i++) {
+      for (size_t j = 0; j < (std::size_t)grid_y; j++) {
+        pt_cloud.pts[0][i + j * grid_x] = min_x + i * hx;
+        pt_cloud.pts[1][i + j * grid_x] = min_y + j * hy;
+      }
+    }
+  }
+
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
+  FrontH2Opus<scalar_t,integer_t>::factor_phase2
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
+
+    ////////////////////////////////////////////////////////
+    /// H2Opus test ////////////////////////////////////////
+    ////////////////////////////////////////////////////////
+
+    if (etree_level == 0 &&
+        opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
+
+      // F11_.write("Froot");
+
+      // assume regular cube mesh
+      int k = opts.nx();
+      int n = k*k, dim = 2;
+      assert(F11_.rows() == (std::size_t)n);
+      const int max_samples = 512, bs = 64,
+        leaf_size = 64, hw = H2OPUS_HWTYPE_CPU;
+      const double eta = 1.;
+
+      std::cout << "k= " << k
+                << " n= " << n
+                << " dim= " << dim
+                << " max_samples= " << max_samples
+                << " bs= " << bs
+                << " leaf_size= " << leaf_size
+                << " hw= " << hw
+                << " eta= " << eta
+                << std::endl;
+
+      h2opusHandle_t handle;
+      h2opusCreateHandle(&handle);
+
+      PointCloud<H2Opus_Real> pt_cloud(dim, n);
+      generate2DGrid<H2Opus_Real>(pt_cloud, k, k, 0, 1, 0, 1);
+
+      H2OpusBoxCenterAdmissibility admissibility(eta);
+      HMatrix hmatrix(n, true);
+      buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
+
+      DenseCPUSampler<scalar_t> sampler(F11_);
+
+      typedef typename
+        HaraSketchSimpleBatchGenSelect<hw,H2Opus_Real,DenseMatrix<H2Opus_Real>>::type
+        BatchEntryGenHost;
+      BatchEntryGenHost gen(*reinterpret_cast<DenseMatrix<H2Opus_Real>*>(&F11_));
+
+      H2Opus_Real approx_norm = sampler_norm<H2Opus_Real, hw>(&sampler, n, 10, handle);
+      H2Opus_Real trunc_eps = opts.HODLR_options().abs_tol();
+      H2Opus_Real abs_trunc_tol = trunc_eps * approx_norm;
+
+      hara_sketch_batchgen<hw, H2Opus_Real>
+        (hmatrix, &sampler, &gen, max_samples, bs, abs_trunc_tol, handle);
+      H2Opus_Real approx_H2_error =
+        sampler_difference<H2Opus_Real, hw>(&sampler, hmatrix, 40, handle)
+        / approx_norm;
+
+      std::cout << "H2Opus approximate matrix norm = "
+                << approx_norm << std::endl
+                << " trunc_eps = " << trunc_eps << std::endl
+                << " abs_trunc_tol = " << abs_trunc_tol << std::endl
+                << " H2Opus approximation error = "
+                << approx_H2_error << std::endl;
+    }
+
+    ////////////////////////////////////////////////////////
+
+
     if (dim_sep()) {
       if (F11_.LU(piv_, task_depth))
         err_code = ReturnCode::ZERO_PIVOT;
@@ -289,7 +417,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::fwd_solve_phase2
+  FrontH2Opus<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
@@ -310,7 +438,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::bwd_solve_phase1
+  FrontH2Opus<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
@@ -330,7 +458,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extract_CB_sub_matrix
+  FrontH2Opus<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
     std::vector<std::size_t> lJ, oJ;
@@ -346,7 +474,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
+  FrontH2Opus<scalar_t,integer_t>::sample_CB
   (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
    DenseM_t& Sc, F_t* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
@@ -369,7 +497,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
+  FrontH2Opus<scalar_t,integer_t>::sample_CB
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
@@ -385,7 +513,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F11
+  FrontH2Opus<scalar_t,integer_t>::sample_CB_to_F11
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -406,7 +534,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F12
+  FrontH2Opus<scalar_t,integer_t>::sample_CB_to_F12
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -441,7 +569,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F21
+  FrontH2Opus<scalar_t,integer_t>::sample_CB_to_F21
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -476,7 +604,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F22
+  FrontH2Opus<scalar_t,integer_t>::sample_CB_to_F22
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -498,7 +626,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::delete_factors() {
+  FrontH2Opus<scalar_t,integer_t>::delete_factors() {
     if (lchild_) lchild_->delete_factors();
     if (rchild_) rchild_->delete_factors();
     F11_ = DenseM_t();
@@ -510,7 +638,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontH2Opus<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
@@ -518,7 +646,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  FrontH2Opus<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontBLRMPI<scalar_t,integer_t>* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::
@@ -526,7 +654,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  FrontH2Opus<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontBLRMPI<scalar_t,integer_t>* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
@@ -536,20 +664,20 @@ namespace strumpack {
 #endif
 
   // explicit template instantiations
-  template class FrontalMatrixDense<float,int>;
-  template class FrontalMatrixDense<double,int>;
-  template class FrontalMatrixDense<std::complex<float>,int>;
-  template class FrontalMatrixDense<std::complex<double>,int>;
+  template class FrontH2Opus<float,int>;
+  template class FrontH2Opus<double,int>;
+  template class FrontH2Opus<std::complex<float>,int>;
+  template class FrontH2Opus<std::complex<double>,int>;
 
-  template class FrontalMatrixDense<float,long int>;
-  template class FrontalMatrixDense<double,long int>;
-  template class FrontalMatrixDense<std::complex<float>,long int>;
-  template class FrontalMatrixDense<std::complex<double>,long int>;
+  template class FrontH2Opus<float,long int>;
+  template class FrontH2Opus<double,long int>;
+  template class FrontH2Opus<std::complex<float>,long int>;
+  template class FrontH2Opus<std::complex<double>,long int>;
 
-  template class FrontalMatrixDense<float,long long int>;
-  template class FrontalMatrixDense<double,long long int>;
-  template class FrontalMatrixDense<std::complex<float>,long long int>;
-  template class FrontalMatrixDense<std::complex<double>,long long int>;
+  template class FrontH2Opus<float,long long int>;
+  template class FrontH2Opus<double,long long int>;
+  template class FrontH2Opus<std::complex<float>,long long int>;
+  template class FrontH2Opus<std::complex<double>,long long int>;
 
 } // end namespace strumpack
 
