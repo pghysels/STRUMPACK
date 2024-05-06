@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
       Cblacs_gridinfo(ctxt, &nprows, &npcols, &rproc, &cproc);
       int lrows = numroc(&n, &NB, &rproc, &rsrc, &nprows);
       int lcols = numroc(&n, &NB, &cproc, &csrc, &npcols);
-      double* T2d = malloc(lrows*lcols*sizeof(double));
+      double* T2d = (double*)malloc(lrows*lcols*sizeof(double));
       /* fill the 2d block cyclic matrix, Toeplitz example  */
       for (int c=0; c<lcols; c++) {
         int cg = indxl2g(c, NB, cproc, csrc, npcols);
@@ -159,8 +159,8 @@ void test(CSPStructMat H, int n, int nrhs, int rank) {
    * Allocate 1d block row distributed matrices to check accuracy,
    * local blocks have nloc rows, using nloc as the leading dimension
    */
-  double* id = malloc(nloc*n*sizeof(double));
-  double* Hdense = malloc(nloc*n*sizeof(double));
+  double* id = (double*)malloc(nloc*n*sizeof(double));
+  double* Hdense = (double*)malloc(nloc*n*sizeof(double));
 
   /* set id to identity matrix */
   for (int j=0; j<n; j++)
@@ -193,8 +193,8 @@ void test(CSPStructMat H, int n, int nrhs, int rank) {
   }
 
 
-  double* B = malloc(nrhs*nloc*sizeof(double));
-  double* X = malloc(nrhs*nloc*sizeof(double));
+  double* B = (double*)malloc(nrhs*nloc*sizeof(double));
+  double* X = (double*)malloc(nrhs*nloc*sizeof(double));
   for (int j=0; j<nrhs; j++)
     for (int i=0; i<nloc; i++)
       X[i + j*nloc] = (double)(rand()) / RAND_MAX;

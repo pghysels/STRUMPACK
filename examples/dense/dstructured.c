@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
   if (argc > 1) n = atoi(argv[1]); // get matrix size
   else printf("# no matrix size provided\n");
 
-  double* T = malloc(n*n*sizeof(double));
+  double* T = (double*)malloc(n*n*sizeof(double));
   for (int j=0; j<n; j++)
     for (int i=0; i<n; i++)
       T[i+j*n] = Toeplitz(i, j);
@@ -61,8 +61,8 @@ int main(int argc, char* argv[]) {
   SP_d_struct_from_elements(&H, n, n, Toeplitz, &opts);
 
 
-  double* id = malloc(n*n*sizeof(double));
-  double* Hdense = malloc(n*n*sizeof(double));
+  double* id = (double*)malloc(n*n*sizeof(double));
+  double* Hdense = (double*)malloc(n*n*sizeof(double));
 
   // set id to identity matrix
   for (int j=0; j<n; j++) {
@@ -83,8 +83,8 @@ int main(int argc, char* argv[]) {
   printf("||T-H||_F/||T||_F = %e\n", sqrt(err)/sqrt(nrm));
 
 
-  double* B = malloc(nrhs*n*sizeof(double));
-  double* X = malloc(nrhs*n*sizeof(double));
+  double* B = (double*)malloc(nrhs*n*sizeof(double));
+  double* X = (double*)malloc(nrhs*n*sizeof(double));
   for (int j=0; j<nrhs; j++)
     for (int i=0; i<n; i++)
       X[i+j*n] = (double)(rand()) / RAND_MAX;

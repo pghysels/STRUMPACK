@@ -73,9 +73,9 @@ int main(int argc, char* argv[]) {
 
   int N = n * n;
   int nnz = 5 * N - 4 * n;
-  int* row_ptr = malloc((N+1)*sizeof(int));
-  int* col_ind = malloc(nnz*sizeof(int));
-  double* val = malloc(nnz*sizeof(double));
+  int* row_ptr = (int*)malloc((N+1)*sizeof(int));
+  int* col_ind = (int*)malloc(nnz*sizeof(int));
+  double* val = (double*)malloc(nnz*sizeof(double));
 
   nnz = 0;
   row_ptr[0] = 0;
@@ -92,8 +92,8 @@ int main(int argc, char* argv[]) {
       row_ptr[ind+1] = nnz;
     }
   }
-  double* b = malloc(N*sizeof(double));
-  double* x = malloc(N*sizeof(double));
+  double* b = (double*)malloc(N*sizeof(double));
+  double* x = (double*)malloc(N*sizeof(double));
   int i;
   for (i=0; i<N; i++) {
     b[i] = 1.;
