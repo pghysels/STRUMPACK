@@ -587,8 +587,9 @@ namespace strumpack {
              [=](sycl::nd_item<3> item_ct1) {
               LU_block_kernel_batched<T, NT, real_t>
                 (dat, replace, thresh, dinfo, item_ct1, p_acc_ct1,
-                 M__acc_ct1.get_pointer(), Mmax_acc_ct1,
-                 cabs_acc_ct1.get_pointer());
+                 M__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+		 Mmax_acc_ct1,
+                 cabs_acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get());
             });
         });
       /*
@@ -604,8 +605,10 @@ namespace strumpack {
             (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
              [=](sycl::nd_item<3> item_ct1) {
               solve_block_kernel_batched<T, NT>
-                (dat, item_ct1, P_acc_ct1.get_pointer(),
-                 A__acc_ct1.get_pointer(), B__acc_ct1.get_pointer());
+                (dat, item_ct1,
+		 P_acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+                 A__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+		 B__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get());
             });
         });
       /*
@@ -620,8 +623,9 @@ namespace strumpack {
             (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
              [=](sycl::nd_item<3> item_ct1) {
               Schur_block_kernel_batched<T, NT>
-                (dat, item_ct1, B__acc_ct1.get_pointer(),
-                 A__acc_ct1.get_pointer());
+                (dat, item_ct1,
+		 B__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+                 A__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get());
             });
         });
     }
