@@ -116,11 +116,12 @@ namespace strumpack {
             
 
             g_->Comm().barrier();
-            
+            MPI_Pcontrol(1);   # start profiling
              auto begin = std::chrono::steady_clock::now();
             (*Amult_)(R, Sr, Sc);
             
             g_->Comm().barrier();
+            MPI_Pcontrol(0);  # stop profiling
             auto end = std::chrono::steady_clock::now();
             auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
             
@@ -144,11 +145,12 @@ namespace strumpack {
 
 
             g_->Comm().barrier();
-            
+            MPI_Pcontrol(1);   # start profiling
             auto begin = std::chrono::steady_clock::now();
             (*Amult_)(Rnew, Srnew, Scnew);
             
             g_->Comm().barrier();
+            MPI_Pcontrol(0);  # stop profiling
             auto end = std::chrono::steady_clock::now();
             auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
             
@@ -187,10 +189,12 @@ namespace strumpack {
               S_sjlt.add_columns(d_, opts.nnz0());
       
               hss_->Comm().barrier();
+              MPI_Pcontrol(1);   # start profiling
               auto begin = std::chrono::steady_clock::now();
               matrix_times_SJLT(sub_A, S_sjlt, sub_Sr);
 
               hss_->Comm().barrier();
+              MPI_Pcontrol(0);  # stop profiling
               auto end = std::chrono::steady_clock::now();
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
               
@@ -236,11 +240,13 @@ namespace strumpack {
               S_sjlt.add_columns(dd, opts.nnz0());
               
               hss_->Comm().barrier();
+              MPI_Pcontrol(1);   # start profiling
               auto begin = std::chrono::steady_clock::now();
-        
+
               matrix_times_SJLT(sub_A, S_sjlt, subSrnew);
               
               hss_->Comm().barrier();
+              MPI_Pcontrol(0);  # stop profiling
               auto end = std::chrono::steady_clock::now();
 
               auto T = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
