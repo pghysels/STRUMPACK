@@ -370,7 +370,8 @@ namespace strumpack {
   }
 #endif
 
-  template<typename integer_t> template<typename int_t> DenseMatrix<bool>
+  template<typename integer_t> template<typename int_t>
+  DenseMatrix<bool>
   CSRGraph<integer_t>::admissibility(const std::vector<int_t>& tiles) const {
     std::size_t nt = tiles.size(), n = size();
     DenseMatrix<bool> adm(nt, nt);

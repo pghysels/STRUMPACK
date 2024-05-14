@@ -53,13 +53,13 @@ namespace strumpack {
     F22_.clear();
   }
 
-  template<typename scalar_t,typename integer_t> scalar_t*
-  FrontH2Opus<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
-#if defined(STRUMPACK_USE_GPU)
-    gpu::copy_host_to_device(dF22, F22_);
-#endif
-    return dF22;
-  }
+//   template<typename scalar_t,typename integer_t> scalar_t*
+//   FrontH2Opus<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+// #if defined(STRUMPACK_USE_GPU)
+//     gpu::copy_host_to_device(dF22, F22_);
+// #endif
+//     return dF22;
+//   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontH2Opus<scalar_t,integer_t>::matrix_inertia
@@ -238,7 +238,7 @@ namespace strumpack {
     F12_ = DenseM_t(dsep, dupd); F12_.zero();
     F21_ = DenseM_t(dupd, dsep); F21_.zero();
     A.extract_front
-      (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
+      (F11_, F12_, F21_, sep_begin_, sep_end_,
        this->upd_, task_depth);
     if (dupd) {
       CBstorage_ = workspace.get();
@@ -275,23 +275,19 @@ namespace strumpack {
     }
   };
 
-  template<class T> class PointCloud : public H2OpusDataSet<T> {
+  template<class T>
+  class PointCloud : public H2OpusDataSet<T> {
   public:
-    int dimension;
-    std::size_t num_points;
+    int dimension = 0;
+    std::size_t num_points = 0;
     std::vector<std::vector<T>> pts;
 
-    PointCloud() {
-      this->dimension = 0;
-      this->num_points = 0;
-    }
+    PointCloud() {}
 
-    PointCloud(int dim, std::size_t num_pts) {
-      this->dimension = dim;
-      this->num_points = num_pts;
-
+    PointCloud(int dim, std::size_t num_pts) :
+      dimension(dim), num_points(num_pts) {
       pts.resize(dim);
-      for (int i = 0; i < dim; i++)
+      for (int i=0; i<dim; i++)
         pts[i].resize(num_points);
     }
 
@@ -305,8 +301,9 @@ namespace strumpack {
     }
   };
 
-  template <typename T>
-  void generate2DGrid(PointCloud<T> &pt_cloud, int grid_x, int grid_y,
+  template<typename T>
+  void generate2DGrid(PointCloud<T> &pt_cloud,
+                      int grid_x, int grid_y,
                       T min_x, T max_x, T min_y, T max_y) {
     T hx = (max_x - min_x) / (grid_x - 1);
     T hy = (max_y - min_y) / (grid_y - 1);
@@ -317,6 +314,87 @@ namespace strumpack {
       }
     }
   }
+
+  class GraphClusterTree : public H2OpusClusterTree {
+  private:
+    // const structured::ClusterTree& tree_;
+    std::vector<int> index_map_, node_begin_, node_end_, level_sizes_;
+
+  public:
+    GraphClusterTree(const structured::ClusterTree& tree) {
+      // TODO: set level_sizes_
+      // TODO: set node begin/end
+
+    }
+
+    int getLeafSize() override {
+      // TODO
+    }
+    int getDepth() override { return tree.levels(); }
+    int getLevelSize(std::size_t level_index) override {
+      return level_sizes_[level_index];
+    }
+    void getNodeLimits(ClusterNodeType node_index,
+                       int &start, int &end) override {
+      start = node_begin_[node_index];
+      end = node_end_[node_index];
+    }
+    int *getIndexMap() override {
+      return index_map.data();
+    }
+    ClusterNodeType getHeadChild(ClusterNodeType node) override {
+      // TODO return left child?
+    }
+    ClusterNodeType getNextChild(ClusterNodeType node) override {
+      // TODO if left child, return right child of parent node
+    }
+    ClusterNodeType getParent(ClusterNodeType node) override {
+      // TODO return parent
+    }
+    bool isLeaf(ClusterNodeType node) override {
+      // TODO return .. 
+    }
+    ClusterNodeType getRoot() override {
+      // TODO
+    }
+  };
+
+  template<typename integer_t>
+  class GraphAdmissibility : public H2OpusAdmissibility {
+  private:
+    CSRGraph<integer_t>& graph_;
+    GraphClusterTree& tree_;
+    std::vector<bool> visit_;
+  public:
+    GraphAdmissibility(CSRGraph<integer_t>& g,
+                       GraphClusterTree& t)
+      : graph_(g), tree_(t), visit(g.size()) {}
+    bool operator()(H2OpusClusterTree* cluster_tree,
+                    ClusterNodeType node_index_u,
+                    ClusterNodeType node_index_v) override {
+      inst start_u, start_v, end_u, end_v;
+      tree_->getNodeLimits(node_index_u, start_u, end_u);
+      tree_->getNodeLimits(node_index_v, start_v, end_v);
+      std::fill(flag.begin(), flag.end(), false);
+      auto ind = graph_.ind();
+      auto ptr = graph_.ptr();
+      for (std::size_t i=start_u; i<end_u; i++) {
+        auto hij = ind + ptr[i+1];
+        for (auto pj=ind+ptr[i]; pj!=hij; pj++) {
+          auto j = *pj;
+          if (visit[j]) continue;
+          if (j >= start_v && j < end_v) return false;
+          visit[j] = true;
+          auto hik = ind + ptr[j+1];
+          for (auto pk=ind+ptr[j]; pk!=hik; pk++) {
+            auto k = *pk;
+            if (k >= start_v && k < end_v) return false;
+          }
+        }
+      }
+      return true;
+    }
+  };
 
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontH2Opus<scalar_t,integer_t>::factor_phase2
@@ -331,25 +409,24 @@ namespace strumpack {
     if (etree_level == 0 &&
         opts.reordering_method() == ReorderingStrategy::GEOMETRIC) {
 
-      // F11_.write("Froot");
-
       // assume regular cube mesh
       int k = opts.nx();
       int n = k*k, dim = 2;
       assert(F11_.rows() == (std::size_t)n);
       const int max_samples = 512, bs = 64,
-        leaf_size = 64, hw = H2OPUS_HWTYPE_CPU;
+        leaf_size = opts.HODLR_options().leaf_size(),
+        hw = H2OPUS_HWTYPE_CPU;
       const double eta = 1.;
 
-      std::cout << "k= " << k
-                << " n= " << n
-                << " dim= " << dim
-                << " max_samples= " << max_samples
-                << " bs= " << bs
-                << " leaf_size= " << leaf_size
-                << " hw= " << hw
-                << " eta= " << eta
-                << std::endl;
+      // std::cout << "k= " << k
+      //           << " n= " << n
+      //           << " dim= " << dim
+      //           << " max_samples= " << max_samples
+      //           << " bs= " << bs
+      //           << " leaf_size= " << leaf_size
+      //           << " hw= " << hw
+      //           << " eta= " << eta
+      //           << std::endl;
 
       h2opusHandle_t handle;
       h2opusCreateHandle(&handle);
@@ -359,7 +436,11 @@ namespace strumpack {
 
       H2OpusBoxCenterAdmissibility admissibility(eta);
       HMatrix hmatrix(n, true);
-      buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
+
+      // ?? alternative without pt_cloud?
+      // buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
+      H2OpusClusterTree ctree;
+      buildHMatrixStructure(hmatrix, &ctree, leaf_size, admissibility);
 
       DenseCPUSampler<scalar_t> sampler(F11_);
 
@@ -383,7 +464,13 @@ namespace strumpack {
                 << " trunc_eps = " << trunc_eps << std::endl
                 << " abs_trunc_tol = " << abs_trunc_tol << std::endl
                 << " H2Opus approximation error = "
-                << approx_H2_error << std::endl;
+                << approx_H2_error << std::endl
+                << " hmatrix memory usage = "
+                << hmatrix.getMemoryUsage()*1000 << " MB = "
+                << hmatrix.getDenseMemoryUsage()*1000
+                << " (dense) + "
+                << hmatrix.getLowRankMemoryUsage()*1000
+                << " (low-rank)" << std::endl;
     }
 
     ////////////////////////////////////////////////////////
@@ -420,7 +507,7 @@ namespace strumpack {
   FrontH2Opus<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
-      DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
+      DenseMW_t bloc(dim_sep(), b.cols(), b, sep_begin_, 0);
       bloc.laswp(piv_, true);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11_, bloc, task_depth);
@@ -441,7 +528,7 @@ namespace strumpack {
   FrontH2Opus<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
-      DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
+      DenseMW_t yloc(dim_sep(), y.cols(), y, sep_begin_, 0);
       if (y.cols() == 1) {
         if (dim_upd())
           gemv(Trans::N, scalar_t(-1.), F12_, yupd,
@@ -662,6 +749,35 @@ namespace strumpack {
       seq_copy_to_buffers_col(F22_, sbuf, pa, this, begin_col, end_col);
   }
 #endif
+
+  template<typename scalar_t,typename integer_t> void
+  FrontH2Opus<scalar_t,integer_t>::partition
+  (const Opts_t& opts, const SpMat_t& A,
+   integer_t* sorder, bool is_root, int task_depth) {
+    if (dim_sep()) {
+      g_ = A.extract_graph
+        (opts.separator_ordering_level(), sep_begin_, sep_end_);
+      sep_tree_ = g_.recursive_bisection
+        (opts.HODLR_options().leaf_size(), 0,
+         sorder+sep_begin_, nullptr, 0, 0, dim_sep());
+      // sep_tiles_ = sep_tree_.template leaf_sizes<std::size_t>();
+      std::vector<integer_t> siorder(dim_sep());
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        siorder[sorder[i]] = i - sep_begin_;
+
+      g_.permute(sorder+sep_begin_, siorder.data());
+      // admissibility_ = g_.admissibility(sep_tiles_);
+
+      for (integer_t i=sep_begin_; i<sep_end_; i++)
+        sorder[i] += sep_begin_;
+    }
+    // if (dim_upd()) {
+    //   auto leaf = opts.HODLR_options().leaf_size();
+    //   auto nt = std::ceil(float(dim_upd()) / leaf);
+    //   upd_tiles_.resize(nt, leaf);
+    //   upd_tiles_.back() = dim_upd() - leaf*(nt-1);
+    // }
+  }
 
   // explicit template instantiations
   template class FrontH2Opus<float,int>;

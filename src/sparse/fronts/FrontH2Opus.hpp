@@ -39,6 +39,7 @@
 #if defined(STRUMPACK_USE_MPI)
 #include "FrontBLRMPI.hpp"
 #endif
+#include "sparse/CSRGraph.hpp"
 
 namespace strumpack {
 
@@ -127,13 +128,19 @@ namespace strumpack {
       const override;
 #endif
 
-    scalar_t* get_device_F22(scalar_t* dF22) override;
+    void partition(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
+                   bool is_root=true, int task_depth=0) override;
 
-  protected:
+  private:
     DenseM_t F11_, F12_, F21_;
     DenseMW_t F22_;
     std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
     std::vector<int> piv_; // regular int because it is passed to BLAS
+
+    CSRGraph<integer_t> g_;
+    structured::ClusterTree sep_tree_;
+    // std::vector<std::size_t> sep_tiles_, upd_tiles_;
+    // DenseMatrix<bool> admissibility_;
 
     FrontH2Opus(const FrontH2Opus&) = delete;
     FrontH2Opus& operator=(FrontH2Opus const&) = delete;
@@ -167,6 +174,8 @@ namespace strumpack {
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
+    using F_t::sep_begin_;
+    using F_t::sep_end_;
 
     // suppress warnings
     using F_t::sample_CB;
