@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     std::vector<int> ranks;
     std::vector<double> times, errors;
 
-    for (int r=0; r<10; r++) {
+    for (int r=0; r<3; r++) {
       auto begin = std::chrono::steady_clock::now();
       strumpack::HSS::HSSMatrixMPI<double> H(A, hss_opts);
       auto end = std::chrono::steady_clock::now();
