@@ -52,6 +52,7 @@ namespace strumpack {
       switch (a) {
       case CompressionSketch::GAUSSIAN: return "Gaussian";
       case CompressionSketch::SJLT: return "SJLT";
+      case CompressionSketch::SRHT: return "SRHT";
       default: return "unknown";
       }
     }
@@ -192,9 +193,11 @@ namespace strumpack {
             set_compression_sketch(CompressionSketch::GAUSSIAN);
           else if (s.compare("SJLT") == 0)
             set_compression_sketch(CompressionSketch::SJLT);
+	  else if (s.compare("SRHT") == 0)
+            set_compression_sketch(CompressionSketch::SRHT);
           else
             std::cerr << "# WARNING: compression sketch not recognized,"
-                      << " use 'Gaussian', or 'SJLT'."
+                      << " use 'Gaussian', 'SJLT' or 'SRHT'."
                       << std::endl;
         } break;
         case 14: {
@@ -263,7 +266,7 @@ namespace strumpack {
                 << get_name(random_engine()) << ")" << std::endl
                 << "#   --hss_compression_algorithm original|stable|hard_restart (default "
                 << get_name(compression_algorithm()) << ")" << std::endl
-                << "#   --hss_compression_sketch Gaussian|SJLT (default "
+                << "#   --hss_compression_sketch Gaussian|SJLT|SRHT (default "
                 << get_name(compression_sketch()) << ")" << std::endl
                 << "#   --hss_SJLT_algo chunk|perm (default "
                 << get_name(SJLT_algo()) << ")" << std::endl

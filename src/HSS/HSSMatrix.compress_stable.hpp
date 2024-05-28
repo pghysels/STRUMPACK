@@ -93,6 +93,86 @@ namespace strumpack {
           std::cout << "# Final length of row: " << d+dd << std::endl
                     << "# Total nnz in each row: "
                     << total_nnz << std::endl;
+      } else if (opts.compression_sketch() == CompressionSketch::SRHT) {
+        std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
+        rgen = random::make_random_generator<real_t>
+          (opts.random_engine(), opts.random_distribution());
+        auto d = opts.d0();
+        auto dd = opts.dd();
+        auto n = this->cols();
+        auto m = this->rows();
+        DenseM_t Br, Cr, Sr, Rr, Bc, Cc, Sc, Rc;
+        DenseM_t pvrc(1, n+m);
+        pvrc.randombinary(*rgen); // Generate the pvrc matrix
+        int min_mn = std::min(m, n);
+        d  = std::min(d, min_mn);
+        dd = std::min(opts.dd(), opts.max_rank()-d);
+        dd = std::min(dd, min_mn-d);
+        scalar_t factor = 1.0 / std::sqrt((double)min_mn);
+        DenseM_t srhtconsts(1, 3);
+        srhtconsts(0, 0) = m;
+        srhtconsts(0, 1) = n;
+        srhtconsts(0, 2) = factor;
+        std::random_device rd1, rd2;
+        std::mt19937 g(rd1()), h(rd2());
+        std::vector<int> svecr((int)std::pow(2, std::ceil(std::log2(n))));
+        std::iota(svecr.begin(), svecr.end(), 0);
+        std::shuffle(svecr.begin(), svecr.end(), g);
+        std::vector<int> svecc((int)std::pow(2, std::ceil(std::log2(m))));
+        std::iota(svecc.begin(), svecc.end(), 0);
+        std::shuffle(svecc.begin(), svecc.end(), h);
+        if (opts.verbose())
+          std::cout << "# compressing with SRHT" << std::endl;
+        WorkCompress<scalar_t> w;
+        Rr.resize(m, d+dd);
+        Rc.resize(n, d+dd);
+        Sr.resize(m, d+dd);
+        Sc.resize(n, d+dd);
+        std::vector<int> svr = slice(svecr, 0, d+dd);
+        std::sort(svr.begin(), svr.end());
+        std::vector<int> svc = slice(svecc, 0, d+dd);
+        std::sort(svc.begin(), svc.end());
+        // Do B = A*P*H
+        matrix_times_PH_SRHT(A, DenseM_t(1, n, pvrc, 0, 0), Br, Cr);
+        matrix_times_PH_SRHT(A.conj_transpose(),
+                             DenseM_t(1, m, pvrc, 0, n), Bc, Cc);
+        // Do B*S
+        matrix_times_S_SRHT(Br, Cr, svr, 0, m, Sr, factor);
+        matrix_times_S_SRHT(Bc, Cc, svc, 0, n, Sc, factor);
+        // Get Rr and Rc matrices
+        SRHT_R_matrix(DenseM_t(1, n, pvrc, 0, 0), svr, 0, m, factor, Rr);
+        SRHT_R_matrix(DenseM_t(1, m, pvrc, 0, n), svc, 0, n, factor, Rc);
+        while (!this->is_compressed()) {
+#pragma omp parallel if(!omp_in_parallel())
+#pragma omp single nowait
+          compress_recursive_stable
+            (Rr, Rc, Sr, Sc, afunc, opts, w, d, dd, this->openmp_task_depth_);
+          if (!this->is_compressed()) {
+            dd = std::min(opts.dd(), opts.max_rank()-d);
+            dd = std::min(dd, min_mn-d);
+            d += dd;
+            d  = std::min(d, min_mn);
+            Rr.resize(m, d+dd);
+            Rc.resize(n, d+dd);
+            Sr.resize(m, d+dd);
+            Sc.resize(n, d+dd);
+            std::vector<int> svr_ = slice(svecr, d, d+dd);
+            std::sort(svr_.begin(), svr_.end());
+            std::vector<int> svc_ = slice(svecc, d, d+dd);
+            std::sort(svc_.begin(), svc_.end());
+            // increase size of Sr/Sc and scale new columns appropriately
+            matrix_times_S_SRHT(Br, Cr, svr_, d, m, Sr, factor);
+            matrix_times_S_SRHT(Bc, Cc, svc_, d, n, Sc, factor);
+            // increase size of Rr/Rc and scale new columns appropriately
+            SRHT_R_matrix(DenseM_t(1, n, pvrc, 0, 0), svr_, d, m, factor, Rr);
+            SRHT_R_matrix(DenseM_t(1, m, pvrc, 0, n), svc_, d, n, factor, Rc);
+            // update svr and svc for compress_recursive_stable
+            for (int i=0; i<(int)svr_.size(); i++) {
+              svr.push_back(svr_[i]);
+              svc.push_back(svc_[i]);
+            }
+          }
+        }
       } else
         compress_stable(afunc, afunc, opts);
     }

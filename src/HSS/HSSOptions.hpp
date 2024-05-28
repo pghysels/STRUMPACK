@@ -112,10 +112,12 @@ namespace strumpack {
     enum class CompressionSketch {
       GAUSSIAN,  /*!< Sketch using iid gaussian entries mean 0
                    variance 1. */
-      SJLT       /*!< Sketch using the sparse Johnson-Lindenstrauss
+      SJLT,       /*!< Sketch using the sparse Johnson-Lindenstrauss
                    transform, with nnz entries per row randomly selected each
                    with a value of 1/sqrt(nnz) with pr = 0.5 or -1/sqrt(nnz)
-                   with pr = 0.5. */
+                   with pr = 0.5. */	
+
+      SRHT       /*!< Sketch via the subsampled randomized Hadamard transform */
     };
 
     /**

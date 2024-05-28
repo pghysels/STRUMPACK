@@ -34,6 +34,8 @@
 #include <algorithm>
 #include <random>
 #include <chrono>
+#include <bitset> //for converting decimal number to binary
+#include <cmath>
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -691,6 +693,322 @@ namespace strumpack {
         }
       }
     }
+
+    // SRHT - single core
+    // We want to do Y = A PHS
+    // P: Is a diagonal matrices with random +/-1
+    // H: Hadmard matrix
+    // S: sampling matrix
+    //==================================================================
+    // Component of SRHT. Given a matrix A and the matrix P, return B=AP.
+    template<typename scalar_t, typename integer_t> void
+    matrix_times_P_SRHT(const DenseMatrix<scalar_t>& A,
+                        const DenseMatrix<scalar_t>& pvec,
+                        integer_t m, integer_t nn,
+                        DenseMatrix<scalar_t>& B) {
+      B = A;
+      // B <- A*P
+      for (int j=0; j<nn; ++j)
+        if (std::real(pvec(0,j)) < 0) // flip sign of column
+          for (int i=0; i<m; ++i)
+            B(i,j) = -B(i,j);
+    }
+
+    // Template to slice a subvector (starting at index i and ending
+    // at index j-1) from a vector
+    template<typename integer_t> std::vector<integer_t>
+    slice(const std::vector<integer_t>& svec, int i, int j) {
+      return std::vector<integer_t>(svec.begin() + i, svec.begin() + j);
+    }
+
+    // Template to slice a vector into two subvectors
+    template<typename integer_t> void
+    slicevec(const std::vector<integer_t>& svec, integer_t splitval,
+             std::vector<integer_t>& svec1, std::vector<integer_t>& svec2) {
+      auto upper = std::upper_bound(svec.begin(), svec.end(), splitval);
+      auto id    = std::distance(svec.begin(), upper);
+      auto first = svec.begin();
+      auto mid   = svec.begin() + id;
+      auto last  = svec.end();
+      svec1 = std::vector<integer_t>(first, mid);
+      svec2 = std::vector<integer_t>(mid, last);
+    }
+
+    // Component of SRHT. Given a matrix B and the matrix S (subset of
+    // identity matrix), return B*S
+    template<typename scalar_t, typename integer_t> void
+    matrix_times_S_SRHT(const DenseMatrix<scalar_t>& B,
+                        const DenseMatrix<scalar_t>& C,
+                        const std::vector<integer_t>& svec, int first_col,
+                        int m, DenseMatrix<scalar_t>& Y, scalar_t fac) {
+      // sort svec elements in ascending order
+      //sort(svec.begin(), svec.end());
+      // now pick columns of B
+      // and C if C is nonempty
+      int k = first_col;
+      //scalar_t fac = 1.0/std::sqrt((double) svec.size());
+      int n = B.cols();
+      int nn = C.cols();
+      if (nn > 0) { //This means we split the Hadamard transform
+        // sort svec elements in ascending order
+        //sort(svec.begin(), svec.end());
+        // Now slice vectors
+        std::vector<integer_t> svec1;
+        std::vector<integer_t> svec2;
+        slicevec(svec, n-1, svec1, svec2);
+        for (auto j : svec1) {
+          for (int i=0; i<m; ++i)
+            Y(i,k) = fac*(B(i,j) + C(i,j%nn));
+          k++;
+        }
+        for (auto j : svec2) {
+          for (int i=0; i<m; ++i)
+            Y(i,k) = fac*(B(i,j-n) - C(i,j%nn));
+          k++;
+        }
+      }
+      else {
+        for (auto j : svec) {
+          for (int i=0; i<m; ++i)
+            Y(i,k) = fac*B(i,j);
+          k++;
+        }
+      }
+    }
+    // Fast Walsh-Hadamard Transform
+    // Computes AH where A is a matrix and H is the Hadamard matrix
+    // The operation is row by row
+    template<typename scalar_t> void
+    Hadamard(DenseMatrix<scalar_t>& A) {
+      // Find number of rows and columns of A
+      int m = A.rows();
+      int nn = A.cols();
+      // Make sure number of columns is a power of 2
+      int n = std::max(2,(int)std::pow(2, std::ceil(std::log2(nn))));
+      A.resize(m, n);
+      // set new columns of tmp to zero
+      for (int j=nn; j<n; ++j)
+        for (int i=0; i<m; ++i)
+          A(i,j) = scalar_t(0.);
+
+      // loop over rows
+      for (int i=0; i<m; ++i) {
+        // Hadamard transform of row i
+        int h = 1;
+        while (h < n) {
+          for (int j = 0; j < n; j = j+h*2) {
+            for (int k = j; k < j+h; ++k) {
+              scalar_t u = A(i,k);
+              scalar_t v = A(i,k+h);
+              A(i,k)   = u + v;
+              A(i,k+h) = u - v;
+            }
+          }
+          h *= 2;
+        }
+      }
+    }
+
+    template<typename scalar_t> void
+    matrix_times_PH_SRHT(const DenseMatrix<scalar_t>& A,
+                         const DenseMatrix<scalar_t>& pvec,
+                         DenseMatrix<scalar_t>& B,
+                         DenseMatrix<scalar_t>& C) {
+      int m = A.rows();
+      int n = A.cols();
+      // splitting up Hadamard transform
+      int k = (int)std::pow(2, std::floor(std::log2(n)));
+
+      B.resize(m, k);
+      // B <- A*P
+      matrix_times_P_SRHT
+        (DenseMatrix(m, k, A, 0, 0),
+         DenseMatrix(1, k, pvec, 0, 0), m, k, B);
+      //B <- B*H (B.cols() is resized to a power of 2 in Hadamard)
+      Hadamard(B);
+
+      int r = n - k; // remaining column
+      if (r > 0) {
+        C.resize(m,r);
+        matrix_times_P_SRHT(DenseMatrix(m, r, A, 0, k),
+                            DenseMatrix(1, r, pvec, 0, k), m, r, C);
+        Hadamard(C);
+      }
+      // Y <- A*P*H*S (Pick columns of APH)
+      //matrix_times_S_SRHT(B,C,svec,m,Y);
+    }
+
+    // This template is the workhorse for blk_diag_times_DSRHT
+    template<typename scalar_t,typename integer_t>
+    DenseMatrix<scalar_t>
+    DSRHT(DenseMatrix<scalar_t>& A, const integer_t indc,
+          const std::vector<integer_t>& svec, scalar_t fac) {
+      integer_t d = svec.size();
+      integer_t m = A.rows();
+      integer_t n = A.cols();
+      DenseMatrix<scalar_t> B(m,d);
+      //scalar_t fac = 1.0/std::sqrt((double) svec.size());
+
+      // row index of local Hadamard block
+      integer_t rk = std::floor(indc/n);
+
+      const integer_t bitlen = 32;
+      // rbits: bit representation of row index of local Hadamard block
+      // the output is a reversed bit representation, which suffices
+      // since we dot the output with the bit representation of the
+      // column index of the local Hadamard block which is similarly
+      // reversed
+      std::bitset<bitlen> rbits(rk);
+
+      Hadamard(A);
+
+      //loop over column indices of the result of the sketch of
+      //the original matrix
+      integer_t k = 0;
+      for (auto mu : svec) {
+        //map column index mu to column index of local Hadamard block
+        integer_t ck = std::floor(mu/n);
+        // cbits: the bit representation of ck
+        std::bitset<bitlen> cbits(ck);
+        //dot_product(cbits, rbits)
+        int dprod = 0;
+        for (int i=0; i<bitlen; i++)
+          dprod += rbits[i]*cbits[i];
+        // find the column j of the local Hadamard corresponding to
+        // column mu of original matrix
+        integer_t j = mu % n;
+        for (int i=0; i<m; ++i)
+          B(i,k) = fac * std::pow((scalar_t)-1.0, dprod) * A(i,j);
+        k += 1;
+      }
+      return B;
+    }
+
+    //This template performs the sketching on the
+    //diagonal blocks of the original matrix.
+    //It is called within the HSS algorithm
+    template<typename scalar_t, typename integer_t> void
+    blk_diag_times_DSRHT(DenseMatrix<scalar_t>& A,
+                         const std::vector<std::size_t>& I,
+                         const DenseMatrix<scalar_t>& pvec,
+                         const std::vector<integer_t>& svec,
+                         DenseMatrix<scalar_t>& Y, scalar_t fac) {
+      integer_t m = A.rows();
+      integer_t n = A.cols();
+
+      assert(n == (int) I.size()); //# of cols of diagonal block
+      //must be the same as length of
+      //indices vector
+      // size of local Hadamard
+      integer_t hsz = (int)std::pow(2, std::ceil(std::log2(n)));
+      integer_t hl = hsz*std::floor((double)I.front()/hsz);
+      integer_t zl = I.front() - hl;
+
+      integer_t hr = hsz*std::ceil((double)I.back()/hsz);
+      integer_t zr = hr - I.back() - 1;
+
+      DenseMatrix<scalar_t> B(m, n);
+      //B <- A*P
+      matrix_times_P_SRHT(A, pvec, m, n, B);
+
+      DenseMatrix<scalar_t> C(m, hsz);
+      C.zero();
+      // C(:,zl:hsz-1) <- B(:,0:hsz-zl-1)
+      C.copy(B, zl, 0, std::min(hsz-zl, n));
+      Y = DSRHT(C, hl, svec, fac);
+      if (hr-hl > hsz) {
+        DenseMatrix<scalar_t> D(m, hsz);
+        D.zero();
+        //D(:,0:hsz-zr) <- B(:,hsz-zl):
+        D.copy(B, 0, hsz-zl, hsz-zr);
+        Y.add(DSRHT(D, hl+hsz, svec, fac));
+      }
+    }
+
+    // Given ncols, ndim, generate ndim integers in the interval [0,ncols]
+    // The Fisher-Yates algorithm (Durstenfeld, R., Algorithm 235: Random
+    // permutation, Communications of the ACM,7(7), 420, July 1964
+    // https://dl.acm.org/doi/10.1145/364520.364540
+    // https://dl.acm.org/doi/pdf/10.1145/364520.364540#.pdf
+    template<typename integer_t> void
+    randintrange(const integer_t ncols, const integer_t ndim,
+                 std::vector<integer_t>& svec) {
+      assert(ndim <= ncols);
+      std::vector<int> num(ncols);
+      for (int i=0; i<ncols; i++)
+        num[i] = i;
+      std::random_device rd; // seed source for PRNG
+      std::mt19937 rgen(rd()); // mersenne_twister_engine seeded with rd()
+      //Fisher-Yates shuffle algorithm
+      int j;
+      for (int i=ncols-1; i>0; i--) {
+        //use distrib to transform the random unsigned int
+        //generated by rgen into an int in [0,i]
+        std::uniform_int_distribution<> distrib(0, i);
+        j        = distrib(rgen);
+        int temp = num[i];
+        num[i]   = num[j];
+        num[j]   = temp;
+      }
+      //put first ndim integers into vector svec
+      for (int i=0; i<ndim; i++)
+        svec.push_back(num[i]);
+      // sort svec elements in ascending order
+      std::sort(svec.begin(), svec.end());
+    }
+
+
+    //==================================================================
+    //Get the matrix R = PHS
+    template<typename scalar_t, typename integer_t> void
+    SRHT_R_matrix(const DenseMatrix<scalar_t>& pvec,
+                  const std::vector<integer_t>& svec, int first_col,
+                  int m, scalar_t fac, DenseMatrix<scalar_t>& R) {
+      int k = first_col;
+      const integer_t bitlen = 32;
+      for (auto j : svec) {
+        std::bitset<bitlen> jbits(j); // bit representation of column #j
+        for (int i=0; i<m; ++i) {
+          std::bitset<bitlen> ibits(i); // bit representation of row #i
+          //dot_product(jbits,ibits)
+          int dprod = 0;
+          for (int ll=0; ll<bitlen; ll++)
+            dprod += jbits[ll] * ibits[ll];
+          R(i,k) = std::real(pvec(0,i)) * fac
+            * std::pow((scalar_t)-1.0, dprod);
+        }
+        k++;
+      }
+
+    }
+
+    //==================================================================
+    //Get a sub matrix of R = PHS determined by I and J
+    //i.e. get R(I,J)
+    template<typename scalar_t,typename integer_t> void
+    SRHT_Roffdiag_matrix(const DenseMatrix<scalar_t>& pvec,
+                         int row_offset, int col_offset,
+                         const std::vector<integer_t>& svec,
+                         scalar_t fac, DenseMatrix<scalar_t>& R) {
+      const integer_t bitlen = 32;
+      for (int j=0; j<(int)R.cols(); ++j) {
+        std::bitset<bitlen> jbits(svec[j+col_offset]); // bit representation of column #j
+        for (int i=0; i<(int)R.rows(); ++i) {
+          std::bitset<bitlen> ibits(i+row_offset); // bit representation of row #i
+          //dot_product(jbits,ibits)
+          int dprod = 0;
+          for (int ll=0; ll<bitlen; ll++)
+            dprod += jbits[ll] * ibits[ll];
+          R(i,j) = std::real(pvec(0, i+row_offset)) * fac
+            * std::pow((scalar_t)-1.0, dprod);
+        }
+      }
+    }
+
+
+    //End of SRHT - single core
+    //==================================================================
+
 
     // given M,S,m,n,i,j : A <- alpha * M *S(i:i+m,j:j+n) + beta * A
     template<typename scalar_t, typename integer_t> void
