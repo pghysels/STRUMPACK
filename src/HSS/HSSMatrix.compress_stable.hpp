@@ -38,7 +38,7 @@ namespace strumpack {
       AFunctor<scalar_t> afunc(A);
       using tpoint = std::chrono::steady_clock::time_point;
       const auto& tnow = std::chrono::steady_clock::now;
-      tpoint end, begin = tnow();
+      tpoint end, begin;
       auto dt = [](tpoint begin, tpoint end) {
         return std::chrono::duration_cast<std::chrono::milliseconds>
           (end - begin).count();

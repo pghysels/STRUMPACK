@@ -29,6 +29,7 @@
 #define HSS_EXTRA_HPP
 
 #include "dense/DenseMatrix.hpp"
+#include <chrono>
 
 namespace strumpack {
   namespace HSS {
@@ -234,8 +235,18 @@ namespace strumpack {
       AFunctor(const DenseM_t& A) : _A(A) {}
       const DenseM_t& _A;
       void operator()(DenseM_t& Rr, DenseM_t& Rc, DenseM_t& Sr, DenseM_t& Sc) {
+        using tpoint = std::chrono::steady_clock::time_point;
+        const auto& tnow = std::chrono::steady_clock::now;
+        auto dt = [](tpoint begin, tpoint end) {
+        return std::chrono::duration_cast<std::chrono::milliseconds>
+          (end - begin).count();
+        };
+        auto begin = tnow();
         gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
+        std::cout << "# A*S time = " << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+        begin = tnow();
         gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
+        std::cout << "# AT*S time = " << dt(begin, tnow()) << " [10e-3s]" << std::endl;
       }
       void operator()(const std::vector<std::size_t>& I,
                       const std::vector<std::size_t>& J, DenseM_t& B) {
