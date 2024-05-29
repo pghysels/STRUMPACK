@@ -100,7 +100,7 @@ namespace strumpack {
         auto m = this->rows();
         DenseM_t Br, Cr, Sr, Rr, Bc, Cc, Sc, Rc;
         DenseM_t pvrc(1, n+m);
-        pvrc.randombinary(); // Generate the pvrc matrix
+        pvrc.random_signed_one(); // Generate the pvrc matrix
         int min_mn = std::min(m, n);
         d  = std::min(d, min_mn);
         dd = std::min(opts.dd(), opts.max_rank()-d);

@@ -355,10 +355,9 @@ namespace strumpack {
                 value_type>& rgen);
 
     /**
-     * Fill the matrix with random 0, 1 entries, using the specified
-     * random number generator.
+     * Fill the matrix with random -1, 1 entries.
      */
-    void randombinary();
+    void random_signed_one();
 
     /**
      * Fill matrix with a constant value

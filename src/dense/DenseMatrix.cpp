@@ -181,14 +181,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t> void
-  DenseMatrix<scalar_t>::randombinary() {
+  DenseMatrix<scalar_t>::random_signed_one() {
     TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distrib(0, 1);
     for (std::size_t j=0; j<cols(); j++)
       for (std::size_t i=0; i<rows(); i++)
-        operator()(i,j) = distrib(gen);
+        operator()(i,j) = distrib(gen)*2-1;
   }
 
   template<typename scalar_t> void DenseMatrix<scalar_t>::random() {
