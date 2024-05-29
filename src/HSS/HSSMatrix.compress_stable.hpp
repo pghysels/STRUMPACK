@@ -36,6 +36,13 @@ namespace strumpack {
     template<typename scalar_t> void HSSMatrix<scalar_t>::compress_stable
     (const DenseM_t& A, const opts_t& opts) {
       AFunctor<scalar_t> afunc(A);
+      using tpoint = std::chrono::steady_clock::time_point;
+      const auto& tnow = std::chrono::steady_clock::now;
+      tpoint end, begin = tnow();
+      auto dt = [](tpoint begin, tpoint end) {
+        return std::chrono::duration_cast<std::chrono::milliseconds>
+          (end - begin).count();
+      };
       if (opts.compression_sketch() == CompressionSketch::SJLT) {
         auto d = opts.d0();
         auto dd = opts.dd();
@@ -61,16 +68,37 @@ namespace strumpack {
           DenseMW_t Sr_new(n, dnew, Sr, 0, c);
           DenseMW_t Sc_new(n, dnew, Sc, 0, c);
           if (c == 0) {
+            begin = tnow();
             S.add_columns(dnew,opts.nnz0());
+            if (opts.verbose())
+              std::cout << "# S init creation time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
             Rr_new.copy(S.SJLT_to_dense());
+            begin = tnow();
             matrix_times_SJLT(A, S, Sr_new);
+            if (opts.verbose())
+              std::cout << "# A*S time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+            begin = tnow();
             matrixT_times_SJLT(A, S, Sc_new);
+            if (opts.verbose())
+              std::cout << "# AT*S time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
           } else {
+            begin = tnow();
             SJLTMatrix<scalar_t,int> temp
               (S.get_g(), opts.nnz(), n, dnew, chunk);
             S.append_sjlt_matrix(temp);
+            if (opts.verbose())
+              std::cout << "# S append cols creation time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
             Rr_new.copy(temp.SJLT_to_dense());
+            begin = tnow();
             matrix_times_SJLT(A, temp, Sr_new);
+            if (opts.verbose())
+              std::cout << "# A*S time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+            begin = tnow();
             matrixT_times_SJLT(A, temp, Sc_new);
             total_nnz += opts.nnz();
           }
@@ -125,20 +153,31 @@ namespace strumpack {
         Rc.resize(n, d+dd);
         Sr.resize(m, d+dd);
         Sc.resize(n, d+dd);
+
+        begin = tnow();
         std::vector<int> svr = slice(svecr, 0, d+dd);
         std::sort(svr.begin(), svr.end());
-        std::vector<int> svc = slice(svecc, 0, d+dd);
-        std::sort(svc.begin(), svc.end());
         // Do B = A*P*H
         matrix_times_PH_SRHT(A, DenseM_t(1, n, pvrc, 0, 0), Br, Cr);
-        matrix_times_PH_SRHT(A.conj_transpose(),
-                             DenseM_t(1, m, pvrc, 0, n), Bc, Cc);
         // Do B*S
         matrix_times_S_SRHT(Br, Cr, svr, 0, m, Sr, factor);
-        matrix_times_S_SRHT(Bc, Cc, svc, 0, n, Sc, factor);
-        // Get Rr and Rc matrices
+        // Get Rr
         SRHT_R_matrix(DenseM_t(1, n, pvrc, 0, 0), svr, 0, m, factor, Rr);
+        if (opts.verbose())
+          std::cout << "# A*S time = "
+                    << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+
+        begin = tnow();
+        std::vector<int> svc = slice(svecc, 0, d+dd);
+        std::sort(svc.begin(), svc.end());
+        matrix_times_PH_SRHT(A.conj_transpose(),
+                             DenseM_t(1, m, pvrc, 0, n), Bc, Cc);
+        matrix_times_S_SRHT(Bc, Cc, svc, 0, n, Sc, factor);
         SRHT_R_matrix(DenseM_t(1, m, pvrc, 0, n), svc, 0, n, factor, Rc);
+        if (opts.verbose())
+          std::cout << "# AT*S time = "
+                    << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+
         while (!this->is_compressed()) {
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
@@ -153,21 +192,26 @@ namespace strumpack {
             Rc.resize(n, d+dd);
             Sr.resize(m, d+dd);
             Sc.resize(n, d+dd);
-            std::vector<int> svr_ = slice(svecr, d, d+dd);
-            std::sort(svr_.begin(), svr_.end());
-            std::vector<int> svc_ = slice(svecc, d, d+dd);
-            std::sort(svc_.begin(), svc_.end());
+
+            begin = tnow();
+            std::vector<int> svr = slice(svecr, d, d+dd);
+            std::sort(svr.begin(), svr.end());
             // increase size of Sr/Sc and scale new columns appropriately
-            matrix_times_S_SRHT(Br, Cr, svr_, d, m, Sr, factor);
-            matrix_times_S_SRHT(Bc, Cc, svc_, d, n, Sc, factor);
+            matrix_times_S_SRHT(Br, Cr, svr, d, m, Sr, factor);
             // increase size of Rr/Rc and scale new columns appropriately
-            SRHT_R_matrix(DenseM_t(1, n, pvrc, 0, 0), svr_, d, m, factor, Rr);
-            SRHT_R_matrix(DenseM_t(1, m, pvrc, 0, n), svc_, d, n, factor, Rc);
-            // update svr and svc for compress_recursive_stable
-            for (int i=0; i<(int)svr_.size(); i++) {
-              svr.push_back(svr_[i]);
-              svc.push_back(svc_[i]);
-            }
+            SRHT_R_matrix(DenseM_t(1, n, pvrc, 0, 0), svr, d, m, factor, Rr);
+            if (opts.verbose())
+              std::cout << "# A*S time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+
+            begin = tnow();
+            std::vector<int> svc = slice(svecc, d, d+dd);
+            std::sort(svc.begin(), svc.end());
+            matrix_times_S_SRHT(Bc, Cc, svc, d, n, Sc, factor);
+            SRHT_R_matrix(DenseM_t(1, m, pvrc, 0, n), svc, d, n, factor, Rc);
+            if (opts.verbose())
+              std::cout << "# AT*S time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
           }
         }
       } else
