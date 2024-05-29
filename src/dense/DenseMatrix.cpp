@@ -180,6 +180,17 @@ namespace strumpack {
     STRUMPACK_FLOPS(rgen.flops_per_prng()*cols()*rows());
   }
 
+  template<typename scalar_t> void
+  DenseMatrix<scalar_t>::randombinary() {
+    TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distrib(0, 1);
+    for (std::size_t j=0; j<cols(); j++)
+      for (std::size_t i=0; i<rows(); i++)
+        operator()(i,j) = distrib(gen);
+  }
+
   template<typename scalar_t> void DenseMatrix<scalar_t>::random() {
     TIMER_TIME(TaskType::RANDOM_GENERATE, 1, t_gen);
     auto rgen = random::make_default_random_generator<real_t>();

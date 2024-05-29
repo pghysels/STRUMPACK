@@ -94,16 +94,13 @@ namespace strumpack {
                     << "# Total nnz in each row: "
                     << total_nnz << std::endl;
       } else if (opts.compression_sketch() == CompressionSketch::SRHT) {
-        std::unique_ptr<random::RandomGeneratorBase<real_t>> rgen;
-        rgen = random::make_random_generator<real_t>
-          (opts.random_engine(), opts.random_distribution());
         auto d = opts.d0();
         auto dd = opts.dd();
         auto n = this->cols();
         auto m = this->rows();
         DenseM_t Br, Cr, Sr, Rr, Bc, Cc, Sc, Rc;
         DenseM_t pvrc(1, n+m);
-        pvrc.randombinary(*rgen); // Generate the pvrc matrix
+        pvrc.randombinary(); // Generate the pvrc matrix
         int min_mn = std::min(m, n);
         d  = std::min(d, min_mn);
         dd = std::min(opts.dd(), opts.max_rank()-d);

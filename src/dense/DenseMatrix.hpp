@@ -355,6 +355,12 @@ namespace strumpack {
                 value_type>& rgen);
 
     /**
+     * Fill the matrix with random 0, 1 entries, using the specified
+     * random number generator.
+     */
+    void randombinary();
+
+    /**
      * Fill matrix with a constant value
      *
      * \param v value to set
