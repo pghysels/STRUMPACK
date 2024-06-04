@@ -416,7 +416,7 @@ namespace strumpack {
       const int max_samples = 512, bs = 64,
         leaf_size = opts.HODLR_options().leaf_size(),
         hw = H2OPUS_HWTYPE_CPU;
-      const double eta = 1.;
+      // const double eta = 1.;
 
       // std::cout << "k= " << k
       //           << " n= " << n
@@ -434,13 +434,16 @@ namespace strumpack {
       PointCloud<H2Opus_Real> pt_cloud(dim, n);
       generate2DGrid<H2Opus_Real>(pt_cloud, k, k, 0, 1, 0, 1);
 
-      H2OpusBoxCenterAdmissibility admissibility(eta);
+      // H2OpusBoxCenterAdmissibility admissibility(eta);
       HMatrix hmatrix(n, true);
+
+      GraphClusterTree gctree(sep_tree_);
+      // H2OpusClusterTree ctree;
+      GraphAdmissibility<integer_t> admissibility(g_, gctree);
 
       // ?? alternative without pt_cloud?
       // buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
-      H2OpusClusterTree ctree;
-      buildHMatrixStructure(hmatrix, &ctree, leaf_size, admissibility);
+      buildHMatrixStructure(hmatrix, &gctree, leaf_size, admissibility);
 
       DenseCPUSampler<scalar_t> sampler(F11_);
 
