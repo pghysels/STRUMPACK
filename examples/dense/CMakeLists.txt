@@ -17,8 +17,11 @@ target_link_libraries(testCovariance strumpack)
 target_link_libraries(testQC strumpack)
 target_link_libraries(testFront strumpack)
 
-target_include_directories(testCovariance PRIVATE /home/pieterg/LBL/summer2022/random/mfem/mfem-4.4)
-target_link_libraries(testCovariance /home/pieterg/LBL/summer2022/random/mfem/mfem-4.4/libmfem.a)
+# target_include_directories(testCovariance PRIVATE /home/pieterg/LBL/summer2022/random/mfem/mfem-4.4)
+# target_link_libraries(testCovariance /home/pieterg/LBL/summer2022/random/mfem/mfem-4.4/libmfem.a)
+target_include_directories(testCovariance PRIVATE /global/homes/p/pghysels/perlmutter/mfem-4.7)
+target_link_libraries(testCovariance /global/homes/p/pghysels/perlmutter/mfem-4.7/libmfem.a)
+
 
 add_dependencies(examples
   KernelRegression

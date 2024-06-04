@@ -102,33 +102,40 @@ int main(int argc, char* argv[]) {
   TaskTimer tassmbly("");
   tassmbly.start();
   DenseMatrix<std::complex<double>> Lop(N, N);
+
+  std::string fname("Lop_" + std::to_string(N) + ".bin");
+  std::ifstream f(fname.c_str());
+  if (f.good())
+    Lop = DenseMatrix<std::complex<double>>::read(fname);
+  else {
 #pragma omp parallel for
-  for (int i=0; i<N; i++) {
-    double p[] = {xyz(0,i), xyz(1,i)};
-    double k = w * n_num(p[0], p[1]);
-    for (int j=0; j<N; j++) {
-      Lop(i, j) = 0.;
-      if (i == j)
-        Lop(i, j) = 1. / (2. * M_PI) *
-          (dl[j] - dl[j] * std::log(dl[j] / 2.));
-      for (int aa=0; aa<nquad; aa++) {
-        auto nq = (aa - 0.5) / nquad;
-        double q[] = {pn0(0,j) + nq * (pn1(0,j)-pn0(0,j)),
-          pn0(1,j) + nq * (pn1(1,j)-pn0(1,j))};
-        double rvec[] = {p[0]-q[0], p[1]-q[1]};
-        auto r = norm(rvec, 2);
-        auto G = std::complex<double>(0, 1./4.) * BesselH0(k * r);
-        if (std::abs(i-j) > 0)
-          Lop(i, j) += dl[j] / nquad * G;
-        else {
-          auto G0 = -1. / (2. * M_PI) * std::log(r);
-          Lop(i, j) += dl[j] / nquad * (G - G0);
-        }
+    for (int i=0; i<N; i++) {
+      double p[] = {xyz(0,i), xyz(1,i)};
+      double k = w * n_num(p[0], p[1]);
+      for (int j=0; j<N; j++) {
+	Lop(i, j) = 0.;
+	if (i == j)
+	  Lop(i, j) = 1. / (2. * M_PI) *
+	    (dl[j] - dl[j] * std::log(dl[j] / 2.));
+	for (int aa=0; aa<nquad; aa++) {
+	  auto nq = (aa - 0.5) / nquad;
+	  double q[] = {pn0(0,j) + nq * (pn1(0,j)-pn0(0,j)),
+	    pn0(1,j) + nq * (pn1(1,j)-pn0(1,j))};
+	  double rvec[] = {p[0]-q[0], p[1]-q[1]};
+	  auto r = norm(rvec, 2);
+	  auto G = std::complex<double>(0, 1./4.) * BesselH0(k * r);
+	  if (std::abs(i-j) > 0)
+	    Lop(i, j) += dl[j] / nquad * G;
+	  else {
+	    auto G0 = -1. / (2. * M_PI) * std::log(r);
+	    Lop(i, j) += dl[j] / nquad * (G - G0);
+	  }
+	}
       }
     }
+    std::cout << "# SIE assembly time: " << tassmbly.elapsed() << std::endl;
+    Lop.write(fname);
   }
-  std::cout << "# SIE assembly time: " << tassmbly.elapsed() << std::endl;
-
 
   // strumpack::HSS::HSSOptions<std::complex<double>> hss_opts;
   // hss_opts.set_from_command_line(argc, argv);

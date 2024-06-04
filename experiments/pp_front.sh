@@ -1,9 +1,9 @@
 #!/bin/bash
 
-out=out_qc
+out=out_front
 comp=stable
 
-for k in 10000 20000 40000; do
+for k in 100 150 200; do
     for tol in 1e-2 1e-4 1e-6; do
         rm -rf tmp*
         for nnz in 1 2 4 8; do
@@ -42,7 +42,7 @@ for k in 10000 20000 40000; do
 done
 
 
-for k in 10000 20000 40000; do
+for k in 100 150 200; do
     for tol in 1e-2 1e-4 1e-6; do
         rm -rf tmp*
         for nnz in 1 2 4 8; do
@@ -91,26 +91,24 @@ for k in 10000 20000 40000; do
     done
 done
 
-
 for tol in 1e-2 1e-4 1e-6; do
     echo $tol
-    for k in 10000 20000 40000; do
+    for k in 100 150 200; do
         rm -rf tmp*
         for nnz in 1 2 4 8; do
-            grep "A\*S time\|AT\*S time" ${out}/out_dim_k${k}*tol${tol}*${comp}_SJLT_nnz${nnz} | awk '{sum+=$5} END {print sum/3./1000.0}' > tmp_sample_nnz${nnz}
-            grep "times:" ${out}/out_dim_k${k}*tol${tol}*${comp}_SJLT_nnz${nnz} | awk '{print $2/1000.0}' > tmp_constr_nnz${nnz}
+            grep "A\*S time\|AT\*S time" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_SJLT_nnz${nnz} | awk '{sum+=$5} END {print sum/3.0/1000.0}' > tmp_sample_nnz${nnz}
+            grep "times:" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_SJLT_nnz${nnz} | awk '{print $2/1000.0}' > tmp_constr_nnz${nnz}
         done
 
-        grep "A\*S time\|AT\*S time" ${out}/out_dim_k${k}*tol${tol}*${comp}_Gaussian | awk '{sum+=$5} END {print sum/3.0/1000.0}' >> tmp_sample_gaussian
-        grep "times:" ${out}/out_dim_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $2/1000.0}' >> tmp_constr_gaussian
+        grep "A\*S time\|AT\*S time" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_Gaussian | awk '{sum+=$5} END {print sum/3.0/1000.0}' >> tmp_sample_gaussian
+        grep "times:" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $2/1000.0}' >> tmp_constr_gaussian
 
-        grep "A\*S time\|AT\*S time" ${out}/out_dim_k${k}*tol${tol}*${comp}_SRHT | awk '{sum+=$5} END {print sum/3.0/1000.0}' >> tmp_sample_srht
-        grep "times:" ${out}/out_dim_k${k}*tol${tol}*${comp}_SRHT | awk '{print $2/1000.0}' >> tmp_constr_srht
+        grep "A\*S time\|AT\*S time" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_SRHT | awk '{sum+=$5} END {print sum/3.0/1000.0}' >> tmp_sample_srht
+        grep "times:" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_SRHT | awk '{print $2/1000.0}' >> tmp_constr_srht
 
-        grep "Number of unknowns:" ${out}/out_dim_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $4/1000.0}' >> tmp_N_gaussian
-        grep "\% of dense" ${out}/out_dim_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $6}' | tail -n 1 | sed 's/%//'>> tmp_compr
-        # printf '& & %s & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.0f & %5.1f \\\\ \n' $k `cat tmp_sample_gaussian` `cat tmp_sample_nnz1` `cat tmp_sample_nnz2` `cat tmp_sample_nnz4` `cat tmp_sample_nnz8` `cat tmp_sample_srht` `cat tmp_constr_gaussian` `cat tmp_constr_nnz1` `cat tmp_constr_nnz2` `cat tmp_constr_nnz4` `cat tmp_constr_nnz8` `cat tmp_constr_srht` `cat tmp_compr`
-        printf '& & %s & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %5.1f \\\\ \n' $k `cat tmp_sample_gaussian` `cat tmp_sample_nnz1` `cat tmp_sample_nnz2` `cat tmp_sample_nnz4` `cat tmp_sample_nnz8` `cat tmp_sample_srht` `cat tmp_constr_gaussian` `cat tmp_constr_nnz1` `cat tmp_constr_nnz2` `cat tmp_constr_nnz4` `cat tmp_constr_nnz8` `cat tmp_constr_srht` `cat tmp_compr`
+        grep "Number of unknowns:" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $4/1000.0}' >> tmp_N_gaussian
+        grep "\% of dense" ${out}/out_dim${dim}_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $6}' | tail -n 1 | sed 's/%//'>> tmp_compr
+        printf '& & %s & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %3.4g & %5.1f \\\\ \n' $k `cat tmp_sample_gaussian` `cat tmp_sample_nnz1` `cat tmp_sample_nnz2` `cat tmp_sample_nnz4` `cat tmp_sample_nnz8` `cat tmp_sample_srht` `cat tmp_constr_gaussian` `cat tmp_constr_nnz1` `cat tmp_constr_nnz2` `cat tmp_constr_nnz4` `cat tmp_constr_nnz8` `cat tmp_constr_srht` `cat tmp_compr`
     done
     echo ""
 done
