@@ -100,6 +100,9 @@ namespace strumpack {
                         << dt(begin, tnow()) << " [10e-3s]" << std::endl;
             begin = tnow();
             matrixT_times_SJLT(A, temp, Sc_new);
+            if (opts.verbose())
+              std::cout << "# AT*S time = "
+                        << dt(begin, tnow()) << " [10e-3s]" << std::endl;
             total_nnz += opts.nnz();
           }
           Rc_new.copy(Rr_new);
