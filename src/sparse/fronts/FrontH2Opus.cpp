@@ -315,86 +315,86 @@ namespace strumpack {
     }
   }
 
-  class GraphClusterTree : public H2OpusClusterTree {
-  private:
-    // const structured::ClusterTree& tree_;
-    std::vector<int> index_map_, node_begin_, node_end_, level_sizes_;
+  // class GraphClusterTree : public H2OpusClusterTree {
+  // private:
+  //   // const structured::ClusterTree& tree_;
+  //   std::vector<int> index_map_, node_begin_, node_end_, level_sizes_;
 
-  public:
-    GraphClusterTree(const structured::ClusterTree& tree) {
-      // TODO: set level_sizes_
-      // TODO: set node begin/end
+  // public:
+  //   GraphClusterTree(const structured::ClusterTree& tree) {
+  //     // TODO: set level_sizes_
+  //     // TODO: set node begin/end
 
-    }
+  //   }
 
-    int getLeafSize() override {
-      // TODO
-    }
-    int getDepth() override { return tree.levels(); }
-    int getLevelSize(std::size_t level_index) override {
-      return level_sizes_[level_index];
-    }
-    void getNodeLimits(ClusterNodeType node_index,
-                       int &start, int &end) override {
-      start = node_begin_[node_index];
-      end = node_end_[node_index];
-    }
-    int *getIndexMap() override {
-      return index_map.data();
-    }
-    ClusterNodeType getHeadChild(ClusterNodeType node) override {
-      // TODO return left child?
-    }
-    ClusterNodeType getNextChild(ClusterNodeType node) override {
-      // TODO if left child, return right child of parent node
-    }
-    ClusterNodeType getParent(ClusterNodeType node) override {
-      // TODO return parent
-    }
-    bool isLeaf(ClusterNodeType node) override {
-      // TODO return .. 
-    }
-    ClusterNodeType getRoot() override {
-      // TODO
-    }
-  };
+  //   int getLeafSize() override {
+  //     // TODO
+  //   }
+  //   int getDepth() override { return tree.levels(); }
+  //   int getLevelSize(std::size_t level_index) override {
+  //     return level_sizes_[level_index];
+  //   }
+  //   void getNodeLimits(ClusterNodeType node_index,
+  //                      int &start, int &end) override {
+  //     start = node_begin_[node_index];
+  //     end = node_end_[node_index];
+  //   }
+  //   int *getIndexMap() override {
+  //     return index_map.data();
+  //   }
+  //   ClusterNodeType getHeadChild(ClusterNodeType node) override {
+  //     // TODO return left child?
+  //   }
+  //   ClusterNodeType getNextChild(ClusterNodeType node) override {
+  //     // TODO if left child, return right child of parent node
+  //   }
+  //   ClusterNodeType getParent(ClusterNodeType node) override {
+  //     // TODO return parent
+  //   }
+  //   bool isLeaf(ClusterNodeType node) override {
+  //     // TODO return .. 
+  //   }
+  //   ClusterNodeType getRoot() override {
+  //     // TODO
+  //   }
+  // };
 
-  template<typename integer_t>
-  class GraphAdmissibility : public H2OpusAdmissibility {
-  private:
-    CSRGraph<integer_t>& graph_;
-    GraphClusterTree& tree_;
-    std::vector<bool> visit_;
-  public:
-    GraphAdmissibility(CSRGraph<integer_t>& g,
-                       GraphClusterTree& t)
-      : graph_(g), tree_(t), visit(g.size()) {}
-    bool operator()(H2OpusClusterTree* cluster_tree,
-                    ClusterNodeType node_index_u,
-                    ClusterNodeType node_index_v) override {
-      inst start_u, start_v, end_u, end_v;
-      tree_->getNodeLimits(node_index_u, start_u, end_u);
-      tree_->getNodeLimits(node_index_v, start_v, end_v);
-      std::fill(flag.begin(), flag.end(), false);
-      auto ind = graph_.ind();
-      auto ptr = graph_.ptr();
-      for (std::size_t i=start_u; i<end_u; i++) {
-        auto hij = ind + ptr[i+1];
-        for (auto pj=ind+ptr[i]; pj!=hij; pj++) {
-          auto j = *pj;
-          if (visit[j]) continue;
-          if (j >= start_v && j < end_v) return false;
-          visit[j] = true;
-          auto hik = ind + ptr[j+1];
-          for (auto pk=ind+ptr[j]; pk!=hik; pk++) {
-            auto k = *pk;
-            if (k >= start_v && k < end_v) return false;
-          }
-        }
-      }
-      return true;
-    }
-  };
+  // template<typename integer_t>
+  // class GraphAdmissibility : public H2OpusAdmissibility {
+  // private:
+  //   CSRGraph<integer_t>& graph_;
+  //   GraphClusterTree& tree_;
+  //   std::vector<bool> visit_;
+  // public:
+  //   GraphAdmissibility(CSRGraph<integer_t>& g,
+  //                      GraphClusterTree& t)
+  //     : graph_(g), tree_(t), visit(g.size()) {}
+  //   bool operator()(H2OpusClusterTree* cluster_tree,
+  //                   ClusterNodeType node_index_u,
+  //                   ClusterNodeType node_index_v) override {
+  //     inst start_u, start_v, end_u, end_v;
+  //     tree_->getNodeLimits(node_index_u, start_u, end_u);
+  //     tree_->getNodeLimits(node_index_v, start_v, end_v);
+  //     std::fill(flag.begin(), flag.end(), false);
+  //     auto ind = graph_.ind();
+  //     auto ptr = graph_.ptr();
+  //     for (std::size_t i=start_u; i<end_u; i++) {
+  //       auto hij = ind + ptr[i+1];
+  //       for (auto pj=ind+ptr[i]; pj!=hij; pj++) {
+  //         auto j = *pj;
+  //         if (visit[j]) continue;
+  //         if (j >= start_v && j < end_v) return false;
+  //         visit[j] = true;
+  //         auto hik = ind + ptr[j+1];
+  //         for (auto pk=ind+ptr[j]; pk!=hik; pk++) {
+  //           auto k = *pk;
+  //           if (k >= start_v && k < end_v) return false;
+  //         }
+  //       }
+  //     }
+  //     return true;
+  //   }
+  // };
 
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontH2Opus<scalar_t,integer_t>::factor_phase2
@@ -413,7 +413,7 @@ namespace strumpack {
       int k = opts.nx();
       int n = k*k, dim = 2;
       assert(F11_.rows() == (std::size_t)n);
-      const int max_samples = 512, bs = 64,
+      const int max_samples = 512, bs = 32,
         leaf_size = opts.HODLR_options().leaf_size(),
         hw = H2OPUS_HWTYPE_CPU;
       // const double eta = 1.;
@@ -442,8 +442,8 @@ namespace strumpack {
       GraphAdmissibility<integer_t> admissibility(g_, gctree);
 
       // ?? alternative without pt_cloud?
-      // buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
-      buildHMatrixStructure(hmatrix, &gctree, leaf_size, admissibility);
+      buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
+      // buildHMatrixStructure(hmatrix, &gctree, leaf_size, admissibility);
 
       DenseCPUSampler<scalar_t> sampler(F11_);
 
@@ -456,8 +456,13 @@ namespace strumpack {
       H2Opus_Real trunc_eps = opts.HODLR_options().abs_tol();
       H2Opus_Real abs_trunc_tol = trunc_eps * approx_norm;
 
+#if 1
       hara_sketch_batchgen<hw, H2Opus_Real>
         (hmatrix, &sampler, &gen, max_samples, bs, abs_trunc_tol, handle);
+#else
+      hara(&sampler, hmatrix, max_samples, 10, abs_trunc_tol, bs, handle);
+#endif
+
       H2Opus_Real approx_H2_error =
         sampler_difference<H2Opus_Real, hw>(&sampler, hmatrix, 40, handle)
         / approx_norm;
