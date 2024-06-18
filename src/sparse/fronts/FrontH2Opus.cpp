@@ -437,9 +437,9 @@ namespace strumpack {
       // H2OpusBoxCenterAdmissibility admissibility(eta);
       HMatrix hmatrix(n, true);
 
-      GraphClusterTree gctree(sep_tree_);
-      // H2OpusClusterTree ctree;
-      GraphAdmissibility<integer_t> admissibility(g_, gctree);
+      // GraphClusterTree gctree(sep_tree_);
+      // // H2OpusClusterTree ctree;
+      // GraphAdmissibility<integer_t> admissibility(g_, gctree);
 
       // ?? alternative without pt_cloud?
       buildHMatrixStructure(hmatrix, &pt_cloud, leaf_size, admissibility);
@@ -448,11 +448,13 @@ namespace strumpack {
       DenseCPUSampler<scalar_t> sampler(F11_);
 
       typedef typename
-        HaraSketchSimpleBatchGenSelect<hw,H2Opus_Real,DenseMatrix<H2Opus_Real>>::type
-        BatchEntryGenHost;
-      BatchEntryGenHost gen(*reinterpret_cast<DenseMatrix<H2Opus_Real>*>(&F11_));
+        HaraSketchSimpleBatchGenSelect
+        <hw,H2Opus_Real,DenseMatrix<H2Opus_Real>>::type BatchEntryGenHost;
+      BatchEntryGenHost gen
+        (*reinterpret_cast<DenseMatrix<H2Opus_Real>*>(&F11_));
 
-      H2Opus_Real approx_norm = sampler_norm<H2Opus_Real, hw>(&sampler, n, 10, handle);
+      H2Opus_Real approx_norm = sampler_norm<H2Opus_Real, hw>
+        (&sampler, n, 10, handle);
       H2Opus_Real trunc_eps = opts.HODLR_options().abs_tol();
       H2Opus_Real abs_trunc_tol = trunc_eps * approx_norm;
 
