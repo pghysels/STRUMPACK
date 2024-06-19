@@ -416,17 +416,17 @@ namespace strumpack {
       const int max_samples = 512, bs = 32,
         leaf_size = opts.HODLR_options().leaf_size(),
         hw = H2OPUS_HWTYPE_CPU;
-      // const double eta = 1.;
+      const double eta = 1.0;
 
-      // std::cout << "k= " << k
-      //           << " n= " << n
-      //           << " dim= " << dim
-      //           << " max_samples= " << max_samples
-      //           << " bs= " << bs
-      //           << " leaf_size= " << leaf_size
-      //           << " hw= " << hw
-      //           << " eta= " << eta
-      //           << std::endl;
+      std::cout << "k= " << k
+                << " n= " << n
+                << " dim= " << dim
+                << " max_samples= " << max_samples
+                << " bs= " << bs
+                << " leaf_size= " << leaf_size
+                << " hw= " << hw
+                << " eta= " << eta
+                << std::endl;
 
       h2opusHandle_t handle;
       h2opusCreateHandle(&handle);
@@ -434,7 +434,7 @@ namespace strumpack {
       PointCloud<H2Opus_Real> pt_cloud(dim, n);
       generate2DGrid<H2Opus_Real>(pt_cloud, k, k, 0, 1, 0, 1);
 
-      // H2OpusBoxCenterAdmissibility admissibility(eta);
+      H2OpusBoxCenterAdmissibility admissibility(eta);
       HMatrix hmatrix(n, true);
 
       // GraphClusterTree gctree(sep_tree_);
@@ -480,7 +480,10 @@ namespace strumpack {
                 << hmatrix.getDenseMemoryUsage()*1000
                 << " (dense) + "
                 << hmatrix.getLowRankMemoryUsage()*1000
-                << " (low-rank)" << std::endl;
+                << " (low-rank)" << std::endl
+                << " compression = "
+                << hmatrix.getMemoryUsage() / (F11_.memory()/1.e9) * 100
+                << " %"  << std::endl;
     }
 
     ////////////////////////////////////////////////////////
