@@ -121,7 +121,7 @@ namespace strumpack {
         rchild_->extend_add_to_blr_col
           (F11blr_, F12blr_, F21blr_, F22blr_, this,
            F22blr_.tilecoff(i) + dim_sep(),
-           F22blr_.tilecoff(std::min(i+CP,F22blr_.colblocks())) + dim_sep(),
+           F22blr_.tilecoff(std::min(i+CP, F22blr_.colblocks())) + dim_sep(),
            task_depth, opts);
     }
   }
@@ -324,23 +324,21 @@ namespace strumpack {
       if (blr_opts.BLR_factor_algorithm() ==
           BLR::BLRFactorAlgorithm::COLWISE) {
         // factor column-block-wise for memory reduction
-        if (dsep) {
-          F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
-          F12blr_ = BLRM_t(dsep, sep_tiles_, dupd, upd_tiles_);
-          F21blr_ = BLRM_t(dupd, upd_tiles_, dsep, sep_tiles_);
-          F22blr_ = BLRM_t(dupd, upd_tiles_, dupd, upd_tiles_);
-          using Trip_t = Triplet<scalar_t>;
-          std::vector<Trip_t> e11, e12, e21;
-          A.push_front_elements
-            (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
-          BLRM_t::construct_and_partial_factor_col
-            (F11blr_, F12blr_, F21blr_, F22blr_, sep_tiles_,
-             upd_tiles_, admissibility_, blr_opts,
-             [&](int i, bool part, std::size_t CP) {
-               build_front_cols
-                 (A, i, part, CP, e11, e12, e21, task_depth, opts);
-             });
-        }
+        F11blr_ = BLRM_t(dsep, sep_tiles_, dsep, sep_tiles_);
+        F12blr_ = BLRM_t(dsep, sep_tiles_, dupd, upd_tiles_);
+        F21blr_ = BLRM_t(dupd, upd_tiles_, dsep, sep_tiles_);
+        F22blr_ = BLRM_t(dupd, upd_tiles_, dupd, upd_tiles_);
+        using Trip_t = Triplet<scalar_t>;
+        std::vector<Trip_t> e11, e12, e21;
+        A.push_front_elements
+          (sep_begin_, sep_end_, this->upd(), e11, e12, e21);
+        BLRM_t::construct_and_partial_factor_col
+          (F11blr_, F12blr_, F21blr_, F22blr_, sep_tiles_,
+           upd_tiles_, admissibility_, blr_opts,
+           [&](int i, bool part, std::size_t CP) {
+             build_front_cols
+               (A, i, part, CP, e11, e12, e21, task_depth, opts);
+           });
       } else {
 #if defined(STRUMPACK_USE_GPU)
         if (opts.use_gpu()) {
