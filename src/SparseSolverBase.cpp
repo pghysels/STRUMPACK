@@ -406,6 +406,10 @@ namespace strumpack {
           std::cout << "#   - nr of HODLR Frontal matrices = "
                     << number_format_with_commas(fc.HODLR) << std::endl;
           break;
+        case CompressionType::H2:
+          std::cout << "#   - nr of H2 Frontal matrices = "
+                    << number_format_with_commas(fc.H2) << std::endl;
+          break;
         case CompressionType::BLR_HODLR:
           std::cout << "#   - nr of HODLR Frontal matrices = "
                     << number_format_with_commas(fc.HODLR) << std::endl;
