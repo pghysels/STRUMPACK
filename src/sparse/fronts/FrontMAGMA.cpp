@@ -803,8 +803,12 @@ namespace strumpack {
   FrontMAGMA<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& b) const {
     if (dev_factors_) gpu_solve(b);
-    else // factors are not on the device, solve on CPU
+    else {
+      if (!mpi_rank())
+        std::cerr << "WARNING: Solve is performed on CPU" << std::endl;
+      // factors are not on the device, solve on CPU
       FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
+    }
   }
 
   template<typename scalar_t,typename integer_t> void

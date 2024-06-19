@@ -57,13 +57,20 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
     int thread_level;
     MPI_Query_thread(&thread_level);
-    if (thread_level != MPI_THREAD_MULTIPLE &&
-        mpi_rank(comm) == 0)
+    if (thread_level != MPI_THREAD_MULTIPLE && !mpi_rank(comm))
       std::cerr << "MPI_THREAD_MULTIPLE is required for SLATE"
                 << std::endl;
+#else
+    if (opts_.use_gpu() && !mpi_rank(comm))
+      std::cerr
+        << "-------------------------------------------------------" << std::endl
+        << "WARNING: SLATE is required for full GPU support." << std::endl
+        << "SLATE is a GPU-capable replacement for ScaLAPACK, see" << std::endl
+        << "   https://github.com/icl-utk-edu/slate" << std::endl
+        << "Configure with -DTPL_ENABLE_SLATE=ON" << std::endl
+        << "and set the SLATE_DIR environment variable." << std::endl
+        << "-------------------------------------------------------" << std::endl;
 #endif
-    // Set the default reordering to PARMETIS?
-    //opts_.set_reordering_method(ReorderingStrategy::PARMETIS);
   }
 
   template<typename scalar_t,typename integer_t> MPI_Comm

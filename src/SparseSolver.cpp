@@ -293,6 +293,17 @@ namespace strumpack {
     auto MFsolve =
       [&](scalar_t* w) {
         DenseMW_t X(x.rows(), 1, w, x.ld());
+#if !defined(STRUMPACK_USE_MAGMA)
+        if (opts_.use_gpu())
+          std::cerr
+            << "-------------------------------------------------------" << std::endl
+            << "WARNING: sparse multifrontal solve is done on CPU," << std::endl
+            << "GPU solve requires MAGMA, see" << std::endl
+            << "   https://bitbucket.org/icl/magma/src/master/" << std::endl
+            << "Configure with -DTPL_ENABLE_MAGMA=ON" << std::endl
+            << "and set the MAGMA_DIR environment variable" << std::endl
+            << "-------------------------------------------------------" << std::endl
+#endif
         tree()->multifrontal_solve(X);
       };
 
