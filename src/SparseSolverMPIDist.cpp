@@ -58,7 +58,7 @@ namespace strumpack {
     int thread_level;
     MPI_Query_thread(&thread_level);
     if (thread_level != MPI_THREAD_MULTIPLE && !mpi_rank(comm))
-      std::cerr << "MPI_THREAD_MULTIPLE is required for SLATE"
+      std::cerr << "WARNING: MPI_THREAD_MULTIPLE is required for SLATE"
                 << std::endl;
 #else
     if (opts_.use_gpu() && !mpi_rank(comm))

@@ -180,6 +180,11 @@ namespace strumpack {
       }
       case ReorderingStrategy::PTSCOTCH: {
 #if defined(STRUMPACK_USE_PTSCOTCH)
+        int thread_level;
+        MPI_Query_thread(&thread_level);
+        if (thread_level != MPI_THREAD_MULTIPLE && comm_->is_root())
+          std::cerr << "WARNING: MPI_THREAD_MULTIPLE might be required for PTSCOTCH"
+                    << std::endl;
         tree_ = ptscotch_nested_dissection
           (A, comm_->comm(), true, perm_, opts);
 #else

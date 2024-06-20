@@ -8,7 +8,7 @@ The STRUMPACK package uses the CMake build system (CMake version ≥
 follows:
 
 \code {.bash}
-> tar-xvzf strumpack-x.y.z.tar.gz
+> tar -xvzf strumpack-x.y.z.tar.gz
 > cd strumpack-x.y.z
 > mkdir build
 > mkdir install
@@ -197,30 +197,32 @@ TPL_PARMETIS_INCLUDE_DIRS and TPL_PARMETIS_LIBRARIES, or set the
 environment variable ParMETIS_DIR.
 
 
-- __SCOTCH__ and __PT-SCOTCH__ (≥ 5.1.12) (optional) for matrix
-reordering. Scotch can be downloaded from:
-http://www.labri.fr/perso/pelegrin/scotch/  Configuring CMake
-to find (PT-)Scotch is similar to Metis. Enable with
--DTPL_ENABLE_SCOTCH=ON and -DTPL_ENABLE_PTSCOTCH=ON. For (PT-)Scotch
-the environment variables SCOTCH_DIR (PTSCOTCH_DIR) or the CMake
-variables TPL_SCOTCH_INCLUDE_DIRS, TPL_PTSCOTCH_INCLUDE_DIRS, and
-TPL_SCOTCH_LIBRARIES, TPL_PTSCOTCH_LIBRARIES (make sure to specify all
-libraries: libscotch, libscotcherr, libptscotch and libptscotcherr).
+- __SCOTCH__ and __PT-SCOTCH__ (≥ 7.0.4 using CMake installation)
+(optional) for matrix reordering. Scotch can be downloaded from:
+https://gitlab.inria.fr/scotch/scotch Enable with
+-DTPL_ENABLE_SCOTCH=ON and -DTPL_ENABLE_PTSCOTCH=ON. Set the
+environment variable SCOTCH_DIR to the installation path for SCOTCH
+(and optionally PTSCOTCH).  When SCOTCH is built with
+MPI_THREAD_MULTIPLE support, then make sure to call MPI_Init_thread
+with MPI_THREAD_MULTIPLE. We also recommend configuring/installing
+SCOTCH with -DINSTALL_METIS_HEADERS=OFF to avoid confusion with the
+Metis headers.
 
 
-- __ButterflyPACK__ (≥ 1.2.0): https://github.com/liuyangzhuan/ButterflyPACK STRUMPACK
-  supports the HODLR (Hierarchically Off-Diagonal Low-Rank) and
-  Butterfly matrix formats, see also \ref hodlr_matrices, through the
-  ButterflyPACK library. To enable this from CMake, add the following:
+- __ButterflyPACK__ (≥ 3.0.0):
+https://github.com/liuyangzhuan/ButterflyPACK STRUMPACK supports the
+HODLR (Hierarchically Off-Diagonal Low-Rank) and Butterfly matrix
+formats, see also \ref hodlr_matrices, through the ButterflyPACK
+library. To enable this from CMake, add the following:
 \code {.bash}
  > export ButterflyPACK_DIR=...
  > cmake ../ -DTPL_ENABLE_BPACK=ON
 \endcode
 
 
-- __ZFP__ (≥ 0.5.5) https://computing.llnl.gov/projects/floating-point-compression :
-  ZFP is used for lossy compression in the sparse solver
-  (preconditioner).
+- __ZFP__ (≥ 1.0.0)
+https://computing.llnl.gov/projects/floating-point-compression : ZFP
+is used for lossy compression in the sparse solver (preconditioner).
 \code {.bash}
  > export ZFP_DIR=...
  > cmake ../ -DTPL_ENABLE_ZFP=ON

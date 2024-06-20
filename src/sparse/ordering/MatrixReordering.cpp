@@ -127,9 +127,8 @@ namespace strumpack {
     }
     default:
       std::cerr << "# ERROR: parallel matrix reorderings are"
-        " not supported from this interface, \n"
-        "\tuse StrumpackSparseSolverMPI or"
-        " StrumpackSparseSolverMPIDist instead." << std::endl;
+        " not supported from the sequential interface, \n"
+        "\tuse SparseSolverMPIDist instead." << std::endl;
       return 1;
     }
     tree_.check();
