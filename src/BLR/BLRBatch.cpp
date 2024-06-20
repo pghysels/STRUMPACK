@@ -36,9 +36,6 @@
 #include "dense/KBLASWrapper.hpp"
 #endif
 
-// for gpu::round_up
-#include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
-
 namespace strumpack {
   namespace BLR {
 

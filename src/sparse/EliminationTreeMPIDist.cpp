@@ -34,8 +34,8 @@
 #include "PropMapSparseMatrix.hpp"
 #include "ordering/MatrixReorderingMPI.hpp"
 #include "fronts/FrontFactory.hpp"
-#include "fronts/FrontalMatrix.hpp"
-#include "fronts/FrontalMatrixMPI.hpp"
+#include "fronts/Front.hpp"
+#include "fronts/FrontMPI.hpp"
 
 namespace strumpack {
 
@@ -628,7 +628,7 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
+  std::unique_ptr<Front<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::prop_map
   (const Opts_t& opts, std::vector<std::vector<integer_t>>& local_upd,
    std::vector<float>& local_subtree_work,
@@ -699,7 +699,7 @@ namespace strumpack {
    * [P0_sib,P0_sib+P_sib)
    */
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
+  std::unique_ptr<Front<scalar_t,integer_t>>
   EliminationTreeMPIDist<scalar_t,integer_t>::prop_map_sub_graphs
   (const Opts_t& opts, const RedistSubTree<integer_t>& tree,
    int P0, int P, int P0_sib, int P_sib, const MPIComm& fcomm, int level) {

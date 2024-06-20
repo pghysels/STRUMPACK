@@ -27,30 +27,30 @@
  *
  */
 
-#include "FrontalMatrixDense.hpp"
+#include "FrontDense.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #include "FrontBLRMPI.hpp"
 #endif
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixDense<scalar_t,integer_t>::FrontalMatrixDense
+  FrontDense<scalar_t,integer_t>::FrontDense
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::release_work_memory
+  FrontDense<scalar_t,integer_t>::release_work_memory
   (VectorPool<scalar_t>& workspace) {
     workspace.restore(CBstorage_);
     F22_.clear();
   }
 
   template<typename scalar_t,typename integer_t> scalar_t*
-  FrontalMatrixDense<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+  FrontDense<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
 #if defined(STRUMPACK_USE_GPU)
     gpu::copy_host_to_device(dF22, F22_);
 #endif
@@ -58,7 +58,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::matrix_inertia
+  FrontDense<scalar_t,integer_t>::matrix_inertia
   (const DenseM_t& F, integer_t& neg, integer_t& zero, integer_t& pos) const {
     using real_t = typename RealType<scalar_t>::value_type;
     for (std::size_t i=0; i<F.rows(); i++) {
@@ -73,13 +73,13 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::node_inertia
+  FrontDense<scalar_t,integer_t>::node_inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     return matrix_inertia(F11_, neg, zero, pos);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::node_subnormals
+  FrontDense<scalar_t,integer_t>::node_subnormals
   (std::size_t& ns, std::size_t& nz) const {
     auto dns = F11_.subnormals() + F12_.subnormals() + F21_.subnormals();
     auto dnz = F11_.zeros() + F12_.zeros() + F21_.zeros();
@@ -94,7 +94,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::node_pivot_growth
+  FrontDense<scalar_t,integer_t>::node_pivot_growth
   (scalar_t& pgL, scalar_t& pgU) const {
     for (std::size_t i=0; i<F11_.rows(); i++)
       pgU = std::max(std::abs(pgU), std::abs(F11_(i, i)));
@@ -103,7 +103,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
+  FrontDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
     VectorPool<scalar_t> workspace;
@@ -111,7 +111,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_dense
+  FrontDense<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace, int task_depth) {
     this->extend_add(paF11, paF12, paF21, paF22, F22_, p);
@@ -119,7 +119,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr
+  FrontDense<scalar_t,integer_t>::extend_add_to_blr
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
    const F_t* p, VectorPool<scalar_t>& workspace,
    int task_depth, const Opts_t& opts) {
@@ -152,7 +152,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_to_blr_col
+  FrontDense<scalar_t,integer_t>::extend_add_to_blr_col
   (BLRM_t& paF11, BLRM_t& paF12, BLRM_t& paF21, BLRM_t& paF22,
    const F_t* p, integer_t begin_col, integer_t end_col, int task_depth,
    const Opts_t& opts) {
@@ -186,7 +186,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::factor
+  FrontDense<scalar_t,integer_t>::factor
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode e1, e2;
@@ -205,7 +205,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::factor_phase1
+  FrontDense<scalar_t,integer_t>::factor_phase1
   (const SpMat_t& A, const Opts_t& opts, VectorPool<scalar_t>& workspace,
    int etree_level, int task_depth) {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
@@ -257,7 +257,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDense<scalar_t,integer_t>::factor_phase2
+  FrontDense<scalar_t,integer_t>::factor_phase2
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
@@ -289,7 +289,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::fwd_solve_phase2
+  FrontDense<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
@@ -310,7 +310,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::bwd_solve_phase1
+  FrontDense<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
@@ -330,7 +330,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extract_CB_sub_matrix
+  FrontDense<scalar_t,integer_t>::extract_CB_sub_matrix
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DenseM_t& B, int task_depth) const {
     std::vector<std::size_t> lJ, oJ;
@@ -346,7 +346,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
+  FrontDense<scalar_t,integer_t>::sample_CB
   (const Opts_t& opts, const DenseM_t& R, DenseM_t& Sr,
    DenseM_t& Sc, F_t* pa, int task_depth) {
     auto I = this->upd_to_parent(pa);
@@ -369,7 +369,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB
+  FrontDense<scalar_t,integer_t>::sample_CB
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     auto I = this->upd_to_parent(pa);
     auto cR = R.extract_rows(I);
@@ -385,7 +385,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F11
+  FrontDense<scalar_t,integer_t>::sample_CB_to_F11
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -406,7 +406,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F12
+  FrontDense<scalar_t,integer_t>::sample_CB_to_F12
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -441,7 +441,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F21
+  FrontDense<scalar_t,integer_t>::sample_CB_to_F21
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -476,7 +476,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::sample_CB_to_F22
+  FrontDense<scalar_t,integer_t>::sample_CB_to_F22
   (Trans op, const DenseM_t& R, DenseM_t& S, F_t* pa, int task_depth) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
@@ -498,7 +498,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::delete_factors() {
+  FrontDense<scalar_t,integer_t>::delete_factors() {
     if (lchild_) lchild_->delete_factors();
     if (rchild_) rchild_->delete_factors();
     F11_ = DenseM_t();
@@ -510,15 +510,15 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontDense<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+   const FrontMPI<scalar_t,integer_t>* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
       (F22_, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  FrontDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontBLRMPI<scalar_t,integer_t>* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::
@@ -526,7 +526,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  FrontDense<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontBLRMPI<scalar_t,integer_t>* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
@@ -536,20 +536,20 @@ namespace strumpack {
 #endif
 
   // explicit template instantiations
-  template class FrontalMatrixDense<float,int>;
-  template class FrontalMatrixDense<double,int>;
-  template class FrontalMatrixDense<std::complex<float>,int>;
-  template class FrontalMatrixDense<std::complex<double>,int>;
+  template class FrontDense<float,int>;
+  template class FrontDense<double,int>;
+  template class FrontDense<std::complex<float>,int>;
+  template class FrontDense<std::complex<double>,int>;
 
-  template class FrontalMatrixDense<float,long int>;
-  template class FrontalMatrixDense<double,long int>;
-  template class FrontalMatrixDense<std::complex<float>,long int>;
-  template class FrontalMatrixDense<std::complex<double>,long int>;
+  template class FrontDense<float,long int>;
+  template class FrontDense<double,long int>;
+  template class FrontDense<std::complex<float>,long int>;
+  template class FrontDense<std::complex<double>,long int>;
 
-  template class FrontalMatrixDense<float,long long int>;
-  template class FrontalMatrixDense<double,long long int>;
-  template class FrontalMatrixDense<std::complex<float>,long long int>;
-  template class FrontalMatrixDense<std::complex<double>,long long int>;
+  template class FrontDense<float,long long int>;
+  template class FrontDense<double,long long int>;
+  template class FrontDense<std::complex<float>,long long int>;
+  template class FrontDense<std::complex<double>,long long int>;
 
 } // end namespace strumpack
 

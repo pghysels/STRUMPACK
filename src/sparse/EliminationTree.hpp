@@ -39,7 +39,7 @@
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrix;
+  template<typename scalar_t,typename integer_t> class Front;
   template<typename integer_t> class SeparatorTree;
 
   // TODO rename this to SuperNodalTree?
@@ -47,7 +47,7 @@ namespace strumpack {
   class EliminationTree {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
 
   public:
     EliminationTree() {}

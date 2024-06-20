@@ -29,29 +29,27 @@
 #ifndef FRONTAL_MATRIX_GPU_HPP
 #define FRONTAL_MATRIX_GPU_HPP
 
-#include "FrontalMatrixDense.hpp"
-#include "dense/DPCPPWrapper.hpp"
+#include "FrontDense.hpp"
+#include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfo;
-  template<typename scalar_t, typename integer_t> class BatchMetaData;
-  template<typename scalar_t> struct FrontData;
 
-  template<typename scalar_t,typename integer_t> class FrontSYCL
-    : public FrontalMatrix<scalar_t,integer_t> {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+  template<typename scalar_t,typename integer_t> class FrontGPU
+    : public Front<scalar_t,integer_t> {
+    using F_t = Front<scalar_t,integer_t>;
+    using FG_t = FrontGPU<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using LInfo_t = LevelInfo<scalar_t,integer_t>;
-    using Batch_t = BatchMetaData<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
+    using LInfo_t = LevelInfo<scalar_t,integer_t>;
 
   public:
-    FrontSYCL(integer_t sep, integer_t sep_begin, integer_t sep_end,
-               std::vector<integer_t>& upd);
-    ~FrontSYCL();
+    FrontGPU(integer_t sep, integer_t sep_begin, integer_t sep_end,
+                     std::vector<integer_t>& upd);
+    ~FrontGPU();
 
     void release_work_memory() override;
 
@@ -60,58 +58,71 @@ namespace strumpack {
                              const F_t* p, int task_depth) override;
 
     ReturnCode multifrontal_factorization(const SpMat_t& A,
-					  const Opts_t& opts,
-					  int etree_level=0,
-					  int task_depth=0) override;
-
-    void forward_multifrontal_solve(DenseM_t& b, DenseM_t* work,
-                                    int etree_level=0, int task_depth=0)
-      const override;
-    void backward_multifrontal_solve(DenseM_t& y, DenseM_t* work,
-                                     int etree_level=0, int task_depth=0)
-      const override;
+                                          const SPOptions<scalar_t>& opts,
+                                          int etree_level=0,
+                                          int task_depth=0) override;
 
     void extract_CB_sub_matrix(const std::vector<std::size_t>& I,
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override {}
 
-    std::string type() const override { return "FrontSYCL"; }
+    std::string type() const override { return "FrontGPU"; }
+    bool isGPU() const override { return true; }
 
 #if defined(STRUMPACK_USE_MPI)
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                               const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+                               const FrontMPI<scalar_t,integer_t>* pa)
+      const override;
+    void
+    extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FrontBLRMPI<scalar_t,integer_t>* pa)
+      const override;
+    void
+    extadd_blr_copy_to_buffers_col(std::vector<std::vector<scalar_t>>& sbuf,
+                                   const FrontBLRMPI<scalar_t,integer_t>* pa,
+                                   integer_t begin_col, integer_t end_col,
+                                   const Opts_t& opts)
       const override;
 #endif
+
+    scalar_t* get_device_F22(scalar_t* dF22) override;
 
   private:
     std::unique_ptr<scalar_t[]> host_factors_, host_Schur_;
     DenseMW_t F11_, F12_, F21_, F22_;
-    std::vector<std::int64_t> pivot_mem_;
-    std::int64_t* piv_ = nullptr;
+    std::vector<int> pivot_mem_;
+    int* piv_ = nullptr;
 
-    FrontSYCL(const FrontSYCL&) = delete;
-    FrontSYCL& operator=(FrontSYCL const&) = delete;
+    FrontGPU(const FrontGPU&) = delete;
+    FrontGPU& operator=(FrontGPU const&) = delete;
 
-    void front_assembly(cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
+    void front_assembly(const SpMat_t& A, LInfo_t& L,
                         char* hea_mem, char* dea_mem);
-    void factor_batch(cl::sycl::queue& q, const LInfo_t& L,
-                      Batch_t& batch, const Opts_t& opts);
+    void factor_small_fronts(LInfo_t& L, gpu::FrontData<scalar_t>* fdata,
+                             int* dinfo, const SPOptions<scalar_t>& opts);
+
     ReturnCode split_smaller(const SpMat_t& A, const SPOptions<scalar_t>& opts,
-			     int etree_level=0, int task_depth=0);
+                             int etree_level=0, int task_depth=0);
 
     void fwd_solve_phase2(DenseM_t& b, DenseM_t& bupd,
                           int etree_level, int task_depth) const override;
     void bwd_solve_phase1(DenseM_t& y, DenseM_t& yupd,
                           int etree_level, int task_depth) const override;
 
+    ReturnCode node_inertia(integer_t& neg,
+                            integer_t& zero,
+                            integer_t& pos) const override;
+
     using F_t::lchild_;
     using F_t::rchild_;
     using F_t::dim_sep;
     using F_t::dim_upd;
 
-    template<typename T, typename I> friend class LevelInfo;
-    template<typename T, typename I> friend class BatchMetaData;
+    // suppress warnings
+    using F_t::extend_add_to_dense;
+
+    template<typename T,typename I> friend class LevelInfo;
   };
 
 } // end namespace strumpack

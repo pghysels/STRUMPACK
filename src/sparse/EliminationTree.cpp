@@ -31,7 +31,7 @@
 
 #include "EliminationTree.hpp"
 #include "fronts/FrontFactory.hpp"
-#include "fronts/FrontalMatrix.hpp"
+#include "fronts/Front.hpp"
 #include "SeparatorTree.hpp"
 
 namespace strumpack {
@@ -51,7 +51,7 @@ namespace strumpack {
   EliminationTree<scalar_t,integer_t>::~EliminationTree() {}
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrix<scalar_t,integer_t>*
+  Front<scalar_t,integer_t>*
   EliminationTree<scalar_t,integer_t>::root() const {
     return root_.get();
   }
@@ -123,7 +123,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  std::unique_ptr<FrontalMatrix<scalar_t,integer_t>>
+  std::unique_ptr<Front<scalar_t,integer_t>>
   EliminationTree<scalar_t,integer_t>::setup_tree
   (const SPOptions<scalar_t>& opts, const SpMat_t& A,
    SeparatorTree<integer_t>& sep_tree,

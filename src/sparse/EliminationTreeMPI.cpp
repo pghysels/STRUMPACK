@@ -35,7 +35,7 @@
 #include "ordering/MatrixReorderingMPI.hpp"
 #include "dense/DistributedMatrix.hpp"
 #include "fronts/FrontFactory.hpp"
-#include "fronts/FrontalMatrixMPI.hpp"
+#include "fronts/FrontMPI.hpp"
 
 namespace strumpack {
 

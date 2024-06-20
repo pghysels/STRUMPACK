@@ -29,7 +29,7 @@
 #ifndef FRONTAL_MATRIX_LOSSY_HPP
 #define FRONTAL_MATRIX_LOSSY_HPP
 
-#include "FrontalMatrixDense.hpp"
+#include "FrontDense.hpp"
 #include "structured/StructuredMatrix.hpp"
 
 namespace strumpack {
@@ -101,9 +101,9 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t> class FrontLossy
-    : public FrontalMatrixDense<scalar_t,integer_t> {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FD_t = FrontalMatrixDense<scalar_t,integer_t>;
+    : public FrontDense<scalar_t,integer_t> {
+    using F_t = Front<scalar_t,integer_t>;
+    using FD_t = FrontDense<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;

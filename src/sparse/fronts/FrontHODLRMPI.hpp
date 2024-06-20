@@ -29,7 +29,7 @@
 #ifndef FRONTAL_MATRIX_HODLR_MPI_HPP
 #define FRONTAL_MATRIX_HODLR_MPI_HPP
 
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #include "HODLR/HODLRMatrix.hpp"
 #include "HODLR/ButterflyMatrix.hpp"
 
@@ -38,10 +38,10 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  class FrontHODLRMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+  class FrontHODLRMPI : public FrontMPI<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;

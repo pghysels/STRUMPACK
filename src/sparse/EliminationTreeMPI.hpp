@@ -48,7 +48,7 @@ namespace strumpack {
     using DistM_t = DistributedMatrix<scalar_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
     using SepRange = std::pair<integer_t,integer_t>;
 
   public:

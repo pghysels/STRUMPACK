@@ -205,7 +205,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontHODLR<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+   const FrontMPI<scalar_t,integer_t>* pa) const {
     const std::size_t dupd = dim_upd();
     if (!dupd) return;
     auto CB = get_dense_CB();

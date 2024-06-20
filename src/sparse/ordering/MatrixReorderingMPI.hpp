@@ -81,7 +81,7 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
     using CSRMPI_t = CSRMatrixMPI<scalar_t,integer_t>;
     using CSM_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
 
   public:
     MatrixReorderingMPI(integer_t n, const MPIComm& c);

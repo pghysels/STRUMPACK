@@ -28,12 +28,12 @@
  */
 #include <array>
 
-#include "FrontalMatrixGPU.hpp"
-#include "FrontalMatrixGPUKernels.hpp"
+#include "FrontGPU.hpp"
+#include "FrontGPUKernels.hpp"
 
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #include "FrontBLRMPI.hpp"
 #endif
 
@@ -41,8 +41,8 @@
 namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfo {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FG_t = FrontalMatrixGPU<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
+    using FG_t = FrontGPU<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
 
@@ -217,13 +217,13 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixGPU<scalar_t,integer_t>::FrontalMatrixGPU
+  FrontGPU<scalar_t,integer_t>::FrontGPU
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
     : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixGPU<scalar_t,integer_t>::~FrontalMatrixGPU() {
+  FrontGPU<scalar_t,integer_t>::~FrontGPU() {
 #if defined(STRUMPACK_COUNT_FLOPS)
     const std::size_t dupd = dim_upd();
     const std::size_t dsep = dim_sep();
@@ -232,28 +232,28 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> scalar_t*
-  FrontalMatrixGPU<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
+  FrontGPU<scalar_t,integer_t>::get_device_F22(scalar_t* dF22) {
     gpu::copy_host_to_device(dF22, F22_);
     return dF22;
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::release_work_memory() {
+  FrontGPU<scalar_t,integer_t>::release_work_memory() {
     F22_.clear();
     host_Schur_.reset(nullptr);
   }
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontGPU<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+   const FrontMPI<scalar_t,integer_t>* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
       (F22_, sbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  FrontGPU<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontBLRMPI<scalar_t,integer_t>* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::
@@ -261,7 +261,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  FrontGPU<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf,
    const FrontBLRMPI<scalar_t,integer_t>* pa,
    integer_t begin_col, integer_t end_col, const Opts_t& opts) const {
@@ -271,7 +271,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::extend_add_to_dense
+  FrontGPU<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
    const F_t* p, int task_depth) {
     this->extend_add(paF11, paF12, paF21, paF22, F22_, p);
@@ -298,7 +298,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t, typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::front_assembly
+  FrontGPU<scalar_t,integer_t>::front_assembly
   (const SpMat_t& A, LInfo_t& L, char* hea_mem, char* dea_mem) {
     using Trip_t = Triplet<scalar_t>;
     auto N = L.f.size();
@@ -345,7 +345,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t, typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::factor_small_fronts
+  FrontGPU<scalar_t,integer_t>::factor_small_fronts
   (LInfo_t& L, gpu::FrontData<scalar_t>* fdata, int* dinfo,
    const SPOptions<scalar_t>& opts) {
     if (!L.small_fronts) return;
@@ -371,7 +371,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixGPU<scalar_t,integer_t>::split_smaller
+  FrontGPU<scalar_t,integer_t>::split_smaller
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     const std::size_t dupd = dim_upd(), dsep = dim_sep();
@@ -468,7 +468,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixGPU<scalar_t,integer_t>::multifrontal_factorization
+  FrontGPU<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
@@ -695,7 +695,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::fwd_solve_phase2
+  FrontGPU<scalar_t,integer_t>::fwd_solve_phase2
   (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
@@ -712,7 +712,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixGPU<scalar_t,integer_t>::bwd_solve_phase1
+  FrontGPU<scalar_t,integer_t>::bwd_solve_phase1
   (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
     if (dim_sep()) {
       DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
@@ -729,7 +729,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixGPU<scalar_t,integer_t>::node_inertia
+  FrontGPU<scalar_t,integer_t>::node_inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     using real_t = typename RealType<scalar_t>::value_type;
     for (std::size_t i=0; i<F11_.rows(); i++) {
@@ -744,19 +744,19 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class FrontalMatrixGPU<float,int>;
-  template class FrontalMatrixGPU<double,int>;
-  template class FrontalMatrixGPU<std::complex<float>,int>;
-  template class FrontalMatrixGPU<std::complex<double>,int>;
+  template class FrontGPU<float,int>;
+  template class FrontGPU<double,int>;
+  template class FrontGPU<std::complex<float>,int>;
+  template class FrontGPU<std::complex<double>,int>;
 
-  template class FrontalMatrixGPU<float,long int>;
-  template class FrontalMatrixGPU<double,long int>;
-  template class FrontalMatrixGPU<std::complex<float>,long int>;
-  template class FrontalMatrixGPU<std::complex<double>,long int>;
+  template class FrontGPU<float,long int>;
+  template class FrontGPU<double,long int>;
+  template class FrontGPU<std::complex<float>,long int>;
+  template class FrontGPU<std::complex<double>,long int>;
 
-  template class FrontalMatrixGPU<float,long long int>;
-  template class FrontalMatrixGPU<double,long long int>;
-  template class FrontalMatrixGPU<std::complex<float>,long long int>;
-  template class FrontalMatrixGPU<std::complex<double>,long long int>;
+  template class FrontGPU<float,long long int>;
+  template class FrontGPU<double,long long int>;
+  template class FrontGPU<std::complex<float>,long long int>;
+  template class FrontGPU<std::complex<double>,long long int>;
 
 } // end namespace strumpack

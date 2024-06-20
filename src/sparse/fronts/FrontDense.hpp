@@ -35,7 +35,7 @@
 #include <cmath>
 #include <random>
 
-#include "FrontalMatrix.hpp"
+#include "Front.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "FrontBLRMPI.hpp"
 #endif
@@ -44,9 +44,9 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontBLRMPI;
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixDense
-    : public FrontalMatrix<scalar_t,integer_t> {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+  template<typename scalar_t,typename integer_t> class FrontDense
+    : public Front<scalar_t,integer_t> {
+    using F_t = Front<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
@@ -54,8 +54,8 @@ namespace strumpack {
     using Opts_t = SPOptions<scalar_t>;
 
   public:
-    FrontalMatrixDense(integer_t sep, integer_t sep_begin, integer_t sep_end,
-                       std::vector<integer_t>& upd);
+    FrontDense(integer_t sep, integer_t sep_begin, integer_t sep_end,
+               std::vector<integer_t>& upd);
 
     void release_work_memory(VectorPool<scalar_t>& workspace) override;
 
@@ -108,12 +108,12 @@ namespace strumpack {
 
     void delete_factors() override;
 
-    std::string type() const override { return "FrontalMatrixDense"; }
+    std::string type() const override { return "FrontDense"; }
 
 #if defined(STRUMPACK_USE_MPI)
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                               const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+                               const FrontMPI<scalar_t,integer_t>* pa)
       const override;
     void
     extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
@@ -135,8 +135,8 @@ namespace strumpack {
     std::vector<scalar_t,NoInit<scalar_t>> CBstorage_;
     std::vector<int> piv_; // regular int because it is passed to BLAS
 
-    FrontalMatrixDense(const FrontalMatrixDense&) = delete;
-    FrontalMatrixDense& operator=(FrontalMatrixDense const&) = delete;
+    FrontDense(const FrontDense&) = delete;
+    FrontDense& operator=(FrontDense const&) = delete;
 
     ReturnCode factor_phase1(const SpMat_t& A, const Opts_t& opts,
                              VectorPool<scalar_t>& workspace,

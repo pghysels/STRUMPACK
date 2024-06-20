@@ -4,21 +4,21 @@
 
 #pragma once
 
-#include "FrontalMatrixDense.hpp"
+#include "FrontDense.hpp"
 #include "dense/GPUWrapper.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfoUnified;
 
-  namespace gpu {
-    template<typename scalar_t> struct FrontData;
-    // template<typename scalar_t> struct FwdSolveData;
-  }
+  // namespace gpu {
+  //   template<typename scalar_t> struct FrontData;
+  //   // template<typename scalar_t> struct FwdSolveData;
+  // }
 
   template<typename scalar_t,typename integer_t> class FrontGPUSPD
-    : public FrontalMatrix<scalar_t,integer_t> {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    : public Front<scalar_t,integer_t> {
+    using F_t = Front<scalar_t,integer_t>;
     using FG_t = FrontGPUSPD<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -51,13 +51,13 @@ namespace strumpack {
                                const std::vector<std::size_t>& J,
                                DenseM_t& B, int task_depth) const override {}
 
-    std::string type() const override { return "FrontalMatrixGPU"; }
+    std::string type() const override { return "FrontGPU"; }
     bool isGPU() const override { return true; }
 
 #if defined(STRUMPACK_USE_MPI)
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                               const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+                               const FrontMPI<scalar_t,integer_t>* pa)
       const override;
 #endif
 

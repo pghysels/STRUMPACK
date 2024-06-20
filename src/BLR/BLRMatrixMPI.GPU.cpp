@@ -36,10 +36,7 @@
 #include "BLRTileBLAS.hpp"
 #include "BLRBatch.hpp"
 #include "dense/GPUWrapper.hpp"
-
-// TODO why include this?
-#include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
-
+#include "sparse/fronts/FrontGPUKernels.hpp" // for replace_pivots
 
 namespace strumpack {
   namespace BLR {

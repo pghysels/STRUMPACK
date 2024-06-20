@@ -33,17 +33,17 @@
 #include <cstring>
 
 #include "FrontGPUSPD.hpp"
-#include "FrontalMatrixGPUKernels.hpp"
+#include "FrontGPUKernels.hpp"
 
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #endif
 
 namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfoUnified {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
     using FG_t = FrontGPUSPD<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
@@ -335,7 +335,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontGPUSPD<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+   const FrontMPI<scalar_t,integer_t>* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
       (F22_, sbuf, pa, this);
   }

@@ -38,7 +38,7 @@
 #include "BLRBatch.hpp"
 
 #include "dense/GPUWrapper.hpp"
-#include "sparse/fronts/FrontalMatrixGPUKernels.hpp"
+#include "sparse/fronts/FrontGPUKernels.hpp" // for replace_pivots
 
 namespace strumpack {
   namespace BLR {

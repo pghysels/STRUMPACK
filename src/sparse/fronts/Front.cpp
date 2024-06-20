@@ -32,10 +32,10 @@
 #include <vector>
 #include <cmath>
 
-#include "FrontalMatrix.hpp"
+#include "Front.hpp"
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #include "BLR/BLRExtendAdd.hpp"
 #include "FrontBLRMPI.hpp"
 #endif
@@ -43,7 +43,7 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrix<scalar_t,integer_t>::FrontalMatrix
+  Front<scalar_t,integer_t>::Front
   (F_t* lchild, F_t* rchild, integer_t sep, integer_t sep_begin,
    integer_t sep_end, std::vector<integer_t>& upd)
     : sep_(sep), sep_begin_(sep_begin), sep_end_(sep_end),
@@ -51,7 +51,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::draw
+  Front<scalar_t,integer_t>::draw
   (std::ostream& of, int etree_level) const {
     draw_node(of, etree_level == 0);
     for (auto u : upd_) {
@@ -71,7 +71,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::draw_node
+  Front<scalar_t,integer_t>::draw_node
   (std::ostream& of, bool is_root) const {
     char prev = std::cout.fill('0');
     of << "set obj rect from "
@@ -89,7 +89,7 @@ namespace strumpack {
    * that element corresponds.
    */
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::find_upd_indices
+  Front<scalar_t,integer_t>::find_upd_indices
   (const std::vector<std::size_t>& I, std::vector<std::size_t>& lI,
    std::vector<std::size_t>& oI) const {
     auto n = I.size();
@@ -105,7 +105,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
+  Front<scalar_t,integer_t>::upd_to_parent
   (const F_t* pa, std::size_t& upd2sep, std::size_t* I) const {
     integer_t r = 0, dupd = dim_upd(), pa_dsep = pa->dim_sep();
     for (; r<dupd; r++) {
@@ -121,7 +121,7 @@ namespace strumpack {
     }
   }
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
+  Front<scalar_t,integer_t>::upd_to_parent
   (const F_t* pa, std::size_t* I) const {
     integer_t r = 0, dupd = dim_upd(), pa_dsep = pa->dim_sep();
     for (; r<dupd; r++) {
@@ -137,14 +137,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> std::vector<std::size_t>
-  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
+  Front<scalar_t,integer_t>::upd_to_parent
   (const F_t* pa) const {
     std::size_t upd2sep;
     return upd_to_parent(pa, upd2sep);
   }
 
   template<typename scalar_t,typename integer_t> std::vector<std::size_t>
-  FrontalMatrix<scalar_t,integer_t>::upd_to_parent
+  Front<scalar_t,integer_t>::upd_to_parent
   (const F_t* pa, std::size_t& upd2sep) const {
     std::vector<std::size_t> I(dim_upd());
     upd_to_parent(pa, upd2sep, I.data());
@@ -152,7 +152,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> inline void
-  FrontalMatrix<scalar_t,integer_t>::extend_add_b
+  Front<scalar_t,integer_t>::extend_add_b
   (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const {
     std::size_t upd2sep;
     auto I = upd_to_parent(pa, upd2sep);
@@ -176,7 +176,7 @@ namespace strumpack {
    * parent.
    */
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extract_b
+  Front<scalar_t,integer_t>::extract_b
   (const DenseM_t& y, const DenseM_t& yupd, DenseM_t& CB, const F_t* pa) const {
     std::size_t upd2sep;
     auto I = upd_to_parent(pa, upd2sep);
@@ -196,7 +196,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> integer_t
-  FrontalMatrix<scalar_t,integer_t>::maximum_rank(int task_depth) const {
+  Front<scalar_t,integer_t>::maximum_rank(int task_depth) const {
     integer_t r = front_rank(), rl = 0, rr = 0;
     if (lchild_)
 #pragma omp task untied default(shared)                                 \
@@ -211,7 +211,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(DenseM_t& b) const {
+  Front<scalar_t,integer_t>::multifrontal_solve(DenseM_t& b) const {
     auto max_dupd = max_dim_upd();
     auto lvls = levels();
     std::vector<DenseM_t> CB(lvls);
@@ -228,7 +228,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
+  Front<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
     bupd.zero();
@@ -246,7 +246,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::fwd_solve_phase1
+  Front<scalar_t,integer_t>::fwd_solve_phase1
   (DenseM_t& b, DenseM_t& bupd, DenseM_t* work,
    int etree_level, int task_depth) const {
     if (task_depth < params::task_recursion_cutoff_level) {
@@ -291,7 +291,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
+  Front<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (task_depth == 0) {
@@ -309,7 +309,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::bwd_solve_phase2
+  Front<scalar_t,integer_t>::bwd_solve_phase2
   (DenseM_t& y, DenseM_t& yupd, DenseM_t* work,
    int etree_level, int task_depth) const {
     if (task_depth < params::task_recursion_cutoff_level) {
@@ -356,7 +356,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrix<scalar_t,integer_t>::factor_nonzeros(int task_depth) const {
+  Front<scalar_t,integer_t>::factor_nonzeros(int task_depth) const {
     long long nnz = node_factor_nonzeros(), nnzl = 0, nnzr = 0;
     if (lchild_)
 #pragma omp task default(shared)                        \
@@ -371,7 +371,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrix<scalar_t,integer_t>::dense_factor_nonzeros
+  Front<scalar_t,integer_t>::dense_factor_nonzeros
   (int task_depth) const {
     long long nnz = dense_node_factor_nonzeros(), nnzl = 0, nnzr = 0;
     if (lchild_)
@@ -387,7 +387,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrix<scalar_t,integer_t>::inertia
+  Front<scalar_t,integer_t>::inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
     if (lchild_) el = lchild_->inertia(neg, zero, pos);
@@ -398,8 +398,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrix<scalar_t,integer_t>::subnormals(std::size_t& ns,
-                                                std::size_t& nz) const {
+  Front<scalar_t,integer_t>::subnormals(std::size_t& ns,
+                                        std::size_t& nz) const {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
     if (lchild_) el = lchild_->subnormals(ns, nz);
     if (rchild_) er = rchild_->subnormals(ns, nz);
@@ -409,8 +409,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrix<scalar_t,integer_t>::pivot_growth(scalar_t& pgL,
-                                                  scalar_t& pgU) const {
+  Front<scalar_t,integer_t>::pivot_growth(scalar_t& pgL,
+                                          scalar_t& pgU) const {
     ReturnCode el = ReturnCode::SUCCESS, er = ReturnCode::SUCCESS;
     if (lchild_) el = lchild_->pivot_growth(pgL, pgU);
     if (rchild_) er = rchild_->pivot_growth(pgL, pgU);
@@ -421,7 +421,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_MPI)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::multifrontal_solve
+  Front<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist) const {
     DistM_t CB;
     DenseM_t seqCB;
@@ -434,7 +434,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::forward_multifrontal_solve
+  Front<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t& seqbupd,
    int etree_level) const {
     auto max_dupd = max_dim_upd();
@@ -449,7 +449,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::backward_multifrontal_solve
+  Front<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t& seqyupd,
    int etree_level) const {
     auto max_dupd = max_dim_upd();
@@ -464,7 +464,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extend_add_copy_from_buffers
+  Front<scalar_t,integer_t>::extend_add_copy_from_buffers
   (DistM_t& F11, DistM_t& F12, DistM_t& F21, DistM_t& F22,
    scalar_t** pbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_from_buffers
@@ -472,7 +472,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  Front<scalar_t,integer_t>::extadd_blr_copy_from_buffers
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::seq_copy_from_buffers
@@ -480,7 +480,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  Front<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa, integer_t begin_col, integer_t end_col) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::seq_copy_from_buffers_col
@@ -488,7 +488,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extend_add_column_copy_to_buffers
+  Front<scalar_t,integer_t>::extend_add_column_copy_to_buffers
   (const DistM_t& CB, const DenseM_t& seqCB,
    std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_column_seq_copy_to_buffers
@@ -496,14 +496,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extend_add_column_copy_from_buffers
+  Front<scalar_t,integer_t>::extend_add_column_copy_from_buffers
   (DistM_t& B, DistM_t& Bupd, scalar_t** pbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_column_seq_copy_from_buffers
       (B, Bupd, *pbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extract_column_copy_to_buffers
+  Front<scalar_t,integer_t>::extract_column_copy_to_buffers
   (const DistM_t& b, const DistM_t& bupd, int ch_master,
    std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::extract_column_seq_copy_to_buffers
@@ -511,7 +511,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extract_column_copy_from_buffers
+  Front<scalar_t,integer_t>::extract_column_copy_from_buffers
   (const DistM_t& b, DistM_t& CB, DenseM_t& seqCB,
    std::vector<scalar_t*>& pbuf, const FMPI_t* pa) const {
     seqCB = DenseM_t(dim_upd(), b.cols());
@@ -520,7 +520,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::skinny_ea_to_buffers
+  Front<scalar_t,integer_t>::skinny_ea_to_buffers
   (const DistM_t& S, const DenseM_t& seqS,
    std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::skinny_extend_add_seq_copy_to_buffers
@@ -528,14 +528,14 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::skinny_ea_from_buffers
+  Front<scalar_t,integer_t>::skinny_ea_from_buffers
   (DistM_t& S, scalar_t** pbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::skinny_extend_add_seq_copy_from_buffers
       (S, *pbuf, pa, this);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extract_from_R2D
+  Front<scalar_t,integer_t>::extract_from_R2D
   (const DistM_t& R, DistM_t& cR, DenseM_t& seqcR,
    const FMPI_t* pa, bool visit) const {
     if (visit) seqcR = DenseM_t(R.rows(), R.cols());
@@ -544,7 +544,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::get_submatrix_2d
+  Front<scalar_t,integer_t>::get_submatrix_2d
   (const std::vector<std::size_t>& I, const std::vector<std::size_t>& J,
    DistM_t&, DenseM_t& Bseq) const {
     TIMER_TIME(TaskType::GET_SUBMATRIX, 2, t_getsub);
@@ -554,7 +554,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::get_submatrix_2d
+  Front<scalar_t,integer_t>::get_submatrix_2d
   (const std::vector<std::vector<std::size_t>>& I,
    const std::vector<std::vector<std::size_t>>& J,
    std::vector<DistM_t>&, std::vector<DenseM_t>& Bseq) const {
@@ -564,7 +564,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extract_CB_sub_matrix_blocks
+  Front<scalar_t,integer_t>::extract_CB_sub_matrix_blocks
   (const std::vector<std::vector<std::size_t>>& I,
    const std::vector<std::vector<std::size_t>>& J,
    std::vector<DenseM_t>& Bseq, int task_depth) const {
@@ -576,7 +576,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::extract_CB_sub_matrix_blocks
+  Front<scalar_t,integer_t>::extract_CB_sub_matrix_blocks
   (const std::vector<std::vector<std::size_t>>& I,
    const std::vector<std::vector<std::size_t>>& J,
    std::vector<DenseMW_t>& Bseq, int task_depth) const {
@@ -585,7 +585,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::partition_fronts
+  Front<scalar_t,integer_t>::partition_fronts
   (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
    bool is_root, int task_depth) {
     auto lch = lchild_.get();
@@ -603,16 +603,16 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::partition
+  Front<scalar_t,integer_t>::partition
   (const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
    bool is_root, int task_depth) {
-    // default is to do nothing, see FrontalMatrixHSS for an actual
+    // default is to do nothing, see FrontHSS for an actual
     // implementation
     std::iota(sorder+sep_begin_, sorder+sep_end_, sep_begin_);
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::permute_CB
+  Front<scalar_t,integer_t>::permute_CB
   (const integer_t* perm, int task_depth) {
     auto lch = lchild_.get();
     auto rch = rchild_.get();
@@ -631,7 +631,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::get_level_fronts
+  Front<scalar_t,integer_t>::get_level_fronts
   (std::vector<const F_t*>& ldata, int elvl, int l) const {
     if (l < elvl) {
       if (lchild_) lchild_->get_level_fronts(ldata, elvl, l+1);
@@ -639,7 +639,7 @@ namespace strumpack {
     } else ldata.push_back(this);
   }
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrix<scalar_t,integer_t>::get_level_fronts
+  Front<scalar_t,integer_t>::get_level_fronts
   (std::vector<F_t*>& ldata, int elvl, int l) {
     if (l < elvl) {
       if (lchild_) lchild_->get_level_fronts(ldata, elvl, l+1);
@@ -649,19 +649,19 @@ namespace strumpack {
 
 
   // explicit template instantiations
-  template class FrontalMatrix<float,int>;
-  template class FrontalMatrix<double,int>;
-  template class FrontalMatrix<std::complex<float>,int>;
-  template class FrontalMatrix<std::complex<double>,int>;
+  template class Front<float,int>;
+  template class Front<double,int>;
+  template class Front<std::complex<float>,int>;
+  template class Front<std::complex<double>,int>;
 
-  template class FrontalMatrix<float,long int>;
-  template class FrontalMatrix<double,long int>;
-  template class FrontalMatrix<std::complex<float>,long int>;
-  template class FrontalMatrix<std::complex<double>,long int>;
+  template class Front<float,long int>;
+  template class Front<double,long int>;
+  template class Front<std::complex<float>,long int>;
+  template class Front<std::complex<double>,long int>;
 
-  template class FrontalMatrix<float,long long int>;
-  template class FrontalMatrix<double,long long int>;
-  template class FrontalMatrix<std::complex<float>,long long int>;
-  template class FrontalMatrix<std::complex<double>,long long int>;
+  template class Front<float,long long int>;
+  template class Front<double,long long int>;
+  template class Front<std::complex<float>,long long int>;
+  template class Front<std::complex<double>,long long int>;
 
 } // end namespace strumpack

@@ -29,7 +29,7 @@
 #ifndef FRONTAL_MATRIX_MAGMA_HPP
 #define FRONTAL_MATRIX_MAGMA_HPP
 
-#include "FrontalMatrixDense.hpp"
+#include "FrontDense.hpp"
 #include "dense/GPUWrapper.hpp"
 
 
@@ -39,8 +39,8 @@ namespace strumpack {
 
 
   template<typename scalar_t,typename integer_t> class FrontMAGMA
-    : public FrontalMatrix<scalar_t,integer_t> {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    : public Front<scalar_t,integer_t> {
+    using F_t = Front<scalar_t,integer_t>;
     using FM_t = FrontMAGMA<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
@@ -91,7 +91,7 @@ namespace strumpack {
 
     void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
-                               const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+                               const FrontMPI<scalar_t,integer_t>* pa)
       const override;
     void
     extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,

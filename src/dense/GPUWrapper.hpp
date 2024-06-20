@@ -31,10 +31,30 @@
 
 #include <memory>
 #include "DenseMatrix.hpp"
+#include "sparse/fronts/FrontGPUStructs.hpp"
 
 namespace strumpack {
   namespace gpu {
 #if defined(STRUMPACK_USE_GPU)
+
+    // constexpr
+    inline int align_max_struct() {
+      auto m = sizeof(std::complex<double>);
+      m = std::max(m, sizeof(gpu::FrontData<std::complex<double>>));
+      m = std::max(m, sizeof(gpu::AssembleData<std::complex<double>>));
+      m = std::max(m, sizeof(Triplet<std::complex<double>>));
+      int k = 16;
+      while (k < int(m)) k *= 2;
+      return k;
+    }
+
+    inline std::size_t round_up(std::size_t n) {
+      int k = align_max_struct();
+      return std::size_t((n + k - 1) / k) * k;
+    }
+    template<typename T> T* aligned_ptr(void* p) {
+      return (T*)(round_up(uintptr_t(p)));
+    }
 
     class Stream {
     public:

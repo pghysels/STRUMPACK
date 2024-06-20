@@ -26,1039 +26,818 @@
  *             Division).
  *
  */
-#include <array>
-#include <limits>
+#include <sycl/sycl.hpp>
+#include <complex>
+#include <iostream>
+#include <complex>
 
-#include "FrontSYCL.hpp"
+#define STRUMPACK_NO_TRIPLET_MPI
+#include "FrontGPUKernels.hpp"
+#include "dense/SYCLWrapper.hpp"
 
-#if defined(STRUMPACK_USE_MPI)
-#include "ExtendAdd.hpp"
-#include "FrontalMatrixMPI.hpp"
-#endif
 
 namespace strumpack {
+  namespace gpu {
 
-  template<typename T> struct AssembleData {
-    AssembleData(std::size_t d1_, std::size_t d2_,
-                 T* F11_, T* F12_, T* F21_, T* F22_,
-                 std::size_t n11_, std::size_t n12_, std::size_t n21_,
-                 Triplet<T>* e11_, Triplet<T>* e12_, Triplet<T>* e21_)
-      : d1(d1_), d2(d2_), F11(F11_), F12(F12_), F21(F21_), F22(F22_),
-        n11(n11_), n12(n12_), n21(n21_), e11(e11_), e12(e12_), e21(e21_) {}
-    AssembleData(int d1_, int d2_, T* F11_, T* F21_)
-      : d1(d1_), d2(d2_), F11(F11_), F21(F21_) {}
-
-    // sizes and pointers for this front
-    std::size_t d1 = 0, d2 = 0;
-    T *F11 = nullptr, *F12 = nullptr, *F21 = nullptr, *F22 = nullptr;
-
-    // info for extend add
-    std::size_t dCB1 = 0, dCB2 = 0;
-    T *CB1 = nullptr, *CB2 = nullptr;
-    std::size_t *I1 = nullptr, *I2 = nullptr;
-
-    // sparse matrix elements
-    std::size_t n11 = 0, n12 = 0, n21 = 0;
-    Triplet<T> *e11 = nullptr, *e12 = nullptr, *e21 = nullptr;
-
-    void set_ext_add_left(std::size_t dCB, T* CB, std::size_t* I) {
-      dCB1 = dCB;
-      CB1 = CB;
-      I1 = I;
-    }
-    void set_ext_add_right(std::size_t dCB, T* CB, std::size_t* I) {
-      dCB2 = dCB;
-      CB2 = CB;
-      I2 = I;
-    }
-  };
-
-  constexpr int align_max_struct() {
-    auto m = sizeof(std::complex<double>);
-    m = std::max(m, sizeof(AssembleData<std::complex<double>>));
-    m = std::max(m, sizeof(Triplet<std::complex<double>>));
-    int k = 16;
-    while (k < int(m)) k *= 2;
-    return k;
-  }
-  std::size_t round_up(std::size_t n) {
-    int k = align_max_struct();
-    return std::size_t((n + k - 1) / k) * k;
-  }
-  template<typename T> T* aligned_ptr(void* p) {
-    return (T*)(round_up(uintptr_t(p)));
-  }
-
-  template<typename scalar_t, typename integer_t> class LevelInfo {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FSYCL_t = FrontSYCL<scalar_t,integer_t>;
-    using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-    using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-
-  public:
-    LevelInfo() {}
-
-    LevelInfo(const std::vector<F_t*>& fronts,
-              cl::sycl::queue& q, const SpMat_t* A=nullptr) {
-      f.reserve(fronts.size());
-      for (auto& F : fronts)
-        f.push_back(dynamic_cast<FSYCL_t*>(F));
-#pragma omp parallel for                        \
-  reduction(+:L_size,U_size,Schur_size)         \
-  reduction(+:piv_size,total_upd_size)
-      for (auto F : f) {
-        const std::size_t dsep = F->dim_sep();
-        const std::size_t dupd = F->dim_upd();
-        L_size += dsep*dsep + dsep*dupd;
-        U_size += dsep*dupd;
-        Schur_size += dupd*dupd;
-        piv_size += dsep;
-        total_upd_size += dupd;
-      }
-      if (A) {
-        auto N = f.size();
-        elems11.resize(N+1);
-        elems12.resize(N+1);
-        elems21.resize(N+1);
-        Isize.resize(N+1);
-#pragma omp parallel for
-        for (std::size_t i=0; i<N; i++) {
-          auto& F = *(f[i]);
-          A->count_front_elements
-            (F.sep_begin(), F.sep_end(), F.upd(),
-             elems11[i+1], elems12[i+1], elems21[i+1]);
-          if (F.lchild_) Isize[i+1] += F.lchild_->dim_upd();
-          if (F.rchild_) Isize[i+1] += F.rchild_->dim_upd();
-        }
-        for (std::size_t i=0; i<N; i++) {
-          elems11[i+1] += elems11[i];
-          elems12[i+1] += elems12[i];
-          elems21[i+1] += elems21[i];
-          Isize[i+1] += Isize[i];
-        }
-      }
-      factor_size = L_size + U_size;
-
-      factor_bytes = sizeof(scalar_t) * factor_size;
-      factor_bytes = round_up(factor_bytes);
-
-      work_bytes = sizeof(scalar_t) * Schur_size;
-      work_bytes = round_up(work_bytes);
-      work_bytes += sizeof(std::int64_t) * piv_size;
-      work_bytes = round_up(work_bytes);
-
-      ea_bytes = sizeof(AssembleData<scalar_t>) * f.size();
-      ea_bytes = round_up(ea_bytes);
-      ea_bytes += sizeof(std::size_t) * Isize.back();
-      ea_bytes = round_up(ea_bytes);
-      ea_bytes += sizeof(Triplet<scalar_t>) *
-        (elems11.back() + elems12.back() + elems21.back());
-      ea_bytes = round_up(ea_bytes);
-    }
-
-    void print_info(int l, int lvls) {
-      std::cout << "#  level " << l << " of " << lvls
-                << " has " << f.size() << " nodes and "
-                << factor_bytes / 1.e6
-                << " MB for factors, "
-                << Schur_size * sizeof(scalar_t) / 1.e6
-                << " MB for Schur complements" << std::endl;
-    }
-
-    long long total_flops() {
-      long long level_flops = 0;
-      for (auto F : f) {
-        level_flops += LU_flops(F->F11_) +
-          gemm_flops(Trans::N, Trans::N, scalar_t(-1.),
-                     F->F21_, F->F12_, scalar_t(1.)) +
-          trsm_flops(Side::L, scalar_t(1.), F->F11_, F->F12_) +
-          trsm_flops(Side::R, scalar_t(1.), F->F11_, F->F21_);
-      }
-      return level_flops;
-    }
-
-    /*
-     * first store L factors, then U factors,
-     *  F11, F21, F11, F21, ..., F12, F12, ...
+    /**
+     * Get the real T type corresponding to a scalar, for instance T,
+     * std::complex<T> or thrust::complex<T>, to be used for instance
+     * to compute norms or absolute value.
      */
-    void set_factor_pointers(scalar_t* factors) {
-      for (auto F : f) {
-        const int dsep = F->dim_sep();
-        const int dupd = F->dim_upd();
-        F->F11_ = DenseMW_t(dsep, dsep, factors, dsep); factors += dsep*dsep;
-        F->F12_ = DenseMW_t(dsep, dupd, factors, dsep); factors += dsep*dupd;
-        F->F21_ = DenseMW_t(dupd, dsep, factors, dupd); factors += dupd*dsep;
-      }
-    }
+    template<class T> struct real_type { typedef T value_type; };
+    template<class T> struct real_type<std::complex<T>> { typedef T value_type; };
 
-    void set_pivot_pointers(std::int64_t* pmem) {
-      for (auto F : f) {
-        F->piv_ = pmem;
-        pmem += F->dim_sep();
-      }
-    }
+    float real_part(float& a) { return a; }
+    double real_part(double& a) { return a; }
+    float real_part(std::complex<float> &a) { return a.real(); }
+    double real_part(std::complex<double> &a) { return a.real(); }
 
-    void set_work_pointers(void* wmem) {
-      auto smem = reinterpret_cast<scalar_t*>(wmem);
-      for (auto F : f) {
-        const int dupd = F->dim_upd();
-        if (dupd) {
-          F->F22_ = DenseMW_t(dupd, dupd, smem, dupd);
-          smem += dupd*dupd;
+    float absolute_value(float &a) { return std::abs(a); }
+    double absolute_value(double &a) { return std::abs(a); }
+    float absolute_value(std::complex<float> &a) { return std::abs(a); }
+    double absolute_value(std::complex<double> &a) { return std::abs(a); }
+    // float absolute_value(std::complex<float> &a) { return thrust::abs(a); }
+    // double absolute_value(std::complex<double> &a) { return thrust::abs(a); }
+
+    /**
+     * Put elements of the sparse matrix in the F11, F12 and F21 parts
+     * of the front.  The sparse elements are taken from F.e11, F.e12,
+     * F.e21, which are lists of triplets {r,c,v}. The front is
+     * assumed to be initialized to zero.
+     *
+     */
+    template<typename T> struct Assemble {
+      AssembleData<T>* dat;
+      std::size_t nf;
+      Assemble(AssembleData<T>* d, std::size_t N) : dat(d), nf(N) {}
+      void operator()(const sycl::nd_item<2>& it) const {
+        std::size_t op = it.get_global_id(0);
+        if (op >= nf) return;
+        auto& F = dat[op];
+        auto idx = it.get_global_id(1);
+        if (idx < F.n11) {
+          auto& t = F.e11[idx];
+          F.F11[t.r + t.c*F.d1] = t.v;
+        }
+        if (idx < F.n12) {
+          auto& t = F.e12[idx];
+          F.F12[t.r + t.c*F.d1] = t.v;
+        }
+        if (idx < F.n21) {
+          auto& t = F.e21[idx];
+          F.F21[t.r + t.c*F.d2] = t.v;
         }
       }
-      auto imem = aligned_ptr<std::int64_t>(smem);
-      for (auto F : f) {
-        F->piv_ = imem;
-        imem += F->dim_sep();
-      }
-    }
-
-    std::vector<FSYCL_t*> f;
-    std::size_t L_size = 0, U_size = 0, factor_size = 0,
-      Schur_size = 0, piv_size = 0, total_upd_size = 0,
-      factor_bytes = 0, work_bytes = 0, ea_bytes = 0;
-    std::vector<std::size_t> elems11, elems12, elems21, Isize;
-  };
+    };
 
 
-  template<typename scalar_t,typename integer_t>
-  FrontSYCL<scalar_t,integer_t>::FrontSYCL
-  (integer_t sep, integer_t sep_begin, integer_t sep_end,
-   std::vector<integer_t>& upd)
-    : F_t(nullptr, nullptr, sep, sep_begin, sep_end, upd) {}
-
-  template<typename scalar_t,typename integer_t>
-  FrontSYCL<scalar_t,integer_t>::~FrontSYCL() {
-#if defined(STRUMPACK_COUNT_FLOPS)
-    const std::size_t dupd = dim_upd();
-    const std::size_t dsep = dim_sep();
-    STRUMPACK_SUB_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
-#endif
-  }
-
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::release_work_memory() {
-    F22_.clear();
-    host_Schur_.release();
-  }
-
-#if defined(STRUMPACK_USE_MPI)
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::extend_add_copy_to_buffers
-  (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
-    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
-      (F22_, sbuf, pa, this);
-  }
-#endif
-
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::extend_add_to_dense
-  (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const F_t* p, int task_depth) {
-    const std::size_t pdsep = paF11.rows();
-    const std::size_t dupd = dim_upd();
-    std::size_t upd2sep;
-    auto I = this->upd_to_parent(p, upd2sep);
-#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
-#pragma omp taskloop default(shared) grainsize(64)      \
-  if(task_depth < params::task_recursion_cutoff_level)
-#endif
-    for (std::size_t c=0; c<dupd; c++) {
-      auto pc = I[c];
-      if (pc < pdsep) {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF11(I[r],pc) += F22_(r,c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF21(I[r]-pdsep,pc) += F22_(r,c);
-      } else {
-        for (std::size_t r=0; r<upd2sep; r++)
-          paF12(I[r],pc-pdsep) += F22_(r, c);
-        for (std::size_t r=upd2sep; r<dupd; r++)
-          paF22(I[r]-pdsep,pc-pdsep) += F22_(r,c);
-      }
-    }
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    STRUMPACK_FULL_RANK_FLOPS((is_complex<scalar_t>()?2:1) * dupd * dupd);
-    release_work_memory();
-  }
-
-  template<typename scalar_t,typename integer_t>
-  std::size_t peak_device_memory
-  (const std::vector<LevelInfo<scalar_t,integer_t>>& ldata) {
-    std::size_t peak_dmem = 0;
-    for (std::size_t l=0; l<ldata.size(); l++) {
-      auto& L = ldata[l];
-      // memory needed on this level: factors,
-      // schur updates, pivot vectors, cuSOLVER work space,
-      // assembly data (indices, sparse elements)
-      std::size_t level_mem = L.factor_bytes + L.work_bytes + L.ea_bytes;
-      // the contribution blocks of the previous level are still
-      // needed for the extend-add
-      if (l+1 < ldata.size())
-        level_mem += ldata[l+1].work_bytes;
-      peak_dmem = std::max(peak_dmem, level_mem);
-    }
-    return peak_dmem;
-  }
-
-  template<typename T> struct Assemble {
-    AssembleData<T>* dat;
-    std::size_t nf;
-    Assemble(AssembleData<T>* d, std::size_t N) : dat(d), nf(N) {}
-    void operator()(cl::sycl::nd_item<2> it) const {
-      std::size_t op = it.get_global_id(0);
-      if (op >= nf) return;
-      auto& F = dat[op];
-      auto idx = it.get_global_id(1);
-      if (idx < F.n11) {
-        auto& t = F.e11[idx];
-        F.F11[t.r + t.c*F.d1] = t.v;
-      }
-      if (idx < F.n12) {
-        auto& t = F.e12[idx];
-        F.F12[t.r + t.c*F.d1] = t.v;
-      }
-      if (idx < F.n21) {
-        auto& t = F.e21[idx];
-        F.F21[t.r + t.c*F.d2] = t.v;
-      }
-    }
-  };
-
-  template<typename T, unsigned int unroll> struct EA {
-    AssembleData<T>* dat;
-    bool left;
-    std::size_t nf;
-    EA(AssembleData<T>* d, std::size_t N, bool l)
-      : dat(d), nf(N), left(l) {}
-    void operator()(cl::sycl::nd_item<3> it) const {
-      int y = it.get_global_id(2),
-        x0 = it.get_group(1) * unroll,
-        z = it.get_global_id(0);
-      if (z >= nf) return;
-      auto& f = dat[z];
-      auto CB = left ? f.CB1 : f.CB2;
-      if (!CB) return;
-      auto dCB = left ? f.dCB1 : f.dCB2;
-      if (y >= dCB) return;
-      auto I = left ? f.I1 : f.I2;
-      auto Iy = I[y];
-      CB += y + x0*dCB;
-      int d1 = f.d1, d2 = f.d2;
-      int ld;
-      T* F[2];
-      if (Iy < d1) {
-        ld = d1;
-        F[0] = f.F11+Iy;
-        F[1] = f.F12+Iy-d1*d1;
-      } else {
-        ld = d2;
-        F[0] = f.F21+Iy-d1;
-        F[1] = f.F22+Iy-d1-d1*d2;
-      }
+    /**
+     * Single extend-add operation from one contribution block into
+     * the parent front. d1 is the size of F11, d2 is the size of F22.
+     */
+    template<typename T, unsigned int unroll> struct EA {
+      AssembleData<T>* dat;
+      bool left;
+      std::size_t nf;
+      EA(AssembleData<T>* d, std::size_t N, bool l)
+        : dat(d), nf(N), left(l) {}
+      void operator()(const sycl::nd_item<3>& it) const {
+        int y = it.get_global_id(2),
+          x0 = it.get_group(1) * unroll,
+          z = it.get_global_id(0);
+        if (z >= nf) return;
+        auto& f = dat[z];
+        auto CB = left ? f.CB1 : f.CB2;
+        if (!CB) return;
+        auto dCB = left ? f.dCB1 : f.dCB2;
+        if (y >= dCB) return;
+        auto I = left ? f.I1 : f.I2;
+        auto Iy = I[y];
+        CB += y + x0*dCB;
+        int d1 = f.d1, d2 = f.d2;
+        int ld;
+        T* F[2];
+        if (Iy < d1) {
+          ld = d1;
+          F[0] = f.F11+Iy;
+          F[1] = f.F12+Iy-d1*d1;
+        } else {
+          ld = d2;
+          F[0] = f.F21+Iy-d1;
+          F[1] = f.F22+Iy-d1-d1*d2;
+        }
 #pragma unroll
-      for (int i=0; i<unroll; i++) {
-        int x = x0 + i;
-        if (x >= dCB) break;
-        auto Ix = I[x];
-        F[Ix >= d1][Ix*ld] += CB[i*dCB];
-      }
-    }
-  };
-
-  template<typename T> T rnd(T a, T b) { return ((a + b - 1) / b) * b; }
-
-
-  template<typename scalar_t, typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::front_assembly
-  (cl::sycl::queue& q, const SpMat_t& A, LInfo_t& L,
-   char* hea_mem, char* dea_mem) {
-    using FSYCL_t = FrontSYCL<scalar_t,integer_t>;
-    using Trip_t = Triplet<scalar_t>;
-    auto N = L.f.size();
-    auto hasmbl = aligned_ptr<AssembleData<scalar_t>>(hea_mem);
-    auto Iptr   = aligned_ptr<std::size_t>(hasmbl + N);
-    auto e11    = aligned_ptr<Trip_t>(Iptr + L.Isize.back());
-    auto e12    = e11 + L.elems11.back();
-    auto e21    = e12 + L.elems12.back();
-    auto dasmbl = aligned_ptr<AssembleData<scalar_t>>(dea_mem);
-    auto dIptr  = aligned_ptr<std::size_t>(dasmbl + N);
-    auto de11   = aligned_ptr<Trip_t>(dIptr + L.Isize.back());
-    auto de12   = de11 + L.elems11.back();
-    auto de21   = de12 + L.elems12.back();
-
-#pragma omp parallel for
-    for (std::size_t n=0; n<N; n++) {
-      auto& f = *(L.f[n]);
-      A.set_front_elements
-        (f.sep_begin_, f.sep_end_, f.upd_,
-         e11+L.elems11[n], e12+L.elems12[n], e21+L.elems21[n]);
-      hasmbl[n] = AssembleData<scalar_t>
-        (f.dim_sep(), f.dim_upd(), f.F11_.data(), f.F12_.data(),
-         f.F21_.data(), f.F22_.data(),
-         L.elems11[n+1]-L.elems11[n], L.elems12[n+1]-L.elems12[n],
-         L.elems21[n+1]-L.elems21[n],
-         de11+L.elems11[n], de12+L.elems12[n], de21+L.elems21[n]);
-      auto fIptr = Iptr + L.Isize[n];
-      auto fdIptr = dIptr + L.Isize[n];
-      if (f.lchild_) {
-        auto c = dynamic_cast<FSYCL_t*>(f.lchild_.get());
-        hasmbl[n].set_ext_add_left(c->dim_upd(), c->F22_.data(), fdIptr);
-        c->upd_to_parent(&f, fIptr);
-        fIptr += c->dim_upd();
-        fdIptr += c->dim_upd();
-      }
-      if (f.rchild_) {
-        auto c = dynamic_cast<FSYCL_t*>(f.rchild_.get());
-        hasmbl[n].set_ext_add_right(c->dim_upd(), c->F22_.data(), fdIptr);
-        c->upd_to_parent(&f, fIptr);
-      }
-    }
-    dpcpp::memcpy<char>(q, dea_mem, hea_mem, L.ea_bytes);
-    q.wait_and_throw();
-    { // front assembly from sparse matrix
-      std::size_t nnz = 0;
-      for (std::size_t f=0; f<N; f++)
-        nnz = std::max
-          (nnz, std::max(hasmbl[f].n11, std::max(hasmbl[f].n12, hasmbl[f].n21)));
-      if (nnz) {
-        std::size_t nt = 512, ops = 1;
-        while (nt > nnz) {
-          nt /= 2;
-          ops *= 2;
+        for (int i=0; i<unroll; i++) {
+          int x = x0 + i;
+          if (x >= dCB) break;
+          auto Ix = I[x];
+          F[Ix >= d1][Ix*ld] += CB[i*dCB];
         }
-        assert(rnd(N,ops) * rnd(nnz,nt) < std::numeric_limits<int>::max());
-        cl::sycl::range<2> global{rnd(N,ops), rnd(nnz,nt)}, local{ops, nt};
-        q.parallel_for(cl::sycl::nd_range<2>{global, local},
-                       Assemble<scalar_t>(dasmbl, N));
       }
-    }
-    q.wait_and_throw();
-    { // extend-add
-      std::size_t gCB = 0;
-      for (std::size_t f=0; f<N; f++)
-        gCB = std::max(gCB, std::max(hasmbl[f].dCB1, hasmbl[f].dCB2));
-      if (gCB) {
-        std::size_t nt = 256, ops = 1;
-        const unsigned int unroll = 16;
-        while (nt > gCB) {
-          nt /= 2;
-          ops *= 2;
-        }
-        std::size_t gx = (gCB + unroll - 1) / unroll;
-        gCB = rnd(gCB, nt);
-        assert(gCB * gx * rnd(N,ops) < std::numeric_limits<int>::max());
-        cl::sycl::range<3> global{rnd(N, ops), gx, gCB}, local{ops, 1, nt};
-        q.parallel_for(cl::sycl::nd_range<3>{global, local},
-                       EA<scalar_t,unroll>(dasmbl, N, true));
-        q.wait_and_throw();
-        q.parallel_for(cl::sycl::nd_range<3>{global, local},
-                       EA<scalar_t,unroll>(dasmbl, N, false));
-        q.wait_and_throw();
-      }
-    }
-  }
+    };
 
+    template<typename T> T rnd(T a, T b) { return ((a + b - 1) / b) * b; }
 
-  template<typename scalar_t, typename integer_t>
-  struct BatchMetaData {
-    using LInfo_t = LevelInfo<scalar_t,integer_t>;
-    BatchMetaData() {}
-    BatchMetaData(const std::vector<LInfo_t>& L,
-                  cl::sycl::queue& q) {
-      std::size_t nb = 0;
-      for (auto& l : L) nb = std::max(nb, l.f.size());
-      std::size_t bytes = nb * 2 * sizeof(std::int64_t);
-      bytes = round_up(bytes);
-      bytes += nb * 2 * sizeof(std::int64_t); // ds, du
-      bytes = round_up(bytes);
-      bytes += nb * 5 * sizeof(void*);        // F11, F12, F21, F22, piv
-      bytes = round_up(bytes);
-      bytes += nb * 2 * sizeof(scalar_t);     // alpha, beta
-      bytes = round_up(bytes);
-      bytes += nb * sizeof(std::int64_t);     // group_sizes
-      bytes = round_up(bytes);
-      bytes += nb * sizeof(oneapi::mkl::transpose); // op
-      bytes = round_up(bytes);
-
-      hmem_ = dpcpp::HostMemory<char>(bytes, q);
-      ds = hmem_.as<std::int64_t>();
-      du = ds + nb;
-      F11 = aligned_ptr<scalar_t*>(du + nb);
-      F12 = F11 + nb;
-      F21 = F12 + nb;
-      F22 = F21 + nb;
-      piv = aligned_ptr<std::int64_t*>(F22 + nb);
-      alpha = aligned_ptr<scalar_t>(piv + nb);
-      beta = alpha + nb;
-      group_sizes = aligned_ptr<std::int64_t>(beta + nb);
-      op = aligned_ptr<oneapi::mkl::transpose>(group_sizes + nb);
-      dpcpp::fill(q, alpha, scalar_t(-1.), nb);
-      dpcpp::fill(q, beta, scalar_t(1.), nb);
-      dpcpp::fill(q, group_sizes, std::int64_t(1), nb);
-      dpcpp::fill(q, op, oneapi::mkl::transpose::N, nb);
-      for (auto& l : L) {
-        set_level(q, l, false);
-        lwork = std::max
-          (lwork,
-           oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>
-           (q, ds, ds, ds, l.f.size(), group_sizes));
-        lwork = std::max
-          (lwork,
-           oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>
-           (q, op, ds, du, ds, ds, l.f.size(), group_sizes));
-      }
-      scratchpad = dpcpp::DeviceMemory<scalar_t>(lwork, q);
-    }
-    std::size_t set_level(cl::sycl::queue& q, const LInfo_t& L,
-                          bool Schur, std::size_t B=0) {
-      std::size_t i = 0;
-      for (auto& f : L.f) {
-        if (Schur && (f->dim_sep() == 0 || f->dim_upd() == 0))
-          continue;
-        if (f->dim_sep() <= B)
-          continue;
-        ds[i] = f->dim_sep();
-        du[i] = f->dim_upd();
-        F11[i] = f->F11_.data();  F12[i] = f->F12_.data();
-        F21[i] = f->F21_.data();  F22[i] = f->F22_.data();
-        piv[i] = f->piv_;
-        i++;
-      }
-      return i;
-    }
-    std::size_t set_level_small(cl::sycl::queue& q, const LInfo_t& L,
-                                std::size_t Bmin, std::size_t Bmax) {
-      std::size_t i = 0;
-      for (auto& f : L.f) {
-        if (f->dim_sep() <= Bmin || f->dim_sep() > Bmax)
-          continue;
-        ds[i] = f->dim_sep();
-        du[i] = f->dim_upd();
-        F11[i] = f->F11_.data();  F12[i] = f->F12_.data();
-        F21[i] = f->F21_.data();  F22[i] = f->F22_.data();
-        piv[i] = f->piv_;
-        i++;
-      }
-      return i;
-    }
-    std::int64_t lwork = 0, *ds = nullptr, *du = nullptr,
-      **piv = nullptr, *group_sizes = nullptr;
-    scalar_t *alpha = nullptr, *beta = nullptr,
-      **F11 = nullptr, **F12 = nullptr,
-      **F21 = nullptr, **F22 = nullptr;
-    oneapi::mkl::transpose* op = nullptr;
-    dpcpp::DeviceMemory<scalar_t> scratchpad;
-  private:
-    dpcpp::HostMemory<char> hmem_;
-  };
-
-
-  template<std::size_t B, typename scalar_t, typename integer_t>
-  struct PartialFactor {
-    std::int64_t *ds_, *du_, **piv_;
-    scalar_t **F11_, **F12_, **F21_, **F22_;
-    PartialFactor(std::int64_t *ds, std::int64_t *du, std::int64_t **piv,
-                  scalar_t **F11, scalar_t **F12, scalar_t **F21, scalar_t **F22)
-      : ds_(ds), du_(du), piv_(piv),
-        F11_(F11), F12_(F12), F21_(F21), F22_(F22) {}
-    void operator()(cl::sycl::nd_item<3> it) const {
-      auto front = it.get_group(0);
-      int j = it.get_global_id(1), i = it.get_global_id(2);
-      int n = ds_[front], n2 = du_[front];
-      auto A11 = F11_[front];
-      auto piv = piv_[front];
-      for (int k=0; k<n; k++) {
-        // TODO make p and Amax global?
-        auto p = k;
-        auto Amax = std::abs(A11[k+k*n]);
-        for (int l=k+1; l<n; l++) {
-          auto tmp = std::abs(A11[l+k*n]);
-          if (tmp > Amax) {
-            Amax = tmp;
-            p = l;
+    template <typename T>
+    void assemble(unsigned int N, AssembleData<T> *dat,
+                  AssembleData<T> *ddat) {
+      sycl::queue &q = get_sycl_queue();
+      { // front assembly from sparse matrix
+        std::size_t nnz = 0;
+        for (std::size_t f=0; f<N; f++)
+          nnz = std::max
+            (nnz, std::size_t(std::max(dat[f].n11,
+                                       std::max(dat[f].n12, dat[f].n21))));
+        if (nnz) {
+          // TODO unroll
+          std::size_t nt = 512, ops = 1;
+          while (nt > nnz && ops < 64) {
+            nt /= 2;
+            ops *= 2;
           }
+          // assert(rnd(std::size_t(N),ops) * rnd(nnz,nt) < std::numeric_limits<int>::max());
+          sycl::range<2> global{rnd(std::size_t(N),ops),
+              rnd(nnz,nt)}, local{ops, nt};
+          q.parallel_for(sycl::nd_range<2>{global, local},
+                         Assemble<T>(ddat, N));
         }
-        if (i == 0 && j == 0)
+      }
+      { // extend-add
+        std::size_t gCB = 0;
+        for (std::size_t f=0; f<N; f++)
+          gCB = std::max(gCB, std::size_t(std::max(dat[f].dCB1, dat[f].dCB2)));
+        if (gCB) {
+          std::size_t nt = 256, ops = 1;
+          const std::size_t unroll = 16;
+          while (nt > gCB && ops < 64) {
+            nt /= 2;
+            ops *= 2;
+          }
+          std::size_t gx = (gCB + unroll - 1) / unroll;
+          gCB = rnd(gCB, nt);
+          // assert(gCB * gx * rnd(N,ops) < std::numeric_limits<int>::max());
+          sycl::range<3> global{rnd(std::size_t(N), ops), gx, gCB},
+            local{ops, 1, nt};
+          q.parallel_for(sycl::nd_range<3>{global, local},
+                         EA<T,unroll>(ddat, N, true));
+          q.parallel_for(sycl::nd_range<3>{global, local},
+                         EA<T,unroll>(ddat, N, false));
+        }
+      }
+    }
+
+
+    // /**
+    //  * This only works if value >= 0.
+    //  * It's assuming two's complement for the int.
+    //  * __float_as_int is like reinterpret_cast<int&>(value)
+    //  */
+    // __device__ __forceinline__ void atomicAbsMax(float* data, float value) {
+    //   atomicMax((int *)data, __float_as_int(value));
+    // }
+    // __device__ __forceinline__ void atomicAbsMax(double* addr, double value) {
+    //   // why does this not compile?
+    //   atomicMax((long long int *)addr, __double_as_longlong(value));
+    // }
+
+
+    /**
+     * LU with row pivoting, with a single NTxNT thread block. The
+     * matrix size n must be less than NT.
+     *
+     * This is a naive implementation. The goal here is to reduce
+     * kernel launch overhead by batching many small LU
+     * factorizations.
+     *
+     * Use thrust::complex instead of std::complex.
+     */
+    template<typename T, int NT, typename real_t> void
+    LU_block_kernel(int n, T* F, int* piv, int* info,
+                    const sycl::nd_item<3> &item_ct1, int &p,
+                    T* M, real_t &Mmax, real_t *cabs) {
+      int j = item_ct1.get_local_id(2), i = item_ct1.get_local_id(1);
+      if (i == 0 && j == 0)
+        *info = 0;
+
+      // copy F from global device storage into shared memory
+      if (i < n && j < n)
+        M[i+j*NT] = F[i+j*n];
+      /*
+        DPCT1065:3: Consider replacing sycl::nd_item::barrier() with
+        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
+        performance if there is no access to global memory.
+      */
+      item_ct1.barrier();
+
+      for (int k=0; k<n; k++) {
+        // only 1 thread looks for the pivot element
+        // this should be optimized?
+        if (j == k && i >= k)
+          cabs[i] = absolute_value(M[i+j*NT]);
+        /*
+          DPCT1065:4: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
+        */
+        item_ct1.barrier();
+        if (j == k && i == k) {
+          p = k;
+          Mmax = cabs[k];
+          for (int l=k+1; l<n; l++) {
+            auto tmp = cabs[l];
+            if (tmp > Mmax) {
+              Mmax = tmp;
+              p = l;
+            }
+          }
           piv[k] = p + 1;
-        it.barrier();
-        if (Amax == scalar_t(0.)) {
-          // TODO
-          // if (info == 0)
-          //   info = k;
+        }
+        /*
+          DPCT1065:5: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
+        */
+        item_ct1.barrier();
+        if (Mmax == T(0.)) {
+          if (j == k && i == k && *info == 0)
+            *info = k;
         } else {
           // swap row k with the pivot row
           if (j < n && i == k && p != k) {
-            auto tmp = A11[k+j*n];
-            A11[k+j*n] = A11[p+j*n];
-            A11[p+j*n] = tmp;
+            auto tmp = M[k+j*NT];
+            M[k+j*NT] = M[p+j*NT];
+            M[p+j*NT] = tmp;
           }
+          /*
+            DPCT1065:6: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier();
+          // divide by the pivot element
+          if (j == k && i > k && i < n)
+            M[i+k*NT] /= M[k+k*NT];
+          /*
+            DPCT1065:7: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier();
+          // Schur update
+          if (j > k && i > k && j < n && i < n)
+            M[i+j*NT] -= M[i+k*NT] * M[k+j*NT];
+          /*
+            DPCT1065:8: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier();
         }
-        it.barrier();
-        // divide by the pivot element
-        if (j == k && i > k && i < n)
-          A11[i+j*n] /= A11[k+k*n];
-        it.barrier();
-        // Schur update
-        if (j > k && i > k && j < n && i < n)
-          A11[i+j*n] -= A11[i+k*n] * A11[k+j*n];
-        it.barrier();
       }
-      auto A12 = F12_[front];
-      for (int cb=0; cb<n2; cb+=B) {
-        int c = cb + j;
-        bool col = c < n2;
-        // L trsm (unit diag)
+      // write back from shared to global device memory
+      if (i < n && j < n)
+        F[i+j*n] = M[i+j*NT];
+    }
+
+    template<typename T, int NT, typename real_t> void
+    LU_block_kernel_batched(FrontData<T>* dat, bool replace,
+                            real_t thresh, int* dinfo,
+                            const sycl::nd_item<3> &item_ct1, int &p,
+                            T* M, real_t &Mmax, real_t *cabs) {
+      FrontData<T> &A = dat[item_ct1.get_group(2)];
+      LU_block_kernel<T, NT>(A.n1, A.F11, A.piv, &dinfo[item_ct1.get_group(2)],
+                             item_ct1, p, M, Mmax, cabs);
+      if (replace) {
+        int i = item_ct1.get_local_id(2), j = item_ct1.get_local_id(1);
+        if (i == j && i < A.n1) {
+          std::size_t k = i + i*A.n1;
+          if (absolute_value(A.F11[k]) < thresh)
+            A.F11[k] = (real_part(A.F11[k]) < 0) ? -thresh : thresh;
+        }
+      }
+    }
+
+    template<typename T, typename real_t> void
+    replace_pivots_kernel(int n, T* A, real_t thresh,
+                          const sycl::nd_item<3> &item_ct1) {
+      int i = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
+        item_ct1.get_local_id(2);
+      if (i < n) {
+        std::size_t k = i + i*n;
+        if (absolute_value(A[k]) < thresh)
+          A[k] = (real_part(A[k]) < 0) ? -thresh : thresh;
+      }
+    }
+
+    template<typename T, typename real_t>
+    void replace_pivots(int n, T* A, real_t thresh, gpu::Stream* s) {
+      if (!n) return;
+      int NT = 128;
+      if (s)
+        /*
+          DPCT1049:9: The work-group size passed to the SYCL kernel may exceed the
+          limit. To get the device limit, query info::device::max_work_group_size.
+          Adjust the work-group size if needed.
+        */
+        get_sycl_queue(*s).parallel_for
+          (sycl::nd_range<3>((n + NT - 1) / NT * sycl::range<3>(1, 1, NT),
+                             sycl::range<3>(1, 1, NT)),
+           [=](sycl::nd_item<3> item_ct1) {
+            replace_pivots_kernel<T, real_t>(n, A, thresh, item_ct1);
+          });
+      else
+        /*
+          DPCT1049:10: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
+        */
+        get_sycl_queue().parallel_for
+          (sycl::nd_range<3>(sycl::range<3>(1, 1, (n + NT - 1) / NT) *
+                             sycl::range<3>(1, 1, NT),
+                             sycl::range<3>(1, 1, NT)),
+           [=](sycl::nd_item<3> item_ct1) {
+            replace_pivots_kernel<T, real_t>(n, A, thresh, item_ct1);
+          });
+    }
+
+    template<typename T, typename real_t> void
+    replace_pivots_vbatch_kernel(int* dn, T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount,
+                                 const sycl::nd_item<3> &item_ct1) {
+      int i = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
+        item_ct1.get_local_id(2),
+        f = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
+      if (f >= batchCount) return;
+      if (i >= dn[f]) return;
+      auto A = dA[f];
+      auto ldA = lddA[f];
+      std::size_t ii = i + i*ldA;
+      if (absolute_value(A[ii]) < thresh)
+        A[ii] = (real_part(A[ii]) < 0) ? -thresh : thresh;
+    }
+
+    template<typename T, typename real_t>
+    void replace_pivots_vbatched(Handle& handle, int* dn, int max_n,
+                                 T** dA, int* lddA, real_t thresh,
+                                 unsigned int batchCount) {
+      if (max_n <= 0 || !batchCount) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > max_n) {
+        nt /= 2;
+        ops *= 2;
+      }
+      ops = std::min(ops, batchCount);
+      unsigned int nbx = (max_n + nt - 1) / nt,
+        nbf = (batchCount + ops - 1) / ops;
+      sycl::range<3> block(1, ops, nt);
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Y) {
+        std::cout << "TODO fix" << std::endl;
+        sycl::range<3> grid(nbx, std::min(nbf - f, MAX_BLOCKS_Y), 1);
+        auto f0 = f * ops;
+        /*
+          DPCT1049:11: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
+        */
+        get_sycl_queue(handle).parallel_for
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            replace_pivots_vbatch_kernel(dn + f0, dA + f0, lddA + f0,
+                                         thresh, batchCount - f0, item_ct1);
+          });
+      }
+    }
+
+    /**
+     * LU solve with matrix F factor in LU, with pivot vector piv. F
+     * is n x n, and n <= NT. X is the right hand side, and is n x
+     * m. Both F and X have leading dimension n.
+     *
+     * NTxNT is the dimension of the thread block.
+     *
+     * This doesn't work for T = std::complex<?>, use
+     * T=thrust::complex<?> instead.
+     */
+    template<typename T, int NT> void
+    solve_block_kernel(int n, int m, T* F, T* X, int* piv,
+                       const sycl::nd_item<3> &item_ct1, int *P, T* A, T* B) {
+      int j = item_ct1.get_local_id(2), i = item_ct1.get_local_id(1);
+      if (j == 0)
+        P[i] = i;
+      /*
+        DPCT1065:12: Consider replacing sycl::nd_item::barrier() with
+        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
+        performance if there is no access to global memory.
+      */
+      item_ct1.barrier();
+      if (i == 0 && j == 0)
         for (int k=0; k<n; k++) {
-          if (i > k && i < n && col)
-            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
-          it.barrier();
+          auto p = piv[k]-1;
+          auto tmp = P[k];
+          P[k] = P[p];
+          P[p] = tmp;
         }
-        // U trsm
+      // put matrix F in shared memory
+      if (i < n && j < n)
+        A[j+i*NT] = F[i+j*n];
+      /*
+        DPCT1065:13: Consider replacing sycl::nd_item::barrier() with
+        sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better
+        performance if there is no access to global memory.
+      */
+      item_ct1.barrier();
+
+      // loop over blocks of NT columns of X
+      for (int b=0; b<m; b+=NT) {
+        int c = b + j;
+
+        // put X in shared memory, while applying the permutation
+        if (i < n && c < m)
+          B[j+i*NT] = X[P[i]+c*n];
+        /*
+          DPCT1065:14: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
+        */
+        item_ct1.barrier();
+
+        // solve with L (unit diagonal)
+        for (int k=0; k<n; k++) {
+          if (i > k && i < n && c < m)
+            B[j+i*NT] -= A[k+i*NT] * B[j+k*NT];
+          /*
+            DPCT1065:15: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier();
+        }
+
+        // solve with U
         for (int k=n-1; k>=0; k--) {
-          if (i == k && col)
-            A12[k+c*n] /= A11[k+k*n];
-          it.barrier();
-          if (i < k && col)
-            A12[i+c*n] -= A11[i+k*n] * A12[k+c*n];
-          it.barrier();
+          if (i == k && c < m)
+            B[j+i*NT] /= A[i+i*NT];
+          /*
+            DPCT1065:16: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier();
+          if (i < k && c < m)
+            B[j+i*NT] -= A[k+i*NT] * B[j+k*NT];
+          /*
+            DPCT1065:17: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier();
+        }
+
+        // write from shared back to global device memory
+        if (i < n && c < m)
+          X[i+c*n] = B[j+i*NT];
+      }
+    }
+
+    template<typename T, int NT> void
+    solve_block_kernel_batched(FrontData<T>* dat,
+                               const sycl::nd_item<3> &item_ct1, int *P,
+                               T* A_, T* B_) {
+      FrontData<T> &A = dat[item_ct1.get_group(2)];
+      solve_block_kernel<T, NT>(A.n1, A.n2, A.F11, A.F12, A.piv, item_ct1, P, A_, B_);
+    }
+
+
+    /**
+     * Compute F -= F21 * F12, where F is d2 x d2 and F12 is d1 x d2.
+     * d1 is <= NT. This should be called with a single NT x NT thread
+     * block.
+     */
+    template<typename T, int NT> void
+    Schur_block_kernel(int d1, int d2, T* F12, T* F21, T* F22,
+                       const sycl::nd_item<3> &item_ct1, T* B, T* A) {
+      int j = item_ct1.get_local_id(2), i = item_ct1.get_local_id(1);
+      A[j+i*NT] = B[j+i*NT] = 0.;
+      for (int cb=0; cb<d2; cb+=NT) {
+        int c = cb + j;
+        // put NT columns of F12 in shared memory B
+        if (i < d1 && c < d2)
+          B[j+i*NT] = F12[i+c*d1];
+        /*
+          DPCT1065:18: Consider replacing sycl::nd_item::barrier() with
+          sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+          better performance if there is no access to global memory.
+        */
+        item_ct1.barrier();
+        for (int rb=0; rb<d2; rb+=NT) {
+          int r = rb + i;
+          // put NT rows of F21 in shared memory A
+          if (r < d2 && j < d1)
+            A[j+i*NT] = F21[r+j*d2];
+          /*
+            DPCT1065:19: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier(); // wait for A and B
+          if (c < d2 && r < d2) {
+            T tmp(0.);
+            // k < d1 <= NT, by using k<NT this can be unrolled
+            for (int k=0; k<NT; k++)
+              tmp += A[k+i*NT] * B[j+k*NT];
+            F22[r+c*d2] -= tmp;
+          }
+          /*
+            DPCT1065:20: Consider replacing sycl::nd_item::barrier() with
+            sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
+            better performance if there is no access to global memory.
+          */
+          item_ct1.barrier(); // sync before reading new A/B
         }
       }
-      // Schur GEMM
-      auto A22 = F22_[front], A21 = F21_[front];
-      for (int c=j; c<n2; c+=B)
-        for (int r=i; r<n2; r+=B)
-          for (int k=0; k<n; k++)
-            A22[r+c*n2] -= A21[r+k*n2] * A12[k+c*n];
-    }
-  };
-
-
-  template<std::size_t B, typename scalar_t, typename integer_t>
-  void partial_factor_small(cl::sycl::queue& q, std::size_t nb,
-                            BatchMetaData<scalar_t,integer_t>& batch) {
-    if (!nb) return;
-    cl::sycl::range<3> global{nb, B, B}, local{1, B, B};
-    q.parallel_for(cl::sycl::nd_range<3>{global, local},
-                   PartialFactor<B, scalar_t, integer_t>
-                   (batch.ds, batch.du, batch.piv,
-                    batch.F11, batch.F12, batch.F21, batch.F22));
-  }
-
-  template<typename scalar_t, typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::factor_batch
-  (cl::sycl::queue& q, const LInfo_t& L, Batch_t& batch,
-   const Opts_t& opts) {
-#if 1
-    auto nb = batch.set_level(q, L, false);
-    oneapi::mkl::lapack::getrf_batch
-      (q, batch.ds, batch.ds, batch.F11, batch.ds, batch.piv,
-       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
-    nb = batch.set_level(q, L, true);
-    oneapi::mkl::lapack::getrs_batch
-      (q, batch.op, batch.ds, batch.du, batch.F11, batch.ds,
-       batch.piv, batch.F12, batch.ds,
-       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
-    oneapi::mkl::blas::column_major::gemm_batch
-      (q, batch.op, batch.op, batch.du, batch.du, batch.ds,
-       batch.alpha, const_cast<const scalar_t**>(batch.F21), batch.du,
-       const_cast<const scalar_t**>(batch.F12), batch.ds,
-       batch.beta, batch.F22, batch.du, nb, batch.group_sizes).wait();
-#else
-    auto Bmax = 16;
-    auto nb = batch.set_level_small(q, L, 0, 8);
-    partial_factor_small<8, scalar_t, integer_t>(q, nb, batch);
-    q.wait();
-    nb = batch.set_level_small(q, L, 8, 16);
-    partial_factor_small<16, scalar_t, integer_t>(q, nb, batch);
-    q.wait();
-
-    nb = batch.set_level(q, L, false, Bmax);
-    oneapi::mkl::lapack::getrf_batch
-      (q, batch.ds, batch.ds, batch.F11, batch.ds, batch.piv,
-       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
-    nb = batch.set_level(q, L, true, Bmax);
-    oneapi::mkl::lapack::getrs_batch
-      (q, batch.op, batch.ds, batch.du, batch.F11, batch.ds,
-       batch.piv, batch.F12, batch.ds,
-       nb, batch.group_sizes, batch.scratchpad.get(), batch.lwork).wait();
-    oneapi::mkl::blas::column_major::gemm_batch
-      (q, batch.op, batch.op, batch.du, batch.du, batch.ds,
-       batch.alpha, const_cast<const scalar_t**>(batch.F21), batch.du,
-       const_cast<const scalar_t**>(batch.F12), batch.ds,
-       batch.beta, batch.F22, batch.du, nb, batch.group_sizes).wait();
-#endif
-    // #else
-    // auto nb = batch.set_level(q, L, false);
-    // for (auto& f : L.f)
-    //   dpcpp::getrf(q, f->F11_, f->piv_, batch.scratchpad.get(),
-    //                batch.lwork).wait();
-    // nb = batch.set_level(q, L, true);
-    // for (auto& f : L.f)
-    //   dpcpp::getrs(q, Trans::N, f->F11_, f->piv_, f->F12_,
-    //                     batch.scratchpad.get(), batch.lwork).wait();
-    // for (auto& f : L.f)
-    //   dpcpp::gemm(q, Trans::N, Trans::N, scalar_t(-1.),
-    //                    f->F21_, f->F12_, scalar_t(1.), f->F22_).wait();
-    // #endif
-  }
-
-  template<typename scalar_t,typename integer_t> ReturnCode
-  FrontSYCL<scalar_t,integer_t>::split_smaller
-  (const SpMat_t& A, const SPOptions<scalar_t>& opts,
-   int etree_level, int task_depth) {
-    if (opts.verbose())
-      std::cout << "# Factorization does not fit in GPU memory, "
-        "splitting in smaller traversals." << std::endl;
-    ReturnCode err_code = ReturnCode::SUCCESS;
-    if (lchild_) {
-      auto el = lchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
-      if (el != ReturnCode::SUCCESS) err_code = el;
-    }
-    if (rchild_) {
-      auto er = rchild_->multifrontal_factorization
-        (A, opts, etree_level+1, task_depth);
-      if (er != ReturnCode::SUCCESS) err_code = er;
     }
 
-    const std::size_t dupd = dim_upd(), dsep = dim_sep();
-    STRUMPACK_ADD_MEMORY(dsep*(dsep+2*dupd)*sizeof(scalar_t));
-    STRUMPACK_ADD_MEMORY(dupd*dupd*sizeof(scalar_t));
-    host_factors_.reset(new scalar_t[dsep*(dsep+2*dupd)]);
-    host_Schur_.reset(new scalar_t[dupd*dupd]);
-    {
-      auto fmem = host_factors_.get();
-      F11_ = DenseMW_t(dsep, dsep, fmem, dsep); fmem += dsep*dsep;
-      F12_ = DenseMW_t(dsep, dupd, fmem, dsep); fmem += dsep*dupd;
-      F21_ = DenseMW_t(dupd, dsep, fmem, dupd);
+    template<typename T, int NT> void
+    Schur_block_kernel_batched(FrontData<T>* dat,
+                               const sycl::nd_item<3> &item_ct1,
+                               T* B_, T* A_) {
+      FrontData<T> &A = dat[item_ct1.get_group(2)];
+      Schur_block_kernel<T, NT>(A.n1, A.n2, A.F12, A.F21, A.F22, item_ct1, B_, A_);
     }
-    F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
-    F11_.zero(); F12_.zero();
-    F21_.zero(); F22_.zero();
-    A.extract_front
-      (F11_, F12_, F21_, this->sep_begin_, this->sep_end_,
-       this->upd_, task_depth);
-    if (lchild_) {
-#pragma omp parallel
-#pragma omp single
-      lchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+
+    template <typename T, int NT, typename real_t>
+    void factor_block_batch(unsigned int count, FrontData<T> *dat, bool replace,
+                            real_t thresh, int *dinfo) {
+      sycl::queue &q_ct1 = get_sycl_queue();
+      if (!count) return;
+      sycl::range<3> block(1, NT, NT); //, grid(count, 1, 1);
+      /*
+        DPCT1049:21: The work-group size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the work-group size if needed.
+      */
+      q_ct1.submit([&](sycl::handler &cgh) {
+          sycl::local_accessor<int, 0> p_acc_ct1(cgh);
+          sycl::local_accessor<T, 1> M__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          sycl::local_accessor<real_t, 0> Mmax_acc_ct1(cgh);
+          sycl::local_accessor<real_t, 1> cabs_acc_ct1(sycl::range<1>(NT), cgh);
+          cgh.parallel_for
+            (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
+             [=](sycl::nd_item<3> item_ct1) {
+              LU_block_kernel_batched<T, NT, real_t>
+                (dat, replace, thresh, dinfo, item_ct1, p_acc_ct1,
+                 M__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+                 Mmax_acc_ct1,
+                 cabs_acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get());
+            });
+        });
+      /*
+        DPCT1049:22: The work-group size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the work-group size if needed.
+      */
+      q_ct1.submit([&](sycl::handler &cgh) {
+          sycl::local_accessor<int, 1> P_acc_ct1(sycl::range<1>(NT), cgh);
+          sycl::local_accessor<T, 1> A__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          sycl::local_accessor<T, 1> B__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          cgh.parallel_for
+            (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
+             [=](sycl::nd_item<3> item_ct1) {
+              solve_block_kernel_batched<T, NT>
+                (dat, item_ct1,
+                 P_acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+                 A__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+                 B__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get());
+            });
+        });
+      /*
+        DPCT1049:23: The work-group size passed to the SYCL kernel may exceed the
+        limit. To get the device limit, query info::device::max_work_group_size.
+        Adjust the work-group size if needed.
+      */
+      q_ct1.submit([&](sycl::handler &cgh) {
+          sycl::local_accessor<T, 1> B__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          sycl::local_accessor<T, 1> A__acc_ct1(sycl::range<1>(NT * NT), cgh);
+          cgh.parallel_for
+            (sycl::nd_range<3>(sycl::range<3>(1, 1, count) * block, block),
+             [=](sycl::nd_item<3> item_ct1) {
+              Schur_block_kernel_batched<T, NT>
+                (dat, item_ct1,
+                 B__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get(),
+                 A__acc_ct1.template get_multi_ptr<sycl::access::decorated::yes>().get());
+            });
+        });
     }
-    if (rchild_) {
-#pragma omp parallel
-#pragma omp single
-      rchild_->extend_add_to_dense(F11_, F12_, F21_, F22_, this, 0);
+
+
+    template<typename T, int NT> void
+    solve_block_kernel_batched(int nrhs, FrontData<T>* dat,
+                               const sycl::nd_item<3> &item_ct1, int *P,
+                               T* A_, T* B_) {
+      FrontData<T> &A = dat[item_ct1.get_group(2)];
+      solve_block_kernel<T, NT>(A.n1, nrhs, A.F11, A.F12, A.piv, item_ct1, P,
+                                A_, B_);
     }
-    TaskTimer tl("");
-    tl.start();
-    if (dsep) {
-      cl::sycl::queue q; //(cl::sycl::default_selector{});
-      auto scratchpad_size = std::max
-        (dpcpp::getrf_buffersize<scalar_t>(q, dsep, dsep, dsep),
-         dpcpp::getrs_buffersize<scalar_t>
-         (q, Trans::N, dsep, dupd, dsep, dsep));
-      dpcpp::DeviceMemory<scalar_t> dm11(dsep*dsep + scratchpad_size, q);
-      auto scratchpad = dm11 + dsep*dsep;
-      dpcpp::DeviceMemory<std::int64_t> dpiv(dsep, q);
-      DenseMW_t dF11(dsep, dsep, dm11, dsep);
-      dpcpp::memcpy(q, dF11, F11_).wait();
-      dpcpp::getrf(q, dF11, dpiv, scratchpad, scratchpad_size).wait();
-      // TODO check info code
-      pivot_mem_.resize(dsep);
-      piv_ = pivot_mem_.data();
-      dpcpp::memcpy(q, F11_, dF11);
-      dpcpp::memcpy(q, piv_, dpiv.as<std::int64_t>(), dsep);
-      q.wait();
-      if (opts.replace_tiny_pivots()) {
-        // TODO do this on the device!
-        auto thresh = opts.pivot_threshold();
-        for (std::size_t i=0; i<F11_.rows(); i++)
-          if (std::abs(F11_(i,i)) < thresh)
-            F11_(i,i) = (std::real(F11_(i,i)) < 0) ? -thresh : thresh;
+
+    /**
+     * Single extend-add operation along the column dimension, for the
+     * solve.  d1 is the size of F11, d2 is the size of F22.
+     */
+    template<typename T> void
+    ea_rhs_kernel(int r, int N, int nrhs,
+                  int dsep, int dupd, int dCB,
+                  T* b, T* bupd, T* CB, std::size_t* I) {
+      if (r >= dCB) return;
+      auto Ir = I[r];
+      for (int c=0; c<nrhs; c++)
+        if (Ir < dsep) b[Ir+c*N] += CB[r+c*dCB];
+        else bupd[Ir-dsep+c*dupd] += CB[r+c*dCB];
+    }
+
+    template<typename T> void
+    extend_add_rhs_kernel_left
+    (int N, int nrhs, unsigned int nf, AssembleData<T>* dat,
+     const sycl::nd_item<3> &item_ct1) {
+      int r = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
+        item_ct1.get_local_id(2),
+        i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
+      if (i >= nf) return;
+      auto& f = dat[i];
+      if (f.CB1)
+        ea_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB1,
+                      f.F11, f.F21, f.CB1, f.I1);
+    }
+    template<typename T> void
+    extend_add_rhs_kernel_right
+    (int N, int nrhs, unsigned int nf, AssembleData<T>* dat,
+     const sycl::nd_item<3> &item_ct1) {
+      int r = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
+        item_ct1.get_local_id(2),
+        i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
+      if (i >= nf) return;
+      auto& f = dat[i];
+      if (f.CB2)
+        ea_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB2,
+                      f.F11, f.F21, f.CB2, f.I2);
+    }
+
+    template <typename T>
+    void extend_add_rhs(int N, int nrhs, unsigned int nf, AssembleData<T> *dat,
+                        AssembleData<T> *ddat) {
+      sycl::queue &q_ct1 = get_sycl_queue();
+      int du = 0;
+      for (unsigned int f=0; f<nf; f++)
+        du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
+      if (!du) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > du && ops < 64) {
+        nt /= 2;
+        ops *= 2;
       }
-      if (dupd) {
-        dpcpp::DeviceMemory<scalar_t> dm12(dsep*dupd, q);
-        DenseMW_t dF12(dsep, dupd, dm12, dsep);
-        dpcpp::memcpy(q, dF12, F12_).wait();
-        dpcpp::getrs(q, Trans::N, dF11, dpiv, dF12,
-                     scratchpad, scratchpad_size).wait();
-        dpcpp::memcpy(q, F12_, dF12);
-        dm11.release();
-        q.wait();
-        dpcpp::DeviceMemory<scalar_t> dm2122((dsep+dupd)*dupd, q);
-        DenseMW_t dF21(dupd, dsep, dm2122, dupd),
-          dF22(dupd, dupd, dm2122+(dsep*dupd), dupd);
-        dpcpp::memcpy(q, dF21, F21_);
-        dpcpp::memcpy(q, dF22.data(), host_Schur_.get(), dupd*dupd);
-        q.wait();
-        dpcpp::gemm
-          (q, Trans::N, Trans::N, scalar_t(-1.),
-           dF21, dF12, scalar_t(1.), dF22).wait();
-        dpcpp::memcpy(q, host_Schur_.get(), dF22.data(), dupd*dupd).wait();
+      ops = std::min(ops, nf);
+      unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
+      sycl::range<3> block(1, ops, nt);
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
+        std::cout << "TODO fix" << std::endl;
+        sycl::range<3> grid(nb, std::min(nbf - f, MAX_BLOCKS_Z), 1);
+        /*
+          DPCT1049:24: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
+        */
+        q_ct1.parallel_for
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            extend_add_rhs_kernel_left(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
+          });
+        /*
+          DPCT1049:25: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
+        */
+        q_ct1.parallel_for
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            extend_add_rhs_kernel_right(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
+          });
       }
     }
-    // count flops
-    auto level_flops = LU_flops(F11_) +
-      gemm_flops(Trans::N, Trans::N, scalar_t(-1.), F21_, F12_, scalar_t(1.)) +
-      trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
-      trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
-    STRUMPACK_FULL_RANK_FLOPS(level_flops);
-    if (opts.verbose()) {
-      auto level_time = tl.elapsed();
-      std::cout << "#   GPU Factorization complete, took: "
-                << level_time << " seconds, "
-                << level_flops / 1.e9 << " GFLOPS, "
-                << (float(level_flops) / level_time) / 1.e9
-                << " GFLOP/s" << std::endl;
-    }
-    return err_code;
-  }
 
 
-  template<auto query, typename T>
-  void do_query(const T& obj_to_query, const std::string& name, int indent=4) {
-    std::cout << std::string(indent, ' ') << name << " is '"
-              << obj_to_query.template get_info<query>() << "'\n";
-  }
-
-
-  template<typename scalar_t,typename integer_t> ReturnCode
-  FrontSYCL<scalar_t,integer_t>::multifrontal_factorization
-  (const SpMat_t& A, const Opts_t& opts,
-   int etree_level, int task_depth) {
-    ReturnCode err_code = ReturnCode::SUCCESS;
-    cl::sycl::queue q; //(cl::sycl::default_selector{});
-    // cl::sycl::queue q(cl::sycl::cpu_selector{});
-    if (opts.verbose())
-      std::cout << "# SYCL/DPC++ selected device: "
-                << q.get_device().get_info<cl::sycl::info::device::name>()
-                << std::endl;
-
-    // // Loop through the available platforms
-    // for (auto const& this_platform : cl::sycl::platform::get_platforms() ) {
-    //   std::cout << "Found Platform:\n";
-    //   do_query<cl::sycl::info::platform::name>
-    //          (this_platform, "info::platform::name");
-    //   do_query<cl::sycl::info::platform::vendor>
-    //          (this_platform, "info::platform::vendor");
-    //   do_query<cl::sycl::info::platform::version>
-    //          (this_platform, "info::platform::version");
-    //   do_query<cl::sycl::info::platform::profile>
-    //          (this_platform, "info::platform::profile");
-    //   // Loop through the devices available in this plaform
-    //   for (auto &dev : this_platform.get_devices() ) {
-    //          std::cout << " Device: "
-    //                    << dev.get_info<cl::sycl::info::device::name>() << "\n";
-    //          std::cout << "is_host(): "
-    //                    << (dev.is_host() ? "Yes" : "No") << "\n";
-    //          std::cout << "is_cpu(): "
-    //                    << (dev.is_cpu() ? "Yes" : "No") << "\n";
-    //          std::cout << "is_gpu(): "
-    //                    << (dev.is_gpu() ? "Yes" : "No") << "\n";
-    //          std::cout << "is_accelerator(): "
-    //                    << (dev.is_accelerator() ? "Yes" : "No") << "\n";
-    //          do_query<cl::sycl::info::device::vendor>(dev, "info::device::vendor");
-    //          do_query<cl::sycl::info::device::driver_version>
-    //            (dev, "info::device::driver_version");
-    //          do_query<cl::sycl::info::device::max_work_item_dimensions>
-    //            (dev, "info::device::max_work_item_dimensions");
-    //          do_query<cl::sycl::info::device::max_work_group_size>
-    //            (dev, "info::device::max_work_group_size");
-    //          do_query<cl::sycl::info::device::mem_base_addr_align>
-    //            (dev, "info::device::mem_base_addr_align");
-    //          do_query<cl::sycl::info::device::partition_max_sub_devices>
-    //            (dev, "info::device::partition_max_sub_devices");
-    //          // do_query<cl::sycl::info::device::max_work_item_sizes>
-    //          //   (dev, "info::device::max_work_item_sizes");
-    //          std::cout << "    info::device::max_work_item_sizes" << " is '"
-    //                    << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[0] << "'\n";
-    //          std::cout << "    info::device::max_work_item_sizes" << " is '"
-    //                    << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[1] << "'\n";
-    //          std::cout << "    info::device::max_work_item_sizes" << " is '"
-    //                    << dev.get_info<cl::sycl::info::device::max_work_item_sizes>()[2] << "'\n";
-    //   }
-    // }
-
-    const int lvls = this->levels();
-    std::vector<LInfo_t> ldata(lvls);
-    for (int l=lvls-1; l>=0; l--) {
-      std::vector<F_t*> fp;
-      this->get_level_fronts(fp, l);
-      ldata[l] = LInfo_t(fp, q, &A);
+    /**
+     * Single extend-add operation along the column dimension, for the
+     * solve.  d1 is the size of F11, d2 is the size of F22.
+     */
+    template<typename T> void
+    extract_rhs_kernel(int r, int N, int nrhs,
+                       int dsep, int dupd, int dCB,
+                       T* b, T* bupd, T* CB, std::size_t* I) {
+      //const sycl::nd_item<3> &item_ct1) {
+      if (r >= dCB) return;
+      auto Ir = I[r];
+      for (int c=0; c<nrhs; c++)
+        if (Ir < dsep) CB[r+c*dCB] = b[Ir+c*N];
+        else CB[r+c*dCB] = bupd[Ir-dsep+c*dupd];
     }
 
-    auto peak_dmem = peak_device_memory(ldata);
-    dpcpp::DeviceMemory<char> all_dmem;
-    BatchMetaData<scalar_t,integer_t> batch;
-    try {
-      all_dmem = dpcpp::DeviceMemory<char>(peak_dmem, q, false);
-      batch = BatchMetaData<scalar_t,integer_t>(ldata, q);
-    } catch (std::exception& e) {
-      return split_smaller(A, opts, etree_level, task_depth);
+    template<typename T> void
+    extract_rhs_kernel(int N, int nrhs, unsigned int nf,
+                       AssembleData<T>* dat, const sycl::nd_item<3> &item_ct1) {
+      int r = item_ct1.get_group(2) * item_ct1.get_local_range(2) +
+        item_ct1.get_local_id(2),
+        i = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
+        item_ct1.get_local_id(1);
+      if (i >= nf) return;
+      auto& f = dat[i];
+      if (f.CB1)
+        extract_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB1, f.F11,
+                           f.F21, f.CB1, f.I1);
+      if (f.CB2)
+        extract_rhs_kernel(r, N, nrhs, f.d1, f.d2, f.dCB2, f.F11,
+                           f.F21, f.CB2, f.I2);
     }
 
-    std::size_t peak_hea_mem = 0;
-    for (int l=lvls-1; l>=0; l--)
-      peak_hea_mem = std::max(peak_hea_mem, ldata[l].ea_bytes);
-    dpcpp::HostMemory<char> hea_mem(peak_hea_mem, q);
-    char* old_work = nullptr;
-    for (int l=lvls-1; l>=0; l--) {
-      TaskTimer tl("");
-      tl.start();
-      auto& L = ldata[l];
-      if (opts.verbose()) L.print_info(l, lvls);
-      try {
-        char *work_mem = nullptr, *dea_mem = nullptr;
-        scalar_t* dev_factors = nullptr;
-        if (l % 2) {
-          work_mem = all_dmem;
-          dea_mem = work_mem + L.work_bytes;
-          dev_factors = aligned_ptr<scalar_t>(dea_mem + L.ea_bytes);
-        } else {
-          work_mem = all_dmem + peak_dmem - L.work_bytes;
-          dea_mem = work_mem - L.ea_bytes;
-          dev_factors = aligned_ptr<scalar_t>(dea_mem - L.factor_bytes);
-        }
-        dpcpp::fill(q, dev_factors, scalar_t(0.), L.factor_size);
-        dpcpp::fill(q, reinterpret_cast<scalar_t*>(work_mem),
-                    scalar_t(0.), L.Schur_size);
-        L.set_factor_pointers(dev_factors);
-        L.set_work_pointers(work_mem);
-        front_assembly(q, A, L, hea_mem, dea_mem);
-        old_work = work_mem;
-        //factor_large_fronts(q, L, opts);
-        factor_batch(q, L, batch, opts);
-        STRUMPACK_ADD_MEMORY(L.factor_bytes);
-        L.f[0]->host_factors_.reset(new scalar_t[L.factor_size]);
-        L.f[0]->pivot_mem_.resize(L.piv_size);
-        q.wait_and_throw();
-        dpcpp::memcpy
-          (q, L.f[0]->pivot_mem_.data(), L.f[0]->piv_, L.piv_size);
-        dpcpp::memcpy<scalar_t>
-          (q, L.f[0]->host_factors_.get(), dev_factors, L.factor_size);
-        L.set_factor_pointers(L.f[0]->host_factors_.get());
-        L.set_pivot_pointers(L.f[0]->pivot_mem_.data());
-        q.wait_and_throw();
-      } catch (const std::bad_alloc& e) {
-        std::cerr << "Out of memory" << std::endl;
-        abort();
+    template<typename T> void
+    extract_rhs(int N, int nrhs, unsigned int nf, AssembleData<T>* dat,
+                AssembleData<T>* ddat) {
+      int du = 0;
+      for (unsigned int f=0; f<nf; f++)
+        du = std::max(du, std::max(dat[f].dCB1, dat[f].dCB2));
+      if (!du) return;
+      unsigned int nt = 512, ops = 1;
+      while (nt > du && ops < 64) {
+        nt /= 2;
+        ops *= 2;
       }
-      auto level_flops = L.total_flops();
-      STRUMPACK_FLOPS(level_flops);
-      STRUMPACK_FULL_RANK_FLOPS(level_flops);
-      if (opts.verbose()) {
-        auto level_time = tl.elapsed();
-        std::cout << "#   GPU Factorization complete, took: "
-                  << level_time << " seconds, "
-                  << level_flops / 1.e9 << " GFLOPS, "
-                  << (float(level_flops) / level_time) / 1.e9
-                  << " GFLOP/s" << std::endl;
+      ops = std::min(ops, nf);
+      unsigned int nb = (du + nt - 1) / nt, nbf = (nf + ops - 1) / ops;
+      sycl::range<3> block(1, ops, nt);
+      for (unsigned int f=0; f<nbf; f+=MAX_BLOCKS_Z) {
+        std::cout << "TODO fix" << std::endl;
+        sycl::range<3> grid(nb, std::min(nbf - f, MAX_BLOCKS_Z), 1);
+        /*
+          DPCT1049:26: The work-group size passed to the SYCL kernel may exceed
+          the limit. To get the device limit, query
+          info::device::max_work_group_size. Adjust the work-group size if needed.
+        */
+        get_sycl_queue().parallel_for
+          (sycl::nd_range<3>(grid * block, block),
+           [=](sycl::nd_item<3> item_ct1) {
+            extract_rhs_kernel(N, nrhs, nf - f * ops, ddat + f * ops, item_ct1);
+          });
       }
     }
-    const std::size_t dupd = dim_upd();
-    if (dupd) { // get the contribution block from the device
-      host_Schur_.reset(new scalar_t[dupd*dupd]);
-      dpcpp::memcpy(q, host_Schur_.get(),
-                    reinterpret_cast<scalar_t*>(old_work), dupd*dupd);
-      q.wait_and_throw();
-      F22_ = DenseMW_t(dupd, dupd, host_Schur_.get(), dupd);
-    }
-    return err_code;
-  }
 
-  // template<typename scalar_t,typename integer_t> void
-  // FrontSYCL<scalar_t,integer_t>::multifrontal_solve
-  // (DenseM_t& b, const GPUFactors<scalar_t>* gpu_factors) const {
-  //   FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
-  // }
 
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::forward_multifrontal_solve
-  (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
-    DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
-    bupd.zero();
-    if (task_depth == 0) {
-      // tasking when calling the children
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
-      this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
-      // no tasking for the root node computations, use system blas threading!
-      fwd_solve_phase2(b, bupd, etree_level, params::task_recursion_cutoff_level);
-    } else {
-      this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
-      fwd_solve_phase2(b, bupd, etree_level, task_depth);
-    }
-  }
+    // explicit template instantiations
+    template void assemble(unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void assemble(unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void assemble(unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void assemble(unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::fwd_solve_phase2
-  (DenseM_t& b, DenseM_t& bupd, int etree_level, int task_depth) const {
-    if (dim_sep()) {
-      DenseMW_t bloc(dim_sep(), b.cols(), b, this->sep_begin_, 0);
-      std::vector<int> p(piv_, piv_+dim_sep());
-      F11_.solve_LU_in_place(bloc, p.data(), task_depth);
-      if (dim_upd()) {
-        if (b.cols() == 1)
-          gemv(Trans::N, scalar_t(-1.), F21_, bloc,
-               scalar_t(1.), bupd, task_depth);
-        else
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F21_, bloc,
-               scalar_t(1.), bupd, task_depth);
-      }
-    }
-  }
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void extend_add_rhs(int, int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::backward_multifrontal_solve
-  (DenseM_t& y, DenseM_t* work, int etree_level, int task_depth) const {
-    DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
-    if (task_depth == 0) {
-      // no tasking in blas routines, use system threaded blas instead
-      bwd_solve_phase1
-        (y, yupd, etree_level, params::task_recursion_cutoff_level);
-#pragma omp parallel if(!omp_in_parallel())
-#pragma omp single nowait
-      // tasking when calling children
-      this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
-    } else {
-      bwd_solve_phase1(y, yupd, etree_level, task_depth);
-      this->bwd_solve_phase2(y, yupd, work, etree_level, task_depth);
-    }
-  }
+    template void extract_rhs(int, int, unsigned int, AssembleData<float>*, AssembleData<float>*);
+    template void extract_rhs(int, int, unsigned int, AssembleData<double>*, AssembleData<double>*);
+    template void extract_rhs(int, int, unsigned int, AssembleData<std::complex<float>>*, AssembleData<std::complex<float>>*);
+    template void extract_rhs(int, int, unsigned int, AssembleData<std::complex<double>>*, AssembleData<std::complex<double>>*);
 
-  template<typename scalar_t,typename integer_t> void
-  FrontSYCL<scalar_t,integer_t>::bwd_solve_phase1
-  (DenseM_t& y, DenseM_t& yupd, int etree_level, int task_depth) const {
-    if (dim_sep()) {
-      DenseMW_t yloc(dim_sep(), y.cols(), y, this->sep_begin_, 0);
-      if (y.cols() == 1) {
-        if (dim_upd())
-          gemv(Trans::N, scalar_t(-1.), F12_, yupd,
-               scalar_t(1.), yloc, task_depth);
-      } else {
-        if (dim_upd())
-          gemm(Trans::N, Trans::N, scalar_t(-1.), F12_, yupd,
-               scalar_t(1.), yloc, task_depth);
-      }
-    }
-  }
 
-  // explicit template instantiations
-  template class FrontSYCL<float,int>;
-  template class FrontSYCL<double,int>;
-  template class FrontSYCL<std::complex<float>,int>;
-  template class FrontSYCL<std::complex<double>,int>;
+    template void factor_block_batch<float,8,float>(unsigned int, FrontData<float>*, bool, float, int*);
+    template void factor_block_batch<double,8,double>(unsigned int, FrontData<double>*, bool, double, int*);
+    template void factor_block_batch<std::complex<float>,8,float>(unsigned int, FrontData<std::complex<float>>*, bool, float, int*);
+    template void factor_block_batch<std::complex<double>,8,double>(unsigned int, FrontData<std::complex<double>>*, bool, double, int*);
 
-  template class FrontSYCL<float,long int>;
-  template class FrontSYCL<double,long int>;
-  template class FrontSYCL<std::complex<float>,long int>;
-  template class FrontSYCL<std::complex<double>,long int>;
+    template void factor_block_batch<float,16,float>(unsigned int, FrontData<float>*, bool, float, int*);
+    template void factor_block_batch<double,16,double>(unsigned int, FrontData<double>*, bool, double, int*);
+    template void factor_block_batch<std::complex<float>,16,float>(unsigned int, FrontData<std::complex<float>>*, bool, float, int*);
+    template void factor_block_batch<std::complex<double>,16,double>(unsigned int, FrontData<std::complex<double>>*, bool, double, int*);
 
-  template class FrontSYCL<float,long long int>;
-  template class FrontSYCL<double,long long int>;
-  template class FrontSYCL<std::complex<float>,long long int>;
-  template class FrontSYCL<std::complex<double>,long long int>;
+    template void factor_block_batch<float,24,float>(unsigned int, FrontData<float>*, bool, float, int*);
+    template void factor_block_batch<double,24,double>(unsigned int, FrontData<double>*, bool, double, int*);
+    template void factor_block_batch<std::complex<float>,24,float>(unsigned int, FrontData<std::complex<float>>*, bool, float, int*);
+    template void factor_block_batch<std::complex<double>,24,double>(unsigned int, FrontData<std::complex<double>>*, bool, double, int*);
 
+    template void factor_block_batch<float,32,float>(unsigned int, FrontData<float>*, bool, float, int*);
+    template void factor_block_batch<double,32,double>(unsigned int, FrontData<double>*, bool, double, int*);
+    template void factor_block_batch<std::complex<float>,32,float>(unsigned int, FrontData<std::complex<float>>*, bool, float, int*);
+    template void factor_block_batch<std::complex<double>,32,double>(unsigned int, FrontData<std::complex<double>>*, bool, double, int*);
+
+    template void replace_pivots(int, float*, float, gpu::Stream*);
+    template void replace_pivots(int, double*, double, gpu::Stream*);
+    template void replace_pivots(int, std::complex<float>*, float, gpu::Stream*);
+    template void replace_pivots(int, std::complex<double>*, double, gpu::Stream*);
+
+    template void replace_pivots_vbatched(Handle&, int*, int, float**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(Handle&, int*, int, double**, int*, double, unsigned int);
+    template void replace_pivots_vbatched(Handle&, int*, int, std::complex<float>**, int*, float, unsigned int);
+    template void replace_pivots_vbatched(Handle&, int*, int, std::complex<double>**, int*, double, unsigned int);
+
+  } // end namespace gpu
 } // end namespace strumpack

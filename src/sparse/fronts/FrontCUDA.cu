@@ -31,7 +31,7 @@
 #include <thrust/complex.h>
 
 #define STRUMPACK_NO_TRIPLET_MPI
-#include "FrontalMatrixGPUKernels.hpp"
+#include "FrontGPUKernels.hpp"
 #include "dense/CUDAWrapper.hpp"
 
 

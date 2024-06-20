@@ -30,19 +30,19 @@
 #include <fstream>
 
 #include "FrontMAGMA.hpp"
-#include "FrontalMatrixGPUKernels.hpp"
+#include "FrontGPUKernels.hpp"
 #include "dense/MAGMAWrapper.hpp"
 
 #if defined(STRUMPACK_USE_MPI)
 #include "ExtendAdd.hpp"
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #include "FrontBLRMPI.hpp"
 #endif
 
 namespace strumpack {
 
   template<typename scalar_t, typename integer_t> class LevelInfoMAGMA {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
     using FM_t = FrontMAGMA<scalar_t,integer_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
@@ -283,7 +283,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontMAGMA<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf,
-   const FrontalMatrixMPI<scalar_t,integer_t>* pa) const {
+   const FrontMPI<scalar_t,integer_t>* pa) const {
     DenseM_t F22(dim_upd(), dim_upd());
     gpu::copy_device_to_host(F22, F22_);
     ExtendAdd<scalar_t,integer_t>::
@@ -807,7 +807,7 @@ namespace strumpack {
       if (!mpi_rank())
         std::cerr << "WARNING: Solve is performed on CPU" << std::endl;
       // factors are not on the device, solve on CPU
-      FrontalMatrix<scalar_t,integer_t>::multifrontal_solve(b);
+      Front<scalar_t,integer_t>::multifrontal_solve(b);
     }
   }
 

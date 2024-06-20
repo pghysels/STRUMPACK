@@ -28,7 +28,7 @@
  */
 #include <fstream>
 
-#include "FrontalMatrixDenseMPI.hpp"
+#include "FrontDenseMPI.hpp"
 #include "FrontBLRMPI.hpp"
 #include "ExtendAdd.hpp"
 #include "BLR/BLRExtendAdd.hpp"
@@ -36,34 +36,34 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::FrontalMatrixDenseMPI
+  FrontDenseMPI<scalar_t,integer_t>::FrontDenseMPI
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd, const MPIComm& comm, int P)
-    : FrontalMatrixMPI<scalar_t,integer_t>
+    : FrontMPI<scalar_t,integer_t>
     (sep, sep_begin, sep_end, upd, comm, P) {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::release_work_memory() {
+  FrontDenseMPI<scalar_t,integer_t>::release_work_memory() {
     F22_.clear(); // remove the update block
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
+  FrontDenseMPI<scalar_t,integer_t>::extend_add_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FMPI_t* pa) const {
     ExtendAdd<scalar_t,integer_t>::extend_add_copy_to_buffers
       (F22_, sbuf, pa, this->upd_to_parent(pa));
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
+  FrontDenseMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers
       (F22_, sbuf, pa, this->upd_to_parent(pa));
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
+  FrontDenseMPI<scalar_t,integer_t>::extadd_blr_copy_to_buffers_col
   (std::vector<std::vector<scalar_t>>& sbuf, const FBLRMPI_t* pa,
   integer_t begin_col, integer_t end_col, const SPOptions<scalar_t>& opts) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_to_buffers_col
@@ -71,7 +71,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
+  FrontDenseMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa) const {
     BLR::BLRExtendAdd<scalar_t,integer_t>::copy_from_buffers
@@ -79,7 +79,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
+  FrontDenseMPI<scalar_t,integer_t>::extadd_blr_copy_from_buffers_col
   (BLRMPI_t& F11, BLRMPI_t& F12, BLRMPI_t& F21, BLRMPI_t& F22,
    scalar_t** pbuf, const FBLRMPI_t* pa,
    integer_t begin_col, integer_t end_col) const {
@@ -88,7 +88,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> long long
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
+  FrontDenseMPI<scalar_t,integer_t>::node_factor_nonzeros() const {
 #if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
     if (compressed_)
       return (F11c_.compressed_size() + F12c_.compressed_size() +
@@ -99,7 +99,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extend_add() {
+  FrontDenseMPI<scalar_t,integer_t>::extend_add() {
     if (!lchild_ && !rchild_) return;
     std::vector<std::vector<scalar_t>> sbuf(this->P());
     for (auto& ch : {lchild_.get(), rchild_.get()}) {
@@ -122,7 +122,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::build_front
+  FrontDenseMPI<scalar_t,integer_t>::build_front
   (const SpMat_t& A) {
     const auto dupd = this->dim_upd();
     const auto dsep = this->dim_sep();
@@ -147,12 +147,12 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::partial_factorization
+  FrontDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     if (!this->dim_sep() || !grid()->active())
       return err_code;
-    TaskTimer pf("FrontalMatrixDenseMPI_factor");
+    TaskTimer pf("FrontDenseMPI_factor");
     pf.start();
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
     if (opts.use_gpu()) {
@@ -225,7 +225,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
   template<typename scalar_t,typename integer_t> slate::Matrix<scalar_t>
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::slate_matrix(const DistM_t& M) const {
+  FrontDenseMPI<scalar_t,integer_t>::slate_matrix(const DistM_t& M) const {
     return slate::Matrix<scalar_t>::fromScaLAPACK
       (M.rows(), M.cols(), const_cast<scalar_t*>(M.data()), M.ld(),
        M.MB(), M.nprows(), M.npcols(), M.grid()->Comm_active().comm());
@@ -233,7 +233,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::multifrontal_factorization
+  FrontDenseMPI<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
@@ -272,7 +272,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::compress
+  FrontDenseMPI<scalar_t,integer_t>::compress
   (const SPOptions<scalar_t>& opts) {
     if (opts.compression() == CompressionType::LOSSY ||
         opts.compression() == CompressionType::LOSSLESS ||
@@ -290,7 +290,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::decompress
+  FrontDenseMPI<scalar_t,integer_t>::decompress
   (DistM_t& F11, DistM_t& F12, DistM_t& F21) const {
     if (this->dim_sep()) {
       auto wF11 = F11.dense_wrapper();
@@ -306,7 +306,7 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::fwd_solve_phase2
+  FrontDenseMPI<scalar_t,integer_t>::fwd_solve_phase2
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& b, DistM_t& bupd) const {
     if (!grid()->active()) return;
@@ -350,7 +350,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::forward_multifrontal_solve
+  FrontDenseMPI<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist, DistM_t& bupd, DenseM_t&,
    int etree_level) const {
     DistM_t CBl, CBr;
@@ -379,7 +379,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::bwd_solve_phase1
+  FrontDenseMPI<scalar_t,integer_t>::bwd_solve_phase1
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& y, DistM_t& yupd) const {
     if (!grid()->active()) return;
@@ -417,7 +417,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
+  FrontDenseMPI<scalar_t,integer_t>::backward_multifrontal_solve
   (DenseM_t& yloc, DistM_t* ydist, DistM_t& yupd, DenseM_t&,
    int etree_level) const {
     DistM_t& y = ydist[this->sep_];
@@ -448,7 +448,7 @@ namespace strumpack {
    * front. This simplifies communication.
    */
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
+  FrontDenseMPI<scalar_t,integer_t>::extract_CB_sub_matrix_2d
   (const VecVec_t& I, const VecVec_t& J, std::vector<DistM_t>& B) const {
     if (Comm().is_null() || !this->dim_upd()) return;
     // TIMER_TIME(TaskType::HSS_EXTRACT_SCHUR, 3, t_ex_schur);
@@ -478,9 +478,8 @@ namespace strumpack {
    *  Sc = F22^* * R
    */
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::sample_CB
-  (const DistM_t& R, DistM_t& Sr, DistM_t& Sc,
-   FrontalMatrix<scalar_t,integer_t>* pa) const {
+  FrontDenseMPI<scalar_t,integer_t>::sample_CB
+  (const DistM_t& R, DistM_t& Sr, DistM_t& Sc, F_t* pa) const {
     if (F11_.active() || F22_.active()) {
       auto b = R.cols();
       Sr = DistM_t(grid(), this->dim_upd(), b);
@@ -494,9 +493,8 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::sample_CB
-  (Trans op, const DistM_t& R, DistM_t& S,
-   FrontalMatrix<scalar_t,integer_t>* pa) const {
+  FrontDenseMPI<scalar_t,integer_t>::sample_CB
+  (Trans op, const DistM_t& R, DistM_t& S, F_t* pa) const {
     if (F11_.active() || F22_.active()) {
       auto b = R.cols();
       S = DistM_t(grid(), this->dim_upd(), b);
@@ -509,7 +507,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::delete_factors() {
+  FrontDenseMPI<scalar_t,integer_t>::delete_factors() {
     if (visit(lchild_)) lchild_->delete_factors();
     if (visit(rchild_)) rchild_->delete_factors();
     F11_ = DistM_t();
@@ -520,7 +518,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::matrix_inertia
+  FrontDenseMPI<scalar_t,integer_t>::matrix_inertia
   (const DistM_t& F, integer_t& neg, integer_t& zero, integer_t& pos) const {
     using real_t = typename RealType<scalar_t>::value_type;
     int prow = F.prow(), pcol = F.pcol();
@@ -541,7 +539,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_inertia
+  FrontDenseMPI<scalar_t,integer_t>::node_inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) const {
     if (!this->dim_sep() || !grid()->active())
       return ReturnCode::SUCCESS;
@@ -557,7 +555,7 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
-  FrontalMatrixDenseMPI<scalar_t,integer_t>::node_subnormals
+  FrontDenseMPI<scalar_t,integer_t>::node_subnormals
   (std::size_t& ns, std::size_t& nz) const {
     const auto dsep = this->dim_sep();
     if (!dsep || !grid()->active())
@@ -590,19 +588,19 @@ namespace strumpack {
   }
 
   // explicit template instantiations
-  template class FrontalMatrixDenseMPI<float,int>;
-  template class FrontalMatrixDenseMPI<double,int>;
-  template class FrontalMatrixDenseMPI<std::complex<float>,int>;
-  template class FrontalMatrixDenseMPI<std::complex<double>,int>;
+  template class FrontDenseMPI<float,int>;
+  template class FrontDenseMPI<double,int>;
+  template class FrontDenseMPI<std::complex<float>,int>;
+  template class FrontDenseMPI<std::complex<double>,int>;
 
-  template class FrontalMatrixDenseMPI<float,long int>;
-  template class FrontalMatrixDenseMPI<double,long int>;
-  template class FrontalMatrixDenseMPI<std::complex<float>,long int>;
-  template class FrontalMatrixDenseMPI<std::complex<double>,long int>;
+  template class FrontDenseMPI<float,long int>;
+  template class FrontDenseMPI<double,long int>;
+  template class FrontDenseMPI<std::complex<float>,long int>;
+  template class FrontDenseMPI<std::complex<double>,long int>;
 
-  template class FrontalMatrixDenseMPI<float,long long int>;
-  template class FrontalMatrixDenseMPI<double,long long int>;
-  template class FrontalMatrixDenseMPI<std::complex<float>,long long int>;
-  template class FrontalMatrixDenseMPI<std::complex<double>,long long int>;
+  template class FrontDenseMPI<float,long long int>;
+  template class FrontDenseMPI<double,long long int>;
+  template class FrontDenseMPI<std::complex<float>,long long int>;
+  template class FrontDenseMPI<std::complex<double>,long long int>;
 
 } // end namespace strumpack

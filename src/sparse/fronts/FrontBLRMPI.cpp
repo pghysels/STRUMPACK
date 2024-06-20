@@ -42,7 +42,7 @@ namespace strumpack {
   FrontBLRMPI<scalar_t,integer_t>::FrontBLRMPI
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd, const MPIComm& comm, int P, int leaf)
-    : FrontalMatrixMPI<scalar_t,integer_t>
+    : FrontMPI<scalar_t,integer_t>
     (sep, sep_begin, sep_end, upd, comm, P),
       pgrid_(Comm(), P), leaf_(leaf) {}
 

@@ -34,7 +34,7 @@
 #include "StrumpackConfig.hpp"
 #include "sparse/CSRGraph.hpp"
 #include "sparse/SeparatorTree.hpp"
-#include "sparse/fronts/FrontalMatrix.hpp"
+#include "sparse/fronts/Front.hpp"
 #if defined(STRUMPACK_USE_SCOTCH)
 #include "ScotchReordering.hpp"
 #endif

@@ -28,8 +28,8 @@
  */
 
 #include "ExtendAdd.hpp"
-#include "FrontalMatrix.hpp"
-#include "FrontalMatrixMPI.hpp"
+#include "Front.hpp"
+#include "FrontMPI.hpp"
 #include "BLR/BLRMatrixMPI.hpp"
 
 #include "sparse/CompressedSparseMatrix.hpp"

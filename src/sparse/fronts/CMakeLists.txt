@@ -1,16 +1,16 @@
 target_sources(strumpack
   PRIVATE
-  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixHIP.hip
+  ${CMAKE_CURRENT_LIST_DIR}/FrontHIP.hip
   ${CMAKE_CURRENT_LIST_DIR}/FrontFactory.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrix.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDense.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDense.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/Front.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/FrontDense.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/FrontDense.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontHSS.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontHSS.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontBLR.cpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontBLR.hpp
   ${CMAKE_CURRENT_LIST_DIR}/FrontFactory.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrix.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/Front.hpp)
 
 install(FILES
   FrontFactory.hpp
@@ -19,10 +19,10 @@ install(FILES
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
     PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixMPI.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixMPI.hpp
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDenseMPI.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixDenseMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontMPI.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontMPI.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontDenseMPI.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontDenseMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontHSSMPI.cpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontHSSMPI.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontBLRMPI.cpp
@@ -34,10 +34,10 @@ endif()
 if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP OR STRUMPACK_USE_SYCL)
   target_sources(strumpack
     PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPU.hpp
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixGPUKernels.hpp)
-
+    ${CMAKE_CURRENT_LIST_DIR}/FrontGPU.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontGPU.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontGPUKernels.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/FrontGPUStructs.hpp)
 endif()
 
 if(STRUMPACK_USE_MAGMA)
@@ -48,7 +48,7 @@ endif()
 
 if(STRUMPACK_USE_CUDA)
   target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixCUDA.cu
+    ${CMAKE_CURRENT_LIST_DIR}/FrontCUDA.cu
     ${CMAKE_CURRENT_LIST_DIR}/FrontGPUSPD.cu
     ${CMAKE_CURRENT_LIST_DIR}/FrontGPUSPD.cpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontGPUSPD.hpp)
@@ -56,7 +56,7 @@ endif()
 
 if(STRUMPACK_USE_SYCL)
   target_sources(strumpack PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/FrontalMatrixSYCL.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/FrontSYCL.cpp)
 endif()
 
 if(STRUMPACK_USE_ZFP OR STRUMPACK_USE_SZ3)

@@ -36,7 +36,7 @@ namespace strumpack {
   FrontHSS<scalar_t,integer_t>::FrontHSS
   (integer_t sep, integer_t sep_begin, integer_t sep_end,
    std::vector<integer_t>& upd)
-    : FrontalMatrix<scalar_t,integer_t>
+    : Front<scalar_t,integer_t>
     (nullptr, nullptr, sep, sep_begin, sep_end, upd) {
   }
 
@@ -53,7 +53,7 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   FrontHSS<scalar_t,integer_t>::extend_add_to_dense
   (DenseM_t& paF11, DenseM_t& paF12, DenseM_t& paF21, DenseM_t& paF22,
-   const FrontalMatrix<scalar_t,integer_t>* p, int task_depth) {
+   const Front<scalar_t,integer_t>* p, int task_depth) {
     auto F22 = H_.child(1)->dense();
     if (Theta_.cols() < Phi_.cols())
       // S = F22 - Theta_ * ThetaVhatC_or_VhatCPhiC_

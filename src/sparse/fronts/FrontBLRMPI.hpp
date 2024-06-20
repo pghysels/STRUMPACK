@@ -29,22 +29,22 @@
 #ifndef FRONTAL_MATRIX_BLR_MPI_HPP
 #define FRONTAL_MATRIX_BLR_MPI_HPP
 
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #include "BLR/BLRMatrixMPI.hpp"
 #include "BLR/BLRExtendAdd.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  class FrontBLRMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+  class FrontBLRMPI : public FrontMPI<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
     using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 

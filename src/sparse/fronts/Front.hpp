@@ -26,8 +26,8 @@
  *             Division).
  *
  */
-#ifndef FRONTAL_MATRIX_HPP
-#define FRONTAL_MATRIX_HPP
+#ifndef FRONT_HPP
+#define FRONT_HPP
 
 #include <iostream>
 #include <vector>
@@ -49,29 +49,29 @@
 
 namespace strumpack {
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
+  template<typename scalar_t,typename integer_t> class FrontMPI;
   template<typename scalar_t,typename integer_t> class FrontBLRMPI;
 
 
-  template<typename scalar_t,typename integer_t> class FrontalMatrix {
+  template<typename scalar_t,typename integer_t> class Front {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
     using DistM_t = DistributedMatrix<scalar_t>;
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
     using BLRMPI_t = BLR::BLRMatrixMPI<scalar_t>;
 #endif
 
   public:
-    FrontalMatrix(F_t* lchild, F_t* rchild,
-                  integer_t sep, integer_t sep_begin,
-                  integer_t sep_end, std::vector<integer_t>& upd);
-    virtual ~FrontalMatrix() = default;
+    Front(F_t* lchild, F_t* rchild,
+          integer_t sep, integer_t sep_begin,
+          integer_t sep_end, std::vector<integer_t>& upd);
+    virtual ~Front() = default;
 
     integer_t sep_begin() const { return sep_begin_; }
     integer_t sep_end() const { return sep_end_; }
@@ -192,38 +192,35 @@ namespace strumpack {
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
-                        const FrontalMatrix<scalar_t,integer_t>* p,
-                        int task_depth) {
+                        const F_t* p, int task_depth) {
       assert(false);
     }
     virtual void
     extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                         DenseM_t& paF21, DenseM_t& paF22,
-                        const FrontalMatrix<scalar_t,integer_t>* p,
-                        VectorPool<scalar_t>& workspace,
+                        const F_t* p, VectorPool<scalar_t>& workspace,
                         int task_depth) {
       extend_add_to_dense(paF11, paF12, paF21, paF22, p, task_depth);
     }
-      // TODO(Jie): make it pure virtual
-      /*
-       * This is for symmetric
-       */
-      virtual void
-      extend_add_to_dense(DenseM_t& paF11,
-                                    DenseM_t& paF21, DenseM_t& paF22,
-                                    const FrontalMatrix<scalar_t,integer_t>* p,
-                                    int task_depth) { abort(); }
+
+    // TODO(Jie): make it pure virtual
+    /*
+     * This is for symmetric
+     */
+    virtual void
+    extend_add_to_dense(DenseM_t& paF11,
+                        DenseM_t& paF21, DenseM_t& paF22,
+                        const F_t* p, int task_depth) { abort(); }
 
     virtual void
     extend_add_to_blr(BLRM_t& paF11, BLRM_t& paF12,
                       BLRM_t& paF21, BLRM_t& paF22,
-                      const FrontalMatrix<scalar_t,integer_t>* p,
-                      VectorPool<scalar_t>& workspace,
+                      const F_t* p, VectorPool<scalar_t>& workspace,
                       int task_depth, const Opts_t& opts) {}
     virtual void
     extend_add_to_blr_col(BLRM_t& paF11, BLRM_t& paF12,
                           BLRM_t& paF21, BLRM_t& paF22,
-                          const FrontalMatrix<scalar_t,integer_t>* p,
+                          const F_t* p,
                           integer_t begin_col, integer_t end_col,
                           int task_depth, const Opts_t& opts) {}
 
@@ -279,7 +276,7 @@ namespace strumpack {
     virtual bool isMPI() const { return false; }
     virtual bool isGPU() const { return false; }
     virtual void print_rank_statistics(std::ostream &out) const {}
-    virtual std::string type() const { return "FrontalMatrix"; }
+    virtual std::string type() const { return "Front"; }
 
     virtual void
     partition_fronts(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,
@@ -354,7 +351,7 @@ namespace strumpack {
     virtual void
     extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FMPI_t* pa) const {
-      std::cerr << "FrontalMatrix::extend_add_copy_to_buffers"
+      std::cerr << "Front::extend_add_copy_to_buffers"
                 << " not implemented for this front type: "
                 << typeid(*this).name()
                 << std::endl;
@@ -368,7 +365,7 @@ namespace strumpack {
     virtual void
     extadd_blr_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
                                const FBLRMPI_t* pa) const {
-      std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers"
+      std::cerr << "Front::extadd_blr_copy_to_buffers"
                 << " not implemented for this front type: "
                 << typeid(*this).name()
                 << std::endl;
@@ -379,7 +376,7 @@ namespace strumpack {
                                    const FBLRMPI_t* pa,
                                    integer_t begin_col, integer_t end_col,
                                    const Opts_t& opts) const {
-      std::cerr << "FrontalMatrix::extadd_blr_copy_to_buffers_col"
+      std::cerr << "Front::extadd_blr_copy_to_buffers_col"
                 << " not implemented for this front type: "
                 << typeid(*this).name()
                 << std::endl;
@@ -467,8 +464,8 @@ namespace strumpack {
     }
 
   private:
-    FrontalMatrix(const FrontalMatrix&) = delete;
-    FrontalMatrix& operator=(FrontalMatrix const&) = delete;
+    Front(const Front&) = delete;
+    Front& operator=(Front const&) = delete;
 
     virtual void draw_node(std::ostream& of, bool is_root) const;
 
@@ -480,4 +477,4 @@ namespace strumpack {
 
 } // end namespace strumpack
 
-#endif // FRONTAL_MATRIX_HPP
+#endif // FRONT_HPP

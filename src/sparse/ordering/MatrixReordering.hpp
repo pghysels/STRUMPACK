@@ -42,12 +42,12 @@
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class CSRMatrix;
-  template<typename scalar_t,typename integer_t> class FrontalMatrix;
+  template<typename scalar_t,typename integer_t> class Front;
 
   template<typename scalar_t,typename integer_t> class MatrixReordering {
     using Opts_t = SPOptions<scalar_t>;
     using CSR_t = CSRMatrix<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
 
   public:
     MatrixReordering(integer_t  n);

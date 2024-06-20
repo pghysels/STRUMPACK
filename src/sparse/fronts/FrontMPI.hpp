@@ -29,7 +29,7 @@
 #ifndef FRONTAL_MATRIX_MPI_HPP
 #define FRONTAL_MATRIX_MPI_HPP
 
-#include "FrontalMatrix.hpp"
+#include "Front.hpp"
 
 #include "misc/MPIWrapper.hpp"
 #include "dense/DistributedMatrix.hpp"
@@ -42,11 +42,11 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t>
-  class FrontalMatrixMPI : public FrontalMatrix<scalar_t,integer_t> {
+  class FrontMPI : public Front<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;
@@ -56,13 +56,13 @@ namespace strumpack {
     using VecVec_t = std::vector<std::vector<std::size_t>>;
 
   public:
-    FrontalMatrixMPI(integer_t sep, integer_t sep_begin,
-                     integer_t sep_end, std::vector<integer_t>& upd,
-                     const MPIComm& comm, int P);
+    FrontMPI(integer_t sep, integer_t sep_begin,
+             integer_t sep_end, std::vector<integer_t>& upd,
+             const MPIComm& comm, int P);
 
-    FrontalMatrixMPI(const FrontalMatrixMPI&) = delete;
-    FrontalMatrixMPI& operator=(FrontalMatrixMPI const&) = delete;
-    virtual ~FrontalMatrixMPI() = default;
+    FrontMPI(const FrontMPI&) = delete;
+    FrontMPI& operator=(FrontMPI const&) = delete;
+    virtual ~FrontMPI() = default;
 
     virtual void sample_CB(const DistM_t& R, DistM_t& Sr,
                            DistM_t& Sc, F_t* pa) const {}
@@ -77,7 +77,7 @@ namespace strumpack {
     }
     void sample_CB(Trans op, const DistM_t& R, DistM_t& S,
                    const DenseM_t& Rseq, DenseM_t& Sseq,
-                   FrontalMatrix<scalar_t,integer_t>* pa) const override {
+                   F_t* pa) const override {
       sample_CB(op, R, S, pa);
     }
 
@@ -104,16 +104,14 @@ namespace strumpack {
 
     void extend_add_copy_from_buffers(DistM_t& F11, DistM_t& F12,
                                       DistM_t& F21, DistM_t& F22,
-                                      scalar_t** pbuf,
-                                      const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+                                      scalar_t** pbuf, const FMPI_t* pa)
       const override;
     void extend_add_column_copy_to_buffers(const DistM_t& CB,
                                            const DenseM_t& seqCB,
                                            std::vector<std::vector<scalar_t>>& sbuf,
                                            const FMPI_t* pa) const override;
     void extend_add_column_copy_from_buffers(DistM_t& B, DistM_t& Bupd,
-                                             scalar_t** pbuf,
-                                             const FrontalMatrixMPI<scalar_t,integer_t>* pa)
+                                             scalar_t** pbuf, const FMPI_t* pa)
       const override;
     void extract_column_copy_to_buffers(const DistM_t& b, const DistM_t& bupd,
                                         int ch_master,
@@ -148,7 +146,7 @@ namespace strumpack {
 
     virtual long long factor_nonzeros(int task_depth=0) const override;
     virtual long long dense_factor_nonzeros(int task_depth=0) const override;
-    virtual std::string type() const override { return "FrontalMatrixMPI"; }
+    virtual std::string type() const override { return "FrontMPI"; }
     virtual bool isMPI() const override { return true; }
 
     void partition_fronts(const Opts_t& opts, const SpMat_t& A, integer_t* sorder,

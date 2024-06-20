@@ -29,14 +29,14 @@
 #ifndef FRONTAL_MATRIX_HSS_HPP
 #define FRONTAL_MATRIX_HSS_HPP
 
-#include "FrontalMatrix.hpp"
+#include "Front.hpp"
 #include "HSS/HSSMatrix.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontHSS
-    : public FrontalMatrix<scalar_t,integer_t> {
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    : public Front<scalar_t,integer_t> {
+    using F_t = Front<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
@@ -48,8 +48,7 @@ namespace strumpack {
 
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
-                             const FrontalMatrix<scalar_t,integer_t>* p,
-                             int task_depth) override;
+                             const F_t* p, int task_depth) override;
 
     void sample_CB(const Opts_t& opts, const DenseM_t& R,
                    DenseM_t& Sr, DenseM_t& Sc,

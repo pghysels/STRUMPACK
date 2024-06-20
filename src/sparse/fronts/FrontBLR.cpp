@@ -39,7 +39,7 @@
 #include "BLR/BLRExtendAdd.hpp"
 #endif
 #if defined(STRUMPACK_USE_GPU)
-#include "FrontalMatrixGPUKernels.hpp"
+#include "FrontGPUKernels.hpp"
 #endif
 
 namespace strumpack {

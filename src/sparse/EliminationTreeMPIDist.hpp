@@ -39,7 +39,7 @@ namespace strumpack {
 
   // forward declarations
   template<typename scalar_t,typename integer_t> class MatrixReorderingMPI;
-  template<typename scalar_t,typename integer_t> class FrontalMatrixMPI;
+  template<typename scalar_t,typename integer_t> class FrontMPI;
   template<typename scalar_t,typename integer_t> class CSRMatrixMPI;
   template<typename integer_t> class RedistSubTree;
 
@@ -48,8 +48,8 @@ namespace strumpack {
     public EliminationTreeMPI<scalar_t,integer_t> {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using Opts_t = SPOptions<scalar_t>;
     using SepRange = std::pair<integer_t,integer_t>;

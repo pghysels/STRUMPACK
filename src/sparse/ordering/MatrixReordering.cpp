@@ -35,7 +35,7 @@
 
 #include "StrumpackOptions.hpp"
 #include "StrumpackConfig.hpp"
-#include "sparse/fronts/FrontalMatrix.hpp"
+#include "sparse/fronts/Front.hpp"
 #include "sparse/SeparatorTree.hpp"
 #include "sparse/CSRMatrix.hpp"
 #if defined(STRUMPACK_USE_MPI)

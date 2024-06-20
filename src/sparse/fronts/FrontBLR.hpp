@@ -29,7 +29,7 @@
 #ifndef FRONTAL_MATRIX_BLR_HPP
 #define FRONTAL_MATRIX_BLR_HPP
 
-#include "FrontalMatrix.hpp"
+#include "Front.hpp"
 #include "BLR/BLRMatrix.hpp"
 
 namespace strumpack {
@@ -37,15 +37,15 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> class FrontBLRMPI;
 
   template<typename scalar_t,typename integer_t> class FrontBLR
-    : public FrontalMatrix<scalar_t,integer_t> {
+    : public Front<scalar_t,integer_t> {
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
     using Opts_t = SPOptions<scalar_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
     using BLRM_t = BLR::BLRMatrix<scalar_t>;
 #if defined(STRUMPACK_USE_MPI)
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using FBLRMPI_t = FrontBLRMPI<scalar_t,integer_t>;
 #endif
 

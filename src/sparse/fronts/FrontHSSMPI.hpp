@@ -29,16 +29,16 @@
 #ifndef FRONTAL_MATRIX_HSS_MPI_HPP
 #define FRONTAL_MATRIX_HSS_MPI_HPP
 
-#include "FrontalMatrixMPI.hpp"
+#include "FrontMPI.hpp"
 #include "HSS/HSSMatrixMPI.hpp"
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t>
-  class FrontHSSMPI : public FrontalMatrixMPI<scalar_t,integer_t> {
+  class FrontHSSMPI : public FrontMPI<scalar_t,integer_t> {
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
-    using F_t = FrontalMatrix<scalar_t,integer_t>;
-    using FMPI_t = FrontalMatrixMPI<scalar_t,integer_t>;
+    using F_t = Front<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DistM_t = DistributedMatrix<scalar_t>;
     using DistMW_t = DistributedMatrixWrapper<scalar_t>;

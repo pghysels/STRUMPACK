@@ -27,7 +27,7 @@
  *
  */
 #define STRUMPACK_NO_TRIPLET_MPI
-#include "FrontalMatrixGPUKernels.hpp"
+#include "FrontGPUKernels.hpp"
 #include "dense/HIPWrapper.hpp"
 
 #include <hip/hip_runtime.h>
