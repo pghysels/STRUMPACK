@@ -94,7 +94,8 @@ done
 
 for tol in 1e-2 1e-4 1e-6; do
     echo $tol
-    for k in 5000 10000 20000; do
+    # for k in 5000 10000 20000; do
+    for k in 20000; do
         rm -rf tmp*
         for nnz in 1 2 4 8; do
             grep "A\*S time\|AT\*S time" ${out}/out_dim_k${k}*tol${tol}*${comp}_SJLT_nnz${nnz} | awk '{sum+=$5} END {print sum/3./1000.0}' > tmp_sample_nnz${nnz}
@@ -109,7 +110,19 @@ for tol in 1e-2 1e-4 1e-6; do
 
         grep "Number of unknowns:" ${out}/out_dim_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $4/1000.0}' >> tmp_N_gaussian
         grep "\% of dense" ${out}/out_dim_k${k}*tol${tol}*${comp}_Gaussian | awk '{print $6}' | tail -n 1 | sed 's/%//'>> tmp_compr
-        printf '& & %s & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %5.1f \\\\ \n' $k `cat tmp_sample_gaussian` `cat tmp_sample_nnz1` `cat tmp_sample_nnz2` `cat tmp_sample_nnz4` `cat tmp_sample_nnz8` `cat tmp_sample_srht` `cat tmp_constr_gaussian` `cat tmp_constr_nnz1` `cat tmp_constr_nnz2` `cat tmp_constr_nnz4` `cat tmp_constr_nnz8` `cat tmp_constr_srht` `cat tmp_compr`
+        # printf '& & %s & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %3.3g & %5.1f \\\\ \n' $k `cat tmp_sample_gaussian` `cat tmp_sample_nnz1` `cat tmp_sample_nnz2` `cat tmp_sample_nnz4` `cat tmp_sample_nnz8` `cat tmp_sample_srht` `cat tmp_constr_gaussian` `cat tmp_constr_nnz1` `cat tmp_constr_nnz2` `cat tmp_constr_nnz4` `cat tmp_constr_nnz8` `cat tmp_constr_srht` `cat tmp_compr`
+
+		printf '(G, %3.3g)\n (S1, %3.3g)\n (S2, %3.3g)\n (S4, %3.3g)\n (S8, %3.3g)\n (H, %3.3g)\n\n' `cat tmp_sample_gaussian` `cat tmp_sample_nnz1` `cat tmp_sample_nnz2` `cat tmp_sample_nnz4` `cat tmp_sample_nnz8` `cat tmp_sample_srht`
+
+	printf '(G, %3.3g)\n (S1, %3.3g)\n (S2, %3.3g)\n (S4, %3.3g)\n (S8, %3.3g)\n (H, %3.3g)\n\n %3.3g' \
+	       `paste tmp_sample_gaussian tmp_constr_gaussian | awk '{print $2-$1}'` \
+	       `paste tmp_sample_nnz1 tmp_constr_nnz1 | awk '{print $2-$1}'` \
+	       `paste tmp_sample_nnz2 tmp_constr_nnz2 | awk '{print $2-$1}'` \
+	       `paste tmp_sample_nnz4 tmp_constr_nnz4 | awk '{print $2-$1}'` \
+	       `paste tmp_sample_nnz8 tmp_constr_nnz8 | awk '{print $2-$1}'` \
+	       `paste tmp_sample_srht tmp_constr_srht | awk '{print $2-$1}'` \
+	       `cat tmp_constr_gaussian`
+
     done
     echo ""
 done

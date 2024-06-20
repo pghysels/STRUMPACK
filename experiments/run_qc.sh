@@ -11,7 +11,7 @@ export OMP_NUM_THREADS=$T
 export OMP_PLACES=threads
 export OMP_PROC_BIND=spread
 
-out=out_qc
+out=out_qc_symm
 mkdir $out
 
 leaf=256

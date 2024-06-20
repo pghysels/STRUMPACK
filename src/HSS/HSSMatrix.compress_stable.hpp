@@ -79,11 +79,15 @@ namespace strumpack {
             if (opts.verbose())
               std::cout << "# A*S time = "
                         << dt(begin, tnow()) << " [10e-3s]" << std::endl;
-            begin = tnow();
+#if defined(SYMMETRIC_SKETCHING)
+	    Sc_new.copy(Sr_new);
+#else
+	    begin = tnow();
             matrixT_times_SJLT(A, S, Sc_new);
             if (opts.verbose())
               std::cout << "# AT*S time = "
                         << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+#endif
           } else {
             begin = tnow();
             SJLTMatrix<scalar_t,int> temp
@@ -98,11 +102,15 @@ namespace strumpack {
             if (opts.verbose())
               std::cout << "# A*S time = "
                         << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+#if defined(SYMMETRIC_SKETCHING)
+	    Sc_new.copy(Sr_new);
+#else
             begin = tnow();
             matrixT_times_SJLT(A, temp, Sc_new);
             if (opts.verbose())
               std::cout << "# AT*S time = "
                         << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+#endif
             total_nnz += opts.nnz();
           }
           Rc_new.copy(Rr_new);
@@ -170,6 +178,10 @@ namespace strumpack {
           std::cout << "# A*S time = "
                     << dt(begin, tnow()) << " [10e-3s]" << std::endl;
 
+#if defined(SYMMETRIC_SKETCHING)
+	Rc.copy(Rr);
+	Sc.copy(Sr);
+#else
         begin = tnow();
         std::vector<int> svc = slice(svecc, 0, d+dd);
         std::sort(svc.begin(), svc.end());
@@ -180,7 +192,7 @@ namespace strumpack {
         if (opts.verbose())
           std::cout << "# AT*S time = "
                     << dt(begin, tnow()) << " [10e-3s]" << std::endl;
-
+#endif
         while (!this->is_compressed()) {
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
@@ -207,6 +219,10 @@ namespace strumpack {
               std::cout << "# A*S time = "
                         << dt(begin, tnow()) << " [10e-3s]" << std::endl;
 
+#if defined(SYMMETRIC_SKETCHING)
+	    Rc.copy(Rr);
+	    Sc.copy(Sr);
+#else
             begin = tnow();
             std::vector<int> svc = slice(svecc, d, d+dd);
             std::sort(svc.begin(), svc.end());
@@ -215,6 +231,7 @@ namespace strumpack {
             if (opts.verbose())
               std::cout << "# AT*S time = "
                         << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+#endif
           }
         }
       } else

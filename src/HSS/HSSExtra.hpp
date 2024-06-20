@@ -244,9 +244,13 @@ namespace strumpack {
         auto begin = tnow();
         gemm(Trans::N, Trans::N, scalar_t(1.), _A, Rr, scalar_t(0.), Sr);
         std::cout << "# A*S time = " << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+#if defined(SYMMETRIC_SKETCHING)
+	Sc.copy(Sr);
+#else
         begin = tnow();
         gemm(Trans::C, Trans::N, scalar_t(1.), _A, Rc, scalar_t(0.), Sc);
         std::cout << "# AT*S time = " << dt(begin, tnow()) << " [10e-3s]" << std::endl;
+#endif
       }
       void operator()(const std::vector<std::size_t>& I,
                       const std::vector<std::size_t>& J, DenseM_t& B) {

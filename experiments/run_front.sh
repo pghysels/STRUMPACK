@@ -11,17 +11,15 @@ export OMP_NUM_THREADS=$T
 export OMP_PLACES=threads
 export OMP_PROC_BIND=spread
 
-out=out_front
+out=out_front_symm
 mkdir $out
 
 leaf=256
 comp=stable
 
-# for tol in 1e-2 1e-4 1e-6; do
-for tol in 1e-6; do
+for tol in 1e-2 1e-4 1e-6; do
     echo $tol
-    # for k in 100 150 200; do
-    for k in 200; do
+    for k in 100 150 200; do
         echo $k
         sampling=SJLT
         for nnz in 1 2 4 8; do

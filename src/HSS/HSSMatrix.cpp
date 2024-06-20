@@ -27,6 +27,8 @@
  *
  */
 
+#define SYMMETRIC_SKETCHING 1
+
 
 #include "HSSMatrix.hpp"
 
