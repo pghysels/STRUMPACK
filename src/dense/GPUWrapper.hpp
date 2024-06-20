@@ -31,7 +31,9 @@
 
 #include <memory>
 #include "DenseMatrix.hpp"
+#if defined(STRUMPACK_USE_GPU)
 #include "sparse/fronts/FrontGPUStructs.hpp"
+#endif
 
 namespace strumpack {
   namespace gpu {
