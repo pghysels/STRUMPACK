@@ -302,7 +302,7 @@ namespace strumpack {
             << "   https://bitbucket.org/icl/magma/src/master/" << std::endl
             << "Configure with -DTPL_ENABLE_MAGMA=ON" << std::endl
             << "and set the MAGMA_DIR environment variable" << std::endl
-            << "-------------------------------------------------------" << std::endl
+            << "-------------------------------------------------------" << std::endl;
 #endif
         tree()->multifrontal_solve(X);
       };
