@@ -31,12 +31,16 @@
 
 #include "Front.hpp"
 #include "HSS/HSSMatrix.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "FrontMPI.hpp"
+#endif
 
 namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class FrontHSS
     : public Front<scalar_t,integer_t> {
     using F_t = Front<scalar_t,integer_t>;
+    using FMPI_t = FrontMPI<scalar_t,integer_t>;
     using DenseM_t = DenseMatrix<scalar_t>;
     using DenseMW_t = DenseMatrixWrapper<scalar_t>;
     using SpMat_t = CompressedSparseMatrix<scalar_t,integer_t>;
@@ -49,6 +53,11 @@ namespace strumpack {
     void extend_add_to_dense(DenseM_t& paF11, DenseM_t& paF12,
                              DenseM_t& paF21, DenseM_t& paF22,
                              const F_t* p, int task_depth) override;
+#if defined(STRUMPACK_USE_MPI)
+    void
+    extend_add_copy_to_buffers(std::vector<std::vector<scalar_t>>& sbuf,
+                               const FMPI_t* pa) const override;
+#endif
 
     void sample_CB(const Opts_t& opts, const DenseM_t& R,
                    DenseM_t& Sr, DenseM_t& Sc,

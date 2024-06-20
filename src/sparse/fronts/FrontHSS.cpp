@@ -29,6 +29,9 @@
 
 #include "FrontHSS.hpp"
 #include "sparse/CSRGraph.hpp"
+#if defined(STRUMPACK_USE_MPI)
+#include "ExtendAdd.hpp"
+#endif
 
 namespace strumpack {
 
@@ -68,6 +71,27 @@ namespace strumpack {
     this->extend_add(paF11, paF12, paF21, paF22, F22, p);
     release_work_memory();
   }
+
+#if defined(STRUMPACK_USE_MPI)
+  template<typename scalar_t,typename integer_t> void
+  FrontHSS<scalar_t,integer_t>::extend_add_copy_to_buffers
+  (std::vector<std::vector<scalar_t>>& sbuf,
+   const FrontMPI<scalar_t,integer_t>* pa) const {
+    const std::size_t dupd = dim_upd();
+    if (!dupd) return;
+    auto F22 = H_.child(1)->dense();
+    if (Theta_.cols() < Phi_.cols())
+      // S = F22 - Theta_ * ThetaVhatC_or_VhatCPhiC_
+      gemm(Trans::N, Trans::N, scalar_t(-1.), Theta_,
+           ThetaVhatC_or_VhatCPhiC_, scalar_t(1.), F22);
+    else
+      // S = F22 - ThetaVhatC_or_VhatCPhiC_ * Phi_'
+      gemm(Trans::N, Trans::C, scalar_t(-1.),
+           ThetaVhatC_or_VhatCPhiC_, Phi_, scalar_t(1.), F22);
+    ExtendAdd<scalar_t,integer_t>::extend_add_seq_copy_to_buffers
+      (F22, sbuf, pa, this);
+  }
+#endif
 
   template<typename scalar_t,typename integer_t> void
   FrontHSS<scalar_t,integer_t>::extract_CB_sub_matrix
