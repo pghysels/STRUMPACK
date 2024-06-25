@@ -62,6 +62,12 @@ namespace strumpack {
       STRUMPACK_SUB_MEMORY(F22_->get_stat("Mem_Fill")*1.e6);
       F22_.reset(nullptr);
     }
+
+    // temp to get bigger root front
+    F11_ = HODLR::HODLRMatrix<scalar_t>();
+    F12_ = HODLR::ButterflyMatrix<scalar_t>();
+    F21_ = HODLR::ButterflyMatrix<scalar_t>();
+
   }
   template<typename scalar_t,typename integer_t> void
   FrontHODLR<scalar_t,integer_t>::release_work_memory
@@ -481,7 +487,9 @@ namespace strumpack {
                 << " Nupd= " << dim_upd()
                 << " level= " << etree_level << "\n#       "
                 << " nnz(F11)= " << F11nnzH << " , nnz(factor(F11))= "
-                << F11nnzFactors << " , rank(F11)= " << F11rank << " ,\n#       "
+                << F11nnzFactors << " , rank(F11)= " << F11rank
+                << "\n# memory(F11)= " << F11_.get_stat("Mem_Fill") << " MB"
+                << " ,\n#       "
                 << " nnz(F12)= " << F12nnzH << " , rank(F12)= " << F12rank << " , "
                 << " nnz(F21)= " << F21nnzH << " , rank(F21)= " << F21rank << " ,\n#       "
                 << " nnz(F22)= " << F22nnzH << " , rank(F22)= " << F22rank << " , "

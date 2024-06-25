@@ -51,6 +51,12 @@ namespace strumpack {
   (VectorPool<scalar_t>& workspace) {
     workspace.restore(CBstorage_);
     F22_.clear();
+
+
+    F11_.clear();
+    F12_.clear();
+    F21_.clear();
+
   }
 
 //   template<typename scalar_t,typename integer_t> scalar_t*
@@ -413,10 +419,10 @@ namespace strumpack {
       int k = opts.nx();
       int n = k*k, dim = 2;
       assert(F11_.rows() == (std::size_t)n);
-      const int max_samples = 512, bs = 32,
+      const int max_samples = 512, bs = 128,
         leaf_size = opts.HODLR_options().leaf_size(),
         hw = H2OPUS_HWTYPE_CPU;
-      const double eta = 1.0;
+      const double eta = .7;
 
       std::cout << "k= " << k
                 << " n= " << n
@@ -483,7 +489,9 @@ namespace strumpack {
                 << " (low-rank)" << std::endl
                 << " compression = "
                 << hmatrix.getMemoryUsage() / (F11_.memory()/1.e9) * 100
-                << " %"  << std::endl;
+                << " %"
+                << "\n# memory(F11)= " << hmatrix.getMemoryUsage()*1000 << " MB"
+                << std::endl;
     }
 
     ////////////////////////////////////////////////////////
@@ -767,6 +775,9 @@ namespace strumpack {
   FrontH2Opus<scalar_t,integer_t>::partition
   (const Opts_t& opts, const SpMat_t& A,
    integer_t* sorder, bool is_root, int task_depth) {
+    std::iota(sorder+sep_begin_, sorder+sep_end_, sep_begin_);
+    return;
+
     if (dim_sep()) {
       g_ = A.extract_graph
         (opts.separator_ordering_level(), sep_begin_, sep_end_);

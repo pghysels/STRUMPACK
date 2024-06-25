@@ -60,6 +60,12 @@ namespace strumpack {
     workspace.restore(CBstorage_);
     F22_.clear();
     F22blr_.clear();
+
+    // temp to get bigger root front~!!!
+    F11blr_.clear();
+    F12blr_.clear();
+    F21blr_.clear();
+
     admissibility_.clear();
     sep_tiles_.clear();
     upd_tiles_.clear();
@@ -492,7 +498,8 @@ namespace strumpack {
                 << " , Nupd= " << dim_upd()
                 << " level= " << etree_level
                 << "\n#       " << " nnz(F11)= " << nnz
-                << " rank(F11)= " << rank11;
+                << " rank(F11)= " << rank11
+                << "\n# memory(F11)= " << F11blr_.memory() / 1.0e6 << " MB";
       if (dim_upd()) {
         auto nnz12 = F12blr_.nonzeros();
         auto nnz21 = F21blr_.nonzeros();
