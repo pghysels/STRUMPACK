@@ -28,6 +28,21 @@ for k in 25 50 75 100 125 150 200 225 250 275 300 325 350; do
            --sp_print_compressed_front_stats \
            > ${out}/P3_${k}_${comp}_tol${tol}_leaf${leaf}.log
 
+    comp=HSS
+    ./build/examples/sparse/testPoisson3d \
+           $k \
+           --sp_nx $k --sp_ny $k --sp_nz $k \
+           --sp_disable_gpu \
+           --sp_disable_openmp_tree \
+           --sp_compression $comp \
+           --hss_rel_tol $tol \
+           --hss_abs_tol $tol \
+           --hss_leaf_size $leaf \
+           --sp_compression_min_sep_size $sep \
+           --sp_compression_min_front_size 100000000 \
+           --sp_print_compressed_front_stats \
+           > ${out}/P3_${k}_${comp}_tol${tol}_leaf${leaf}.log
+
     comp=BLR
     ./build/examples/sparse/testPoisson3d \
            $k \
