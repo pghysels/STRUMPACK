@@ -63,7 +63,7 @@ jobs:
 
           printf "${BLUE} PG; Installing ScaLAPACK from apt\n"
           sudo apt-get install libscalapack-mpi-dev
-          export SCALAPACK_LIB=/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so
+          # export SCALAPACK_LIB=/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so
           printf "${BLUE} PG; Done installing ScaLAPACK from apt\n"
 
       - name: Install package
@@ -86,8 +86,8 @@ jobs:
             -DCMAKE_Fortran_COMPILER=mpif90 \
             -DCMAKE_INSTALL_PREFIX=../install \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF \
-            -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
+            -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON
+            # -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
           make
           make install
           make examples
