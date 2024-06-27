@@ -38,6 +38,9 @@ if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP OR STRUMPACK_USE_SYCL)
     ${CMAKE_CURRENT_LIST_DIR}/FrontGPU.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontGPUKernels.hpp
     ${CMAKE_CURRENT_LIST_DIR}/FrontGPUStructs.hpp)
+  install(FILES
+    FrontGPUStructs.hpp
+    DESTINATION include/sparse/fronts)
 endif()
 
 if(STRUMPACK_USE_MAGMA)
