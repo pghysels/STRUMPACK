@@ -26,6 +26,8 @@
  *             Division).
  *
  */
+
+#define STRUMPACK_NO_TRIPLET_MPI
 #include "CUDAWrapper.hpp"
 
 namespace strumpack {
