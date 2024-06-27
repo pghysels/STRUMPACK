@@ -28,14 +28,12 @@ jobs:
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update
           sudo apt-get install gcc g++ -y
-          # sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 60 --slave /usr/bin/g++ g++ /usr/bin/g++-10
           export CXX="g++"
           export CC="gcc"
           printf "${BLUE} PG; Done installing gcc via apt\n"
 
           printf "${BLUE} PG; Installing gfortran via apt\n"
           sudo apt-get install gfortran -y
-          # sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-10 60
           printf "${BLUE} PG; Done installing gfortran via apt\n"
 
           printf "${BLUE} PG; Installing openmpi\n"
@@ -46,32 +44,17 @@ jobs:
           sudo apt-get install libmetis-dev libparmetis-dev
           printf "${BLUE} PG; Done installing metis\n"
 
-          # printf "${BLUE} PG; Installing BLAS from apt\n"
-          # sudo apt-get install libblas-dev
-          # export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
-          # printf "${BLUE} PG; Done installing BLAS from apt\n"
-
-          # printf "${BLUE} PG; Installing LAPACK from apt\n"
-          # sudo apt-get install liblapack-dev
-          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
-          # printf "${BLUE} PG; Done installing LAPACK from apt\n"
-
           printf "${BLUE} PG; Installing OpenBLAS from apt\n"
           sudo apt-get install libopenblas-openmp-dev
-          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
           printf "${BLUE} PG; Done installing OpenBLAS from apt\n"
 
           printf "${BLUE} PG; Installing ScaLAPACK from apt\n"
           sudo apt-get install libscalapack-mpi-dev
-          # export SCALAPACK_LIB=/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so
           printf "${BLUE} PG; Done installing ScaLAPACK from apt\n"
 
       - name: Install package
         run: |
           export BLUE="\033[34;1m"
-          # export BLAS_LIB=/usr/lib/x86_64-linux-gnu/libblas.so
-          # export LAPACK_LIB=/usr/lib/x86_64-linux-gnu/liblapack.so
-          export SCALAPACK_LIB="/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so"
           printf "${BLUE} PG; Installing STRUMPACK from source\n"
           cd $GITHUB_WORKSPACE
           rm -rf build
@@ -86,8 +69,7 @@ jobs:
             -DCMAKE_Fortran_COMPILER=mpif90 \
             -DCMAKE_INSTALL_PREFIX=../install \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON
-            # -DTPL_SCALAPACK_LIBRARIES="$SCALAPACK_LIB"
+            -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF
           make
           make install
           make examples
