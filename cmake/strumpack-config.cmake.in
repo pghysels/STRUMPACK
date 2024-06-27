@@ -22,8 +22,7 @@ if(@STRUMPACK_USE_MPI@) # STRUMPACK_USE_MPI
   enable_language(Fortran)
   find_dependency(MPI)
 
-   # there is no target for ScaLAPACK
-   # find_dependency(SCALAPACK)
+  find_dependency(SCALAPACK)
 endif()
 
 # don't really need to find these because they have no targets
@@ -44,13 +43,13 @@ if(@STRUMPACK_USE_SCOTCH@) # STRUMPACK_USE_SCOTCH
   find_dependency(SCOTCH)
 endif()
 
-if(@STRUMPACK_USE_PTSCOTCH@) # STRUMPACK_USE_PTSCOTCH
-  set(ptscotch_PREFIX @TPL_PTSCOTCH_PREFIX@)
-  set(ptscotch_INCLUDE_DIR @TPL_PTSCOTCH_INCLUDE_DIRS@)
-  set(ptscotch_LIBRARY_DIR @TPL_PTSCOTCH_LIBRARY_DIR@)
-  set(ptscotch_LIBRARIES @TPL_PTSCOTCH_LIBRARIES@)
-  find_dependency(PTSCOTCH)
-endif()
+# if(@STRUMPACK_USE_PTSCOTCH@) # STRUMPACK_USE_PTSCOTCH
+#   set(ptscotch_PREFIX @TPL_PTSCOTCH_PREFIX@)
+#   set(ptscotch_INCLUDE_DIR @TPL_PTSCOTCH_INCLUDE_DIRS@)
+#   set(ptscotch_LIBRARY_DIR @TPL_PTSCOTCH_LIBRARY_DIR@)
+#   set(ptscotch_LIBRARIES @TPL_PTSCOTCH_LIBRARIES@)
+#   find_dependency(PTSCOTCH)
+# endif()
 
 if(@STRUMPACK_USE_PARMETIS@) # STRUMPACK_USE_PARMETIS
   set(parmetis_PREFIX @TPL_PARMETIS_PREFIX@)
