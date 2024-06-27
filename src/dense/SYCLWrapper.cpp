@@ -302,6 +302,8 @@ namespace strumpack {
         (get_sycl_queue(handle), T2MKLOp(ta), T2MKLOp(tb), c.rows(), c.cols(),
          (ta==Trans::N) ? a.cols() : a.rows(), alpha, a.data(), a.ld(),
          b.data(), b.ld(), beta, c.data(), c.ld());
+      STRUMPACK_FLOPS((is_complex<scalar_t>()?4:1)*blas::gemm_flops(c.rows(),c.cols(),(ta==Trans::N)?a.cols():a.rows(),alpha,beta));
+      STRUMPACK_BYTES(sizeof(scalar_t)*blas::gemm_moves(c.rows(),c.cols(),(ta==Trans::N)?a.cols():a.rows()));
     }
     template void gemm(Handle&, Trans, Trans, float, const DenseMatrix<float>&,
                        const DenseMatrix<float>&, float, DenseMatrix<float>&);
