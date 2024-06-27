@@ -403,8 +403,9 @@ namespace strumpack {
                 << " , maxrank= " << rank
                 << " , " << (float(nnzH + nnzULV + nnzSchur)
                              / (float(dim_blk())*dim_blk()) * 100.)
-                << " %compression, time= " << time
-                << " sec" << std::endl;
+                << " %compression, time= " << time << " sec"
+                << "\n# memory(F11)= " << H_.memory() / 1.0e6 << " MB"
+                << std::endl;
     }
     return err_code;
   }

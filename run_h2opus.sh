@@ -9,7 +9,7 @@ leaf=64
 
 export OMP_NUM_THREADS=4
 
-for k in 25 50 75 100 125 150 200 225 250 275 300 325 350; do
+for k in 25 50 75 100 125; do
     sep=$((k*k-1))
     echo $k
 
