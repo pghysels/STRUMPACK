@@ -256,11 +256,6 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   SparseSolver<scalar_t,integer_t>::solve_internal
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
-    TaskTimer t("solve");
-    this->perf_counters_start();
-    t.start();
-    assert(b.cols() == x.cols());
-
     // reordering has to be called, even for the iterative solvers
     if (!this->reordered_) {
       ReturnCode ierr = this->reorder();
@@ -276,6 +271,11 @@ namespace strumpack {
       // should still continue!!
       if (ierr != ReturnCode::SUCCESS) return ierr;
     }
+
+    TaskTimer t("solve");
+    this->perf_counters_start();
+    t.start();
+    assert(b.cols() == x.cols());
 
     integer_t d = b.cols();
     assert(matrix()->size() < std::numeric_limits<int>::max());
