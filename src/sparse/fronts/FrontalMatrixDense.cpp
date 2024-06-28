@@ -47,6 +47,10 @@ namespace strumpack {
   (VectorPool<scalar_t>& workspace) {
     workspace.restore(CBstorage_);
     F22_.clear();
+
+    F11_.clear();
+    F12_.clear();
+    F21_.clear();
   }
 
   template<typename scalar_t,typename integer_t> scalar_t*
