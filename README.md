@@ -15,23 +15,24 @@ the U.S. Dept. of Energy).  All rights reserved.
 
 
 ## Current developers - Lawrence Berkeley National Laboratory
- - Pieter Ghysels - pghysels@lbl.gov
+ - Pieter Ghysels - pghysels@lbl.gov / ghyselsp@gmail.com
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
  - Lisa Claus - LClaus@lbl.gov
  - Wajih Boukaram - wajih.boukaram@lbl.gov
- - Yotam Yaniv - yotamya@math.ucla.edu (UCLA)
+ - Yotam Yaniv - yotamya@math.ucla.edu
+ - Henry Boateng - boateng@sfsu.edu
 
 ## Past contributors
  - Ryan Synk
  - Lucy Guo
  - Gustavo Chávez
- - Liza Rebrova - UCLA, University of Michigan
- - François-Henry Rouet - Livermore Software Technology Corp., Ansys
- - Theo Mary - University of Manchester
- - Christopher Gorman - UC Santa Barbara
- - Jonas Actor - Rice University
- - Michael Neuder - Harvard
+ - Liza Rebrova
+ - François-Henry Rouet
+ - Theo Mary
+ - Christopher Gorman
+ - Jonas Actor
+ - Michael Neuder
 
 
 ## Overview
