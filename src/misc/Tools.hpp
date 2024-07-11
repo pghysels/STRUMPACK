@@ -109,7 +109,22 @@ namespace strumpack {
     void restore(std::vector<scalar_t,NoInit<scalar_t>>& v) {
       if (v.empty()) return;
 #pragma omp critical
-      data_.push_back(std::move(v));
+      {
+        data_.push_back(std::move(v));
+        if (data_.size() > 4) {
+          // remove smallest
+          int pos = 0;
+          std::size_t smin = data_[0].size();
+          for (std::size_t i=1; i<data_.size(); i++) {
+            auto ps = data_[i].size();
+            if (ps < smin) {
+              pos = i;
+              smin = ps;
+            }
+          }
+          data_.erase(data_.begin()+pos);
+        }
+      }
     }
 
 #if defined(STRUMPACK_USE_GPU)
