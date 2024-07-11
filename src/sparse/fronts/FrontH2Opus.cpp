@@ -422,7 +422,7 @@ namespace strumpack {
       const int max_samples = 512, bs = 128,
         leaf_size = opts.HODLR_options().leaf_size(),
         hw = H2OPUS_HWTYPE_CPU;
-      const double eta = .7;
+      const double eta = .8;
 
       std::cout << "k= " << k
                 << " n= " << n
