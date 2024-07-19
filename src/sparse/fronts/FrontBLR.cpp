@@ -100,29 +100,23 @@ namespace strumpack {
             F12blr_(e.r, e.c) = e.v;
     }
     if (part) {
+      auto lo = F11blr_.tilecoff(i);
+      auto hi = F11blr_.tilecoff(std::min(i+CP, F11blr_.colblocks()));
       if (lchild_)
         lchild_->extend_add_to_blr_col
-          (F11blr_, F12blr_, F21blr_, F22blr_, this, F11blr_.tilecoff(i),
-           F11blr_.tilecoff(std::min(i+CP, F11blr_.colblocks())),
-           task_depth, opts);
+          (F11blr_, F12blr_, F21blr_, F22blr_, this, lo, hi, task_depth, opts);
       if (rchild_)
         rchild_->extend_add_to_blr_col
-          (F11blr_, F12blr_, F21blr_, F22blr_, this, F11blr_.tilecoff(i),
-           F11blr_.tilecoff(std::min(i+CP, F11blr_.colblocks())),
-           task_depth, opts);
+          (F11blr_, F12blr_, F21blr_, F22blr_, this, lo, hi, task_depth, opts);
     } else {
+      auto lo = F22blr_.tilecoff(i) + dim_sep();
+      auto hi = F22blr_.tilecoff(std::min(i+CP, F22blr_.colblocks())) + dim_sep();
       if (lchild_)
         lchild_->extend_add_to_blr_col
-          (F11blr_, F12blr_, F21blr_, F22blr_, this,
-           F22blr_.tilecoff(i) + dim_sep(),
-           F22blr_.tilecoff(std::min(i+CP, F22blr_.colblocks())) + dim_sep(),
-           task_depth, opts);
+          (F11blr_, F12blr_, F21blr_, F22blr_, this, lo, hi, task_depth, opts);
       if (rchild_)
         rchild_->extend_add_to_blr_col
-          (F11blr_, F12blr_, F21blr_, F22blr_, this,
-           F22blr_.tilecoff(i) + dim_sep(),
-           F22blr_.tilecoff(std::min(i+CP, F22blr_.colblocks())) + dim_sep(),
-           task_depth, opts);
+          (F11blr_, F12blr_, F21blr_, F22blr_, this, lo, hi, task_depth, opts);
     }
   }
 

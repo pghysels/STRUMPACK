@@ -1403,7 +1403,8 @@ namespace strumpack {
       B11.piv_.resize(B11.rows());
       auto rb = B11.rowblocks();
       auto rb2 = B22.rowblocks();
-      const std::size_t CP = 1; // code below is now simplified for CP == 1
+      const std::size_t CP = 1;
+      // code below is now simplified for CP == 1
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
       {
@@ -1412,7 +1413,8 @@ namespace strumpack {
           B21.fill_col(0., i, CP);
           blockcol(i, true, CP);
           for (std::size_t k=0; k<i; k++) {
-            if (admissible(k, i)) B11.compress_tile(k, i, opts);
+            if (admissible(k, i))
+              B11.compress_tile(k, i, opts);
             std::vector<int> tpiv
               (B11.piv_.begin()+B11.tileroff(k),
                B11.piv_.begin()+B11.tileroff(k+1));
@@ -1449,16 +1451,6 @@ namespace strumpack {
           B12.fill_col(0., i, CP);
           B22.fill_col(0., i, CP);
           blockcol(i, false, CP);
-#pragma omp taskloop
-          for (std::size_t k=0; k<rb; k++) {
-            B12.compress_tile(k, i, opts);
-            std::vector<int> tpiv
-              (B11.piv_.begin()+B11.tileroff(k),
-               B11.piv_.begin()+B11.tileroff(k+1));
-            B12.tile(k, i).laswp(tpiv, true);
-            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                 scalar_t(1.), B11.tile(k, k), B12.tile(k, i));
-          }
           for (std::size_t k=0; k<rb; k++) {
 #pragma omp taskloop
             for (std::size_t lk=k+1; lk<rb+rb2; lk++)
@@ -1470,6 +1462,16 @@ namespace strumpack {
                 gemm(Trans::N, Trans::N, scalar_t(-1.),
                      B21.tile(lk-rb, k), B12.tile(k, i), scalar_t(1.),
                      B22.tile_dense(lk-rb, i).D());
+          }
+#pragma omp taskloop
+          for (std::size_t k=0; k<rb; k++) {
+            B12.compress_tile(k, i, opts);
+            std::vector<int> tpiv
+              (B11.piv_.begin()+B11.tileroff(k),
+               B11.piv_.begin()+B11.tileroff(k+1));
+            B12.tile(k, i).laswp(tpiv, true);
+            trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                 scalar_t(1.), B11.tile(k, k), B12.tile(k, i));
           }
 #pragma omp taskloop
           for (std::size_t k=0; k<rb2; k++)
