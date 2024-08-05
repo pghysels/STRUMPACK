@@ -22,7 +22,7 @@ if(@STRUMPACK_USE_MPI@) # STRUMPACK_USE_MPI
   enable_language(Fortran)
   find_dependency(MPI)
 
-  find_dependency(SCALAPACK)
+  # find_dependency(SCALAPACK)
 endif()
 
 # don't really need to find these because they have no targets
