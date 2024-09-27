@@ -139,6 +139,24 @@ namespace strumpack {
       return m;
     }
 
+    template<typename scalar_t> DenseTile<scalar_t>&
+    BLRMatrixMPI<scalar_t>::ltile_dense(std::size_t i, std::size_t j) {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        assert(dynamic_cast<DenseTile<scalar_t>*>
+               (blocks_[i+j*rowblockslocal()].get()));
+        return *static_cast<DenseTile<scalar_t>*>
+                   (blocks_[i+j*rowblockslocal()].get());
+    }
+
+    template<typename scalar_t> const DenseTile<scalar_t>&
+    BLRMatrixMPI<scalar_t>::ltile_dense(std::size_t i, std::size_t j) const {
+        assert(i < rowblockslocal() && j < colblockslocal());
+        assert(dynamic_cast<const DenseTile<scalar_t>*>
+               (blocks_[i+j*rowblockslocal()].get()));
+        return *static_cast<const DenseTile<scalar_t>*>
+                   (blocks_[i+j*rowblockslocal()].get());
+    }
+
     template<typename scalar_t>
     typename RealType<scalar_t>::value_type
     BLRMatrixMPI<scalar_t>::normF() const {

@@ -272,20 +272,8 @@ namespace strumpack {
         return *blocks_[i+j*rowblockslocal()].get();
       }
 
-      DenseTile<scalar_t>& ltile_dense(std::size_t i, std::size_t j) {
-        assert(i < rowblockslocal() && j < colblockslocal());
-        assert(dynamic_cast<DenseTile<scalar_t>*>
-               (blocks_[i+j*rowblockslocal()].get()));
-        return *static_cast<DenseTile<scalar_t>*>
-                   (blocks_[i+j*rowblockslocal()].get());
-      }
-      const DenseTile<scalar_t>& ltile_dense(std::size_t i, std::size_t j) const {
-        assert(i < rowblockslocal() && j < colblockslocal());
-        assert(dynamic_cast<const DenseTile<scalar_t>*>
-               (blocks_[i+j*rowblockslocal()].get()));
-        return *static_cast<const DenseTile<scalar_t>*>
-                   (blocks_[i+j*rowblockslocal()].get());
-      }
+      DenseTile<scalar_t>& ltile_dense(std::size_t i, std::size_t j);
+      const DenseTile<scalar_t>& ltile_dense(std::size_t i, std::size_t j) const;
 
       std::unique_ptr<BLRTile<scalar_t>>&
       block(std::size_t i, std::size_t j) {

@@ -191,9 +191,7 @@ namespace strumpack {
        * matrix. The value of c should be 0 or 1, and this HSS matrix
        * should not be a leaf!
        */
-      const HSSMatrix<scalar_t>* child(int c) const {
-        return dynamic_cast<HSSMatrix<scalar_t>*>(this->ch_[c].get());
-      }
+      const HSSMatrix<scalar_t>* child(int c) const;
 
       /**
        * Return a raw (non-owning) pointer to child c of this HSS
@@ -201,9 +199,7 @@ namespace strumpack {
        * value of c should be 0 or 1, and this HSS matrix should not
        * be a leaf!
        */
-      HSSMatrix<scalar_t>* child(int c) {
-        return dynamic_cast<HSSMatrix<scalar_t>*>(this->ch_[c].get());
-      }
+      HSSMatrix<scalar_t>* child(int c);
 
       /**
        * Initialize this HSS matrix as the compressed HSS
