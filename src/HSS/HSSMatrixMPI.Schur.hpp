@@ -39,63 +39,6 @@ namespace strumpack {
      *   Phi = (D0^{-1} * U0 * B01 * V1big^C)^C
      *       = V1big * (D0^{-1} * U0 * B01)^C
      */
-    template<typename scalar_t> void HSSMatrixMPI<scalar_t>::Schur_update
-    (DistM_t& Theta, DistM_t& Vhat, DistM_t& DUB01, DistM_t& Phi) const {
-      if (this->leaf()) return;
-      auto ch0 = child(0);
-      auto ch1 = child(1);
-      DistM_t DU(grid(), ch0->U_rows(), ch0->U_rank());
-      if (auto ch0mpi =
-          dynamic_cast<const HSSMatrixMPI<scalar_t>*>(child(0))) {
-        DistM_t chDU;
-        if (ch0mpi->active()) {
-          chDU = ch0->ULV_mpi_.D_.solve(ch0mpi->U_.dense(), ch0->ULV_mpi_.piv_);
-          STRUMPACK_SCHUR_FLOPS
-            (!ch0->ULV_mpi_.D_.is_master() ? 0 :
-             blas::getrs_flops(ch0->ULV_mpi_.D_.rows(), ch0mpi->U_.cols()));
-        }
-        copy(ch0->U_rows(), ch0->U_rank(), chDU, 0, 0, DU, 0, 0, grid()->ctxt_all());
-      } else {
-        auto ch0seq = dynamic_cast<const HSSMatrix<scalar_t>*>(child(0));
-        DenseM_t chDU;
-        if (ch0seq->active()) {
-          chDU = ch0->ULV_mpi_.D_.gather().solve
-            (ch0seq->U_.dense(), ch0->ULV_mpi_.piv_, ch0seq->openmp_task_depth_);
-          STRUMPACK_SCHUR_FLOPS
-            (!ch0->ULV_mpi_.D_.is_master() ? 0 :
-             blas::getrs_flops(ch0->ULV_mpi_.D_.rows(), ch0seq->U_.cols()));
-        }
-        copy(ch0->U_rows(), ch0->U_rank(), chDU, 0/*rank ch0*/, DU, 0, 0, grid()->ctxt_all());
-      }
-      DUB01 = DistM_t(grid(), ch0->U_rows(), ch1->V_rank());
-      gemm(Trans::N, Trans::N, scalar_t(1.), DU, B01_, scalar_t(0.), DUB01);
-      STRUMPACK_SCHUR_FLOPS
-        (gemm_flops(Trans::N, Trans::N, scalar_t(1.), DU, B01_, scalar_t(0.)));
-
-      DistM_t _theta(ch1->grid(grid_local()), B10_.rows(), B10_.cols());
-      copy(B10_.rows(), B10_.cols(), B10_, 0, 0, _theta, 0, 0, grid()->ctxt_all());
-      auto DUB01t = DUB01.transpose();
-      DistM_t _phi(ch1->grid(grid_local()), DUB01t.rows(), DUB01t.cols());
-      copy(DUB01t.rows(), DUB01t.cols(), DUB01t, 0, 0, _phi, 0, 0, grid()->ctxt_all());
-      DUB01t.clear();
-
-      DistSubLeaf<scalar_t> Theta_br(_theta.cols(), ch1, grid_local()),
-        Phi_br(_phi.cols(), ch1, grid_local());
-      DistM_t Theta_ch(ch1->grid(grid_local()), ch1->rows(), _theta.cols());
-      DistM_t Phi_ch(ch1->grid(grid_local()), ch1->cols(), _phi.cols());
-      long long int flops = 0;
-      ch1->apply_UV_big(Theta_br, _theta, Phi_br, _phi, flops);
-      STRUMPACK_SCHUR_FLOPS(flops);
-      Theta_br.from_block_row(Theta_ch);
-      Phi_br.from_block_row(Phi_ch);
-      Theta = DistM_t(grid(), Theta_ch.rows(), Theta_ch.cols());
-      Phi = DistM_t(grid(), Phi_ch.rows(), Phi_ch.cols());
-      copy(Theta.rows(), Theta.cols(), Theta_ch, 0, 0, Theta, 0, 0, grid()->ctxt_all());
-      copy(Phi.rows(), Phi.cols(), Phi_ch, 0, 0, Phi, 0, 0, grid()->ctxt_all());
-
-      Vhat = DistM_t(grid(), Phi.cols(), Theta.cols());
-      copy(Vhat.rows(), Vhat.cols(), ch0->ULV_mpi_.Vhat(), 0, 0, Vhat, 0, 0, grid()->ctxt_all());
-    }
 
     /**
      * Apply Schur complement the direct way:

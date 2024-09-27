@@ -138,6 +138,16 @@ namespace strumpack {
         (new HSSMatrix<scalar_t>(*this));
     }
 
+    template<typename scalar_t> const HSSMatrix<scalar_t>*
+    HSSMatrix<scalar_t>::child(int c) const {
+        return dynamic_cast<HSSMatrix<scalar_t>*>(this->ch_[c].get());
+    }
+
+    template<typename scalar_t> HSSMatrix<scalar_t>*
+    HSSMatrix<scalar_t>::child(int c) {
+        return dynamic_cast<HSSMatrix<scalar_t>*>(this->ch_[c].get());
+    }
+
     template<typename scalar_t> void
     HSSMatrix<scalar_t>::delete_trailing_block() {
       B01_.clear();
