@@ -409,7 +409,7 @@ namespace strumpack {
             A.extract_front
               (F11, F12, F21, sep_begin_, sep_end_, this->upd_, task_depth);
             if (dupd) {
-              CBstorage_ = workspace.get(dupd*dupd);
+              CBstorage_ = workspace.get(std::size_t(dupd)*dupd);
               F22_ = DenseMW_t(dupd, dupd, CBstorage_.data(), dupd);
               F22_.zero();
             }
