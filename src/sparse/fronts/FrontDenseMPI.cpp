@@ -204,7 +204,7 @@ namespace strumpack {
       auto time = pf.elapsed();
       std::cout << "# DenseMPI factorization complete, "
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
-                << "GPU=" << opts.use_gpu()
+                << (opts.use_gpu() ? "GPU enabled" : "GPU disabled")
 #else
                 << "no GPU support"
 #endif
