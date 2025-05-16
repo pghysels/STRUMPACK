@@ -319,7 +319,7 @@ namespace strumpack {
     void init() {
 #if defined(STRUMPACK_USE_MPI)
       int devs;
-      cudaGetDeviceCount(&devs);
+      gpu_check(cudaGetDeviceCount(&devs));
       if (devs > 1) {
         int flag, rank = 0;
         MPI_Initialized(&flag);
@@ -327,7 +327,11 @@ namespace strumpack {
           MPIComm c;
           rank = c.rank();
         }
-        cudaSetDevice(rank % devs);
+        gpu_check(cudaSetDevice(rank % devs));
+#pragma omp parallel
+        {
+          gpu_check(cudaSetDevice(rank % devs));
+        }
       }
 #endif
       //       gpu_check(cudaFree(0));

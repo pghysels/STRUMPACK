@@ -291,6 +291,10 @@ namespace strumpack {
           rank = c.rank();
         }
         gpu_check(hipSetDevice(rank % devs));
+#pragma omp parallel
+        {
+          gpu_check(hipSetDevice(rank % devs));
+        }
       }
 #endif
     }
