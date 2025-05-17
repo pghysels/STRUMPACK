@@ -69,6 +69,7 @@ jobs:
             -DCMAKE_Fortran_COMPILER=mpif90 \
             -DCMAKE_INSTALL_PREFIX=../install \
             -DCMAKE_BUILD_TYPE=Debug \
+	    -DTPL_SCALAPACK_LIBRARIES='/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so' \
             -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF
           make
           make install
