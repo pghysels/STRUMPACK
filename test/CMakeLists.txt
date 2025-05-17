@@ -33,8 +33,10 @@ if(STRUMPACK_USE_MPI)
   target_link_libraries(test_structure_reuse_mpi strumpack)
   target_link_libraries(test_BLR_mpi strumpack)
 
-  # TODO check whether this is supported?
-  set(OVERSUBSCRIBEFLAG "--oversubscribe")
+  execute_process(COMMAND ${MPIEXEC} --oversubscribe --version RESULT_VARIABLE oversubscribe_supported)
+  if(${oversubscribe_supported} EQUAL 0)
+    set(OVERSUBSCRIBEFLAG "--oversubscribe")
+  endif()
 
   add_test("user_test_HSS_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
