@@ -251,15 +251,15 @@ namespace strumpack {
       m.data_ = nullptr;
     } else {
       if (lrows_ && lcols_) {
-        STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
-        data_ = new scalar_t[lrows_*lcols_];
+        STRUMPACK_ADD_MEMORY(std::size_t(lrows_)*lcols_*sizeof(scalar_t));
+        data_ = new scalar_t[std::size_t(lrows_)*lcols_];
         for (int c=0; c<lcols_; c++)
           for (int r=0; r<lrows_; r++)
             operator()(r, c) = m(r, c);
       }
     }
     if (m.data_) {
-      STRUMPACK_SUB_MEMORY(m.rows_*m.cols_*sizeof(scalar_t));
+      STRUMPACK_SUB_MEMORY(std::size_t(m.rows_)*m.cols_*sizeof(scalar_t));
       delete[] m.data_;
     }
     m.data_ = nullptr;
@@ -277,9 +277,9 @@ namespace strumpack {
     : grid_(m.grid()), lrows_(m.lrows()), lcols_(m.lcols()) {
     std::copy(m.desc_, m.desc_+9, desc_);
     if (lrows_ && lcols_) {
-      STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
-      data_ = new scalar_t[lrows_*lcols_];
-      std::copy(m.data_, m.data_+lrows_*lcols_, data_);
+      STRUMPACK_ADD_MEMORY(std::size_t(lrows_)*lcols_*sizeof(scalar_t));
+      data_ = new scalar_t[std::size_t(lrows_)*lcols_];
+      std::copy(m.data_, m.data_+std::size_t(lrows_)*lcols_, data_);
     }
   }
 
@@ -320,8 +320,8 @@ namespace strumpack {
       lrows_ = scalapack::numroc(M, MB, prow(), 0, nprows());
       lcols_ = scalapack::numroc(N, NB, pcol(), 0, npcols());
       if (lrows_ && lcols_) {
-        STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
-        data_ = new scalar_t[lrows_*lcols_];
+        STRUMPACK_ADD_MEMORY(std::size_t(lrows_)*lcols_*sizeof(scalar_t));
+        data_ = new scalar_t[std::size_t(lrows_)*lcols_];
       }
       if (scalapack::descinit
           (desc_, M, N, MB, NB, 0, 0, ctxt(), std::max(lrows_,1))) {
@@ -345,15 +345,15 @@ namespace strumpack {
   (const DistributedMatrix<scalar_t>& m) {
     if (lrows_ != m.lrows_ || lcols_ != m.lcols_) {
       if (data_) {
-        STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+        STRUMPACK_SUB_MEMORY(std::size_t(lrows_)*lcols_*sizeof(scalar_t));
         delete[] data_;
       }
       lrows_ = m.lrows_;  lcols_ = m.lcols_;
-      STRUMPACK_ADD_MEMORY(lrows_*lcols_*sizeof(scalar_t));
-      data_ = new scalar_t[lrows_*lcols_];
+      STRUMPACK_ADD_MEMORY(std::size_t(lrows_)*lcols_*sizeof(scalar_t));
+      data_ = new scalar_t[std::size_t(lrows_)*lcols_];
     }
     grid_ = m.grid();
-    std::copy(m.data_, m.data_+lrows_*lcols_, data_);
+    std::copy(m.data_, m.data_+std::size_t(lrows_)*lcols_, data_);
     std::copy(m.desc_, m.desc_+9, desc_);
     return *this;
   }
@@ -362,7 +362,7 @@ namespace strumpack {
   DistributedMatrix<scalar_t>::operator=(DistributedMatrix<scalar_t>&& m) {
     grid_ = m.grid();
     if (data_) {
-      STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+      STRUMPACK_SUB_MEMORY(std::size_t(lrows_)*lcols_*sizeof(scalar_t));
       delete[] data_;
     }
     lrows_ = m.lrows_;
@@ -382,7 +382,7 @@ namespace strumpack {
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::clear() {
     if (data_) {
-      STRUMPACK_SUB_MEMORY(lrows_*lcols_*sizeof(scalar_t));
+      STRUMPACK_SUB_MEMORY(std::size_t(lrows_)*lcols_*sizeof(scalar_t));
       delete[] data_;
     }
     data_ = nullptr;
@@ -413,6 +413,7 @@ namespace strumpack {
     if (!active()) return;
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
+#pragma omp parallel for collapse(2)
     for (int c=clo; c<chi; c++)
       for (int r=rlo; r<rhi; r++)
         operator()(r,c) = scalar_t(0.);
@@ -423,6 +424,7 @@ namespace strumpack {
     if (!active()) return;
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
+#pragma omp parallel for collapse(2)
     for (int c=clo; c<chi; c++)
       for (int r=rlo; r<rhi; r++)
         operator()(r,c) = a;
@@ -434,10 +436,18 @@ namespace strumpack {
     if (!active()) return;
     int rlo, rhi, clo, chi;
     lranges(rlo, rhi, clo, chi);
-    for (int c=clo; c<chi; c++) {
-      auto cg = coll2g(c);
-      for (int r=rlo; r<rhi; r++)
-        operator()(r,c) = A(rowl2g(r), cg);
+    if (fixed()) {
+#pragma omp parallel for collapse(2)
+      for (int c=clo; c<chi; c++) {
+        for (int r=rlo; r<rhi; r++)
+          operator()(r,c) = A(rowl2g_fixed(r), coll2g_fixed(c));
+      }
+    } else {
+#pragma omp parallel for collapse(2)
+      for (int c=clo; c<chi; c++) {
+        for (int r=rlo; r<rhi; r++)
+          operator()(r,c) = A(rowl2g(r), coll2g(c));
+      }
     }
   }
 
@@ -451,7 +461,7 @@ namespace strumpack {
     for (int c=clo; c<chi; ++c)
       for (int r=rlo; r<rhi; ++r)
         operator()(r,c) = rgen->get();
-    STRUMPACK_FLOPS(rgen->flops_per_prng()*(chi-clo)*(rhi-rlo));
+    STRUMPACK_FLOPS(rgen->flops_per_prng()*std::size_t(chi-clo)*(rhi-rlo));
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::random
@@ -464,7 +474,7 @@ namespace strumpack {
     for (int c=clo; c<chi; ++c)
       for (int r=rlo; r<rhi; ++r)
         operator()(r,c) = rgen.get();
-    STRUMPACK_FLOPS(rgen.flops_per_prng()*(chi-clo)*(rhi-rlo));
+    STRUMPACK_FLOPS(rgen.flops_per_prng()*std::size_t(chi-clo)*(rhi-rlo));
   }
 
   template<typename scalar_t> void DistributedMatrix<scalar_t>::eye() {
@@ -738,7 +748,7 @@ namespace strumpack {
     for (int c=0; c<lc; ++c)
       for (int r=0; r<lr; ++r)
         operator()(r+rlo,c+clo) += B(r+Brlo,c+Bclo);
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*lc*lr);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?2:1)*std::size_t(lc)*lr);
     return *this;
   }
 
@@ -756,7 +766,7 @@ namespace strumpack {
     for (int c=0; c<lc; ++c)
       for (int r=0; r<lr; ++r)
         operator()(r+rlo,c+clo) += alpha * B(r+Brlo,c+Bclo);
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*lc*lr);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*std::size_t(lc)*lr);
     return *this;
   }
 
@@ -775,7 +785,7 @@ namespace strumpack {
       for (int r=0; r<lr; ++r)
         operator()(r+rlo,c+clo) = alpha * operator()(r+rlo,c+clo)
           + B(r+Brlo,c+Bclo);
-    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*lc*lr);
+    STRUMPACK_FLOPS((is_complex<scalar_t>()?8:2)*std::size_t(lc)*lr);
     return *this;
   }
 

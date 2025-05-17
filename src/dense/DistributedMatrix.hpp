@@ -360,7 +360,9 @@ namespace strumpack {
      * \return value at local row r, local column c
      * \see rowg2l(), colg2l(), rowl2g(), coll2g()
      */
-    const scalar_t& operator()(int r, int c) const { return data_[r+ld()*c]; }
+    const scalar_t& operator()(int r, int c) const {
+      return data_[std::size_t(r)+std::size_t(ld())*std::size_t(c)];
+    }
 
     /**
      * Access an element using local indexing. This can be used to
@@ -371,7 +373,9 @@ namespace strumpack {
      * \return value at local row r, local column c
      * \see rowg2l(), colg2l(), rowl2g(), coll2g()
      */
-    scalar_t& operator()(int r, int c) { return data_[r+ld()*c]; }
+    scalar_t& operator()(int r, int c) {
+      return data_[std::size_t(r)+std::size_t(ld())*std::size_t(c)];
+    }
 
     /**
      * Get the row of the process in the process grid. This requires

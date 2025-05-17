@@ -64,6 +64,15 @@ int main(int argc, char* argv[]) {
     BLR::BLROptions<double> opts;
     opts.set_from_command_line(argc, argv);
 
+    if (c.is_root()) {
+      cout << "# compressing " << N << " x " << N << " Toeplitz matrix,"
+           << " with relative tolerance " << opts.rel_tol() << endl;
+      cout << "# Running with:\n# ";
+#if defined(_OPENMP)
+      cout << "OMP_NUM_THREADS=" << omp_get_max_threads() << endl;
+#endif
+    }
+
 
     // define a partition tree for the HODLR matrix
     structured::ClusterTree t(N);
@@ -73,18 +82,7 @@ int main(int argc, char* argv[]) {
 
     BLACSGrid grid(MPI_COMM_WORLD);
     DistributedMatrix<double> A(&grid, N, N);
-    for (int j=0; j<N; j++)
-      for (int i=0; i<N; i++)
-        A.global(i, j, Toeplitz(i, j));
-
-    if (c.is_root()){
-      cout << "# compressing " << N << " x " << N << " Toeplitz matrix,"
-           << " with relative tolerance " << opts.rel_tol() << endl;
-      cout << "# Running with:\n# ";
-#if defined(_OPENMP)
-      cout << "OMP_NUM_THREADS=" << omp_get_max_threads() << endl;
-#endif
-    }
+    A.fill(Toeplitz);
 
     // construct a HODLR representation for a Toeplitz matrix, using
     // only a routine to evaluate individual elements
