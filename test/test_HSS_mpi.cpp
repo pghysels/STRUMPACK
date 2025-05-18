@@ -74,11 +74,8 @@ int run(int argc, char* argv[]) {
       cout << "# matrix dimension should be positive integer" << endl;
       usage();
     }
-    A = DistributedMatrix<double>(&grid, m, m);
-    // TODO only loop over local rows and columns, get the global coordinate..
-    for (int j=0; j<m; j++)
-      for (int i=0; i<m; i++)
-        A.global(i, j, (i==j) ? 1. : 1./(1+abs(i-j)));
+    A = DistributedMatrix<double>(&grid, m, m,
+      [](int i, int j){ return 1./(1+abs(i-j)); });
   } break;
   case 'U': { // upper triangular Toeplitz
     if (argc > 2) m = stoi(argv[2]);
@@ -86,12 +83,8 @@ int run(int argc, char* argv[]) {
       cout << "# matrix dimension should be positive integer" << endl;
       usage();
     }
-    A = DistributedMatrix<double>(&grid, m, m);
-    // TODO only loop over local rows and columns, get the global coordinate..
-    for (int j=0; j<m; j++)
-      for (int i=0; i<m; i++)
-        if (i > j) A.global(i, j, 0.);
-        else A.global(i, j, (i==j) ? 1. : 1./(1+abs(i-j)));
+    A = DistributedMatrix<double>(&grid, m, m
+      [](int i, int j){ return (i > j) ? 0. : 1./(1+abs(i-j)); });
   } break;
   case 'L': {
     if (argc > 2) m = stoi(argv[2]);
