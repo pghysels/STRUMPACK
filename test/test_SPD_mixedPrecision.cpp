@@ -145,7 +145,7 @@ int test_sparse_solver(int argc, char *argv[],
     // step 7, but in double, not double-double
     SparseSolver<double, integer_t> spss;
     // SparseSolverMixedPrecision<double,long double,int> spss;
-//    spss.set_lower_triangle_matrix(A_d);
+    // spss.set_lower_triangle_matrix(A_d);
     spss.set_matrix(A_d);
     spss.solve(b_d, x_true_d);
   }
@@ -165,12 +165,16 @@ template <typename integer_t>
 int read_matrix_and_run_tests(int argc, char *argv[]) {
   string f(argv[1]);
   CSRMatrix<double, integer_t> A;
-  if (A.read_matrix_market(f) == 0)
+  if (A.read_matrix_market(f) == 0) {
     return test_sparse_solver(argc, argv, A);
-  else {
+  } else {
     CSRMatrix<complex<double>, integer_t> Acomplex;
-    if (Acomplex.read_matrix_market(f)) {
-      std::cerr << "Could not read matrix from file." << std::endl;
+    if (Acomplex.read_matrix_market(f) == 0) {
+      // return test_sparse_solver(argc, argv, A);
+      std::cerr << "Error: Matrix is complex, not supported yet." << std::endl;
+      return 1;
+    } else {
+      std::cerr << "Error: Could not read matrix from file." << std::endl;
       return 1;
     }
   }
