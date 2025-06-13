@@ -14,7 +14,7 @@ the U.S. Dept. of Energy).  All rights reserved.
    [http://portal.nersc.gov/project/sparse/strumpack/](http://portal.nersc.gov/project/sparse/strumpack/)
 
 
-## Current developers - Lawrence Berkeley National Laboratory
+## Contributors
  - Pieter Ghysels - ghyselsp@gmail.com
  - Xiaoye S. Li - xsli@lbl.gov
  - Yang Liu - liuyangzhuan@lbl.gov
@@ -22,8 +22,6 @@ the U.S. Dept. of Energy).  All rights reserved.
  - Wajih Boukaram - wajih.boukaram@lbl.gov
  - Yotam Yaniv - yotamya@math.ucla.edu
  - Henry Boateng - boateng@sfsu.edu
-
-## Past contributors
  - Ryan Synk
  - Lucy Guo
  - Gustavo Chávez
@@ -51,6 +49,10 @@ which case it functions similarly as for instance
 [superlu_dist](https://github.com/xiaoyeli/superlu_dist). The
 STRUMPACK sparse direct solver delivers good performance and
 distributed memory scalability and provides excellent CUDA support.
+
+For large scale dense matrix problems, we recommend ButterflyPACK:
+    [https://github.com/liuyangzhuan/ButterflyPACK](https://github.com/liuyangzhuan/ButterflyPACK)
+
 
 Currently, STRUMPACK has support for the Hierarchically Semi-Separable
 (HSS), Block Low Rank (BLR), Hierachically Off-Diagonal Low Rank
