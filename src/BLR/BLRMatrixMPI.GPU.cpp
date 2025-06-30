@@ -315,7 +315,7 @@ namespace strumpack {
             if (g->is_local_row(j))
               ara.add(A21.block(j, i));
         }
-        ara.run(handle, workspace, opts.rel_tol());
+        ara.run(handle, workspace, opts);
 
         VBatchedTRSM<scalar_t> trsm_left, trsm_right;
         if (g->is_local_row(i)) {

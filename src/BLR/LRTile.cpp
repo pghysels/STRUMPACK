@@ -53,7 +53,7 @@ namespace strumpack {
     }
 
     template<typename scalar_t> LRTile<scalar_t>::LRTile
-    (const DenseM_t& T, const Opts_t& opts):LRTile<scalar_t>() {
+    (const DenseM_t& T, const Opts_t& opts) : LRTile<scalar_t>() {
       if (opts.low_rank_algorithm() == LowRankAlgorithm::RRQR) {
         if (T.rows() == 0 || T.cols() == 0) {
           U_.reset(new DenseM_t(T.rows(), 0));

@@ -35,6 +35,7 @@
 #include <cassert>
 
 #include "misc/Tools.hpp"
+#include "BLROptions.hpp"
 #include "BLRTileBLAS.hpp"
 #if defined(STRUMPACK_USE_MAGMA)
 #include "dense/MAGMAWrapper.hpp"
@@ -142,11 +143,12 @@ namespace strumpack {
       using DenseM_t = DenseMatrix<scalar_t>;
       using DenseMW_t = DenseMatrixWrapper<scalar_t>;
       using real_t = typename RealType<scalar_t>::value_type;
+      using Opts_t = BLROptions<scalar_t>;
 
     public:
       void add(std::unique_ptr<BLRTile<scalar_t>>& tile);
       void run(gpu::Handle& handle, VectorPool<scalar_t>& workspace,
-               real_t tol);
+               const Opts_t& opts);
 
       static void kblas_wsquery(gpu::Handle& handle, int batchcount);
 
@@ -159,6 +161,8 @@ namespace strumpack {
                      real_t tol);
       void run_svd(gpu::Handle& handle, VectorPool<scalar_t>& workspace,
                    real_t tol);
+      void run_cpu(const Opts_t& opts);
+
       void compress(gpu::Handle& handle,
                     std::unique_ptr<BLRTile<scalar_t>>& t,
                     scalar_t* work, int* dinfo, real_t tol);

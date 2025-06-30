@@ -482,17 +482,75 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    VBatchedARA<scalar_t>::run_cpu(const Opts_t& opts) {
+      auto B = tile_.size();
+      if (!B) return;
+      for (std::size_t i=0; i<B; i++) {
+        auto& A = (*tile_[i])->D();
+        auto m = A.rows(), n = A.cols();
+        DenseM_t hA(m, n);
+        gpu::copy(hA, A);
+        LRTile<scalar_t> t(hA, opts);
+        auto r = t.rank();
+        if (r*(m+n) > m*n)
+          continue;
+        gpu::copy(A.data(), t.U());
+        gpu::copy(A.data()+m*r, t.V());
+        DenseMW_t U(m, r, A.data(), m), V(r, n, A.data()+m*r, r);
+        *tile_[i] = LRTile<scalar_t>::create_as_wrapper(U, V);
+      }
+    }
+
+    template<typename scalar_t> void
     VBatchedARA<scalar_t>::run(gpu::Handle& handle,
                                VectorPool<scalar_t>& workspace,
-                               real_t tol) {
+                               const Opts_t& opts) {
+#define DEBUG_GPU_COMPRESSION
+
+#if defined(DEBUG_GPU_COMPRESSION)
+      auto B = tile_.size();
+      std::vector<std::unique_ptr<BLRTile<scalar_t>>> hT(B);
+      for (std::size_t i=0; i<B; i++) {
+        hT[i].reset(new DenseTile<scalar_t>
+                    ((*tile_[i])->rows(), (*tile_[i])->cols()));
+        gpu::copy(hT[i]->D(), (*tile_[i])->D());
+      }
+#endif
+
+      // run_cpu(opts);
+      // return;
+
 #if defined(STRUMPACK_USE_KBLAS)
-      run_kblas(handle, workspace, tol);
+      run_kblas(handle, workspace, opts.rel_tol());
 #else
 #if 0 //defined(STRUMPACK_USE_MAGMA)
-      run_magma(handle, workspace, tol);
+      run_magma(handle, workspace, opts.rel_tol());
 #else
-      run_svd(handle, workspace, tol);
+      run_svd(handle, workspace, opts.rel_tol());
 #endif
+#endif
+
+#if defined(DEBUG_GPU_COMPRESSION)
+      for (std::size_t i=0; i<B; i++) {
+        auto& dt = **tile_[i];
+        auto& ht = *hT[i];
+        if (!dt.is_low_rank()) continue;
+        DenseM_t U(dt.rows(), dt.rank()), V(dt.rank(), dt.cols());
+        gpu::copy(U, dt.U());
+        gpu::copy(V, dt.V());
+        auto normA = ht.D().norm();
+        gemm(Trans::N, Trans::N, scalar_t(-1.), U, V, scalar_t(1.), ht.D(),
+             params::task_recursion_cutoff_level);
+        // auto rel_error = ht.D().norm() / normA;
+        // if (dt.rank() > 0 &&
+        //     (rel_error != rel_error || rel_error > 1.e2 * opts.rel_tol()))
+          std::cout << "VBatchedARA " << dt.rows() << " x " << dt.cols()
+                    << " rank= " << dt.rank()
+                    << " ||UV-A|| = "
+                    << ht.D().norm()
+                    << " ||UV-A||/||A|| = "
+                    << ht.D().norm() / normA << std::endl;
+      }
 #endif
     }
 

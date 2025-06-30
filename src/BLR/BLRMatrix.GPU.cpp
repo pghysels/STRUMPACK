@@ -142,7 +142,7 @@ namespace strumpack {
           ara.add(B12.block(i, j));
           ara.add(B21.block(j, i));
         }
-        ara.run(handle, workspace, opts.rel_tol());
+        ara.run(handle, workspace, opts);
         copy_stream.synchronize(); // stream used for getrf
 
         VBatchedTRSMLeftRight<scalar_t> batched_trsm;
