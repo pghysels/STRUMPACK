@@ -286,7 +286,8 @@ namespace strumpack {
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::compress(gpu::Handle& handle,
                                     std::unique_ptr<BLRTile<scalar_t>>& t,
-                                    scalar_t* work, int* dinfo, real_t tol) {
+                                    scalar_t* work, int* dinfo,
+                                    real_t rel_tol, real_t abs_tol) {
       auto& A = t->D();
       auto m = A.rows(), n = A.cols();
       if (m == 0 || n == 0) return;
@@ -304,10 +305,13 @@ namespace strumpack {
       int lwork = gpu::gesvdj_buffersize<scalar_t>(handle, Jobz::V, m, n);
       gpu::gesvdj<scalar_t>
         (handle, Jobz::V, Atmp, d_sval_real, dU, dV, dinfo,
-         svd_work, lwork, tol);
+         svd_work, lwork, abs_tol);
       gpu::copy_device_to_host(h_sval_real.data(), d_sval_real, minmn);
       std::size_t rank = 0;
-      while (rank < minmn && h_sval_real[rank] >= tol) rank++;
+      while (rank < minmn &&
+             h_sval_real[rank] >= abs_tol &&
+             h_sval_real[rank]/h_sval_real[0] >= rel_tol)
+        rank++;
       if (rank*(m+n) >= m*n) return;
       auto dA = A.data();
       DenseMW_t tU(m, rank, dA, m), tV(rank, n, dA+m*rank, rank);
@@ -326,7 +330,7 @@ namespace strumpack {
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::run_kblas(gpu::Handle& handle,
                                      VectorPool<scalar_t>& workspace,
-                                     real_t tol) {
+                                     real_t rel_tol, real_t abs_tol) {
 #if defined(STRUMPACK_USE_KBLAS)
       auto B = tile_.size();
       if (!B) return;
@@ -372,7 +376,8 @@ namespace strumpack {
       gpu::copy_host_to_device(dA, AUV.data(), 3*B);
       gpu::kblas::ara
         (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
-         tol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, 1, B);
+         abs_tol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, 0, B);
+        //rel_tol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, 1, B);
       std::vector<int> ranks(B), info(B);
       gpu::copy_device_to_host(ranks.data(), dr, B);
       gpu::copy_device_to_host(info.data(), dinfo, B);
@@ -398,7 +403,7 @@ namespace strumpack {
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::run_svd(gpu::Handle& handle,
                                    VectorPool<scalar_t>& workspace,
-                                   real_t tol) {
+                                   real_t rel_tol, real_t abs_tol) {
       auto B = tile_.size();
       if (!B) return;
       std::size_t compress_lwork = 0;
@@ -416,14 +421,14 @@ namespace strumpack {
       auto wptr = work.template as<scalar_t>();
       auto dinfo = gpu::aligned_ptr<int>(wptr + compress_lwork);
       for (std::size_t i=0; i<B; i++)
-        compress(handle, *tile_[i], wptr, dinfo, tol);
+        compress(handle, *tile_[i], wptr, dinfo, rel_tol, abs_tol);
       workspace.restore(work);
     }
 
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::run_magma(gpu::Handle& handle,
                                      VectorPool<scalar_t>& workspace,
-                                     real_t tol) {
+                                     real_t rel_tol, real_t abs_tol) {
 #if defined(STRUMPACK_USE_MAGMA)
       auto B = tile_.size();
       if (!B) return;
@@ -464,7 +469,10 @@ namespace strumpack {
                             Ac.data(), sizeof(scalar_t)*(Ac.ld()+1),
                             sizeof(scalar_t), minmn, gpu::CopyDir::D2H);
         std::size_t rank = 0;
-        while (rank < minmn && std::abs(diagR[rank]/diagR[0]) >= tol) rank++;
+        while (rank < minmn &&
+               std::abs(diagR[rank]) >= abs_tol &&
+               std::abs(diagR[rank]/diagR[0]) >= rel_tol)
+          rank++;
         if (rank*(m+n) >= m*n) continue;
         DenseMW_t Q(m, rank, Ac, 0, 0), R(rank, n, Ac, 0, 0),
           U(m, rank, A.data(), m), V(rank, n, A.data()+m*rank, rank);
@@ -484,14 +492,14 @@ namespace strumpack {
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::run(gpu::Handle& handle,
                                VectorPool<scalar_t>& workspace,
-                               real_t tol) {
+                               real_t rel_tol, real_t abs_tol) {
 #if defined(STRUMPACK_USE_KBLAS)
-      run_kblas(handle, workspace, tol);
+      run_kblas(handle, workspace, rel_tol, abs_tol);
 #else
 #if 0 //defined(STRUMPACK_USE_MAGMA)
-      run_magma(handle, workspace, tol);
+      run_magma(handle, workspace, rel_tol, abs_tol);
 #else
-      run_svd(handle, workspace, tol);
+      run_svd(handle, workspace, rel_tol, abs_tol);
 #endif
 #endif
     }
