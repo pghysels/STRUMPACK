@@ -149,7 +149,7 @@ namespace strumpack {
     if (all || (rows() <= 20 && cols() <= 32)) {
       for (std::size_t i=0; i<rows(); i++) {
         for (std::size_t j=0; j<cols(); j++)
-          std::cout << std::setw(width) << operator()(i,j) << "  ";
+          std::cout << std::setprecision(width) << operator()(i,j) << "  ";
         std::cout << std::endl;
       }
     } else std::cout << " ..." << std::endl;
@@ -163,7 +163,7 @@ namespace strumpack {
        << ", ld=" << ld() << ", norm=" << norm() << std::endl;
     for (std::size_t i=0; i<rows(); i++) {
       for (std::size_t j=0; j<cols(); j++)
-        fs << std::setprecision(16) << std::setw(width) << operator()(i,j) << "  ";
+        fs << std::setprecision(width) << operator()(i,j) << "  ";
       fs << std::endl;
     }
     fs << "];" << std::endl << std::endl;
