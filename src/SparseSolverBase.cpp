@@ -716,7 +716,7 @@ namespace strumpack {
     assert(ldx >= N);
     assert(nrhs >= 1);
     auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
-    DenseMW_t X(N, nrhs, x, N);
+    DenseMW_t X(N, nrhs, x, ldx);
     return this->solve(*B, X, use_initial_guess);
   }
 
