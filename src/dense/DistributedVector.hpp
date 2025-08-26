@@ -38,7 +38,7 @@ namespace strumpack {
         const MPIComm& comm) {
     STRUMPACK_FLOPS(static_cast<long long int>(n)*2);
     auto vdotv = blas::nrm2(n, x, incx);
-    return std::sqrt(MPIComm().all_reduce(vdotv*vdotv, MPI_SUM));
+    return std::sqrt(comm.all_reduce(vdotv*vdotv, MPI_SUM));
   }
 
   template<typename scalar_t> typename RealType<scalar_t>::value_type
