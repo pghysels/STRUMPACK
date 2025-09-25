@@ -33,6 +33,16 @@
 #include "misc/MPIWrapper.hpp"
 #endif
 
+#include <hipblas/hipblas-version.h>
+
+#if hipblasVersionMajor >= 3
+#define hip_float_complex_t hipFloatComplex
+#define hip_double_complex_t hipDoubleComplex
+#else 
+#define hip_float_complex_t hipblasComplex
+#define hip_double_complex_t hipblasDoubleComplex
+#endif
+
 namespace strumpack {
   namespace gpu {
 
@@ -365,11 +375,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*4*blas::gemm_moves(m,n,k));
       gpu_check(hipblasCgemm
                 (handle, transa, transb, m, n, k,
-                 reinterpret_cast<hipFloatComplex*>(&alpha),
-                 reinterpret_cast<const hipFloatComplex*>(A), lda,
-                 reinterpret_cast<const hipFloatComplex*>(B), ldb,
-                 reinterpret_cast<hipFloatComplex*>(&beta),
-                 reinterpret_cast<hipFloatComplex*>(C), ldc));
+                 reinterpret_cast<hip_float_complex_t*>(&alpha),
+                 reinterpret_cast<const hip_float_complex_t*>(A), lda,
+                 reinterpret_cast<const hip_float_complex_t*>(B), ldb,
+                 reinterpret_cast<hip_float_complex_t*>(&beta),
+                 reinterpret_cast<hip_float_complex_t*>(C), ldc));
     }
     void gemm(hipblasHandle_t& handle, hipblasOperation_t transa,
               hipblasOperation_t transb, int m, int n, int k,
@@ -382,11 +392,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*8*blas::gemm_moves(m,n,k));
       gpu_check(hipblasZgemm
                 (handle, transa, transb, m, n, k,
-                 reinterpret_cast<hipDoubleComplex*>(&alpha),
-                 reinterpret_cast<const hipDoubleComplex*>(A), lda,
-                 reinterpret_cast<const hipDoubleComplex*>(B), ldb,
-                 reinterpret_cast<hipDoubleComplex*>(&beta),
-                 reinterpret_cast<hipDoubleComplex*>(C), ldc));
+                 reinterpret_cast<hip_double_complex_t*>(&alpha),
+                 reinterpret_cast<const hip_double_complex_t*>(A), lda,
+                 reinterpret_cast<const hip_double_complex_t*>(B), ldb,
+                 reinterpret_cast<hip_double_complex_t*>(&beta),
+                 reinterpret_cast<hip_double_complex_t*>(C), ldc));
     }
 
     template<typename scalar_t> void
@@ -551,9 +561,9 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::trsm_flops(m, n, alpha, side));
       STRUMPACK_BYTES(2*4*blas::trsm_moves(m, n));
       gpu_check(hipblasCtrsm(handle, side, uplo, trans, diag, m, n,
-                             reinterpret_cast<const hipFloatComplex*>(alpha),
-                             reinterpret_cast<hipFloatComplex*>(A), lda,
-                             reinterpret_cast<hipFloatComplex*>(B), ldb));
+                             reinterpret_cast<const hip_float_complex_t*>(alpha),
+                             reinterpret_cast<hip_float_complex_t*>(A), lda,
+                             reinterpret_cast<hip_float_complex_t*>(B), ldb));
     }
     void trsm(hipblasHandle_t& handle, hipblasSideMode_t side,
               hipblasFillMode_t uplo, hipblasOperation_t trans,
@@ -563,9 +573,9 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::trsm_flops(m, n, alpha, side));
       STRUMPACK_BYTES(2*8*blas::trsm_moves(m, n));
       gpu_check(hipblasZtrsm(handle, side, uplo, trans, diag, m, n,
-                             reinterpret_cast<const hipDoubleComplex*>(alpha),
-                             reinterpret_cast<hipDoubleComplex*>(A), lda,
-                             reinterpret_cast<hipDoubleComplex*>(B), ldb));
+                             reinterpret_cast<const hip_double_complex_t*>(alpha),
+                             reinterpret_cast<hip_double_complex_t*>(A), lda,
+                             reinterpret_cast<hip_double_complex_t*>(B), ldb));
     }
     template<typename scalar_t> void
     trsm(Handle& handle, Side side, UpLo uplo, Trans trans, Diag diag,
@@ -643,11 +653,11 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::geam_flops(m, n, alpha, beta));
       gpu_check
         (hipblasCgeam(handle, transa, transb, m, n,
-                      reinterpret_cast<const hipFloatComplex*>(alpha),
-                      reinterpret_cast<const hipFloatComplex*>(A), lda,
-                      reinterpret_cast<const hipFloatComplex*>(beta),
-                      reinterpret_cast<const hipFloatComplex*>(B), ldb,
-                      reinterpret_cast<hipFloatComplex*>(C), ldc));
+                      reinterpret_cast<const hip_float_complex_t*>(alpha),
+                      reinterpret_cast<const hip_float_complex_t*>(A), lda,
+                      reinterpret_cast<const hip_float_complex_t*>(beta),
+                      reinterpret_cast<const hip_float_complex_t*>(B), ldb,
+                      reinterpret_cast<hip_float_complex_t*>(C), ldc));
     }
     void geam(hipblasHandle_t& handle, hipblasOperation_t transa,
               hipblasOperation_t transb, int m, int n,
@@ -659,11 +669,11 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::geam_flops(m, n, alpha, beta));
       gpu_check
         (hipblasZgeam(handle, transa, transb, m, n,
-                      reinterpret_cast<const hipDoubleComplex*>(alpha),
-                      reinterpret_cast<const hipDoubleComplex*>(A), lda,
-                      reinterpret_cast<const hipDoubleComplex*>(beta),
-                      reinterpret_cast<const hipDoubleComplex*>(B), ldb,
-                      reinterpret_cast<hipDoubleComplex*>(C), ldc));
+                      reinterpret_cast<const hip_double_complex_t*>(alpha),
+                      reinterpret_cast<const hip_double_complex_t*>(A), lda,
+                      reinterpret_cast<const hip_double_complex_t*>(beta),
+                      reinterpret_cast<const hip_double_complex_t*>(B), ldb,
+                      reinterpret_cast<hip_double_complex_t*>(C), ldc));
     }
 
     template<typename scalar_t> void
@@ -703,9 +713,9 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::dgmm_flops(m, n));
       gpu_check
         (hipblasCdgmm(handle, side, m, n,
-                      reinterpret_cast<const hipFloatComplex*>(A), lda,
-                      reinterpret_cast<const hipFloatComplex*>(x), incx,
-                      reinterpret_cast<hipFloatComplex*>(C), ldc));
+                      reinterpret_cast<const hip_float_complex_t*>(A), lda,
+                      reinterpret_cast<const hip_float_complex_t*>(x), incx,
+                      reinterpret_cast<hip_float_complex_t*>(C), ldc));
     }
     void dgmm(hipblasHandle_t& handle, hipblasSideMode_t side, int m, int n,
               const std::complex<double>* A, int lda,
@@ -714,9 +724,9 @@ namespace strumpack {
       STRUMPACK_FLOPS(4*blas::dgmm_flops(m, n));
       gpu_check
         (hipblasZdgmm(handle, side, m, n,
-                      reinterpret_cast<const hipDoubleComplex*>(A), lda,
-                      reinterpret_cast<const hipDoubleComplex*>(x), incx,
-                      reinterpret_cast<hipDoubleComplex*>(C), ldc));
+                      reinterpret_cast<const hip_double_complex_t*>(A), lda,
+                      reinterpret_cast<const hip_double_complex_t*>(x), incx,
+                      reinterpret_cast<hip_double_complex_t*>(C), ldc));
     }
 
     template<typename scalar_t> void
@@ -766,11 +776,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*4*blas::gemv_moves(m,n));
       gpu_check(hipblasCgemv
                 (handle, transa, m, n,
-                 reinterpret_cast<hipFloatComplex*>(&alpha),
-                 reinterpret_cast<const hipFloatComplex*>(A), lda,
-                 reinterpret_cast<const hipFloatComplex*>(B), incb,
-                 reinterpret_cast<hipFloatComplex*>(&beta),
-                 reinterpret_cast<hipFloatComplex*>(C), incc));
+                 reinterpret_cast<hip_float_complex_t*>(&alpha),
+                 reinterpret_cast<const hip_float_complex_t*>(A), lda,
+                 reinterpret_cast<const hip_float_complex_t*>(B), incb,
+                 reinterpret_cast<hip_float_complex_t*>(&beta),
+                 reinterpret_cast<hip_float_complex_t*>(C), incc));
     }
     void gemv(hipblasHandle_t& handle, hipblasOperation_t transa,
               int m, int n, std::complex<double> alpha,
@@ -782,11 +792,11 @@ namespace strumpack {
       STRUMPACK_BYTES(2*8*blas::gemv_moves(m,n));
       gpu_check(hipblasZgemv
                 (handle, transa, m, n,
-                 reinterpret_cast<hipDoubleComplex*>(&alpha),
-                 reinterpret_cast<const hipDoubleComplex*>(A), lda,
-                 reinterpret_cast<const hipDoubleComplex*>(B), incb,
-                 reinterpret_cast<hipDoubleComplex*>(&beta),
-                 reinterpret_cast<hipDoubleComplex*>(C), incc));
+                 reinterpret_cast<hip_double_complex_t*>(&alpha),
+                 reinterpret_cast<const hip_double_complex_t*>(A), lda,
+                 reinterpret_cast<const hip_double_complex_t*>(B), incb,
+                 reinterpret_cast<hip_double_complex_t*>(&beta),
+                 reinterpret_cast<hip_double_complex_t*>(C), incc));
     }
     template<typename scalar_t> void
     gemv(Handle& handle, Trans ta, scalar_t alpha,
