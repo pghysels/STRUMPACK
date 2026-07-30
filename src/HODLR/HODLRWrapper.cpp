@@ -35,10 +35,21 @@
 
 #include "misc/TaskTimer.hpp"
 #include "HODLRWrapper.hpp"
+// ButterflyPACK 4.1.0 renamed the installed C interface header from
+// C_BPACK_wrapper.h to BPACK_wrapper.h, so the precision-prefixed headers
+// are now named [sdcz]BPACK_wrapper.h. The API is unchanged, 4.1.0 only adds
+// new entry points, so picking the right header name is sufficient.
+#if defined(__has_include) && __has_include("sBPACK_wrapper.h")
+#include "sBPACK_wrapper.h"
+#include "dBPACK_wrapper.h"
+#include "cBPACK_wrapper.h"
+#include "zBPACK_wrapper.h"
+#else
 #include "sC_BPACK_wrapper.h"
 #include "dC_BPACK_wrapper.h"
 #include "cC_BPACK_wrapper.h"
 #include "zC_BPACK_wrapper.h"
+#endif
 
 namespace strumpack {
   namespace HODLR {
