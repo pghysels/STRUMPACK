@@ -139,6 +139,8 @@ namespace strumpack {
             create_dense_tile(i, i, A);
             auto tpiv = tile(i, i).LU(opts.pivot_threshold());
             std::copy(tpiv.begin(), tpiv.end(), piv_.begin()+tileroff(i));
+            for (std::size_t jj = 0; jj < i; jj++)
+              if (block(i, jj)) tile(i, jj).laswp(tpiv, true);
           }
           // COMPRESS and SOLVE
           for (std::size_t j=i+1; j<rb; j++) {
@@ -778,6 +780,8 @@ namespace strumpack {
               auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
               std::copy(tpiv.begin(), tpiv.end(),
                         B11.piv_.begin()+B11.tileroff(i));
+              for (std::size_t jj = 0; jj < i; jj++)
+                if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
             }
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
@@ -1277,6 +1281,8 @@ namespace strumpack {
               auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
               std::copy(tpiv.begin(), tpiv.end(),
                         B11.piv_.begin()+B11.tileroff(i));
+              for (std::size_t jj = 0; jj < i; jj++)
+                if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
             }
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
@@ -1434,6 +1440,8 @@ namespace strumpack {
           auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
           std::copy(tpiv.begin(), tpiv.end(),
                     B11.piv_.begin()+B11.tileroff(i));
+          for (std::size_t jj = 0; jj < i; jj++)
+            if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
 #pragma omp taskloop
           for (std::size_t j=i+1; j<rb; j++) {
             trsm(Side::R, UpLo::U, Trans::N, Diag::N,
@@ -1508,6 +1516,8 @@ namespace strumpack {
         B11.create_dense_tile_left_looking(i, i, A11);
         auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
         std::copy(tpiv.begin(), tpiv.end(), B11.piv_.begin()+B11.tileroff(i));
+        for (std::size_t jj = 0; jj < i; jj++)
+          if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
         for (std::size_t j=i+1; j<rb; j++) {
           // these blocks have received all updates, compress now
           if (admissible(i, j))
