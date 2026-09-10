@@ -354,6 +354,9 @@ namespace strumpack {
       std::size_t dmem_size =
         gpu::round_up(5*B*sizeof(int)) +
         gpu::round_up(3*B*sizeof(scalar_t*)) +
+#if defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
+        gpu::round_up(B*sizeof(real_t)) +
+#endif
         gpu::round_up(smem_size*sizeof(scalar_t));
       auto dmem = workspace.get_device_bytes(dmem_size);
       auto dm = dmem.template as<int>();
@@ -364,7 +367,12 @@ namespace strumpack {
       auto dA = gpu::aligned_ptr<scalar_t*>(dinfo+B);
       auto dU = dA + B;
       auto dV = dU + B;
+#if defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
+      auto dtol = gpu::aligned_ptr<real_t>(dV+B);
+      auto smem = gpu::aligned_ptr<scalar_t>(dtol+B);
+#else
       auto smem = gpu::aligned_ptr<scalar_t>(dV+B);
+#endif
       std::vector<scalar_t*> AUV(3*B);
       for (std::size_t i=0; i<B; i++) {
         auto m = m_n_maxr[i], n = m_n_maxr[i+B];
@@ -374,10 +382,18 @@ namespace strumpack {
       }
       gpu::copy_host_to_device(dm, m_n_maxr.data(), 3*B);
       gpu::copy_host_to_device(dA, AUV.data(), 3*B);
+#if defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
+      gpu::kblas::ara_tolerances
+        (handle, dm, dn, dA, dm, rel_tol, abs_tol, dtol, B);
+      gpu::kblas::ara_tol
+        (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
+         dtol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, B);
+#else
+      // Preserve the scalar absolute-tolerance behavior with older KBLAS.
       gpu::kblas::ara
         (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
          abs_tol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, 0, B);
-        //rel_tol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, 1, B);
+#endif
       std::vector<int> ranks(B), info(B);
       gpu::copy_device_to_host(ranks.data(), dr, B);
       gpu::copy_device_to_host(info.data(), dinfo, B);
@@ -536,4 +552,3 @@ namespace strumpack {
 
   } // end namespace BLR
 } // end namespace strumpack
-

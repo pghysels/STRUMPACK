@@ -32,6 +32,7 @@
 #include "kblas_operators.h"
 #include "batch_ara.h"
 #include "kblas_defs.h"
+#include <stdexcept>
 
 namespace strumpack {
   namespace gpu {
@@ -112,8 +113,78 @@ namespace strumpack {
            get_kblas_rand_state(handle), relative, num_ops);
       }
 
+#if defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
+      template<> void
+      ara_tol(Handle& handle, int* rows_batch, int* cols_batch,
+          float** M_batch, int* ldm_batch, float** A_batch, int* lda_batch,
+          float** B_batch, int* ldb_batch, int* ranks_batch, const float* tol_batch,
+          int max_rows, int max_cols, int* max_rank,
+          int bs, int r, int* info, int num_ops) {
+        const int status = kblas_sara_batch_tol
+          (get_kblas_handle(handle), rows_batch, cols_batch, M_batch,
+           ldm_batch, A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
+           tol_batch, max_rows, max_cols, max_rank, bs, r, info,
+           get_kblas_rand_state(handle), 0, num_ops);
+        if (status != KBLAS_Success)
+          throw std::runtime_error("KBLAS ARA failed with status " +
+                                   std::to_string(status));
+      }
+      template<> void
+      ara_tol(Handle& handle, int* rows_batch, int* cols_batch,
+          double** M_batch, int* ldm_batch, double** A_batch, int* lda_batch,
+          double** B_batch, int* ldb_batch, int* ranks_batch, const double* tol_batch,
+          int max_rows, int max_cols, int* max_rank,
+          int bs, int r, int* info, int num_ops) {
+        const int status = kblas_dara_batch_tol
+          (get_kblas_handle(handle), rows_batch, cols_batch, M_batch,
+           ldm_batch, A_batch, lda_batch, B_batch, ldb_batch, ranks_batch,
+           tol_batch, max_rows, max_cols, max_rank, bs, r, info,
+           get_kblas_rand_state(handle), 0, num_ops);
+        if (status != KBLAS_Success)
+          throw std::runtime_error("KBLAS ARA failed with status " +
+                                   std::to_string(status));
+      }
+      template<> void
+      ara_tol(Handle& handle, int* rows_batch, int* cols_batch,
+          std::complex<float>** M_batch, int* ldm_batch,
+          std::complex<float>** A_batch, int* lda_batch,
+          std::complex<float>** B_batch, int* ldb_batch,
+          int* ranks_batch, const float* tol_batch,
+          int max_rows, int max_cols, int* max_rank,
+          int bs, int r, int* info, int num_ops) {
+        const int status = kblas_cara_batch_tol
+          (get_kblas_handle(handle), rows_batch, cols_batch,
+           (cuComplex**)M_batch, ldm_batch,
+           (cuComplex**)A_batch, lda_batch,
+           (cuComplex**)B_batch, ldb_batch, ranks_batch,
+           tol_batch, max_rows, max_cols, max_rank, bs, r, info,
+           get_kblas_rand_state(handle), 0, num_ops);
+        if (status != KBLAS_Success)
+          throw std::runtime_error("KBLAS ARA failed with status " +
+                                   std::to_string(status));
+      }
+      template<> void
+      ara_tol(Handle& handle, int* rows_batch, int* cols_batch,
+          std::complex<double>** M_batch, int* ldm_batch,
+          std::complex<double>** A_batch, int* lda_batch,
+          std::complex<double>** B_batch, int* ldb_batch,
+          int* ranks_batch, const double* tol_batch,
+          int max_rows, int max_cols, int* max_rank,
+          int bs, int r, int* info, int num_ops) {
+        const int status = kblas_zara_batch_tol
+          (get_kblas_handle(handle), rows_batch, cols_batch,
+           (cuDoubleComplex**)M_batch, ldm_batch,
+           (cuDoubleComplex**)A_batch, lda_batch,
+           (cuDoubleComplex**)B_batch, ldb_batch, ranks_batch,
+           tol_batch, max_rows, max_cols, max_rank, bs, r, info,
+           get_kblas_rand_state(handle), 0, num_ops);
+        if (status != KBLAS_Success)
+          throw std::runtime_error("KBLAS ARA failed with status " +
+                                   std::to_string(status));
+      }
+
+#endif
     } // end namespace kblas
   } // end namespace gpu
 } // end namespace strumpack
-
 

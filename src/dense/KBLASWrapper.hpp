@@ -36,6 +36,7 @@
 #if defined(STRUMPACK_USE_HIP)
 #include "HIPWrapper.hpp"
 #endif
+#include "batch_ara.h" // KBLAS_HAS_ARA_TOL_ARRAY, when supported by KBLAS
 
 namespace strumpack {
   namespace gpu {
@@ -52,6 +53,34 @@ namespace strumpack {
                scalar_t** B_batch, int* ldb_batch, int* ranks_batch,
                real_t tol, int max_rows, int max_cols, int* max_rank,
                int bs, int r, int* info, int relative, int num_ops);
+
+#if defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
+      // Per-tile absolute thresholds in device memory. The array must remain
+      // valid until the operation finishes on the handle's stream.
+      template<typename scalar_t,
+               typename real_t=typename RealType<scalar_t>::value_type>
+      void ara_tol(Handle& handle, int* rows_batch, int* cols_batch,
+                   scalar_t** M_batch, int* ldm_batch,
+                   scalar_t** A_batch, int* lda_batch,
+                   scalar_t** B_batch, int* ldb_batch, int* ranks_batch,
+                   const real_t* tol_batch, int max_rows, int max_cols,
+                   int* max_rank, int bs, int r, int* info, int num_ops);
+
+      // Match the CPU RRQR scale: max_j ||M(:,j)||_2 = |R(0,0)|.
+      // Writes max(abs_tol, rel_tol * scale) per tile, on the handle's stream.
+      template<typename scalar_t,
+               typename real_t=typename RealType<scalar_t>::value_type>
+      void ara_tolerances(Handle& handle, const int* rows, const int* cols,
+                          scalar_t* const* matrices, const int* ld,
+                          real_t rel_tol, real_t abs_tol,
+                          real_t* tolerances, int batch_count);
+
+      template<typename scalar_t>
+      typename RealType<scalar_t>::value_type
+      front_norm(const DenseMatrix<scalar_t>& F11,
+                 const DenseMatrix<scalar_t>& F12,
+                 const DenseMatrix<scalar_t>& F21);
+#endif
 
     } // end namespace kblas
   } // end namespace gpu

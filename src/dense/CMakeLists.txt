@@ -75,6 +75,7 @@ endif()
 
 if(STRUMPACK_USE_KBLAS)
   target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/KBLASTolerance.cu
     ${CMAKE_CURRENT_LIST_DIR}/KBLASWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/KBLASWrapper.hpp)
   # install(FILES KBLASWrapper.hpp DESTINATION include/dense)
