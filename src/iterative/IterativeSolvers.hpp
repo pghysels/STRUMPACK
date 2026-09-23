@@ -97,7 +97,7 @@ namespace strumpack {
      */
     template<typename scalar_t,typename integer_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    void IterativeRefinement(const CompressedSparseMatrix<scalar_t,integer_t>& A,
+    real_t IterativeRefinement(const CompressedSparseMatrix<scalar_t,integer_t>& A,
                              const std::function<void(DenseMatrix<scalar_t>&)>& M,
                              DenseMatrix<scalar_t>& x,
                              const DenseMatrix<scalar_t>& b,
@@ -127,7 +127,7 @@ namespace strumpack {
      */
     template<typename scalar_t,
              typename real_t = typename RealType<scalar_t>::value_type>
-    void IterativeRefinement(const DenseMatrix<scalar_t>& A,
+    real_t IterativeRefinement(const DenseMatrix<scalar_t>& A,
                              const std::function
                              <void(DenseMatrix<scalar_t>&)>& M,
                              DenseMatrix<scalar_t>& x,

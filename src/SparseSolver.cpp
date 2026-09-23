@@ -307,6 +307,10 @@ namespace strumpack {
         tree()->multifrontal_solve(X);
       };
 
+    // DIRECT apart, every branch below runs an iterative solver that stops
+    // either because it converged or because it ran out of iterations
+    bool iterative_solve = true;
+
     switch (opts_.Krylov_solver()) {
     case KrylovSolver::AUTO: {
       if (opts_.compression() != CompressionType::NONE && x.cols() == 1)
@@ -325,6 +329,7 @@ namespace strumpack {
     case KrylovSolver::DIRECT: {
       x = bloc;
       tree()->multifrontal_solve(x);
+      iterative_solve = false;
     }; break;
     case KrylovSolver::REFINE: {
       iterative::IterativeRefinement<scalar_t,integer_t>
@@ -364,12 +369,33 @@ namespace strumpack {
          use_initial_guess, opts_.verbose() && is_root_);
     }
     }
+    ReturnCode rc = ReturnCode::SUCCESS;
+    if (iterative_solve && Krylov_its_ >= opts_.maxit()) {
+      // The solver used its whole iteration budget, so it may or may not have
+      // reached the tolerance. Only in that case is it worth one extra
+      // matrix-vector product to find out which, and to say so to the caller.
+      using real_t = typename RealType<scalar_t>::value_type;
+      DenseM_t r(x.rows(), x.cols());
+      matrix()->spmv(x, r);
+      r.scale_and_add(scalar_t(-1.), bloc);
+      auto rnrm = r.norm();
+      auto bnrm = bloc.norm();
+      if (rnrm > opts_.abs_tol() &&
+          (bnrm == real_t(0.) || rnrm / bnrm > opts_.rel_tol())) {
+        if (opts_.verbose() && is_root_)
+          std::cout << "STRUMPACK: iterative solver did not converge in "
+                    << Krylov_its_ << " iterations, ||Ax-b|| = " << rnrm
+                    << ", ||b|| = " << bnrm << std::endl;
+        rc = ReturnCode::NO_CONVERGENCE;
+      }
+    }
+
     transform_x(x, bloc);
 
     t.stop();
     this->perf_counters_stop("DIRECT/GMRES solve");
     this->print_solve_stats(t);
-    return ReturnCode::SUCCESS;
+    return rc;
   }
 
   template<typename scalar_t,typename integer_t> void
