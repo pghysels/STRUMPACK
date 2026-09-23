@@ -63,10 +63,12 @@ namespace strumpack {
     using real_t = typename RealType<scalar_t>::value_type;
     for (std::size_t i=0; i<F.rows(); i++) {
       if (piv_[i] != int(i+1)) return ReturnCode::INACCURATE_INERTIA;
-      auto absFii = std::abs(F(i, i));
-      if (absFii > real_t(0.)) pos++;
-      else if (absFii < real_t(0.)) neg++;
-      else if (absFii == real_t(0.)) zero++;
+      // the sign of the pivot is what the inertia is made of; std::abs would
+      // make every one of them non-negative
+      real_t Fii = std::real(F(i, i));
+      if (Fii > real_t(0.)) pos++;
+      else if (Fii < real_t(0.)) neg++;
+      else if (Fii == real_t(0.)) zero++;
       else std::cerr << "F(" << i << "," << i << ")=" << F(i,i) << std::endl;
     }
     return ReturnCode::SUCCESS;

@@ -529,7 +529,7 @@ namespace strumpack {
       if (pc != pcol) continue;
       if (piv[F.rowg2l(i)] != int(i+1))
         return ReturnCode::INACCURATE_INERTIA;
-      real_t Fii = std::abs(F.global(i,i));
+      real_t Fii = std::real(F.global(i,i));
       if (Fii > real_t(0.)) pos++;
       else if (Fii < real_t(0.)) neg++;
       else if (Fii == real_t(0.)) zero++;
