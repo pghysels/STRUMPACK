@@ -306,10 +306,14 @@ namespace strumpack {
                  my_sub_graph.ind(), sub_n, sub_graph_range.first);
     std::vector<integer_t> iwork(sub_n), post(sub_n);
     auto seps = separators_from_etree(sub_etree, post);
-    for (integer_t i=0; i<sub_n; ++i)
-      iwork[post[i]] = post[sub_etree[i]];
-    for (integer_t i=0; i<sub_n; ++i)
+    for (integer_t i = 0; i < sub_n; ++i) {
+      const auto parent = sub_etree[i];
+      iwork[post[i]] =
+        (parent >= 0 && parent < sub_n) ? post[parent] : sub_n;
+      }
+      for (integer_t i = 0; i < sub_n; ++i) {
       sub_etree[i] = iwork[i];
+    }
     ltree_ = SeparatorTree<integer_t>(seps);
     for (integer_t i=0; i<sub_n; i++) {
       iwork[post[i]] = i;
