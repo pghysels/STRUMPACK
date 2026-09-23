@@ -44,7 +44,7 @@ namespace strumpack {
     using Prec = std::function<void(DMat<scalar_t>&)>;
 
 
-    template<typename scalar_t,typename integer_t,typename real_t> void
+    template<typename scalar_t,typename integer_t,typename real_t> real_t
     IterativeRefinement(const SpMat<scalar_t,integer_t>& A,
                         const Prec<scalar_t>& M,
                         DMat<scalar_t>& x, const DMat<scalar_t>& b,
@@ -85,11 +85,12 @@ namespace strumpack {
                     << "\tbw.error = " << std::setw(12) << bw_error
                     << std::endl;
       }
+      return rel_res_norm;
     }
 
 
     // TODO avoid this duplication
-    template<typename scalar_t,typename real_t> void
+    template<typename scalar_t,typename real_t> real_t
     IterativeRefinement(const DMat<scalar_t>& A, const Prec<scalar_t>& M,
                         DMat<scalar_t>& x, const DMat<scalar_t>& b,
                         real_t rtol, real_t atol, int& totit, int maxit,
@@ -122,27 +123,28 @@ namespace strumpack {
                     << "\trel.res = " << std::setw(12) << rel_res_norm
                     << std::endl;
       }
+      return rel_res_norm;
     }
 
     // explicit template instantiations
-    template void
+    template float
     IterativeRefinement(const SpMat<float,int>& A, const Prec<float>& M,
                         DMat<float>& x, const DMat<float>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const SpMat<double,int>& A, const Prec<double>& M,
                         DMat<double>& x, const DMat<double>& b,
                         double rtol, double atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template float
     IterativeRefinement(const SpMat<std::complex<float>,int>& A,
                         const Prec<std::complex<float>>& M,
                         DMat<std::complex<float>>& x,
                         const DMat<std::complex<float>>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const SpMat<std::complex<double>,int>& A,
                         const Prec<std::complex<double>>& M,
                         DMat<std::complex<double>>& x,
@@ -150,25 +152,25 @@ namespace strumpack {
                         double rtol, double atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
 
-    template void
+    template float
     IterativeRefinement(const SpMat<float,long int>& A, const Prec<float>& M,
                         DMat<float>& x, const DMat<float>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const SpMat<double,long int>& A,
                         const Prec<double>& M,
                         DMat<double>& x, const DMat<double>& b,
                         double rtol, double atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template float
     IterativeRefinement(const SpMat<std::complex<float>,long int>& A,
                         const Prec<std::complex<float>>& M,
                         DMat<std::complex<float>>& x,
                         const DMat<std::complex<float>>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const SpMat<std::complex<double>,long int>& A,
                         const Prec<std::complex<double>>& M,
                         DMat<std::complex<double>>& x,
@@ -176,26 +178,26 @@ namespace strumpack {
                         double rtol, double atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
 
-    template void
+    template float
     IterativeRefinement(const SpMat<float,long long int>& A,
                         const Prec<float>& M,
                         DMat<float>& x, const DMat<float>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const SpMat<double,long long int>& A,
                         const Prec<double>& M,
                         DMat<double>& x, const DMat<double>& b,
                         double rtol, double atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template float
     IterativeRefinement(const SpMat<std::complex<float>,long long int>& A,
                         const Prec<std::complex<float>>& M,
                         DMat<std::complex<float>>& x,
                         const DMat<std::complex<float>>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const SpMat<std::complex<double>,long long int>& A,
                         const Prec<std::complex<double>>& M,
                         DMat<std::complex<double>>& x,
@@ -205,24 +207,24 @@ namespace strumpack {
 
 
 
-    template void
+    template float
     IterativeRefinement(const DMat<float>& A, const Prec<float>& M,
                         DMat<float>& x, const DMat<float>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const DMat<double>& A, const Prec<double>& M,
                         DMat<double>& x, const DMat<double>& b,
                         double rtol, double atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template float
     IterativeRefinement(const DMat<std::complex<float>>& A,
                         const Prec<std::complex<float>>& M,
                         DMat<std::complex<float>>& x,
                         const DMat<std::complex<float>>& b,
                         float rtol, float atol, int& totit, int maxit,
                         bool non_zero_guess, bool verbose);
-    template void
+    template double
     IterativeRefinement(const DMat<std::complex<double>>& A,
                         const Prec<std::complex<double>>& M,
                         DMat<std::complex<double>>& x,
