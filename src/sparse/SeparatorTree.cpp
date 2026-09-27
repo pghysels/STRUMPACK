@@ -413,6 +413,7 @@ namespace strumpack {
         auto k0 = kid0[node];
         auto kbeg = kids.begin() + k0;
         auto kend = kbeg + nc;
+        // Node-count-balanced split.
         std::sort(kbeg, kend, [&w](integer_t a, integer_t b) {
           return w[a] > w[b]; });
         std::vector<integer_t> sk(kbeg, kend);
@@ -520,6 +521,236 @@ namespace strumpack {
   }
 
 
+  /**
+   * Relaxed supernode amalgamation on the supernodal separator tree.
+   *
+   * This pass performs two complementary, fill-safe transformations,
+   * driven by a single absolute threshold `k` (in unknowns):
+   *
+   *   (1) SUBTREE COLLAPSE.  Whenever the TOTAL number of unknowns in the
+   *       subtree rooted at a node is below `k`, the whole subtree is
+   *       collapsed into that node, which becomes a leaf.  This removes
+   *       the mass of tiny fronts near the bottom of the tree.
+   *
+   *   (2) CHAIN CONTRACTION.  The residual DEPTH is dominated by long,
+   *       near-linear chains high in the tree: separators where one child
+   *       carries almost the whole subtree and the sibling is small.  For
+   *       every node whose SMALLER child subtree is below `k`, that small
+   *       child is absorbed into the node and the node is then merged with
+   *       its remaining (heavy) child -- the node inherits the heavy
+   *       child's two children.  Each such contraction removes one level
+   *       along the heavy path, directly shortening the deep chains.  This
+   *       is what actually reduces the number of levels that governs GPU
+   *       factorization performance.
+   *
+   * Both transformations only group columns that are already contiguous in
+   * the postordering into a single, larger separator, so the fill-reducing
+   * permutation stays valid and unchanged.  The symbolic factorization
+   * recomputes the update sets from the enlarged separators, so the fill
+   * is handled correctly; the only cost is a modest fill increase inside
+   * the amalgamated fronts.
+   */
+  template<typename integer_t>
+  std::vector<Separator<integer_t>>
+  amalgamate_separators(const std::vector<Separator<integer_t>>& seps,
+                        integer_t k, std::vector<integer_t>* colperm=nullptr) {
+    integer_t ns = seps.size();
+    if (ns == 0 || k <= 0) return seps;
+
+    std::vector<integer_t> lch(ns), rch(ns), sz(ns), off(ns);
+    integer_t prev_end = 0, root = -1;
+    std::vector<integer_t> pa(ns);
+    for (integer_t i=0; i<ns; i++) {
+      lch[i] = seps[i].lch;
+      rch[i] = seps[i].rch;
+      pa[i] = seps[i].pa;
+      off[i] = prev_end;                          // first column of sep i
+      sz[i] = seps[i].sep_end - prev_end;
+      prev_end = seps[i].sep_end;
+      if (pa[i] == -1) root = i;
+    }
+    integer_t ncols = prev_end;
+
+    {
+      // Tree depth (root at level 0) via a parent walk with memoization.
+      // For each node we walk up to the root or to an already-computed
+      // ancestor, collecting the path, then assign increasing levels back
+      // down the path.  Each node is finalized once, so this is O(ns).
+      std::vector<integer_t> lvl(ns, -1);
+      integer_t maxlev = 0;
+      std::vector<integer_t> path;
+      for (integer_t s=0; s<ns; s++) {
+        if (lvl[s] != -1) continue;
+        path.clear();
+        integer_t c = s;
+        while (c != -1 && lvl[c] == -1) { path.push_back(c); c = pa[c]; }
+        integer_t base = (c == -1) ? -1 : lvl[c];  // ancestor's level (or -1)
+        // path is from s (front) up to just below the memoized ancestor;
+        // the deepest path node (last pushed) is closest to the ancestor.
+        for (integer_t j = (integer_t)path.size()-1, d = base+1; j >= 0; j--, d++) {
+          lvl[path[j]] = d;
+          maxlev = std::max(maxlev, d);
+        }
+      }
+      integer_t depth = maxlev + 1;
+      integer_t minlevels = 48;
+      if (depth < minlevels)
+        return seps;
+    }
+
+    // Subtree size (unknowns) rooted at each node (postorder: children
+    // precede parent, so a forward accumulation sweep suffices).
+    std::vector<integer_t> subsize(sz);
+    for (integer_t i=0; i<ns; i++)
+      if (pa[i] != -1) subsize[pa[i]] += subsize[i];
+
+    // We rebuild the tree with a top-down DFS.  Two fill-safe reshapings,
+    // driven by the single threshold k:
+    //   (1) SUBTREE COLLAPSE: a subtree with < k unknowns becomes a single
+    //       leaf front.
+    //   (2) SYMMETRIC CHAIN CONTRACTION: at each node we may contract the
+    //       child whose SEPARATOR is small (< k) -- EITHER the left or the
+    //       right child -- and continue the chain into it.  To keep every
+    //       front's columns contiguous we control the emission order: the
+    //       contracted child's subtree is emitted so that its separator
+    //       ends up ADJACENT to the growing front's separator.  Because
+    //       this may reorder sibling subtrees relative to the original
+    //       postorder, we also emit a COLUMN PERMUTATION (colperm: old
+    //       postorder position -> new position) that the caller composes
+    //       into the final permutation, so the factorization stays exact.
+    //
+    // We prefer to contract toward the HEAVIER child so the chain follows
+    // the heavy path and maximally reduces depth (this is the part that
+    // now also "merges left", not just right).
+    std::vector<Separator<integer_t>> out;
+    out.reserve(ns);
+    std::vector<integer_t> cperm; cperm.reserve(ncols);
+    integer_t cum = 0;
+
+    // Append all columns [off[i], off[i]+sz[i]) of ORIGINAL separator i to
+    // the new column order.  This records, in new-position order, which
+    // old column each new column comes from.
+    auto append_cols = [&](integer_t i) {
+      for (integer_t c=0; c<sz[i]; c++) cperm.push_back(off[i] + c);
+      cum += sz[i];
+    };
+    // Append all original columns of an ENTIRE subtree, in the subtree's
+    // own postorder (used when collapsing a small subtree into one leaf).
+    std::function<void(integer_t)> append_subtree = [&](integer_t i) {
+      if (lch[i] != -1) append_subtree(lch[i]);
+      if (rch[i] != -1) append_subtree(rch[i]);
+      append_cols(i);
+    };
+
+    // Emit the subtree rooted at `node`; returns the output front index
+    // that roots it.  `pa_out` is the parent output front (-1 for root).
+    std::function<integer_t(integer_t,integer_t)> emit =
+      [&](integer_t node, integer_t pa_out) -> integer_t {
+      // (1) small subtree -> single leaf front, columns in postorder.
+      if (subsize[node] < k) {
+        integer_t id = out.size();
+        out.emplace_back(0, pa_out, -1, -1);      // patched below
+        append_subtree(node);
+        out[id].sep_end = cum;
+        return id;
+      }
+      // Reserve this front; we fill its children and separator after we
+      // know the full contracted chain.
+      integer_t id = out.size();
+      out.emplace_back(0, pa_out, -1, -1);
+      // Walk the contraction chain.  At each step we keep the front's
+      // NON-contracted child as a pending child subtree to emit later, and
+      // continue into the contracted child.  We collect, in order, the
+      // side subtrees whose columns precede this front's separator columns.
+      std::vector<integer_t> side_children;       // roots to emit as children
+      std::vector<integer_t> chain_nodes;         // nodes whose sep merges in
+      integer_t cur = node;
+      for (;;) {
+        chain_nodes.push_back(cur);
+        integer_t cl = lch[cur], cr = rch[cur];
+        if (cl == -1 && cr == -1) break;          // leaf: chain ends
+        // choose heavier child as the one to descend into (heavy path)
+        integer_t heavy = (subsize[cl] >= subsize[cr]) ? cl : cr;
+        integer_t light = (heavy == cl) ? cr : cl;
+        // Contract into heavy iff heavy's SEPARATOR is small (< k); this
+        // is the "merge either side" step.  Otherwise stop the chain and
+        // recurse into both children as separate child fronts.
+        if (sz[heavy] < k && subsize[heavy] >= k) {
+          side_children.push_back(light);         // light stays a child
+          cur = heavy;                            // continue chain
+          continue;
+        }
+        // stop: both children become child fronts of this front.
+        side_children.push_back(cl);
+        side_children.push_back(cr);
+        break;
+      }
+      // Emit side children first (their columns precede this front's
+      // separator columns), in increasing original offset so the emitted
+      // column order is a valid postorder-compatible layout.
+      std::sort(side_children.begin(), side_children.end(),
+                [&off](integer_t a, integer_t b){ return off[a] < off[b]; });
+      std::vector<integer_t> kid_out;
+      for (integer_t c : side_children) kid_out.push_back(emit(c, id));
+      // Now append this front's merged separator columns: the separators
+      // of every node on the contracted chain, in chain order (deepest
+      // first so columns stay increasing/contiguous with the children).
+      std::sort(chain_nodes.begin(), chain_nodes.end(),
+                [&off](integer_t a, integer_t b){ return off[a] < off[b]; });
+      for (integer_t cn : chain_nodes) append_cols(cn);
+      // Wire children: a front has 0 or 2 children; if >2, join with empty
+      // separators (left-deep) to preserve the invariant.
+      integer_t nl = -1, nr = -1;
+      if (kid_out.size() == 1) {
+        // single child: pair it with an empty leaf to keep 0-or-2.  Insert
+        // an empty leaf child before it in column order.
+        integer_t eid = out.size();
+        out.emplace_back(cum, id, -1, -1);        // empty leaf (size 0)
+        nl = eid; nr = kid_out[0];
+      } else if (kid_out.size() == 2) {
+        nl = kid_out[0]; nr = kid_out[1];
+      } else if (kid_out.size() > 2) {
+        integer_t acc = kid_out[0];
+        for (std::size_t j=1; j+1<kid_out.size(); j++) {
+          integer_t jid = out.size();
+          out.emplace_back(cum, id, acc, kid_out[j]); // empty joiner
+          out[acc].pa = jid; out[kid_out[j]].pa = jid;
+          acc = jid;
+        }
+        nl = acc; nr = kid_out.back();
+      }
+      out[id].lch = nl; out[id].rch = nr;
+      if (nl != -1) out[nl].pa = id;
+      if (nr != -1) out[nr].pa = id;
+      out[id].sep_end = cum;
+      return id;
+    };
+    integer_t root_out = emit(root, -1);
+    out[root_out].pa = -1;
+
+    // The DFS reserves a parent front BEFORE its children, so front IDs are
+    // in pre-order while columns/sep_end are already in postorder.  Renumber
+    // fronts into postorder (children before parents) by sorting on sep_end.
+    integer_t no = out.size();
+    std::vector<integer_t> order(no);
+    for (integer_t i=0; i<no; i++) order[i] = i;
+    std::stable_sort(order.begin(), order.end(),
+                     [&out](integer_t a, integer_t b){
+                       return out[a].sep_end < out[b].sep_end; });
+    std::vector<integer_t> nid(no);
+    for (integer_t i=0; i<no; i++) nid[order[i]] = i;
+    std::vector<Separator<integer_t>> res; res.reserve(no);
+    for (integer_t i=0; i<no; i++) {
+      auto& s = out[order[i]];
+      res.emplace_back(s.sep_end,
+                       s.pa  == -1 ? -1 : nid[s.pa],
+                       s.lch == -1 ? -1 : nid[s.lch],
+                       s.rch == -1 ? -1 : nid[s.rch]);
+    }
+    if (colperm) *colperm = std::move(cperm);
+    return res;
+  }
+
   template<typename integer_t> SeparatorTree<integer_t>
   build_sep_tree_from_perm(const integer_t* ptr, const integer_t* ind,
                            std::vector<integer_t>& perm,
@@ -528,8 +759,24 @@ namespace strumpack {
     auto n = perm.size();
     std::vector<integer_t> post(n);
     auto seps = separators_from_etree(etree, post);
-    for (std::size_t i=0; i<n; i++)
-      iperm[i] = post[perm[i]];
+    // Relaxed supernode amalgamation: collapse small subtrees into single
+    // leaf fronts to reduce the number of (tiny) fronts.
+    std::vector<integer_t> colperm;
+    // Default amalgamation threshold 32.
+    integer_t amalg = 32;
+    seps = amalgamate_separators<integer_t>(seps, amalg, &colperm);
+    // Compose the amalgamation column reordering (if any) into the final
+    // permutation.  colperm[new_pos] = old_pos (old postorder position);
+    // its inverse maps old postorder position -> new position.
+    if (!colperm.empty()) {
+      std::vector<integer_t> colinv(colperm.size());
+      for (std::size_t p=0; p<colperm.size(); p++) colinv[colperm[p]] = p;
+      for (std::size_t i=0; i<n; i++)
+        iperm[i] = colinv[post[perm[i]]];
+    } else {
+      for (std::size_t i=0; i<n; i++)
+        iperm[i] = post[perm[i]];
+    }
     for (std::size_t i=0; i<n; i++)
       perm[iperm[i]] = i;
     std::swap(perm, iperm);
