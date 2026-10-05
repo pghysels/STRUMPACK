@@ -1,3 +1,12 @@
+Version 8.1.0 Released Oct 2026
+===============================
+Mostly bug fixes.
+Added tree node amalgamation, which can speed up the solve phase when the tree has a lot of small nodes.
+
+
+Version 8.0.0 Released Nov 2024
+===============================
+
 Version 7.2.0 Released Oct 2023
 ===============================
 - Fix for sparse solve with MAGMA with 1 MPI rank
