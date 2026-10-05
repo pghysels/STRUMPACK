@@ -7,9 +7,6 @@ the U.S. Dept. of Energy).  All rights reserved.
 ## Documentation & Installation instructions
    [http://portal.nersc.gov/project/sparse/strumpack/master/](http://portal.nersc.gov/project/sparse/strumpack/master/)
 
-   [http://portal.nersc.gov/project/sparse/strumpack/v7.2.0/](http://portal.nersc.gov/project/sparse/strumpack/v7.2.0/)
-
-
 ## Website
    [http://portal.nersc.gov/project/sparse/strumpack/](http://portal.nersc.gov/project/sparse/strumpack/)
 
