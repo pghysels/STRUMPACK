@@ -502,6 +502,15 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       if (c_->is_null()) return;
+      // ButterflyPACK takes ld == rows; a DenseMatrixWrapper view
+      // (e.g. part of a multi-column right-hand side) has a larger ld
+      if (X.cols() > 1 && ((X.rows() && X.ld() != X.rows()) ||
+                            (Y.rows() && Y.ld() != Y.rows()))) {
+        DenseM_t Xc(X), Yc(Y.rows(), Y.cols());
+        mult(op, Xc, Yc);
+        Y.copy(Yc);
+        return;
+      }
       HODLR_mult(char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
                  ho_bf_, options_, stats_, ptree_);
     }
@@ -523,6 +532,14 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::inv_mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       if (c_->is_null()) return 0;
+      // ld == rows required, see mult
+      if (X.cols() > 1 && ((X.rows() && X.ld() != X.rows()) ||
+                            (Y.rows() && Y.ld() != Y.rows()))) {
+        DenseM_t Xc(X), Yc(Y.rows(), Y.cols());
+        auto flops = inv_mult(op, Xc, Yc);
+        Y.copy(Yc);
+        return flops;
+      }
       HODLR_inv_mult
         (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);

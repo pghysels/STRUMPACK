@@ -335,6 +335,15 @@ namespace strumpack {
     ButterflyMatrix<scalar_t>::mult
     (Trans op, const DenseM_t& X, DenseM_t& Y) const {
       assert(Y.cols() == X.cols());
+      // ButterflyPACK takes ld == rows; a DenseMatrixWrapper view
+      // (e.g. part of a multi-column right-hand side) has a larger ld
+      if (X.cols() > 1 && ((X.rows() && X.ld() != X.rows()) ||
+                            (Y.rows() && Y.ld() != Y.rows()))) {
+        DenseM_t Xc(X), Yc(Y.rows(), Y.cols());
+        mult(op, Xc, Yc);
+        Y.copy(Yc);
+        return;
+      }
       if (op == Trans::N)
         LRBF_mult(char(op), X.data(), Y.data(), lcols_, lrows_, X.cols(),
                   lr_bf_, options_, stats_, ptree_);
