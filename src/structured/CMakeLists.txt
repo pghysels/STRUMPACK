@@ -13,6 +13,6 @@ install(FILES
   StructuredMatrixMPI.h
   ClusterTree.hpp
   StructuredOptions.hpp
-  DESTINATION include/structured)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/structured)
 
 add_subdirectory(fortran)

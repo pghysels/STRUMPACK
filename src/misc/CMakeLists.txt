@@ -12,7 +12,7 @@ install(FILES
   RandomWrapper.hpp
   Triplet.hpp
   Tools.hpp
-  DESTINATION include/misc)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/misc)
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
@@ -21,7 +21,7 @@ if(STRUMPACK_USE_MPI)
 
   install(FILES
     MPIWrapper.hpp
-    DESTINATION include/misc)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/misc)
 endif()
 
 

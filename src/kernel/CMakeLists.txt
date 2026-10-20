@@ -11,4 +11,4 @@ install(FILES
   KernelRegression.hpp
   Kernel.h
   Metrics.hpp
-  DESTINATION include/kernel)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kernel)

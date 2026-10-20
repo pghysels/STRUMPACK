@@ -26,7 +26,7 @@ install(FILES
   BLRTile.hpp      #
   DenseTile.hpp    #
   LRTile.hpp       #
-  DESTINATION include/BLR)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/BLR)
 
 
 if(STRUMPACK_USE_MPI)
@@ -39,5 +39,5 @@ if(STRUMPACK_USE_MPI)
   install(FILES
     BLRMatrixMPI.hpp
     BLRExtendAdd.hpp
-    DESTINATION include/BLR)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/BLR)
 endif()

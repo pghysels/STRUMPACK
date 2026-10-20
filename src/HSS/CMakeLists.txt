@@ -25,7 +25,7 @@ install(FILES
   HSSMatrixBase.hpp
   HSSOptions.hpp
   HSSMatrix.sketch.hpp
-  DESTINATION include/HSS)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/HSS)
 
 
 if(STRUMPACK_USE_MPI)
@@ -54,5 +54,5 @@ if(STRUMPACK_USE_MPI)
     HSSBasisIDMPI.hpp
     DistSamples.hpp
     DistElemMult.hpp
-    DESTINATION include/HSS)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/HSS)
 endif()

@@ -21,7 +21,7 @@ install(FILES
   BLASLAPACKOpenMPTask.hpp # TODO do not install?
   BLASLAPACKWrapper.hpp  # TODO do not install?
   GPUWrapper.hpp
-  DESTINATION include/dense)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 
 
 if(STRUMPACK_USE_MPI)
@@ -39,7 +39,7 @@ if(STRUMPACK_USE_MPI)
     DistributedVector.hpp
     DistributedMatrix.hpp
     ScaLAPACKWrapper.hpp
-    DESTINATION include/dense)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 endif()
 
 
@@ -49,28 +49,28 @@ if(STRUMPACK_USE_CUDA)
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.cu
     ${CMAKE_CURRENT_LIST_DIR}/CUDAWrapper.hpp)
- # install(FILES CUDAWrapper.hpp DESTINATION include/dense)
+ # install(FILES CUDAWrapper.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 endif()
 
 if(STRUMPACK_USE_HIP)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/HIPWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/HIPWrapper.hpp)
- # install(FILES HIPWrapper.hpp DESTINATION include/dense)
+ # install(FILES HIPWrapper.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 endif()
 
 if(STRUMPACK_USE_SYCL)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/SYCLWrapper.hpp
     ${CMAKE_CURRENT_LIST_DIR}/SYCLWrapper.cpp)
- # install(FILES DPCPPWrapper.hpp DESTINATION include/dense)
+ # install(FILES DPCPPWrapper.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 endif()
 
 if(STRUMPACK_USE_MAGMA)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.hpp
     ${CMAKE_CURRENT_LIST_DIR}/MAGMAWrapper.cpp)
-  # install(FILES MAGMAWrapper.hpp DESTINATION include/dense)
+  # install(FILES MAGMAWrapper.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 endif()
 
 if(STRUMPACK_USE_KBLAS)
@@ -78,7 +78,7 @@ if(STRUMPACK_USE_KBLAS)
     ${CMAKE_CURRENT_LIST_DIR}/KBLASTolerance.cu
     ${CMAKE_CURRENT_LIST_DIR}/KBLASWrapper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/KBLASWrapper.hpp)
-  # install(FILES KBLASWrapper.hpp DESTINATION include/dense)
+  # install(FILES KBLASWrapper.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 endif()
 
 add_subdirectory(lapack)

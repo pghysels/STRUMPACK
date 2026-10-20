@@ -14,7 +14,7 @@ target_sources(strumpack
 
 install(FILES
   FrontFactory.hpp
-  DESTINATION include/sparse/fronts)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/sparse/fronts)
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
@@ -40,7 +40,7 @@ if(STRUMPACK_USE_CUDA OR STRUMPACK_USE_HIP OR STRUMPACK_USE_SYCL)
     ${CMAKE_CURRENT_LIST_DIR}/FrontGPUStructs.hpp)
   install(FILES
     FrontGPUStructs.hpp
-    DESTINATION include/sparse/fronts)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/sparse/fronts)
 endif()
 
 if(STRUMPACK_USE_MAGMA)

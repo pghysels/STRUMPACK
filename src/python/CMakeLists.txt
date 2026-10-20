@@ -3,4 +3,4 @@ configure_file(STRUMPACKKernel.py.in
 
 install(FILES
   ${PROJECT_BINARY_DIR}/STRUMPACKKernel.py
-  DESTINATION include/python)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/python)
