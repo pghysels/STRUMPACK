@@ -11,4 +11,4 @@ target_sources(strumpack
 install(FILES
   Clustering.hpp
   NeighborSearch.hpp
-  DESTINATION include/clustering)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clustering)

@@ -21,7 +21,7 @@ install(FILES
   StrumpackSparseSolver.h
   StrumpackConfig.hpp
   StrumpackSparseSolverMixedPrecision.hpp
-  DESTINATION include)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 
 if(STRUMPACK_USE_MPI)
@@ -35,7 +35,7 @@ if(STRUMPACK_USE_MPI)
   install(FILES
     StrumpackSparseSolverMPIDist.hpp
     StrumpackSparseSolverMixedPrecisionMPIDist.hpp
-    DESTINATION include)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endif()
 
 
@@ -44,14 +44,13 @@ configure_file(StrumpackConfig.h.in
 
 install(FILES
   ${PROJECT_BINARY_DIR}/StrumpackConfig.h
-  DESTINATION include)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 # add build folder as include dir for StrumpackConfig.h and
 # StrumpackFortranCInterface.h, also add the current src/ folder as
 # include dir
 target_include_directories(strumpack PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
-  $<INSTALL_INTERFACE:include>
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>)
 
 

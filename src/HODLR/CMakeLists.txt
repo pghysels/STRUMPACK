@@ -5,7 +5,7 @@ target_sources(strumpack
 
 install(FILES
   HODLROptions.hpp
-  DESTINATION include/HODLR)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/HODLR)
 
 
 if(STRUMPACK_USE_BPACK)
@@ -21,5 +21,5 @@ if(STRUMPACK_USE_BPACK)
   install(FILES
     HODLRMatrix.hpp
     ButterflyMatrix.hpp
-    DESTINATION include/HODLR)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/HODLR)
 endif()

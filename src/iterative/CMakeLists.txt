@@ -7,7 +7,7 @@ target_sources(strumpack
 
 install(FILES
   IterativeSolvers.hpp
-  DESTINATION include/iterative)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iterative)
 
 
 if(STRUMPACK_USE_MPI)
@@ -20,5 +20,5 @@ if(STRUMPACK_USE_MPI)
 
   install(FILES
     IterativeSolversMPI.hpp
-    DESTINATION include/iterative)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iterative)
 endif()

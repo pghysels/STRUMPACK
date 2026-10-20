@@ -17,7 +17,7 @@ if(STRUMPACK_USE_CUDA)
 endif()
 
 install(FILES
-  DESTINATION include/sparse/ordering)
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/sparse/ordering)
 
 if(STRUMPACK_USE_MPI)
   target_sources(strumpack
