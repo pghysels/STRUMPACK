@@ -33,6 +33,7 @@
 #include "misc/Tools.hpp"
 #include "ButterflyMatrix.hpp"
 #include "HODLRWrapper.hpp"
+#include <stdexcept>
 
 namespace strumpack {
   namespace HODLR {
@@ -51,11 +52,7 @@ namespace strumpack {
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
-      int P = c_->size();
-      std::vector<int> groups(P);
-      std::iota(groups.begin(), groups.end(), 0);
-      // create hodlr data structures
-      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
+      share_process_tree(A, B);
       HODLR_createstats<scalar_t>(stats_);
       F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
@@ -66,6 +63,21 @@ namespace strumpack {
          lr_bf_, options_, stats_, msh_, kerquant_, ptree_,
          nullptr, nullptr, nullptr);
       set_dist();
+    }
+
+
+    template<typename scalar_t> void
+    ButterflyMatrix<scalar_t>::share_process_tree
+    (const HODLRMatrix<scalar_t>& A, const HODLRMatrix<scalar_t>& B) {
+      if (!A.process_tree_ || !B.process_tree_)
+        throw std::invalid_argument("Butterfly blocks require nonempty process trees");
+      int comparison = MPI_UNEQUAL;
+      MPI_Comm_compare(A.c_->comm(), B.c_->comm(), &comparison);
+      if (comparison != MPI_IDENT && comparison != MPI_CONGRUENT)
+        throw std::invalid_argument
+          ("Butterfly blocks require the same ordered MPI group");
+      process_tree_ = A.process_tree_;
+      ptree_ = process_tree_.get();
     }
 
     template<typename scalar_t> double
@@ -87,12 +99,8 @@ namespace strumpack {
 
     template<typename scalar_t> void
     ButterflyMatrix<scalar_t>::options_init(const opts_t& opts) {
-      auto P = c_->size();
-      std::vector<int> groups(P);
-      std::iota(groups.begin(), groups.end(), 0);
-
-      // create hodlr data structures
-      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
+      process_tree_ = HODLR_shared_process_tree<scalar_t>(*c_);
+      ptree_ = process_tree_.get();
       HODLR_createoptions<scalar_t>(options_);
       HODLR_createstats<scalar_t>(stats_);
 
@@ -219,11 +227,7 @@ namespace strumpack {
       rows_ = A.rows();
       cols_ = B.cols();
       Fcomm_ = A.Fcomm_;
-      int P = c_->size();
-      std::vector<int> groups(P);
-      std::iota(groups.begin(), groups.end(), 0);
-      // create hodlr data structures
-      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
+      share_process_tree(A, B);
       HODLR_createstats<scalar_t>(stats_);
       F2Cptr Aoptions = const_cast<F2Cptr>(A.options_);
       HODLR_copyoptions<scalar_t>(Aoptions, options_);
@@ -263,16 +267,24 @@ namespace strumpack {
     }
 
     template<typename scalar_t> ButterflyMatrix<scalar_t>::~ButterflyMatrix() {
+      clear();
+    }
+
+    template<typename scalar_t> void ButterflyMatrix<scalar_t>::clear() {
       if (stats_) HODLR_deletestats<scalar_t>(stats_);
-      if (ptree_) HODLR_deleteproctree<scalar_t>(ptree_);
       if (msh_) HODLR_deletemesh<scalar_t>(msh_);
       if (kerquant_) HODLR_deletekernelquant<scalar_t>(kerquant_);
       if (options_) HODLR_deleteoptions<scalar_t>(options_);
       if (lr_bf_) LRBF_deletebf<scalar_t>(lr_bf_);
+      lr_bf_ = options_ = stats_ = msh_ = kerquant_ = ptree_ = nullptr;
+      process_tree_.reset();
     }
 
     template<typename scalar_t> ButterflyMatrix<scalar_t>&
     ButterflyMatrix<scalar_t>::operator=(ButterflyMatrix<scalar_t>&& h) {
+      if (this == &h) return *this;
+      clear();
+      process_tree_ = std::move(h.process_tree_);
       lr_bf_ = h.lr_bf_;       h.lr_bf_ = nullptr;
       options_ = h.options_;   h.options_ = nullptr;
       stats_ = h.stats_;       h.stats_ = nullptr;

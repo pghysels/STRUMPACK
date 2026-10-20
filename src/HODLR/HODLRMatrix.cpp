@@ -33,6 +33,7 @@
 #include "clustering/Clustering.hpp"
 #include "HODLRMatrix.hpp"
 #include "HODLRWrapper.hpp"
+#include <stdexcept>
 
 namespace strumpack {
 
@@ -249,7 +250,7 @@ namespace strumpack {
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const opts_t& opts) {
+     const opts_t& opts, const HODLRMatrix* process_tree_owner) {
       rows_ = cols_ = tree.size;
       structured::ClusterTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
@@ -259,7 +260,7 @@ namespace strumpack {
       c_ = &c;
       if (c_->is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_->comm());
-      options_init(opts);
+      options_init(opts, process_tree_owner);
       perm_.resize(rows_);
       HODLR_construct_init<scalar_t,real_t>
         (rows_, 0, nullptr, nullptr, lvls_-1, leafs_.data(), perm_.data(),
@@ -291,7 +292,8 @@ namespace strumpack {
     template<typename scalar_t> template<typename integer_t>
     HODLRMatrix<scalar_t>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<integer_t>& graph, const opts_t& opts) {
+     const CSRGraph<integer_t>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner) {
       rows_ = cols_ = tree.size;
       structured::ClusterTree full_tree(tree);
       int min_lvl = 2 + std::ceil(std::log2(c.size()));
@@ -301,7 +303,7 @@ namespace strumpack {
       c_ = &c;
       if (c_->is_null()) return;
       Fcomm_ = MPI_Comm_c2f(c_->comm());
-      options_init(opts);
+      options_init(opts, process_tree_owner);
       perm_.resize(rows_);
       HODLR_set_I_option<scalar_t>(options_, "nogeo", 3);
       int knn = opts.knn_hodlrbf();
@@ -347,13 +349,21 @@ namespace strumpack {
 
 
     template<typename scalar_t> void
-    HODLRMatrix<scalar_t>::options_init(const opts_t& opts) {
-      auto P = c_->size();
-      std::vector<int> groups(P);
-      std::iota(groups.begin(), groups.end(), 0);
+    HODLRMatrix<scalar_t>::options_init
+    (const opts_t& opts, const HODLRMatrix* process_tree_owner) {
+      if (process_tree_owner) {
+        int comparison = MPI_UNEQUAL;
+        if (!process_tree_owner->process_tree_)
+          throw std::invalid_argument("Cannot share an empty HODLR process tree");
+        MPI_Comm_compare(c_->comm(), process_tree_owner->c_->comm(), &comparison);
+        if (comparison != MPI_IDENT && comparison != MPI_CONGRUENT)
+          throw std::invalid_argument
+            ("HODLR process-tree sharing requires the same ordered MPI group");
+        process_tree_ = process_tree_owner->process_tree_;
+      } else process_tree_ = HODLR_shared_process_tree<scalar_t>(*c_);
+      ptree_ = process_tree_.get();
 
-      // create hodlr data structures
-      HODLR_createptree<scalar_t>(P, groups.data(), Fcomm_, ptree_);
+      // Matrix-specific data remain private to this block.
       HODLR_createoptions<scalar_t>(options_);
       HODLR_createstats<scalar_t>(stats_);
 
@@ -414,16 +424,25 @@ namespace strumpack {
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>::~HODLRMatrix() {
+      clear();
+    }
+
+    template<typename scalar_t> void HODLRMatrix<scalar_t>::clear() {
       if (stats_) HODLR_deletestats<scalar_t>(stats_);
-      if (ptree_) HODLR_deleteproctree<scalar_t>(ptree_);
       if (msh_) HODLR_deletemesh<scalar_t>(msh_);
       if (kerquant_) HODLR_deletekernelquant<scalar_t>(kerquant_);
       if (ho_bf_) HODLR_delete<scalar_t>(ho_bf_);
       if (options_) HODLR_deleteoptions<scalar_t>(options_);
+      ho_bf_ = options_ = stats_ = msh_ = kerquant_ = ptree_ = nullptr;
+      // Release grids only after all matrix-specific handles are destroyed.
+      process_tree_.reset();
     }
 
     template<typename scalar_t> HODLRMatrix<scalar_t>&
     HODLRMatrix<scalar_t>::operator=(HODLRMatrix<scalar_t>&& h) {
+      if (this == &h) return *this;
+      clear();
+      process_tree_ = std::move(h.process_tree_);
       ho_bf_ = h.ho_bf_;       h.ho_bf_ = nullptr;
       options_ = h.options_;   h.options_ = nullptr;
       stats_ = h.stats_;       h.stats_ = nullptr;
@@ -863,42 +882,54 @@ namespace strumpack {
     // explicit instantiations for the integer type in the CSRGraph
     template HODLRMatrix<float>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<int>& graph, const opts_t& opts);
+     const CSRGraph<int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<double>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<int>& graph, const opts_t& opts);
+     const CSRGraph<int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<std::complex<float>>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<int>& graph, const opts_t& opts);
+     const CSRGraph<int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<std::complex<double>>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<int>& graph, const opts_t& opts);
+     const CSRGraph<int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
 
     template HODLRMatrix<float>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long>& graph, const opts_t& opts);
+     const CSRGraph<long>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<double>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long>& graph, const opts_t& opts);
+     const CSRGraph<long>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<std::complex<float>>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long>& graph, const opts_t& opts);
+     const CSRGraph<long>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<std::complex<double>>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long>& graph, const opts_t& opts);
+     const CSRGraph<long>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
 
     template HODLRMatrix<float>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long long int>& graph, const opts_t& opts);
+     const CSRGraph<long long int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<double>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long long int>& graph, const opts_t& opts);
+     const CSRGraph<long long int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<std::complex<float>>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long long int>& graph, const opts_t& opts);
+     const CSRGraph<long long int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
     template HODLRMatrix<std::complex<double>>::HODLRMatrix
     (const MPIComm& c, const structured::ClusterTree& tree,
-     const CSRGraph<long long int>& graph, const opts_t& opts);
+     const CSRGraph<long long int>& graph, const opts_t& opts,
+     const HODLRMatrix* process_tree_owner);
 
   } // end namespace HODLR
 } // end namespace strumpack

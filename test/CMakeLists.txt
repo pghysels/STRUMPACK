@@ -23,6 +23,16 @@ add_test("user_test_SPD_seq" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_seq bcsstm08/b
 add_test("user_test_SPD_mixedPrecision" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_mixedPrecision bcsstm08/bcsstm08.mtx)
 
 if(STRUMPACK_USE_MPI)
+  if(STRUMPACK_USE_BPACK)
+    add_executable(test_HODLR_process_tree_mpi test_HODLR_process_tree_mpi.cpp)
+    target_link_libraries(test_HODLR_process_tree_mpi strumpack)
+    add_test(NAME HODLR_process_tree_mpi
+      COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+      ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_HODLR_process_tree_mpi>
+      ${MPIEXEC_POSTFLAGS})
+    set_tests_properties(HODLR_process_tree_mpi PROPERTIES
+      ENVIRONMENT "OMP_NUM_THREADS=1;OPENBLAS_NUM_THREADS=1")
+  endif()
   add_executable(test_HSS_mpi             test_HSS_mpi.cpp)
   add_executable(test_sparse_mpi          test_sparse_mpi.cpp)
   add_executable(test_structure_reuse_mpi test_structure_reuse_mpi.cpp)
