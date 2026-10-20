@@ -168,15 +168,19 @@ namespace strumpack {
       F2Cptr stats_ = nullptr;     // statistics structure returned by Fortran code
       F2Cptr msh_ = nullptr;       // mesh structure returned by Fortran code
       F2Cptr kerquant_ = nullptr;  // kernel quantities structure returned by Fortran code
-      F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
-      MPI_Fint Fcomm_;             // the fortran MPI communicator
-      const MPIComm* c_;
+      F2Cptr ptree_ = nullptr;     // borrowed alias of process_tree_.get()
+      std::shared_ptr<void> process_tree_; // owns process tree and BLACS grids
+      MPI_Fint Fcomm_ = 0;        // the fortran MPI communicator
+      const MPIComm* c_ = nullptr;
       int rows_ = 0, cols_ = 0, lrows_ = 0, lcols_ = 0;
       std::vector<int> rdist_, cdist_;  // begin rows/cols of each rank
 
       void set_dist();
 
+      void clear();
       void options_init(const opts_t& opts);
+      void share_process_tree(const HODLRMatrix<scalar_t>& A,
+                              const HODLRMatrix<scalar_t>& B);
 
       void set_extraction_meta_1grid(const VecVec_t& I, const VecVec_t& J,
                                      ExtractionMeta& e,

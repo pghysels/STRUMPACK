@@ -35,6 +35,8 @@
 #include <cassert>
 #include <complex>
 #include <cstdint>
+#include <memory>
+#include <numeric>
 
 #include "dense/DenseMatrix.hpp"
 #include "misc/MPIWrapper.hpp"
@@ -157,6 +159,22 @@ namespace strumpack {
     template<typename scalar_t> void HODLR_deletestats(F2Cptr&);
 
     template<typename scalar_t> void HODLR_deleteproctree(F2Cptr&);
+
+    // Process trees contain communicators and BLACS grids, but no matrix data.
+    // Share them explicitly between blocks with the same ordered communicator.
+    template<typename scalar_t> std::shared_ptr<void>
+    HODLR_shared_process_tree(const MPIComm& comm) {
+      int P = comm.size();
+      std::vector<int> groups(P);
+      std::iota(groups.begin(), groups.end(), 0);
+      F2Cptr tree = nullptr;
+      HODLR_createptree<scalar_t>
+        (P, groups.data(), MPI_Comm_c2f(comm.comm()), tree);
+      return std::shared_ptr<void>(tree, [](void* p) {
+        HODLR_deleteproctree<scalar_t>(p);
+      });
+    }
+
 
     template<typename scalar_t> void HODLR_deletemesh(F2Cptr&);
 

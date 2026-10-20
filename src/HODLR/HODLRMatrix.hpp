@@ -35,6 +35,7 @@
 
 #include <cassert>
 #include <functional>
+#include <memory>
 
 #include "kernel/Kernel.hpp"
 #include "dense/DistributedMatrix.hpp"
@@ -197,8 +198,12 @@ namespace strumpack {
        * compression
        * \see compress, HODLROptions
        */
+      // If supplied, share the owner's process tree and BLACS grids. The
+      // communicator must have the same members in the same rank order.
+      // Shared ownership allows the new matrix to outlive process_tree_owner.
       HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
-                  const opts_t& opts);
+                  const opts_t& opts,
+                  const HODLRMatrix* process_tree_owner = nullptr);
 
       /**
        * Construct an HODLR matrix using a specified HODLR tree. After
@@ -215,7 +220,8 @@ namespace strumpack {
        */
       template<typename integer_t>
       HODLRMatrix(const MPIComm& c, const structured::ClusterTree& tree,
-                  const CSRGraph<integer_t>& graph, const opts_t& opts);
+                  const CSRGraph<integer_t>& graph, const opts_t& opts,
+                  const HODLRMatrix* process_tree_owner = nullptr);
 
       /**
        * Copy constructor is not supported.
@@ -571,15 +577,18 @@ namespace strumpack {
       F2Cptr stats_ = nullptr;     // statistics structure returned by Fortran code
       F2Cptr msh_ = nullptr;       // mesh structure returned by Fortran code
       F2Cptr kerquant_ = nullptr;  // kernel quantities structure returned by Fortran code
-      F2Cptr ptree_ = nullptr;     // process tree returned by Fortran code
-      MPI_Fint Fcomm_;             // the fortran MPI communicator
-      const MPIComm* c_;
+      F2Cptr ptree_ = nullptr;     // borrowed alias of process_tree_.get()
+      std::shared_ptr<void> process_tree_; // owns process tree and BLACS grids
+      MPI_Fint Fcomm_ = 0;        // the fortran MPI communicator
+      const MPIComm* c_ = nullptr;
       int rows_ = 0, cols_ = 0, lrows_ = 0, lvls_ = 0;
       std::vector<int> perm_, iperm_; // permutation used by the HODLR code
       std::vector<int> dist_;         // begin rows of each rank
       std::vector<int> leafs_;        // leaf sizes of the tree
 
-      void options_init(const opts_t& opts);
+      void clear();
+      void options_init(const opts_t& opts,
+                        const HODLRMatrix* process_tree_owner = nullptr);
       void perm_init();
       void dist_init();
 

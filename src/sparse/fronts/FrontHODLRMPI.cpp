@@ -705,7 +705,7 @@ namespace strumpack {
         TIMER_STOP(t_graph_22);
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>
-           (Comm(), CB_tree, gCB, opts.HODLR_options()));
+           (Comm(), CB_tree, gCB, opts.HODLR_options(), &F11_));
         auto knn = opts.HODLR_options().knn_lrbf();
         auto nns12 = HODLR::get_odiag_neighbors(knn, g12, g, gCB);
         auto nns21 = HODLR::get_odiag_neighbors(knn, g21, gCB, g);
@@ -718,7 +718,7 @@ namespace strumpack {
         CB_tree.refine(opts.HODLR_options().leaf_size());
         F22_ = std::unique_ptr<HODLR::HODLRMatrix<scalar_t>>
           (new HODLR::HODLRMatrix<scalar_t>
-           (Comm(), CB_tree, opts.HODLR_options()));
+           (Comm(), CB_tree, opts.HODLR_options(), &F11_));
         F12_ = HODLR::ButterflyMatrix<scalar_t>(F11_, *F22_);
         F21_ = HODLR::ButterflyMatrix<scalar_t>(*F22_, F11_);
       }
