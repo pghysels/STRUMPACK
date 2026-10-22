@@ -41,6 +41,26 @@
 
 namespace strumpack {
 
+  /**
+   * MAGMA 2.9.0 and earlier split the row interchanges inside
+   * magma_Xgetrf_vbatched into launches of at most 65535 matrices
+   * (the CUDA grid z limit) without offsetting the batch arrays, so
+   * the LU factors are wrong when batchCount > 65535 and a matrix is
+   * larger than 32x32. Factoring at most 65535 fronts per call avoids
+   * that code path.
+   */
+  template<typename scalar_t> void
+  getrf_vbatched_chunked(int* d1, int max_d1, scalar_t** F11, int* ld1,
+                         int** ipiv, int* info, void* work, int* lwork,
+                         std::size_t N, gpu::Handle& handle) {
+    const std::size_t max_batch = 65535;
+    for (std::size_t i=0; i<N; i+=max_batch)
+      gpu::magma::getrf_vbatched_max_nocheck_work
+        (d1+i, d1+i, max_d1, max_d1, max_d1, max_d1*max_d1, F11+i,
+         ld1+i, ipiv+i, info+i, work, lwork, std::min(max_batch, N-i),
+         handle);
+  }
+
   template<typename scalar_t, typename integer_t> class LevelInfoMAGMA {
     using F_t = Front<scalar_t,integer_t>;
     using FM_t = FrontMAGMA<scalar_t,integer_t>;
@@ -423,9 +443,8 @@ namespace strumpack {
         auto F11 = L.dev_F_batch;   auto F12 = F11 + Nsmall;
         auto F21 = F12 + Nsmall;    auto F22 = F21 + Nsmall;
 
-        gpu::magma::getrf_vbatched_max_nocheck_work
-          (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
-           L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
+        getrf_vbatched_chunked
+          (d1, L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dev_getrf_err, L.dev_getrf_work, &L.getrf_work_bytes,
            Nsmall, handle);
         for (std::size_t i=Nsmall; i<N; i++)
@@ -704,9 +723,8 @@ namespace strumpack {
         auto F11 = L.dev_F_batch;   auto F12 = F11 + Nsmall;
         auto F21 = F12 + Nsmall;    auto F22 = F21 + Nsmall;
 
-        gpu::magma::getrf_vbatched_max_nocheck_work
-          (d1, d1, L.max_d1_small, L.max_d1_small, L.max_d1_small,
-           L.max_d1_small*L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
+        getrf_vbatched_chunked
+          (d1, L.max_d1_small, F11, ld1, L.dev_ipiv_batch,
            L.dev_getrf_err, L.dev_getrf_work, &L.getrf_work_bytes,
            Nsmall, handle);
         for (std::size_t i=Nsmall; i<N; i++)
