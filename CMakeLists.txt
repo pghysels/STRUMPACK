@@ -537,6 +537,11 @@ if(TPL_ENABLE_BPACK)
         return available;
       }" STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
     cmake_pop_check_state()
+    # CPU builds of the GPU branch export ABI stubs. Honor the package's
+    # compiled capability without forcing CUDA onto a CPU-only installation.
+    if(DEFINED ButterflyPACK_USE_GPU AND NOT ButterflyPACK_USE_GPU)
+      set(STRUMPACK_HAVE_BPACK_GPU_INTERFACE OFF)
+    endif()
     if(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
       find_package(CUDAToolkit REQUIRED)
       message(STATUS "ButterflyPACK GPU ABI found; runtime capability checked when requested")

@@ -27,7 +27,9 @@ older precision-specific targets. It compiles AND links a probe referencing
 all six d_/z_ availability, device-sharing and exchange-initialization
 symbols. STRUMPACK_REQUIRE_BPACK_GPU=ON makes a missing GPU ABI a configure
 error. Exported CPU stubs are distinguished from a GPU-enabled library at
-runtime. Older CPU installations continue to work without GPU symbols.
+runtime. An exported ButterflyPACK_USE_GPU=OFF suppresses CUDA discovery
+for CPU builds exporting GPU stubs. Older CPU installations continue to work
+without GPU symbols.
 
 Selection and lifetime
 ----------------------
