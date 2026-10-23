@@ -34,6 +34,12 @@
 #include "HODLRMatrix.hpp"
 #include "HODLRWrapper.hpp"
 #include <stdexcept>
+#if defined(STRUMPACK_USE_OPENMP)
+#include <omp.h>
+#endif
+#if defined(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+#include <cuda_runtime_api.h>
+#endif
 
 namespace strumpack {
 
@@ -351,6 +357,26 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::options_init
     (const opts_t& opts, const HODLRMatrix* process_tree_owner) {
+      gpu_mode_ = opts.use_gpu();
+      backend_verbose_ = opts.verbose();
+      if (opts.use_gpu()) {
+        if (opts.compression_algorithm() != CompressionAlgorithm::ELEMENT_EXTRACTION)
+          throw std::invalid_argument("Hybrid HODLR GPU mode requires element extraction");
+#if defined(STRUMPACK_USE_OPENMP)
+        if (omp_get_max_threads() != 1)
+          throw std::invalid_argument("Hybrid HODLR GPU mode requires OMP_NUM_THREADS=1");
+#endif
+        if (!std::is_same<scalar_t, double>::value &&
+            !std::is_same<scalar_t, std::complex<double>>::value)
+          throw std::invalid_argument
+            ("HODLR GPU requires double or complex double precision");
+        if (opts.butterfly_levels() != 0)
+          throw std::invalid_argument
+            ("HODLR GPU requires --hodlr_butterfly_levels 0");
+        if (!HODLR_gpu_available<scalar_t>())
+          throw std::runtime_error
+            ("HODLR GPU requested, but the linked ButterflyPACK has no GPU backend");
+      }
       if (process_tree_owner) {
         int comparison = MPI_UNEQUAL;
         if (!process_tree_owner->process_tree_)
@@ -385,6 +411,8 @@ namespace strumpack {
       HODLR_set_I_option<scalar_t>(options_, "less_adapt", opts.less_adapt()); // 0 or 1
       HODLR_set_I_option<scalar_t>(options_, "forwardN15flag", opts.BF_entry_n15()); // 0, 1, 2, 3
       HODLR_set_I_option<scalar_t>(options_, "cpp", 1);
+      if (opts.use_gpu())
+        HODLR_set_I_option<scalar_t>(options_, "HODLR_use_gpu", opts.use_gpu());
       HODLR_set_D_option<scalar_t>(options_, "sample_para", opts.BF_sampling_parameter());
       HODLR_set_D_option<scalar_t>(options_, "sample_para_outer", opts.BF_sampling_parameter());
       HODLR_set_D_option<scalar_t>(options_, "rankrate", opts.rank_rate());
@@ -442,6 +470,9 @@ namespace strumpack {
     HODLRMatrix<scalar_t>::operator=(HODLRMatrix<scalar_t>&& h) {
       if (this == &h) return *this;
       clear();
+      gpu_mode_ = h.gpu_mode_;
+      backend_verbose_ = h.backend_verbose_;
+      backend_stats_ = h.backend_stats_;
       process_tree_ = std::move(h.process_tree_);
       ho_bf_ = h.ho_bf_;       h.ho_bf_ = nullptr;
       options_ = h.options_;   h.options_ = nullptr;
@@ -467,6 +498,26 @@ namespace strumpack {
     }
 
     template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::report_backend(const char* operation, double seconds) const {
+      if (!backend_verbose_ || c_->rank()) return;
+      std::cout << "# HODLR backend=" << (gpu_mode_ ? "GPU" : "CPU")
+                << " mode=" << gpu_mode_ << " rows=" << rows_
+                << " operation=" << operation << " wall_seconds=" << seconds
+                << " construction=" << (gpu_mode_ ? "host_callbacks_plus_upload" : "host_callbacks")
+                << " rhs_boundary_bytes_local=" << backend_stats_.rhs_boundary_bytes;
+      if (gpu_mode_) {
+        std::cout << " device_factor_bytes_local=" << get_stat("Mem_Factor")*1024000.;
+#if defined(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+        std::size_t free = 0, total = 0;
+        if (cudaMemGetInfo(&free, &total) == cudaSuccess)
+          std::cout << " device_used_bytes_all_processes=" << total-free
+                    << " device_total_bytes=" << total;
+#endif
+      }
+      std::cout << std::endl;
+    }
+
+    template<typename scalar_t> void
     HODLRMatrix<scalar_t>::print_stats() {
       if (!stats_) return;
       HODLR_printstats<scalar_t>(stats_, ptree_);
@@ -484,6 +535,8 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const mult_t& Amult) {
       if (c_->is_null()) return;
+      if (gpu_mode_)
+        throw std::invalid_argument("Hybrid HODLR GPU mode requires entry callbacks, not matvec construction");
       C2Fptr f = static_cast<void*>(const_cast<mult_t*>(&Amult));
       HODLR_construct_matvec_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
@@ -502,19 +555,27 @@ namespace strumpack {
       BLACSGrid gloc(MPIComm(MPI_COMM_SELF), 1),
         gnull(MPIComm(MPI_COMM_NULL), 1);
       AelemCommPtrs<scalar_t> AC{&Aelem, c_, &gloc, &gnull};
+      const double started = MPI_Wtime();
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_element_evaluation<scalar_t>),
          &(HODLR_block_evaluation<scalar_t>), &AC);
+      const double elapsed = MPI_Wtime()-started;
+      backend_stats_.construction_seconds += elapsed;
+      report_backend("construction", elapsed);
     }
 
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::compress(const elem_blocks_t& Aelem) {
       C2Fptr f = static_cast<void*>(const_cast<elem_blocks_t*>(&Aelem));
+      const double started = MPI_Wtime();
       HODLR_construct_element_compute<scalar_t>
         (ho_bf_, options_, stats_, msh_, kerquant_, ptree_,
          &(HODLR_element_evaluation<scalar_t>),
          &(HODLR_block_evaluation_seq<scalar_t>), f);
+      const double elapsed = MPI_Wtime()-started;
+      backend_stats_.construction_seconds += elapsed;
+      report_backend("construction", elapsed);
     }
 
     template<typename scalar_t> void
@@ -530,8 +591,14 @@ namespace strumpack {
         Y.copy(Yc);
         return;
       }
+      const double started = MPI_Wtime();
       HODLR_mult(char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
                  ho_bf_, options_, stats_, ptree_);
+      const double elapsed = MPI_Wtime()-started;
+      backend_stats_.multiply_seconds += elapsed;
+      if (gpu_mode_) backend_stats_.rhs_boundary_bytes +=
+        (X.rows()*X.cols()+Y.rows()*Y.cols())*sizeof(scalar_t);
+      report_backend("multiply", elapsed);
     }
 
     template<typename scalar_t> void
@@ -541,8 +608,7 @@ namespace strumpack {
       DenseM_t Y1D(lrows_, X.cols());
       {
         auto X1D = redistribute_2D_to_1D(X);
-        HODLR_mult(char(op), X1D.data(), Y1D.data(), lrows_, lrows_,
-                   X.cols(), ho_bf_, options_, stats_, ptree_);
+        mult(op, X1D, Y1D);
       }
       redistribute_1D_to_2D(Y1D, Y);
     }
@@ -559,9 +625,15 @@ namespace strumpack {
         Y.copy(Yc);
         return flops;
       }
+      const double started = MPI_Wtime();
       HODLR_inv_mult
         (char(op), X.data(), Y.data(), lrows_, lrows_, X.cols(),
          ho_bf_, options_, stats_, ptree_);
+      const double elapsed = MPI_Wtime()-started;
+      backend_stats_.inverse_seconds += elapsed;
+      if (gpu_mode_) backend_stats_.rhs_boundary_bytes +=
+        (X.rows()*X.cols()+Y.rows()*Y.cols())*sizeof(scalar_t);
+      report_backend("inverse", elapsed);
       long long int flops = get_stat("Flop_C_Mult");
 #if 0
       DenseM_t R(X.rows(), X.cols()), E(X.rows(), X.cols());
@@ -580,7 +652,11 @@ namespace strumpack {
     template<typename scalar_t> void
     HODLRMatrix<scalar_t>::factor() {
       if (c_->is_null()) return;
+      const double started = MPI_Wtime();
       HODLR_factor<scalar_t>(ho_bf_, options_, stats_, ptree_, msh_);
+      const double elapsed = MPI_Wtime()-started;
+      backend_stats_.factor_seconds += elapsed;
+      report_backend("factor", elapsed);
     }
 
     template<typename scalar_t> long long int

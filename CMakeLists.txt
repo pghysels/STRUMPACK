@@ -499,6 +499,8 @@ if(TPL_ENABLE_SZ3)
   endif()
 endif()
 
+option(STRUMPACK_REQUIRE_BPACK_GPU "Require the ButterflyPACK HODLR GPU interface" OFF)
+
 if(TPL_ENABLE_BPACK)
   list(APPEND CMAKE_PREFIX_PATH ${TPL_BUTTERFLYPACK_PREFIX}
     $ENV{ButterflyPACK_DIR} $ENV{ButterflyPACK_ROOT}
@@ -506,7 +508,49 @@ if(TPL_ENABLE_BPACK)
   find_package(ButterflyPACK)
   if(ButterflyPACK_FOUND)
     option(STRUMPACK_USE_BPACK "" ON)
+    include(CMakePushCheckState)
+    include(CheckCXXSourceCompiles)
+    cmake_push_check_state(RESET)
+    if(TARGET ButterflyPACK::butterflypack)
+      set(CMAKE_REQUIRED_LIBRARIES ButterflyPACK::butterflypack)
+    else()
+      set(CMAKE_REQUIRED_LIBRARIES ButterflyPACK::dbutterflypack ButterflyPACK::zbutterflypack)
+    endif()
+    list(APPEND CMAKE_REQUIRED_LIBRARIES ${MPI_CXX_LIBRARIES})
+    set(CMAKE_REQUIRED_INCLUDES ${MPI_CXX_INCLUDE_DIRS})
+    # Recheck when switching ButterflyPACK installations in an existing build.
+    unset(STRUMPACK_HAVE_BPACK_GPU_INTERFACE CACHE)
+    check_cxx_source_compiles("
+      #include <mpi.h>
+      extern \"C\" {
+        void d_c_bpack_gpu_available(int*); void z_c_bpack_gpu_available(int*);
+        void d_c_bpack_gpu_share_device(const MPI_Fint*, int*);
+        void z_c_bpack_gpu_share_device(const MPI_Fint*, int*);
+        void d_c_bpack_gpu_init_exchange(const int*, const int*);
+        void z_c_bpack_gpu_init_exchange(const int*, const int*);
+      }
+      int main() {
+        int available=0, share=1, nproc=1; MPI_Fint comm=0;
+        d_c_bpack_gpu_available(&available); z_c_bpack_gpu_available(&available);
+        d_c_bpack_gpu_share_device(&comm,&share); z_c_bpack_gpu_share_device(&comm,&share);
+        d_c_bpack_gpu_init_exchange(&nproc,&share); z_c_bpack_gpu_init_exchange(&nproc,&share);
+        return available;
+      }" STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+    cmake_pop_check_state()
+    if(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+      find_package(CUDAToolkit REQUIRED)
+      message(STATUS "ButterflyPACK GPU ABI found; runtime capability checked when requested")
+    endif()
+
   endif()
+endif()
+
+if(NOT TPL_ENABLE_BPACK OR NOT ButterflyPACK_FOUND)
+  set(STRUMPACK_HAVE_BPACK_GPU_INTERFACE OFF)
+endif()
+
+if(STRUMPACK_REQUIRE_BPACK_GPU AND NOT STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+  message(FATAL_ERROR "ButterflyPACK is missing required HODLR GPU entry points")
 endif()
 
 if(TPL_ENABLE_SLATE)
@@ -673,11 +717,16 @@ if(SZ3_FOUND)
 endif()
 
 if(ButterflyPACK_FOUND)
-  target_link_libraries(strumpack PUBLIC
-    ButterflyPACK::sbutterflypack
-    ButterflyPACK::dbutterflypack
-    ButterflyPACK::cbutterflypack
-    ButterflyPACK::zbutterflypack)
+  # newer ButterflyPACK exports a single combined library target
+  if(TARGET ButterflyPACK::butterflypack)
+    target_link_libraries(strumpack PUBLIC ButterflyPACK::butterflypack)
+  else()
+    target_link_libraries(strumpack PUBLIC
+      ButterflyPACK::sbutterflypack
+      ButterflyPACK::dbutterflypack
+      ButterflyPACK::cbutterflypack
+      ButterflyPACK::zbutterflypack)
+  endif()
 endif()
 
 if(slate_FOUND)

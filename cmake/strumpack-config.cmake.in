@@ -11,6 +11,9 @@ enable_language(CXX)
 
 if(@STRUMPACK_USE_CUDA@) # STRUMPACK_USE_CUDA
   enable_language(CUDA)
+endif()
+# The ButterflyPACK GPU interface uses the runtime even with CPU dense fronts.
+if(@STRUMPACK_USE_CUDA@ OR "@STRUMPACK_HAVE_BPACK_GPU_INTERFACE@")
   find_dependency(CUDAToolkit)
 endif()
 

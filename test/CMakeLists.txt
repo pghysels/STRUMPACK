@@ -24,6 +24,13 @@ add_test("user_test_SPD_mixedPrecision" ${CMAKE_CURRENT_BINARY_DIR}/test_SPD_mix
 
 if(STRUMPACK_USE_MPI)
   if(STRUMPACK_USE_BPACK)
+    add_executable(test_HODLR_gpu_interface_mpi test_HODLR_gpu_interface_mpi.cpp)
+    target_link_libraries(test_HODLR_gpu_interface_mpi strumpack)
+    add_test(NAME HODLR_gpu_interface_cpu
+      COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+      ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_HODLR_gpu_interface_mpi> ${MPIEXEC_POSTFLAGS})
+    set_tests_properties(HODLR_gpu_interface_cpu PROPERTIES
+      ENVIRONMENT "OMP_NUM_THREADS=1;OPENBLAS_NUM_THREADS=1")
     add_executable(test_HODLR_process_tree_mpi test_HODLR_process_tree_mpi.cpp)
     target_link_libraries(test_HODLR_process_tree_mpi strumpack)
     add_test(NAME HODLR_process_tree_mpi

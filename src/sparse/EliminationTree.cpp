@@ -33,6 +33,9 @@
 #include "fronts/FrontFactory.hpp"
 #include "fronts/Front.hpp"
 #include "SeparatorTree.hpp"
+#if defined(STRUMPACK_USE_BPACK)
+#include "HODLR/HODLRWrapper.hpp"
+#endif
 
 namespace strumpack {
 
@@ -151,7 +154,39 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   EliminationTree<scalar_t,integer_t>::multifrontal_factorization
   (const SpMat_t& A, const SPOptions<scalar_t>& opts) {
+    initialize_compression_backend(opts);
     return root_->multifrontal_factorization(A, opts);
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  EliminationTree<scalar_t,integer_t>::initialize_compression_backend
+  (const SPOptions<scalar_t>& opts) const {
+    if (!opts.HODLR_options().use_gpu()) return;
+    switch (opts.compression()) {
+    case CompressionType::HODLR:
+    case CompressionType::BLR_HODLR:
+    case CompressionType::ZFP_BLR_HODLR: break;
+    default: return;
+    }
+    if (opts.HODLR_options().butterfly_levels())
+      throw std::invalid_argument
+        ("ButterflyPACK HODLR GPU mode requires zero butterfly levels");
+#if defined(STRUMPACK_USE_BPACK)
+    if (opts.HODLR_options().compression_algorithm() != HODLR::CompressionAlgorithm::ELEMENT_EXTRACTION)
+      throw std::invalid_argument("Hybrid HODLR GPU mode requires element extraction");
+    // Fronts use different communicators and may first reach GPU work in
+    // different orders. Establish the shared GPU memory budget collectively
+    // over all solver ranks before the frontal traversal starts.
+    if (auto comm = compression_comm())
+      HODLR::HODLR_initialize_gpu<scalar_t>(*comm);
+    else {
+      MPIComm self(MPI_COMM_SELF);
+      HODLR::HODLR_initialize_gpu<scalar_t>(self);
+    }
+#else
+    throw std::runtime_error
+      ("HODLR GPU mode requires STRUMPACK with ButterflyPACK support");
+#endif
   }
 
   template<typename scalar_t,typename integer_t> void

@@ -65,7 +65,7 @@ namespace strumpack {
     (int argc, const char* const* cargv) {
 #if defined(STRUMPACK_USE_GETOPT)
       std::vector<std::unique_ptr<char[]>> argv_data(argc);
-      std::vector<char*> argv(argc);
+      std::vector<char*> argv(argc+1, nullptr);
       for (int i=0; i<argc; i++) {
         argv_data[i].reset(new char[strlen(cargv[i])+1]);
         argv[i] = argv_data[i].get();
@@ -90,6 +90,7 @@ namespace strumpack {
          {"hodlr_enable_less_adapt",     no_argument, 0, 16},
          {"hodlr_disable_less_adapt",    no_argument, 0, 17},
          {"hodlr_BF_entry_n15",          required_argument, 0, 18},
+         {"hodlr_use_gpu",               required_argument, 0, 19},
          {"hodlr_verbose",               no_argument, 0, 'v'},
          {"hodlr_quiet",                 no_argument, 0, 'q'},
          {"help",                        no_argument, 0, 'h'},
@@ -183,6 +184,14 @@ namespace strumpack {
           iss >> BF_entry_n15_;
           set_BF_entry_n15(BF_entry_n15_); 
         }break;
+        case 19: {
+          std::istringstream iss(optarg);
+          int mode;
+          if (!(iss >> mode) || !(iss >> std::ws).eof())
+            throw std::invalid_argument
+              ("--hodlr_use_gpu requires an integer: 0, 1, or 2");
+          set_use_gpu(mode);
+        } break;
         case 'v': this->set_verbose(true); break;
         case 'q': this->set_verbose(false); break;
         case 'h': describe_options(); break;
@@ -235,6 +244,8 @@ namespace strumpack {
                 << !less_adapt() << ")" << std::endl
                 << "#   --hodlr_BF_entry_n15 (default "
                 << BF_entry_n15() << ")" << std::endl
+                << "#   --hodlr_use_gpu 0|1|2 (0: CPU, 1: GPU, 2: GPU FP64 tensor cores) (default "
+                << use_gpu() << ")" << std::endl
                 << "#   --hodlr_verbose or -v (default "
                 << this->verbose() << ")" << std::endl
                 << "#   --hodlr_quiet or -q (default "

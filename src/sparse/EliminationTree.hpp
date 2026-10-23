@@ -41,6 +41,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> class Front;
   template<typename integer_t> class SeparatorTree;
+  class MPIComm;
 
   // TODO rename this to SuperNodalTree?
   template<typename scalar_t,typename integer_t>
@@ -90,6 +91,9 @@ namespace strumpack {
     F_t* root() const;
 
   protected:
+    virtual const MPIComm* compression_comm() const { return nullptr; }
+    void initialize_compression_backend(const SPOptions<scalar_t>& opts) const;
+
     FrontCounter nr_fronts_;
     std::unique_ptr<F_t> root_;
 

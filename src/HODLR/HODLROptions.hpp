@@ -35,6 +35,8 @@
 #include "clustering/Clustering.hpp"
 #include "structured/StructuredOptions.hpp"
 
+#include <stdexcept>
+
 namespace strumpack {
 
   namespace HODLR {
@@ -247,6 +249,19 @@ namespace strumpack {
       void set_BF_entry_n15(int l) { BF_entry_n15_ = l; }
 
       /**
+       * Select the ButterflyPACK HODLR backend: 0 uses the CPU, 1 uses
+       * the GPU, and 2 uses the GPU with FP64 tensor-core GEMMs. GPU
+       * modes require a GPU-enabled ButterflyPACK library, double or
+       * double complex arithmetic, and zero butterfly levels. Matrix
+       * construction may still evaluate entries through host callbacks.
+       */
+      void set_use_gpu(int mode) {
+        if (mode < 0 || mode > 2)
+          throw std::invalid_argument("HODLR GPU mode must be 0, 1, or 2");
+        use_gpu_ = mode;
+      }
+
+      /**
        * Get the initial guess for the rank.
        */
       int rank_guess() const { return rank_guess_; }
@@ -326,6 +341,12 @@ namespace strumpack {
       int BF_entry_n15() const { return BF_entry_n15_; }
 
       /**
+       * Get the ButterflyPACK HODLR backend: 0 CPU, 1 GPU, or 2 GPU
+       * with FP64 tensor-core GEMMs.
+       */
+      int use_gpu() const { return use_gpu_; }
+
+      /**
        * Parse the command line options given by argc and argv.  The
        * options will not be modified. Run with --help to see an
        * overview of available options, or call describe_options().
@@ -355,6 +376,7 @@ namespace strumpack {
       int knn_lrbf_ = 128;
       bool less_adapt_ = true;
       int BF_entry_n15_ = 0;
+      int use_gpu_ = 0;
 
       void set_defaults() {
         this->type_ = structured::Type::HODLR;

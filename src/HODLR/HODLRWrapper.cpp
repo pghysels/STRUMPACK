@@ -29,6 +29,7 @@
 
 #include <cassert>
 #include <complex>
+#include <stdexcept>
 
 #define OMPI_SKIP_MPICXX 1
 #include <mpi.h>
@@ -51,8 +52,81 @@
 #include "zC_BPACK_wrapper.h"
 #endif
 
+// CMake links all six GPU ABI symbols. CPU-only builds of the GPU branch
+// may export stubs, so also query runtime capability before requesting work.
+#if defined(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+extern "C" {
+  void d_c_bpack_gpu_available(int*);
+  void z_c_bpack_gpu_available(int*);
+  void d_c_bpack_gpu_share_device(const MPI_Fint*, int*);
+  void z_c_bpack_gpu_share_device(const MPI_Fint*, int*);
+  void d_c_bpack_gpu_init_exchange(const int*, const int*);
+  void z_c_bpack_gpu_init_exchange(const int*, const int*);
+}
+#endif
+
 namespace strumpack {
   namespace HODLR {
+
+    template<> bool HODLR_gpu_available<float>() { return false; }
+
+    template<> bool HODLR_gpu_available<std::complex<float>>() { return false; }
+
+    template<> bool HODLR_gpu_available<double>() {
+#if defined(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+      int available = 0;
+      d_c_bpack_gpu_available(&available);
+      return available == 1;
+#else
+      return false;
+#endif
+    }
+
+    template<> bool HODLR_gpu_available<std::complex<double>>() {
+#if defined(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+      int available = 0;
+      z_c_bpack_gpu_available(&available);
+      return available == 1;
+#else
+      return false;
+#endif
+    }
+
+    template<> void HODLR_initialize_gpu<float>(const MPIComm&) {
+      throw std::invalid_argument
+        ("ButterflyPACK HODLR GPU mode requires double or double complex arithmetic");
+    }
+
+    template<> void HODLR_initialize_gpu<std::complex<float>>(const MPIComm&) {
+      throw std::invalid_argument
+        ("ButterflyPACK HODLR GPU mode requires double or double complex arithmetic");
+    }
+
+    template<> void HODLR_initialize_gpu<double>(const MPIComm& comm) {
+      if (!HODLR_gpu_available<double>())
+        throw std::runtime_error
+          ("HODLR GPU mode requires a GPU-enabled ButterflyPACK library (enable_h2_gpu=ON)");
+#if defined(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+      const auto fcomm = MPI_Comm_c2f(comm.comm());
+      int share = 1;
+      d_c_bpack_gpu_share_device(&fcomm, &share);
+      const int nproc = comm.size();
+      d_c_bpack_gpu_init_exchange(&nproc, &share);
+#endif
+    }
+
+    template<> void HODLR_initialize_gpu<std::complex<double>>(const MPIComm& comm) {
+      if (!HODLR_gpu_available<std::complex<double>>())
+        throw std::runtime_error
+          ("HODLR GPU mode requires a GPU-enabled ButterflyPACK library (enable_h2_gpu=ON)");
+#if defined(STRUMPACK_HAVE_BPACK_GPU_INTERFACE)
+      const auto fcomm = MPI_Comm_c2f(comm.comm());
+      int share = 1;
+      z_c_bpack_gpu_share_device(&fcomm, &share);
+      const int nproc = comm.size();
+      z_c_bpack_gpu_init_exchange(&nproc, &share);
+#endif
+    }
 
     template<> void HODLR_createptree<float>
     (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree) {

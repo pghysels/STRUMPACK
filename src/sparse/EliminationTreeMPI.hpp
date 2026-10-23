@@ -70,6 +70,8 @@ namespace strumpack {
                             scalar_t& pgU) const override;
 
   protected:
+    const MPIComm* compression_comm() const override { return &comm_; }
+
     const MPIComm& comm_;
     int rank_, P_;
 

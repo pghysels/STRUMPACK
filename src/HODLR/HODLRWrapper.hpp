@@ -49,6 +49,13 @@ namespace strumpack {
     template<typename scalar_t> void HODLR_createptree
     (int& P, int* groups, MPI_Fint comm, F2Cptr& ptree);
 
+    // Query the linked ButterflyPACK library, including its precision.
+    template<typename scalar_t> bool HODLR_gpu_available();
+
+    // Collective on the full solver communicator before independent fronts
+    // start using the process-wide GPU context and memory pool.
+    template<typename scalar_t> void HODLR_initialize_gpu(const MPIComm& comm);
+
     template<typename scalar_t> void HODLR_createoptions(F2Cptr& options);
 
     template<typename scalar_t> void HODLR_copyoptions(F2Cptr& in, F2Cptr& out);

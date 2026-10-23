@@ -237,6 +237,7 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_factorization
   (const CompressedSparseMatrix<scalar_t,integer_t>& A,
    const Opts_t& opts) {
+    this->initialize_compression_backend(opts);
     return this->root_->multifrontal_factorization(Aprop_, opts);
   }
 

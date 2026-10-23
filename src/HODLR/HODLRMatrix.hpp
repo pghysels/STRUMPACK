@@ -52,6 +52,13 @@ namespace strumpack {
    */
   namespace HODLR {
 
+    // Local-rank API wall times. Construction includes host compression/upload.
+    struct BackendStatistics {
+      double construction_seconds = 0., factor_seconds = 0.;
+      double multiply_seconds = 0., inverse_seconds = 0.;
+      std::size_t rhs_boundary_bytes = 0;
+    };
+
     struct ExtractionMeta {
       std::unique_ptr<int[]> iwork;
       int Ninter, Nallrows, Nallcols,
@@ -89,6 +96,9 @@ namespace strumpack {
       using F2Cptr = void*;
 
     public:
+      const BackendStatistics& backend_statistics() const { return backend_stats_; }
+      int gpu_backend() const { return gpu_mode_; }
+
       using real_t = typename RealType<scalar_t>::value_type;
       using mult_t = typename std::function
         <void(Trans, const DenseM_t&, DenseM_t&)>;
@@ -586,6 +596,10 @@ namespace strumpack {
       std::vector<int> dist_;         // begin rows of each rank
       std::vector<int> leafs_;        // leaf sizes of the tree
 
+      int gpu_mode_ = 0;
+      bool backend_verbose_ = false;
+      mutable BackendStatistics backend_stats_;
+      void report_backend(const char* operation, double seconds) const;
       void clear();
       void options_init(const opts_t& opts,
                         const HODLRMatrix* process_tree_owner = nullptr);
