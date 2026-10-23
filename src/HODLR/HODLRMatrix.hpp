@@ -96,6 +96,11 @@ namespace strumpack {
       using F2Cptr = void*;
 
     public:
+      /** Query whether the linked library has this precision's GPU backend. */
+      static bool gpu_available();
+      /** Collective on all solver ranks before independent GPU matrix work. */
+      static void initialize_gpu(const MPIComm& comm);
+
       const BackendStatistics& backend_statistics() const { return backend_stats_; }
       int gpu_backend() const { return gpu_mode_; }
 

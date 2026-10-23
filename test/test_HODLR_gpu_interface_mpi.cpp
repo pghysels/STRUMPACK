@@ -4,7 +4,6 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
-#include "HODLR/HODLRWrapper.hpp"
 #include "HODLR/HODLRMatrix.hpp"
 using namespace strumpack;
 
@@ -45,8 +44,9 @@ template<typename T> void check(const MPIComm& comm, int argc, char** argv) {
   auto& stats=A.backend_statistics();
   if (stats.construction_seconds<=0 || stats.factor_seconds<=0 || stats.inverse_seconds<=0)
     throw std::runtime_error("missing execution timings");
-  if (opts.use_gpu() && stats.rhs_boundary_bytes==0)
-    throw std::runtime_error("missing RHS boundary accounting");
+  const auto expected_bytes = opts.use_gpu() ? 8*A.lrows()*sizeof(T) : 0;
+  if (stats.rhs_boundary_bytes != expected_bytes)
+    throw std::runtime_error("wrong RHS boundary byte accounting");
 }
 int main(int argc, char** argv) {
   int provided;
@@ -60,12 +60,12 @@ int main(int argc, char** argv) {
     if (cold) {
       if (!opts.use_gpu() || world.size()<2) throw std::runtime_error("cold mode needs GPU and multiple ranks");
       if (world.is_root()) {
-        HODLR::HODLR_initialize_gpu<double>(self);
+        HODLR::HODLRMatrix<double>::initialize_gpu(self);
         check<double>(self,argc,argv);
       }
       MPI_Barrier(world.comm());
     } else {
-      if (opts.use_gpu()) HODLR::HODLR_initialize_gpu<double>(world);
+      if (opts.use_gpu()) HODLR::HODLRMatrix<double>::initialize_gpu(world);
       check<double>(world,argc,argv);
       check<std::complex<double>>(world,argc,argv);
     }

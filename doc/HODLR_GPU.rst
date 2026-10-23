@@ -41,8 +41,9 @@ ButterflyPACK's HODLR dense-block ZFP compression is not enabled here.
 
 Before numerical front traversal, every solver rank collectively initializes
 device sharing and the exchange arena on the solver communicator. Explicit
-standalone HODLRMatrix users must call HODLR_initialize_gpu<T>(comm) before
-starting independent matrix work. Rank/GPU binding should initially use one
+standalone HODLRMatrix users must call HODLRMatrix<T>::initialize_gpu(comm) before
+starting independent matrix work. HODLRMatrix<T>::gpu_available() queries
+the linked backend without creating a device context. Rank/GPU binding should initially use one
 MPI rank per GPU. Multiple ranks sharing a GPU and expanding solver groups
 are not claimed as validated by this interface: the backend's sharing cache
 is process-wide and initialized on first use.

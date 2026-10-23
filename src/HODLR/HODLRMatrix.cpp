@@ -45,6 +45,15 @@ namespace strumpack {
 
   namespace HODLR {
 
+    template<typename scalar_t> bool HODLRMatrix<scalar_t>::gpu_available() {
+      return HODLR_gpu_available<scalar_t>();
+    }
+
+    template<typename scalar_t> void
+    HODLRMatrix<scalar_t>::initialize_gpu(const MPIComm& comm) {
+      HODLR_initialize_gpu<scalar_t>(comm);
+    }
+
     template<typename T> struct KernelCommPtrs {
       const kernel::Kernel<T>* K;
       const MPIComm* c;
