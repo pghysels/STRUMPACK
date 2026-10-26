@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     strategy:
+      fail-fast: false
       matrix:
         compiler:
           - gcc
@@ -16,6 +17,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Cache sparse test matrices
+        if: matrix.test >= 3
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/strumpack/test_matrices.tar.gz
+          key: strumpack-test-matrices-${{ hashFiles('.ci_tests.sh') }}
 
       - name: Install dependencies
         run: |

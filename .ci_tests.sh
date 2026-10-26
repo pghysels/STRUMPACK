@@ -13,61 +13,25 @@ export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 
 if [ $TEST_NUMBER -eq 3 ] || [ $TEST_NUMBER -eq 4 ] || [ $TEST_NUMBER -eq 5 ]
 then
-        printf "${GREEN} ###GC: Downloading sparse test matrices\n\n\n"
+        printf "${GREEN} ###GC: Preparing sparse test matrices\n\n\n"
 
-        # wget http://portal.nersc.gov/project/sparse/strumpack/test_matrices.tar.gz
-        # tar -xvzf test_matrices.tar.gz
-        # rm test_matrices.tar.gz
-        if [ ! -d "utm300" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/TOKAMAK/utm300.tar.gz
-            tar -xvzf utm300.tar.gz
-            rm utm300.tar.gz
+        # This archive predates the SuiteSparse download outage and contains
+        # every matrix used below. Keep a verified copy outside the build tree.
+        matrix_cache="${XDG_CACHE_HOME:-$HOME/.cache}/strumpack"
+        matrix_archive="$matrix_cache/test_matrices.tar.gz"
+        matrix_sha256=b4c383f1d99a3837aaac43ed110e47aad8fa90771163e3f7dad910ae66b99d67
+        if [ ! -f "$matrix_archive" ]; then
+            mkdir -p "$matrix_cache"
+            wget --timeout=30 --tries=3 -O "$matrix_archive.tmp" \
+                https://portal.nersc.gov/project/sparse/strumpack/test_matrices.tar.gz
+            printf '%s  %s\n' "$matrix_sha256" "$matrix_archive.tmp" | sha256sum -c -
+            mv "$matrix_archive.tmp" "$matrix_archive"
         fi
-        if [ ! -d "mesh3e1" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/Pothen/mesh3e1.tar.gz
-            tar -xvzf mesh3e1.tar.gz
-            rm mesh3e1.tar.gz
-        fi
-        if [ ! -d "t2dal" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/Oberwolfach/t2dal.tar.gz
-            tar -xvzf t2dal.tar.gz
-            rm t2dal.tar.gz
-        fi
-        if [ ! -d "bcsstk28" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/HB/bcsstk28.tar.gz
-            tar -xvzf bcsstk28.tar.gz
-            rm bcsstk28.tar.gz
-        fi
-        if [ ! -d "bcsstm08" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/HB/bcsstm08.tar.gz
-            tar -xvzf bcsstm08.tar.gz
-            rm bcsstm08.tar.gz
-        fi
-        if [ ! -d "sherman4" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/HB/sherman4.tar.gz
-            tar -xvzf sherman4.tar.gz
-            rm sherman4.tar.gz
-        fi
-        if [ ! -d "rdb968" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/Bai/rdb968.tar.gz
-            tar -xvzf rdb968.tar.gz
-            rm rdb968.tar.gz
-        fi
-        if [ ! -d "cz10228" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/CPM/cz10228.tar.gz
-            tar -xvzf cz10228.tar.gz
-            rm cz10228.tar.gz
-        fi
-        if [ ! -d "cbuckle" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/TKK/cbuckle.tar.gz
-            tar -xvzf cbuckle.tar.gz
-            rm cbuckle.tar.gz
-        fi
-        if [ ! -d "gemat11" ]; then
-            wget https://suitesparse-collection-website.herokuapp.com/MM/HB/gemat11.tar.gz
-            tar -xvzf gemat11.tar.gz
-            rm gemat11.tar.gz
-        fi
+        printf '%s  %s\n' "$matrix_sha256" "$matrix_archive" | sha256sum -c -
+        tar -xzf "$matrix_archive" \
+            utm300/utm300.mtx mesh3e1/mesh3e1.mtx t2dal/t2dal.mtx \
+            bcsstk28/bcsstk28.mtx bcsstm08/bcsstm08.mtx \
+            sherman4/sherman4.mtx rdb968/rdb968.mtx
 fi
 
 if [ $TEST_NUMBER -eq 0 ]
