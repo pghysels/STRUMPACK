@@ -1,0 +1,46 @@
+{
+  "strumpack_branch": "feature/hodlr-gpu-interface",
+  "strumpack_commit": "a01629a2f90a9829e6933bdbef4e1801ec07254d",
+  "base": "217972ad (communicator fix; upstream multi-RHS correction retained)",
+  "butterflypack_branch": "fix/strumpack-gpu-integration",
+  "butterflypack_commit": "8d8b38b",
+  "checks": {
+    "gpu_build": "passed",
+    "cpu_build": "passed",
+    "gpu_six_symbol_link_probe": "passed",
+    "cpu_without_gpu_abi": "passed",
+    "require_gpu_with_cpu_dependency": "rejected as expected",
+    "installed_cxx_consumer_without_cuda_language": "passed",
+    "patch_whitespace": "passed",
+    "focused_runtime_job": 60163423,
+    "focused_runtime_status": "PASS",
+    "previous_runtime_job": 60144883,
+    "previous_runtime_result": "Numerical cases passed; checker failed on old reporting field from stale GPU binary",
+    "installed_public_api_gpu_consumer": "passed",
+    "installed_public_api_cpu_consumer_cuda_disabled": "passed",
+    "gpu_binary_reporting_schema": "verified current bytes field; old MB field absent",
+    "cpu_exported_gpu_stubs_with_cuda_disabled": "passed: all six symbols link, GPU feature stays disabled",
+    "focused_runtime_slurm_state": "COMPLETED",
+    "focused_runtime_exit_code": "0:0",
+    "focused_runtime_elapsed_seconds": 25,
+    "focused_runtime_summary": "gpu_interface_60163423/summary.json"
+  },
+  "prior_numerical_evidence": {
+    "gpu_poisson_job": 60043836,
+    "cpu_poisson_job": 60043857
+  },
+  "scope": "hybrid host entry extraction/compression with ButterflyPACK GPU factors and inverse applications; rectangular Butterfly remains CPU",
+  "limits": [
+    "OMP_NUM_THREADS=1",
+    "element extraction only",
+    "double and double complex",
+    "zero butterfly levels",
+    "GPU block evaluator/front-data residency deferred to next extension",
+    "Construction wall time includes CPU compression and upload; transfer counters cover RHS host API payload only",
+    "CUDA memory utilization is device-wide; resident factor bytes are local-rank ButterflyPACK statistics"
+  ],
+  "executables": {
+    "build_gpu_hodlr/test/test_HODLR_gpu_interface_mpi": "de96daab99d7e386f2861c02bc5d9e4b6b94cecf28fdb28f0e329c4fa2f68b75",
+    "build_cpu_interface/test/test_HODLR_gpu_interface_mpi": "8f8b1abeb698093b0f7183e1ca58d5945a1464ba5accfb21fc0997caebb26b87"
+  }
+}
