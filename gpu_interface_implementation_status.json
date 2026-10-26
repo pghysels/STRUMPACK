@@ -23,7 +23,9 @@
     "focused_runtime_slurm_state": "COMPLETED",
     "focused_runtime_exit_code": "0:0",
     "focused_runtime_elapsed_seconds": 25,
-    "focused_runtime_summary": "gpu_interface_60163423/summary.json"
+    "focused_runtime_summary": "gpu_interface_60163423/summary.json",
+    "sparse_solver_runtime_job": 60333919,
+    "sparse_solver_runtime_status": "PASS"
   },
   "prior_numerical_evidence": {
     "gpu_poisson_job": 60043836,
@@ -41,6 +43,174 @@
   ],
   "executables": {
     "build_gpu_hodlr/test/test_HODLR_gpu_interface_mpi": "de96daab99d7e386f2861c02bc5d9e4b6b94cecf28fdb28f0e329c4fa2f68b75",
-    "build_cpu_interface/test/test_HODLR_gpu_interface_mpi": "8f8b1abeb698093b0f7183e1ca58d5945a1464ba5accfb21fc0997caebb26b87"
+    "build_cpu_interface/test/test_HODLR_gpu_interface_mpi": "8f8b1abeb698093b0f7183e1ca58d5945a1464ba5accfb21fc0997caebb26b87",
+    "build_gpu_hodlr/examples/sparse/testPoisson3dMPIDist": "fa05f78a43f057c3da829a70cea2f4baafdf842aff7282498e6eefbd50ef77ad"
+  },
+  "sparse_solver_validation": {
+    "status": "PASS",
+    "job_id": 60333919,
+    "source_commit": "74c6eb84b24d5609848a42e6df31e321fc1f244a",
+    "grid": [
+      60,
+      60,
+      60
+    ],
+    "unknowns": 216000,
+    "rhs": 3,
+    "mpi_ranks": 4,
+    "openmp_threads": 1,
+    "gpu_aware_mpi": false,
+    "cases": [
+      {
+        "backend": "CPU",
+        "mode": 0,
+        "status": "PASS",
+        "relative_error": 1.97666e-11,
+        "scaled_residual": 8.3448e-09,
+        "hodlr_fronts": 113,
+        "solver_wall_seconds": {
+          "factor": 38.9697,
+          "solve": 1.04638
+        },
+        "matrix_communicator_root_seconds_sum": {
+          "construction": 68.09253621999997,
+          "factor": 0.3207250099999999,
+          "inverse": 0.9710198060000006
+        },
+        "operation_report_counts": {
+          "construction": 225,
+          "factor": 113,
+          "inverse": 2202
+        },
+        "matrix_communicator_root_seconds_by_reporting_rank": {
+          "0": {
+            "construction": 17.69832136,
+            "factor": 0.103619236,
+            "inverse": 0.2958456309999998
+          },
+          "1": {
+            "construction": 16.36882276,
+            "factor": 0.09444443000000002,
+            "inverse": 0.20877404199999997
+          },
+          "2": {
+            "construction": 17.93570081,
+            "factor": 0.065345501,
+            "inverse": 0.27076276599999977
+          },
+          "3": {
+            "construction": 16.08969129,
+            "factor": 0.05731584299999999,
+            "inverse": 0.19563736700000023
+          }
+        },
+        "native_gpu_factor_messages": 0,
+        "max_single_matrix_local_cumulative_rhs_boundary_bytes": 0,
+        "max_single_matrix_local_factor_bytes": null,
+        "max_sampled_device_wide_used_bytes": null,
+        "refinement_iterations": 8
+      },
+      {
+        "backend": "GPU",
+        "mode": 1,
+        "status": "PASS",
+        "relative_error": 2.03731e-11,
+        "scaled_residual": 6.25391e-09,
+        "hodlr_fronts": 113,
+        "solver_wall_seconds": {
+          "factor": 44.2178,
+          "solve": 0.851053
+        },
+        "matrix_communicator_root_seconds_sum": {
+          "construction": 78.51549610000001,
+          "factor": 4.005382599999999,
+          "inverse": 0.3804285020000004
+        },
+        "operation_report_counts": {
+          "construction": 225,
+          "factor": 113,
+          "inverse": 2196
+        },
+        "matrix_communicator_root_seconds_by_reporting_rank": {
+          "0": {
+            "construction": 20.360664200000002,
+            "factor": 1.1175965999999997,
+            "inverse": 0.11716015299999995
+          },
+          "1": {
+            "construction": 18.769689200000002,
+            "factor": 0.9724617,
+            "inverse": 0.08410158699999996
+          },
+          "2": {
+            "construction": 20.667772499999995,
+            "factor": 1.0509929000000002,
+            "inverse": 0.10148569099999988
+          },
+          "3": {
+            "construction": 18.717370200000005,
+            "factor": 0.8643313999999997,
+            "inverse": 0.07768107100000002
+          }
+        },
+        "native_gpu_factor_messages": 113,
+        "max_single_matrix_local_cumulative_rhs_boundary_bytes": 11836800,
+        "max_single_matrix_local_factor_bytes": 7841540.0,
+        "max_sampled_device_wide_used_bytes": 72414724096,
+        "refinement_iterations": 8
+      }
+    ],
+    "timing_notes": [
+      "Solver factor/solve times are reported whole-solver wall times.",
+      "Backend operation times sum local wall times from one reporting rank per matrix communicator; concurrent fronts overlap, so these sums are not solver wall time or all-rank work.",
+      "Construction includes host extraction/compression and, on GPU, upload.",
+      "Inverse times include Schur-complement work during factorization and iterative-refinement solves.",
+      "GPU RHS boundary bytes and device-memory samples are partial accounting, not total traffic or an allocation peak.",
+      "Backend sums omit rectangular Butterfly operations, dense fronts and other sparse-solver work; compare whole-solver wall times separately.",
+      "CPU device-memory fields are null because the CPU path does not report them."
+    ],
+    "executable_sha256": "fa05f78a43f057c3da829a70cea2f4baafdf842aff7282498e6eefbd50ef77ad",
+    "driver": "testPoisson3dMPIDist",
+    "slurm_state": "COMPLETED",
+    "slurm_exit_code": "0:0",
+    "elapsed_seconds": 112,
+    "strumpack_cuda_dense_backend": false,
+    "same_executable_for_cpu_and_gpu": true,
+    "launch_arguments": [
+      "srun",
+      "-n",
+      "4",
+      "-c",
+      "8",
+      "--cpu-bind=cores",
+      "--gpus-per-task=1",
+      "--gpu-bind=single:1"
+    ],
+    "common_driver_arguments": [
+      "60",
+      "3",
+      "--sp_compression",
+      "HODLR",
+      "--sp_compression_min_sep_size",
+      "1000",
+      "--sp_compression_min_front_size",
+      "1000",
+      "--hodlr_leaf_size",
+      "128",
+      "--hodlr_butterfly_levels",
+      "0",
+      "--hodlr_rel_tol",
+      "1e-4",
+      "--sp_rel_tol",
+      "1e-10",
+      "--sp_Krylov_solver",
+      "refinement",
+      "--hodlr_verbose"
+    ],
+    "acceptance_limits": {
+      "relative_error_less_than": 1e-08,
+      "scaled_residual_less_than": 1e-06,
+      "minimum_hodlr_fronts": 2
+    }
   }
 }
