@@ -27,38 +27,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          export BLUE="\033[34;1m"
-          mkdir -p installDir
-
-          printf  "${BLUE} PG; Installing gcc via apt\n"
           sudo apt-get update
-          sudo apt-get install build-essential software-properties-common -y
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-          sudo apt-get update
-          sudo apt-get install gcc g++ -y
-          export CXX="g++"
-          export CC="gcc"
-          printf "${BLUE} PG; Done installing gcc via apt\n"
-
-          printf "${BLUE} PG; Installing gfortran via apt\n"
-          sudo apt-get install gfortran -y
-          printf "${BLUE} PG; Done installing gfortran via apt\n"
-
-          printf "${BLUE} PG; Installing openmpi\n"
-          sudo apt-get install openmpi-bin libopenmpi-dev
-          printf "${BLUE} PG; Done installing openmpi\n"
-
-          printf "${BLUE} PG; Installing metis\n"
-          sudo apt-get install libmetis-dev libparmetis-dev
-          printf "${BLUE} PG; Done installing metis\n"
-
-          printf "${BLUE} PG; Installing OpenBLAS from apt\n"
-          sudo apt-get install libopenblas-openmp-dev
-          printf "${BLUE} PG; Done installing OpenBLAS from apt\n"
-
-          printf "${BLUE} PG; Installing ScaLAPACK from apt\n"
-          sudo apt-get install libscalapack-mpi-dev
-          printf "${BLUE} PG; Done installing ScaLAPACK from apt\n"
+          sudo apt-get install -y \
+            build-essential gcc g++ gfortran \
+            openmpi-bin libopenmpi-dev libmetis-dev libparmetis-dev \
+            libopenblas-openmp-dev libscalapack-mpi-dev
 
       - name: Install package
         run: |
