@@ -1,6 +1,6 @@
 {
   "strumpack_branch": "feature/hodlr-gpu-interface",
-  "strumpack_commit": "a01629a2f90a9829e6933bdbef4e1801ec07254d",
+  "strumpack_commit": "872543e1c58bbe02dca8a552f0856698ba01f5dc",
   "base": "217972ad (communicator fix; upstream multi-RHS correction retained)",
   "butterflypack_branch": "fix/strumpack-gpu-integration",
   "butterflypack_commit": "8d8b38b",
@@ -24,12 +24,14 @@
     "focused_runtime_exit_code": "0:0",
     "focused_runtime_elapsed_seconds": 25,
     "focused_runtime_summary": "gpu_interface_60163423/summary.json",
-    "sparse_solver_runtime_job": 60333919,
-    "sparse_solver_runtime_status": "PASS"
+    "sparse_solver_runtime_job": 60336439,
+    "sparse_solver_runtime_status": "PASS",
+    "focused_runtime_source_commit": "a01629a2f90a9829e6933bdbef4e1801ec07254d"
   },
   "prior_numerical_evidence": {
     "gpu_poisson_job": 60043836,
-    "cpu_poisson_job": 60043857
+    "cpu_poisson_job": 60043857,
+    "post_consolidation_sparse_solver_job": 60333919
   },
   "scope": "hybrid host entry extraction/compression with ButterflyPACK GPU factors and inverse applications; rectangular Butterfly remains CPU",
   "limits": [
@@ -48,8 +50,8 @@
   },
   "sparse_solver_validation": {
     "status": "PASS",
-    "job_id": 60333919,
-    "source_commit": "74c6eb84b24d5609848a42e6df31e321fc1f244a",
+    "job_id": 60336439,
+    "source_commit": "872543e1c58bbe02dca8a552f0856698ba01f5dc",
     "grid": [
       60,
       60,
@@ -65,66 +67,18 @@
         "backend": "CPU",
         "mode": 0,
         "status": "PASS",
-        "relative_error": 1.97666e-11,
-        "scaled_residual": 8.3448e-09,
+        "relative_error": 1.45833e-11,
+        "scaled_residual": 5.24166e-09,
         "hodlr_fronts": 113,
         "solver_wall_seconds": {
-          "factor": 38.9697,
-          "solve": 1.04638
+          "factor": 39.2198,
+          "solve": 0.75746
         },
+        "refinement_iterations": 8,
         "matrix_communicator_root_seconds_sum": {
-          "construction": 68.09253621999997,
-          "factor": 0.3207250099999999,
-          "inverse": 0.9710198060000006
-        },
-        "operation_report_counts": {
-          "construction": 225,
-          "factor": 113,
-          "inverse": 2202
-        },
-        "matrix_communicator_root_seconds_by_reporting_rank": {
-          "0": {
-            "construction": 17.69832136,
-            "factor": 0.103619236,
-            "inverse": 0.2958456309999998
-          },
-          "1": {
-            "construction": 16.36882276,
-            "factor": 0.09444443000000002,
-            "inverse": 0.20877404199999997
-          },
-          "2": {
-            "construction": 17.93570081,
-            "factor": 0.065345501,
-            "inverse": 0.27076276599999977
-          },
-          "3": {
-            "construction": 16.08969129,
-            "factor": 0.05731584299999999,
-            "inverse": 0.19563736700000023
-          }
-        },
-        "native_gpu_factor_messages": 0,
-        "max_single_matrix_local_cumulative_rhs_boundary_bytes": 0,
-        "max_single_matrix_local_factor_bytes": null,
-        "max_sampled_device_wide_used_bytes": null,
-        "refinement_iterations": 8
-      },
-      {
-        "backend": "GPU",
-        "mode": 1,
-        "status": "PASS",
-        "relative_error": 2.03731e-11,
-        "scaled_residual": 6.25391e-09,
-        "hodlr_fronts": 113,
-        "solver_wall_seconds": {
-          "factor": 44.2178,
-          "solve": 0.851053
-        },
-        "matrix_communicator_root_seconds_sum": {
-          "construction": 78.51549610000001,
-          "factor": 4.005382599999999,
-          "inverse": 0.3804285020000004
+          "construction": 68.99590412,
+          "factor": 0.27461479099999986,
+          "inverse": 0.9265412199999997
         },
         "operation_report_counts": {
           "construction": 225,
@@ -133,31 +87,79 @@
         },
         "matrix_communicator_root_seconds_by_reporting_rank": {
           "0": {
-            "construction": 20.360664200000002,
-            "factor": 1.1175965999999997,
-            "inverse": 0.11716015299999995
+            "construction": 17.824581699999996,
+            "factor": 0.111422778,
+            "inverse": 0.29485405499999945
           },
           "1": {
-            "construction": 18.769689200000002,
-            "factor": 0.9724617,
-            "inverse": 0.08410158699999996
+            "construction": 16.63531109,
+            "factor": 0.05307111700000001,
+            "inverse": 0.20792029899999986
           },
           "2": {
-            "construction": 20.667772499999995,
-            "factor": 1.0509929000000002,
-            "inverse": 0.10148569099999988
+            "construction": 18.21595732,
+            "factor": 0.064097717,
+            "inverse": 0.27037986499999994
           },
           "3": {
-            "construction": 18.717370200000005,
-            "factor": 0.8643313999999997,
-            "inverse": 0.07768107100000002
+            "construction": 16.320054009999996,
+            "factor": 0.046023179,
+            "inverse": 0.15338700100000013
+          }
+        },
+        "native_gpu_factor_messages": 0,
+        "max_single_matrix_local_cumulative_rhs_boundary_bytes": 0,
+        "max_single_matrix_local_factor_bytes": null,
+        "max_sampled_device_wide_used_bytes": null
+      },
+      {
+        "backend": "GPU",
+        "mode": 1,
+        "status": "PASS",
+        "relative_error": 7.83158e-11,
+        "scaled_residual": 9.49159e-09,
+        "hodlr_fronts": 113,
+        "solver_wall_seconds": {
+          "factor": 43.8081,
+          "solve": 0.864479
+        },
+        "refinement_iterations": 6,
+        "matrix_communicator_root_seconds_sum": {
+          "construction": 78.67192430000003,
+          "factor": 4.023492199999999,
+          "inverse": 0.3084417029999997
+        },
+        "operation_report_counts": {
+          "construction": 225,
+          "factor": 113,
+          "inverse": 1743
+        },
+        "matrix_communicator_root_seconds_by_reporting_rank": {
+          "0": {
+            "construction": 20.375722699999997,
+            "factor": 1.1283443999999998,
+            "inverse": 0.094060959
+          },
+          "1": {
+            "construction": 18.9324301,
+            "factor": 0.9738937,
+            "inverse": 0.06871547699999998
+          },
+          "2": {
+            "construction": 20.7884224,
+            "factor": 1.0495096,
+            "inverse": 0.083054616
+          },
+          "3": {
+            "construction": 18.5753491,
+            "factor": 0.8717444999999999,
+            "inverse": 0.062610651
           }
         },
         "native_gpu_factor_messages": 113,
-        "max_single_matrix_local_cumulative_rhs_boundary_bytes": 11836800,
-        "max_single_matrix_local_factor_bytes": 7841540.0,
-        "max_sampled_device_wide_used_bytes": 72414724096,
-        "refinement_iterations": 8
+        "max_single_matrix_local_cumulative_rhs_boundary_bytes": 11664000,
+        "max_single_matrix_local_factor_bytes": 7839490.0,
+        "max_sampled_device_wide_used_bytes": 36127703040
       }
     ],
     "timing_notes": [
@@ -167,13 +169,10 @@
       "Inverse times include Schur-complement work during factorization and iterative-refinement solves.",
       "GPU RHS boundary bytes and device-memory samples are partial accounting, not total traffic or an allocation peak.",
       "Backend sums omit rectangular Butterfly operations, dense fronts and other sparse-solver work; compare whole-solver wall times separately.",
-      "CPU device-memory fields are null because the CPU path does not report them."
+      "CPU device-memory fields are null because the CPU path does not report them.",
+      "This run has 8 CPU and 6 GPU refinement iterations; inverse timings and invocation counts are not normalized for equal work."
     ],
-    "executable_sha256": "fa05f78a43f057c3da829a70cea2f4baafdf842aff7282498e6eefbd50ef77ad",
     "driver": "testPoisson3dMPIDist",
-    "slurm_state": "COMPLETED",
-    "slurm_exit_code": "0:0",
-    "elapsed_seconds": 112,
     "strumpack_cuda_dense_backend": false,
     "same_executable_for_cpu_and_gpu": true,
     "launch_arguments": [
@@ -211,6 +210,12 @@
       "relative_error_less_than": 1e-08,
       "scaled_residual_less_than": 1e-06,
       "minimum_hodlr_fronts": 2
-    }
+    },
+    "executable_sha256": "fa05f78a43f057c3da829a70cea2f4baafdf842aff7282498e6eefbd50ef77ad",
+    "slurm_state": "COMPLETED",
+    "slurm_exit_code": "0:0",
+    "elapsed_seconds": 119,
+    "gpu_model": "NVIDIA A100-SXM4-40GB",
+    "gpu_count": 4
   }
 }
