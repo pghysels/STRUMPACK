@@ -98,3 +98,59 @@ jobs:
           cd build
           cmake ../
           make
+
+  build-magma-no-mpi:
+    # Compile-only check of the MAGMA (GPU) code path in a build without MPI,
+    # a combination the test matrix above does not cover (see #156). No GPU is
+    # needed: CUDA, cuBLAS/cuSOLVER and MAGMA come prebuilt from conda-forge,
+    # and only the library is compiled (no tests or examples are run).
+    name: Build with MAGMA, without MPI (compile only)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install CUDA toolkit, MAGMA, BLAS/LAPACK and METIS from conda-forge
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: strumpack-magma
+          create-args: >-
+            cuda-version=12.6
+            cuda-nvcc cuda-cudart-dev libcublas-dev libcusolver-dev libcusparse-dev
+            libmagma libmagma-devel
+            libblas liblapack metis
+            cmake make cxx-compiler fortran-compiler
+          cache-environment: true
+
+      - name: Configure (MPI off, CUDA and MAGMA on)
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSTRUMPACK_USE_MPI=OFF \
+            -DSTRUMPACK_USE_OPENMP=ON \
+            -DSTRUMPACK_USE_CUDA=ON \
+            -DCMAKE_CUDA_ARCHITECTURES=80 \
+            -DTPL_ENABLE_MAGMA=ON \
+            -DTPL_MAGMA_PREFIX=$CONDA_PREFIX \
+            -DTPL_METIS_PREFIX=$CONDA_PREFIX \
+            -DTPL_ENABLE_PARMETIS=OFF \
+            -DTPL_ENABLE_SCOTCH=OFF \
+            -DTPL_ENABLE_PTSCOTCH=OFF \
+            -DTPL_ENABLE_BPACK=OFF \
+            -DTPL_ENABLE_ZFP=OFF \
+            -DTPL_ENABLE_SZ3=OFF \
+            -DTPL_ENABLE_SLATE=OFF \
+            -DTPL_ENABLE_COMBBLAS=OFF \
+            -DTPL_ENABLE_KBLAS=OFF \
+            -DTPL_ENABLE_PAPI=OFF
+
+      - name: Check that MAGMA was found and enabled
+        # STRUMPACK silently builds without MAGMA when it is not found
+        run: grep -q '^#define STRUMPACK_USE_MAGMA' build/StrumpackConfig.h
+
+      - name: Build library
+        run: cmake --build build --target strumpack -j 4
