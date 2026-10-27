@@ -42,11 +42,11 @@ namespace strumpack {
     template<typename integer> SeparatorTree<integer>
     gennd(integer neqns, integer* xadj, integer* adjncy, integer* perm);
 
-#if defined(STRUMPACK_USE_CUDA)
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
     template<typename integer> SeparatorTree<integer>
-    nd_bfs_cuda(integer neqns, integer* xadj, integer* adjncy,
-                std::vector<integer>& perm,
-                std::vector<integer>& iperm);
+    nd_bfs_gpu(integer neqns, integer* xadj, integer* adjncy,
+               std::vector<integer>& perm,
+               std::vector<integer>& iperm);
 #endif
 
     template<typename integer_t>
@@ -65,8 +65,8 @@ namespace strumpack {
       if (e==0)
         if (mpi_root())
           std::cerr << "# WARNING: matrix seems to be diagonal!" << std::endl;
-#if 0 //defined(STRUMPACK_USE_CUDA)
-      auto stree = nd_bfs_cuda(n, xadj.data(), adjncy.data(), iperm, perm);
+#if defined(STRUMPACK_USE_CUDA) || defined(STRUMPACK_USE_HIP)
+      auto stree = nd_bfs_gpu(n, xadj.data(), adjncy.data(), iperm, perm);
 #else
       auto stree = gennd(n, xadj.data(), adjncy.data(), iperm.data());
 #endif

@@ -30,6 +30,8 @@
 #include <string>
 #include <algorithm>
 #include <memory>
+#include <cstdio>
+#include <cstdlib>
 
 #include "MatrixReordering.hpp"
 
@@ -132,6 +134,22 @@ namespace strumpack {
       return 1;
     }
     tree_.check();
+    // STRUMPACK_DUMP_ORDERING=file: write the ordering and separator
+    // tree for offline analysis (results_nd/tools/front_stats.cpp).
+    // Format (64-bit ints): n, nseps, perm[n], iperm[n],
+    // sizes[nseps+1], parent[nseps].
+    if (auto fn = std::getenv("STRUMPACK_DUMP_ORDERING")) {
+      if (FILE* f = std::fopen(fn, "wb")) {
+        auto w = [&](long long v) { std::fwrite(&v, sizeof(v), 1, f); };
+        long long n = perm_.size(), ns = tree_.separators();
+        w(n); w(ns);
+        for (auto v : perm_) w(v);
+        for (auto v : iperm_) w(v);
+        for (long long i=0; i<=ns; i++) w(tree_.sizes[i]);
+        for (long long i=0; i<ns; i++) w(tree_.parent[i]);
+        std::fclose(f);
+      }
+    }
     nested_dissection_print(opts, A.nnz(), opts.verbose());
     return 0;
   }

@@ -16,6 +16,13 @@ if(STRUMPACK_USE_CUDA)
     ${CMAKE_CURRENT_LIST_DIR}/NDBFS.cu)
 endif()
 
+if(STRUMPACK_USE_HIP)
+  # NDBFS.hip includes NDBFS.cu, the implementation is shared
+  target_sources(strumpack
+    PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/NDBFS.hip)
+endif()
+
 install(FILES
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/sparse/ordering)
 
