@@ -822,7 +822,7 @@ namespace strumpack {
   (DenseM_t& b) const {
     if (dev_factors_) gpu_solve(b);
     else {
-      if (!mpi_rank())
+      if (mpi_root())
         std::cerr << "WARNING: Solve is performed on CPU" << std::endl;
       // factors are not on the device, solve on CPU
       Front<scalar_t,integer_t>::multifrontal_solve(b);
