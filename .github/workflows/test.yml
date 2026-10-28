@@ -32,6 +32,10 @@ jobs:
           export CC="gcc"
           printf "${BLUE} PG; Done installing gcc via apt\n"
 
+          printf "${BLUE} PG; Installing ccache via apt\n"
+          sudo apt-get install ccache -y
+          printf "${BLUE} PG; Done installing ccache via apt\n"
+
           printf "${BLUE} PG; Installing gfortran via apt\n"
           sudo apt-get install gfortran -y
           printf "${BLUE} PG; Done installing gfortran via apt\n"
@@ -52,11 +56,52 @@ jobs:
           sudo apt-get install libscalapack-mpi-dev
           printf "${BLUE} PG; Done installing ScaLAPACK from apt\n"
 
+      # Compiler cache. A compiler cache only helps when its directory survives
+      # from one build to the next. A developer building locally gets that for
+      # free (ccache's directory persists between builds), but every CI job
+      # starts on a fresh runner, so the cache has to be restored from a
+      # persistent store and saved back afterwards. actions/cache is GitHub's
+      # built-in store (10 GB per repository, LRU-evicted, no setup needed).
+      - name: Restore ccache directory
+        if: vars.USE_SCCACHE_S3 != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('CMakeLists.txt', 'src/**') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.compiler }}-
+
+      # OPTIONAL remote store, DISABLED by default: sccache with an S3 bucket
+      # instead of actions/cache, for when the GitHub cache is too small or a
+      # cache should be shared across repositories/CI systems. This is
+      # hypothetical infrastructure the project does not have today. To enable
+      # it, create the bucket, set the repository variable USE_SCCACHE_S3=true
+      # and add the secrets SCCACHE_BUCKET, SCCACHE_REGION, AWS_ACCESS_KEY_ID,
+      # AWS_SECRET_ACCESS_KEY (they are exported as environment variables in
+      # the build step below).
+      - name: Set up sccache (optional S3 remote store, off by default)
+        if: vars.USE_SCCACHE_S3 == 'true'
+        uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Use sccache as the compiler launcher
+        if: vars.USE_SCCACHE_S3 == 'true'
+        run: echo "COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+
       - name: Install package
+        env:
+          # ccache: make cache entries independent of the checkout directory
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          # sccache S3 remote (only used when USE_SCCACHE_S3 == 'true')
+          SCCACHE_BUCKET: ${{ secrets.SCCACHE_BUCKET }}
+          SCCACHE_REGION: ${{ secrets.SCCACHE_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           export BLUE="\033[34;1m"
           printf "${BLUE} PG; Installing STRUMPACK from source\n"
           cd $GITHUB_WORKSPACE
+          export CCACHE_DIR=$HOME/.cache/ccache
+          LAUNCHER=${COMPILER_LAUNCHER:-ccache}
+          $LAUNCHER --zero-stats
           rm -rf build
           mkdir -p build
           mkdir -p install
@@ -67,6 +112,9 @@ jobs:
             -DCMAKE_C_COMPILER=mpicc \
             -DCMAKE_CXX_COMPILER=mpic++ \
             -DCMAKE_Fortran_COMPILER=mpif90 \
+            -DCMAKE_C_COMPILER_LAUNCHER=$LAUNCHER \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=$LAUNCHER \
+            -DCMAKE_Fortran_COMPILER_LAUNCHER=$LAUNCHER \
             -DCMAKE_INSTALL_PREFIX=../install \
             -DCMAKE_BUILD_TYPE=Debug \
             -DTPL_SCALAPACK_LIBRARIES='/usr/lib/x86_64-linux-gnu/libscalapack-openmpi.so' \
@@ -75,6 +123,7 @@ jobs:
           make install
           make examples
           printf "${BLUE} PG; Done installing STRUMPACK from source\n"
+          $LAUNCHER --show-stats
           cd ../
           export STRUMPACK_DIR=`pwd`/install
           cd test/build_external/
