@@ -44,6 +44,7 @@ namespace strumpack {
   namespace BLR {
     template<typename scalar_t> class BLRMatrixMPI;
   }
+  namespace trsmnarrow { struct Cache; }
 
   template<typename scalar_t,typename integer_t>
   class FrontDenseMPI : public FrontMPI<scalar_t,integer_t> {
@@ -131,6 +132,10 @@ namespace strumpack {
     // right-hand side in the forward solve, built at the first solve
     // after each factorization
     mutable LaswpPlan laswp_plan_;
+
+    // Copies of blocks of F11 used by the triangular solves with narrow
+    // right-hand sides (lower, upper), rebuilt after each factorization.
+    mutable std::shared_ptr<trsmnarrow::Cache> trsm_cache_[2];
 
     void build_front(const SpMat_t& A);
     ReturnCode partial_factorization(const SPOptions<scalar_t>& opts);

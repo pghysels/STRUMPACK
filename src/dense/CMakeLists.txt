@@ -32,6 +32,7 @@ if(STRUMPACK_USE_MPI)
     ${CMAKE_CURRENT_LIST_DIR}/DistributedVector.hpp
     ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.hpp
     ${CMAKE_CURRENT_LIST_DIR}/DistributedMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/DistTrsmNarrow.hpp
     ${CMAKE_CURRENT_LIST_DIR}/ScaLAPACKWrapper.hpp)
 
   install(FILES
