@@ -247,6 +247,20 @@ namespace strumpack {
     integer_t lo = dist[rank_];
     integer_t m = dist[rank_+1] - lo, n = x.cols();
 
+    // The redistribution of the right-hand side to/from the
+    // elimination tree layout only depends on the tree, the row
+    // distribution and the number of right-hand sides. The first
+    // solve with a given number of right-hand sides exchanges
+    // (row,col,value) triplets and records the pattern. Subsequent
+    // solves only exchange the values.
+    auto& sp = solve_perm_[n];
+    if (sp.ready && sp.m == m) {
+      multifrontal_solve_dist_cached(x, sp);
+      return;
+    }
+    sp = SolvePerm();
+    sp.m = m;
+
     std::unique_ptr<int[]> iwork(new int[4*P_]);
     auto ibuf = iwork.get();
     auto scnts = ibuf;
@@ -256,6 +270,8 @@ namespace strumpack {
 
     using Triplet = Triplet<scalar_t,integer_t>;
     std::vector<Triplet> sbuf(m*n);
+    sp.in_src_r.resize(m*n);
+    sp.in_src_c.resize(m*n);
     std::fill(scnts, scnts+P_, 0);
     if (n == 1)
       for (integer_t r=0; r<m; r++)
@@ -278,34 +294,43 @@ namespace strumpack {
       pp[p] = sdispls[p] = sdispls[p-1] + scnts[p-1];
     if (n == 1) {
       const auto perm = nd_.perm().data() + lo;
-      for (integer_t r=0; r<m; r++)
-        sbuf[pp[row_owner_[r]]++] = {perm[r], 0, x(r,0)};
+      for (integer_t r=0; r<m; r++) {
+        auto k = pp[row_owner_[r]]++;
+        sbuf[k] = {perm[r], 0, x(r,0)};
+        sp.in_src_r[k] = r;
+        sp.in_src_c[k] = 0;
+      }
     } else {
       for (integer_t r=0; r<m; r++) {
         auto destr = row_owner_[r];
         auto permr = nd_.perm()[r+lo];
         int pf = row_pfront_[permr];
         if (pf < 0)
-          for (integer_t c=0; c<n; c++)
-            sbuf[pp[destr]++] = {permr, c, x(r,c)};
+          for (integer_t c=0; c<n; c++) {
+            auto k = pp[destr]++;
+            sbuf[k] = {permr, c, x(r,c)};
+            sp.in_src_r[k] = r;
+            sp.in_src_c[k] = c;
+          }
         else {
           auto& f = all_pfronts_[pf];
-          for (integer_t c=0; c<n; c++)
-            sbuf[pp[destr+((c/B)%f.pcols)*f.prows]++] =
-              {permr, c, x(r,c)};
+          for (integer_t c=0; c<n; c++) {
+            auto k = pp[destr+((c/B)%f.pcols)*f.prows]++;
+            sbuf[k] = {permr, c, x(r,c)};
+            sp.in_src_r[k] = r;
+            sp.in_src_c[k] = c;
+          }
         }
       }
     }
-    auto& rc = solve_rcnts_[n];
-    if (rc.size() == std::size_t(P_))
-      std::copy(rc.begin(), rc.end(), rcnts);
-    else {
-      comm_.all_to_all(scnts, 1, rcnts);
-      rc.assign(rcnts, rcnts+P_);
-    }
+    comm_.all_to_all(scnts, 1, rcnts);
     rdispls[0] = 0;
     for (int p=1; p<P_; p++)
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
+    sp.scnts.assign(scnts, scnts+P_);
+    sp.sdispls.assign(sdispls, sdispls+P_);
+    sp.rcnts.assign(rcnts, rcnts+P_);
+    sp.rdispls.assign(rdispls, rdispls+P_);
 
     auto rbuf = comm_.all_to_allv
       (sbuf.data(), scnts, sdispls, rcnts, rdispls);
@@ -319,16 +344,26 @@ namespace strumpack {
       xdist[f] = DistM_t
         (local_pfronts_[f].grid, local_pfronts_[f].dim_sep(), n);
     auto rsize = rbuf.size();
+    // -2: no destination (dropped, as in the uncached path), -1: local
+    // subtree, f >= 0: local parallel front f
+    sp.in_dst_f.assign(rsize, -2);
+    sp.in_dst_off.assign(rsize, 0);
 #pragma omp parallel for
     for (std::size_t i=0; i<rsize; i++) {
       integer_t r = rbuf[i].r, c = rbuf[i].c;
-      if (r >= local_range_.first && r < local_range_.second)
-        Xloc(r, c) = rbuf[i].v;
-      else {
+      if (r >= local_range_.first && r < local_range_.second) {
+        auto& xrc = Xloc(r, c);
+        xrc = rbuf[i].v;
+        sp.in_dst_f[i] = -1;
+        sp.in_dst_off[i] = &xrc - xloc.data();
+      } else {
         for (std::size_t f=0; f<local_pfronts_.size(); f++)
           if (r >= local_pfronts_[f].sep_begin &&
               r < local_pfronts_[f].sep_end) {
-            xdist[f].global(r - local_pfronts_[f].sep_begin, c) = rbuf[i].v;
+            auto& xrc = xdist[f].global(r - local_pfronts_[f].sep_begin, c);
+            xrc = rbuf[i].v;
+            sp.in_dst_f[i] = f;
+            sp.in_dst_off[i] = &xrc - xdist[f].data();
             break;
           }
       }
@@ -342,12 +377,19 @@ namespace strumpack {
     sdispls = ibuf + 3*P_;
     for (int p=0; p<P_; p++)
       pp[p] = sdispls[p];
+    sp.out_src_f.resize(rsize);
+    sp.out_src_off.resize(rsize);
     for (integer_t r=local_range_.first; r<local_range_.second; r++) {
       auto dest = std::upper_bound
         (dist.begin(), dist.end(), nd_.iperm()[r])-dist.begin()-1;
       auto permgr = nd_.iperm()[r];
-      for (integer_t c=0; c<n; c++)
-        rbuf[pp[dest]++] = {permgr, c, Xloc(r,c)};
+      for (integer_t c=0; c<n; c++) {
+        auto k = pp[dest]++;
+        auto& xrc = Xloc(r,c);
+        rbuf[k] = {permgr, c, xrc};
+        sp.out_src_f[k] = -1;
+        sp.out_src_off[k] = &xrc - xloc.data();
+      }
     }
     for (std::size_t i=0; i<local_pfronts_.size(); i++) {
       if (xdist[i].lcols() == 0) continue;
@@ -356,18 +398,68 @@ namespace strumpack {
         auto permgr = nd_.iperm()[xdist[i].rowl2g(r) + slo];
         auto dest = std::upper_bound
           (dist.begin(), dist.end(), permgr)-dist.begin()-1;
-        for (int c=0; c<xdist[i].lcols(); c++)
-          rbuf[pp[dest]++] = {permgr, xdist[i].coll2g(c), xdist[i](r,c)};
+        for (int c=0; c<xdist[i].lcols(); c++) {
+          auto k = pp[dest]++;
+          auto& xrc = xdist[i](r,c);
+          rbuf[k] = {permgr, xdist[i].coll2g(c), xrc};
+          sp.out_src_f[k] = i;
+          sp.out_src_off[k] = &xrc - xdist[i].data();
+        }
       }
     }
     comm_.all_to_allv
       (rbuf.data(), scnts, sdispls, sbuf.data(), rcnts, rdispls);
 
+    sp.out_dst_r.resize(std::size_t(m)*n);
+    sp.out_dst_c.resize(std::size_t(m)*n);
 #pragma omp parallel for
-    for (std::size_t i=0; i<std::size_t(m)*n; i++)
+    for (std::size_t i=0; i<std::size_t(m)*n; i++) {
       x(sbuf[i].r-lo,sbuf[i].c) = sbuf[i].v;
+      sp.out_dst_r[i] = sbuf[i].r-lo;
+      sp.out_dst_c[i] = sbuf[i].c;
+    }
+    sp.ready = true;
 
     Triplet::free_mpi_type();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_solve_dist_cached
+  (DenseM_t& x, const SolvePerm& sp) {
+    auto n = x.cols();
+    std::vector<scalar_t> sval(sp.in_src_r.size()), rval(sp.in_dst_f.size());
+    for (std::size_t k=0; k<sval.size(); k++)
+      sval[k] = x(sp.in_src_r[k], sp.in_src_c[k]);
+    comm_.all_to_allv
+      (sval.data(), const_cast<int*>(sp.scnts.data()),
+       const_cast<int*>(sp.sdispls.data()), rval.data(),
+       const_cast<int*>(sp.rcnts.data()), const_cast<int*>(sp.rdispls.data()));
+
+    DenseM_t xloc(local_range_.second - local_range_.first, n);
+    DenseMW_t Xloc
+      (Aprop_.size(), n, xloc.data()-local_range_.first, xloc.ld());
+    std::vector<DistM_t> xdist(local_pfronts_.size());
+    for (std::size_t f=0; f<local_pfronts_.size(); f++)
+      xdist[f] = DistM_t
+        (local_pfronts_[f].grid, local_pfronts_[f].dim_sep(), n);
+    for (std::size_t i=0; i<rval.size(); i++) {
+      auto f = sp.in_dst_f[i];
+      if (f < -1) continue;
+      (f < 0 ? xloc.data() : xdist[f].data())[sp.in_dst_off[i]] = rval[i];
+    }
+
+    this->root_->multifrontal_solve(Xloc, xdist.data());
+
+    for (std::size_t k=0; k<rval.size(); k++) {
+      auto f = sp.out_src_f[k];
+      rval[k] = (f < 0 ? xloc.data() : xdist[f].data())[sp.out_src_off[k]];
+    }
+    comm_.all_to_allv
+      (rval.data(), const_cast<int*>(sp.rcnts.data()),
+       const_cast<int*>(sp.rdispls.data()), sval.data(),
+       const_cast<int*>(sp.scnts.data()), const_cast<int*>(sp.sdispls.data()));
+    for (std::size_t i=0; i<sval.size(); i++)
+      x(sp.out_dst_r[i], sp.out_dst_c[i]) = sval[i];
   }
 
   template<typename integer_t, typename It>

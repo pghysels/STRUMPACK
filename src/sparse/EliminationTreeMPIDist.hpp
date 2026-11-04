@@ -106,10 +106,30 @@ namespace strumpack {
     void find_row_front(const CSRMPI_t& A);
 
     /**
-     * receive counts for the redistribution of the right-hand side
-     * in multifrontal_solve_dist, per number of right-hand sides
+     * Communication pattern for the redistribution of the
+     * right-hand side to/from the tree layout in
+     * multifrontal_solve_dist, per number of right-hand sides.
      */
-    std::map<int,std::vector<int>> solve_rcnts_;
+    struct SolvePerm {
+      bool ready = false;
+      integer_t m = 0;
+      std::vector<int> scnts, sdispls, rcnts, rdispls;
+      // source (row,col) in x of each value sent to the tree layout
+      std::vector<integer_t> in_src_r;
+      std::vector<int> in_src_c;
+      // destination of each value received in the tree layout:
+      // local front index (-1: local subtree) and offset
+      std::vector<int> in_dst_f;
+      std::vector<std::size_t> in_dst_off;
+      // source of each value sent back, same encoding as in_dst_*
+      std::vector<int> out_src_f;
+      std::vector<std::size_t> out_src_off;
+      // destination (row,col) in x of each value received back
+      std::vector<integer_t> out_dst_r;
+      std::vector<int> out_dst_c;
+    };
+    std::map<int,SolvePerm> solve_perm_;
+    void multifrontal_solve_dist_cached(DenseM_t& x, const SolvePerm& sp);
 
     struct ParallelFront {
       ParallelFront() {}
