@@ -28,6 +28,7 @@
  */
 #include <fstream>
 
+#include <numeric>
 #include "FrontDenseMPI.hpp"
 #include "FrontBLRMPI.hpp"
 #include "ExtendAdd.hpp"
@@ -150,6 +151,7 @@ namespace strumpack {
   FrontDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
     ReturnCode err_code = ReturnCode::SUCCESS;
+    laswp_plan_ = LaswpPlan(); // pivots change with every factorization
     if (!this->dim_sep() || !grid()->active())
       return err_code;
     TaskTimer pf("FrontDenseMPI_factor");
@@ -306,6 +308,107 @@ namespace strumpack {
 #endif
 
   template<typename scalar_t,typename integer_t> void
+  FrontDenseMPI<scalar_t,integer_t>::laswp_fwd(DistM_t& b) const {
+    // Same result as b.laswp(piv, true): the sequence of row swaps is
+    // composed into a permutation once, then applied with a single
+    // exchange between the process rows of each process column.
+    auto& lp = laswp_plan_;
+    // The pivots are distributed like the rows of F11, the plan indexes
+    // b: same process grid and row blocking as F11 (as for b.laswp)
+    assert(b.grid() == F11_.grid() && b.MB() == F11_.MB() &&
+           b.rows() == F11_.rows());
+    const int nprows = grid()->nprows(), prow = grid()->prow(),
+      pcol = grid()->pcol();
+    const auto& comm = grid()->Comm_active();
+    if (!lp.ready) {
+      const int ds = this->dim_sep(), lr = F11_.lrows();
+      // gather the (global) pivots of all process rows (process column 0)
+      std::vector<int> mine;
+      if (pcol == 0)
+        for (int i=0; i<lr; i++) {
+          mine.push_back(F11_.rowl2g(i));
+          mine.push_back(piv[i]-1);
+        }
+      int cnt = mine.size(), P = comm.size();
+      std::vector<int> cnts(P), displs(P);
+      MPI_Allgather(&cnt, 1, MPI_INT, cnts.data(), 1, MPI_INT, comm.comm());
+      int tot = 0;
+      for (int p=0; p<P; p++) { displs[p] = tot; tot += cnts[p]; }
+      std::vector<int> all(tot);
+      MPI_Allgatherv(mine.data(), cnt, MPI_INT, all.data(), cnts.data(),
+                     displs.data(), MPI_INT, comm.comm());
+      std::vector<int> gpiv(ds);
+      std::iota(gpiv.begin(), gpiv.end(), 0);
+      for (int t=0; t<tot; t+=2) gpiv[all[t]] = all[t+1];
+      // b_new(k) = b_old(src[k])
+      std::vector<int> src(ds);
+      std::iota(src.begin(), src.end(), 0);
+      for (int k=0; k<ds; k++) std::swap(src[k], src[gpiv[k]]);
+      std::vector<int> spos(nprows, -1), rpos(nprows, -1);
+      for (int k=0; k<ds; k++) {
+        int pd = b.rowg2p(k), ps = b.rowg2p(src[k]);
+        if (pd == prow && ps == prow) {
+          if (src[k] != k)
+            lp.loc.emplace_back(b.rowg2l(k), b.rowg2l(src[k]));
+        } else if (pd == prow) {
+          if (rpos[ps] < 0) {
+            rpos[ps] = lp.rprow.size(); lp.rprow.push_back(ps);
+            lp.ridx.emplace_back();
+          }
+          lp.ridx[rpos[ps]].push_back(b.rowg2l(k));
+        } else if (ps == prow) {
+          if (spos[pd] < 0) {
+            spos[pd] = lp.sprow.size(); lp.sprow.push_back(pd);
+            lp.sidx.emplace_back();
+          }
+          lp.sidx[spos[pd]].push_back(b.rowg2l(src[k]));
+        }
+      }
+      lp.ready = true;
+    }
+    const int lc = b.lcols();
+    if (!lc) return;
+    const int tag = 7357;
+    std::vector<std::vector<scalar_t>> sbuf(lp.sprow.size()),
+      rbuf(lp.rprow.size());
+    std::vector<MPI_Request> reqs(lp.sprow.size() + lp.rprow.size());
+    int nr = 0;
+    for (std::size_t q=0; q<lp.rprow.size(); q++) {
+      rbuf[q].resize(lp.ridx[q].size() * lc);
+      MPI_Irecv(rbuf[q].data(), rbuf[q].size(), mpi_type<scalar_t>(),
+                lp.rprow[q] + pcol * nprows, tag, comm.comm(), &reqs[nr++]);
+    }
+    for (std::size_t q=0; q<lp.sprow.size(); q++) {
+      auto& sb = sbuf[q];
+      const auto& I = lp.sidx[q];
+      sb.resize(I.size() * lc);
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<I.size(); t++)
+          sb[t + c*I.size()] = b(I[t], c);
+      MPI_Isend(sb.data(), sb.size(), mpi_type<scalar_t>(),
+                lp.sprow[q] + pcol * nprows, tag, comm.comm(), &reqs[nr++]);
+    }
+    if (!lp.loc.empty()) {
+      std::vector<scalar_t> tmp(lp.loc.size() * lc);
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<lp.loc.size(); t++)
+          tmp[t + c*lp.loc.size()] = b(lp.loc[t].second, c);
+      // all sends are packed already, safe to overwrite b
+      MPI_Waitall(nr, reqs.data(), MPI_STATUSES_IGNORE);
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<lp.loc.size(); t++)
+          b(lp.loc[t].first, c) = tmp[t + c*lp.loc.size()];
+    } else
+      MPI_Waitall(nr, reqs.data(), MPI_STATUSES_IGNORE);
+    for (std::size_t q=0; q<lp.rprow.size(); q++) {
+      const auto& I = lp.ridx[q];
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<I.size(); t++)
+          b(I[t], c) = rbuf[q][t + c*I.size()];
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   FrontDenseMPI<scalar_t,integer_t>::fwd_solve_phase2
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
    DistM_t& b, DistM_t& bupd) const {
@@ -335,7 +438,7 @@ namespace strumpack {
     }
 #else
     if (this->dim_sep()) {
-      b.laswp(piv, true);
+      laswp_fwd(b);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11, b);
         if (this->dim_upd())
@@ -510,6 +613,7 @@ namespace strumpack {
   FrontDenseMPI<scalar_t,integer_t>::delete_factors() {
     if (visit(lchild_)) lchild_->delete_factors();
     if (visit(rchild_)) rchild_->delete_factors();
+    laswp_plan_ = LaswpPlan();
     F11_ = DistM_t();
     F12_ = DistM_t();
     F21_ = DistM_t();

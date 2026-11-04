@@ -440,6 +440,11 @@ namespace strumpack {
     std::vector<integer_t> upd_;
     std::unique_ptr<F_t> lchild_, rchild_;
 
+    // cached result of upd_to_parent, used in the solve phase
+    mutable std::vector<std::size_t> upd2pa_;
+    mutable std::size_t upd2pa_sep_ = 0;
+    mutable const F_t* upd2pa_parent_ = nullptr;
+
     virtual long long node_factor_nonzeros() const {
       return dense_node_factor_nonzeros();
     }

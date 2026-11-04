@@ -127,6 +127,18 @@ namespace strumpack {
     DistM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv;
 
+    // Cached communication plan to apply the row interchanges (piv)
+    // to the right-hand side in the forward solve.
+    struct LaswpPlan {
+      bool ready = false;
+      std::vector<int> sprow, rprow;          // peer process rows
+      std::vector<std::vector<int>> sidx;     // local rows to send
+      std::vector<std::vector<int>> ridx;     // local rows to receive
+      std::vector<std::pair<int,int>> loc;    // local (dst,src) rows
+    };
+    mutable LaswpPlan laswp_plan_;
+    void laswp_fwd(DistM_t& b) const;
+
     void build_front(const SpMat_t& A);
     ReturnCode partial_factorization(const SPOptions<scalar_t>& opts);
 
