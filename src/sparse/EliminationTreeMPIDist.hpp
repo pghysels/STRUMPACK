@@ -30,6 +30,7 @@
 #define ELIMINATION_TREE_MPI_DIST_HPP
 
 #include <cstddef>
+#include <map>
 
 #include "EliminationTreeMPI.hpp"
 #include "PropMapSparseMatrix.hpp"
@@ -103,6 +104,12 @@ namespace strumpack {
      */
     std::vector<int> row_pfront_;
     void find_row_front(const CSRMPI_t& A);
+
+    /**
+     * receive counts for the redistribution of the right-hand side
+     * in multifrontal_solve_dist, per number of right-hand sides
+     */
+    std::map<int,std::vector<int>> solve_rcnts_;
 
     struct ParallelFront {
       ParallelFront() {}

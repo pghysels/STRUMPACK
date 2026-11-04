@@ -296,7 +296,13 @@ namespace strumpack {
         }
       }
     }
-    comm_.all_to_all(scnts, 1, rcnts);
+    auto& rc = solve_rcnts_[n];
+    if (rc.size() == std::size_t(P_))
+      std::copy(rc.begin(), rc.end(), rcnts);
+    else {
+      comm_.all_to_all(scnts, 1, rcnts);
+      rc.assign(rcnts, rcnts+P_);
+    }
     rdispls[0] = 0;
     for (int p=1; p<P_; p++)
       rdispls[p] = rdispls[p-1] + rcnts[p-1];
