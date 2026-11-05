@@ -150,6 +150,7 @@ namespace strumpack {
   FrontDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
     ReturnCode err_code = ReturnCode::SUCCESS;
+    laswp_plan_ = LaswpPlan(); // pivots change with every factorization
     if (!this->dim_sep() || !grid()->active())
       return err_code;
     TaskTimer pf("FrontDenseMPI_factor");
@@ -335,7 +336,8 @@ namespace strumpack {
     }
 #else
     if (this->dim_sep()) {
-      b.laswp(piv, true);
+      if (!laswp_plan_.ready()) laswp_plan_ = F11.laswp_plan(piv);
+      b.laswp(laswp_plan_);
       if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11, b);
         if (this->dim_upd())
@@ -510,6 +512,7 @@ namespace strumpack {
   FrontDenseMPI<scalar_t,integer_t>::delete_factors() {
     if (visit(lchild_)) lchild_->delete_factors();
     if (visit(rchild_)) rchild_->delete_factors();
+    laswp_plan_ = LaswpPlan();
     F11_ = DistM_t();
     F12_ = DistM_t();
     F21_ = DistM_t();

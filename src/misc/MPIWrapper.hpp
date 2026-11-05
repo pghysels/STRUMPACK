@@ -609,6 +609,49 @@ namespace strumpack {
     }
 
     /**
+     * Same as all_to_allv, but for sparse communication patterns,
+     * where each rank sends to and receives from few other ranks:
+     * only the non-empty messages are exchanged, with point-to-point
+     * messages (the counts must be known on both sides), while
+     * MPI_Alltoallv implementations take O(P) steps.
+     */
+    template<typename T, typename A=std::allocator<T>> std::vector<T,A>
+    all_to_allv_sparse(const T* sbuf, const int* scnts, const int* sdispls,
+                       const int* rcnts, const int* rdispls) const {
+      std::size_t rsize = 0;
+      for (int p=0; p<size(); p++)
+        rsize += rcnts[p];
+      std::vector<T,A> rbuf(rsize);
+      all_to_allv_sparse(sbuf, scnts, sdispls, rbuf.data(), rcnts, rdispls);
+      return rbuf;
+    }
+
+    template<typename T> void
+    all_to_allv_sparse(const T* sbuf, const int* scnts, const int* sdispls,
+                       T* rbuf, const int* rcnts, const int* rdispls) const {
+      // Unlike the collective, the point-to-point messages share the
+      // matching space of the communicator: use a tag of their own,
+      // and all messages are completed before returning.
+      constexpr int tag = 30217;
+      auto P = size();
+      int r = rank(), nreqs = 0;
+      std::unique_ptr<MPI_Request[]> reqs(new MPI_Request[2*P]);
+      for (int p=0; p<P; p++) {
+        auto src = (r + p) % P;
+        if (rcnts[src])
+          MPI_Irecv(rbuf + rdispls[src], rcnts[src], mpi_type<T>(), src, tag,
+                    comm_, reqs.get()+nreqs++);
+      }
+      for (int p=0; p<P; p++) {
+        auto dst = (r + p) % P;
+        if (scnts[dst])
+          MPI_Isend(sbuf + sdispls[dst], scnts[dst], mpi_type<T>(), dst, tag,
+                    comm_, reqs.get()+nreqs++);
+      }
+      MPI_Waitall(nreqs, reqs.get(), MPI_STATUSES_IGNORE);
+    }
+
+    /**
      * Perform an MPI_Alltoallv. Each rank sends sbuf[i] to process
      * i. The results are received in a single contiguous vector
      * rbuf. pbuf has pointers into rbuf, with pbuf[i] pointing to the
@@ -629,6 +672,22 @@ namespace strumpack {
     all_to_all_v(std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
                  std::vector<T*>& pbuf) const {
       all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>());
+    }
+
+    /**
+     * Same as above, but the receive sizes are taken from rsizes if
+     * rsizes.size() == size(). Otherwise they are computed (with an
+     * MPI_Alltoall) and stored in rsizes, so they can be reused when
+     * the same communication pattern is repeated. The caller must
+     * guarantee that the send sizes are unchanged whenever the cache
+     * is used, and all ranks must have the same cache state (else the
+     * MPI_Alltoall hangs): the caches are owned by the fronts and
+     * trees whose structure determines the sizes.
+     */
+    template<typename T, typename A=std::allocator<T>> void
+    all_to_all_v(std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
+                 std::vector<T*>& pbuf, std::vector<int>& rsizes) const {
+      all_to_all_v(sbuf, rbuf, pbuf, mpi_type<T>(), &rsizes);
     }
 
     /**
@@ -671,7 +730,8 @@ namespace strumpack {
      */
     template<typename T, typename A=std::allocator<T>> void
     all_to_all_v(std::vector<std::vector<T>>& sbuf, std::vector<T,A>& rbuf,
-                 std::vector<T*>& pbuf, const MPI_Datatype Ttype) const {
+                 std::vector<T*>& pbuf, const MPI_Datatype Ttype,
+                 std::vector<int>* rsizes_cache=nullptr) const {
       assert(sbuf.size() == std::size_t(size()));
       auto P = size();
       std::unique_ptr<int[]> iwork(new int[4*P]);
@@ -688,8 +748,13 @@ namespace strumpack {
         }
         ssizes[p] = sbuf[p].size();
       }
-      MPI_Alltoall
-        (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
+      if (rsizes_cache && rsizes_cache->size() == std::size_t(P))
+        std::copy(rsizes_cache->begin(), rsizes_cache->end(), rsizes);
+      else {
+        MPI_Alltoall
+          (ssizes, 1, mpi_type<int>(), rsizes, 1, mpi_type<int>(), comm_);
+        if (rsizes_cache) rsizes_cache->assign(rsizes, rsizes+P);
+      }
       std::size_t totssize = std::accumulate(ssizes, ssizes+P, std::size_t(0)),
         totrsize = std::accumulate(rsizes, rsizes+P, std::size_t(0));
 #if 1
@@ -715,19 +780,26 @@ namespace strumpack {
         std::unique_ptr<MPI_Request[]> reqs(new MPI_Request[2*P]);
         std::size_t displ = 0;
         pbuf.resize(P);
-        int r = rank();
+        int r = rank(), nreqs = 0;
+        // Only post messages that carry data: the sizes are known on
+        // both sides after the MPI_Alltoall above, so empty messages
+        // are skipped (avoids O(P^2) zero-byte messages on large
+        // communicators).
         for (int p=0; p<P; p++) {
           auto dst = (r + p) % P;
           pbuf[dst] = rbuf.data() + displ;
-          MPI_Irecv(pbuf[dst], rsizes[dst], Ttype, dst, 0, comm_, reqs.get()+dst);
+          if (rsizes[dst])
+            MPI_Irecv(pbuf[dst], rsizes[dst], Ttype, dst, 0, comm_,
+                      reqs.get()+nreqs++);
           displ += rsizes[dst];
         }
         for (int p=0; p<P; p++) {
           auto dst = (r + p) % P;
-          MPI_Isend
-            (sbuf[dst].data(), ssizes[dst], Ttype, dst, 0, comm_, reqs.get()+P+dst);
+          if (ssizes[dst])
+            MPI_Isend(sbuf[dst].data(), ssizes[dst], Ttype, dst, 0, comm_,
+                      reqs.get()+nreqs++);
         }
-        MPI_Waitall(2*P, reqs.get(), MPI_STATUSES_IGNORE);
+        MPI_Waitall(nreqs, reqs.get(), MPI_STATUSES_IGNORE);
         std::vector<std::vector<T>>().swap(sbuf);
       } else {
         std::unique_ptr<T[]> sendbuf_(new T[totssize]);

@@ -31,6 +31,7 @@
 
 #include "Front.hpp"
 
+#include <map>
 #include "misc/MPIWrapper.hpp"
 #include "dense/DistributedMatrix.hpp"
 
@@ -154,6 +155,10 @@ namespace strumpack {
 
   protected:
     BLACSGrid blacs_grid_;     // 2D processor grid
+
+    // receive sizes for the extend_add_b/extract_b exchanges, per
+    // number of right-hand sides, reused for repeated solves
+    mutable std::map<int,std::vector<int>> ea_b_rsizes_, ex_b_rsizes_;
 
     virtual long long node_factor_nonzeros() const override;
 

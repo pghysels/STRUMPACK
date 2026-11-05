@@ -154,8 +154,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> inline void
   Front<scalar_t,integer_t>::extend_add_b
   (DenseM_t& b, DenseM_t& bupd, const DenseM_t& CB, const F_t* pa) const {
-    std::size_t upd2sep;
-    auto I = upd_to_parent(pa, upd2sep);
+    if (upd2pa_.size() != std::size_t(dim_upd()) || upd2pa_parent_ != pa) {
+      upd2pa_ = upd_to_parent(pa, upd2pa_sep_);
+      upd2pa_parent_ = pa;
+    }
+    const auto upd2sep = upd2pa_sep_;
+    const auto& I = upd2pa_;
     for (std::size_t c=0; c<b.cols(); c++) {
       for (std::size_t r=0; r<upd2sep; r++)
         b(I[r]+pa->sep_begin_, c) += CB(r, c);
@@ -178,8 +182,12 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   Front<scalar_t,integer_t>::extract_b
   (const DenseM_t& y, const DenseM_t& yupd, DenseM_t& CB, const F_t* pa) const {
-    std::size_t upd2sep;
-    auto I = upd_to_parent(pa, upd2sep);
+    if (upd2pa_.size() != std::size_t(dim_upd()) || upd2pa_parent_ != pa) {
+      upd2pa_ = upd_to_parent(pa, upd2pa_sep_);
+      upd2pa_parent_ = pa;
+    }
+    const auto upd2sep = upd2pa_sep_;
+    const auto& I = upd2pa_;
     for (std::size_t c=0; c<y.cols(); c++) {
       for (std::size_t r=0; r<upd2sep; r++)
         CB(r,c) = y(I[r]+pa->sep_begin_, c);

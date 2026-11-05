@@ -127,6 +127,11 @@ namespace strumpack {
     DistM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv;
 
+    // row interchanges (piv) as one permutation, applied to the
+    // right-hand side in the forward solve, built at the first solve
+    // after each factorization
+    mutable LaswpPlan laswp_plan_;
+
     void build_front(const SpMat_t& A);
     ReturnCode partial_factorization(const SPOptions<scalar_t>& opts);
 

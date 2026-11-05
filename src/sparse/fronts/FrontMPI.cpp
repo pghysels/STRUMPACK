@@ -188,7 +188,7 @@ namespace strumpack {
       rchild_->extend_add_column_copy_to_buffers(CBr, seqCBr, sbuf, this);
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
-    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    Comm().all_to_all_v(sbuf, rbuf, pbuf, ea_b_rsizes_[b.cols()]);
     for (auto& ch : {lchild_.get(), rchild_.get()})
       if (ch) ch->extend_add_column_copy_from_buffers
                 (b, bupd, pbuf.data()+master(ch), this);
@@ -213,7 +213,7 @@ namespace strumpack {
                 (b, bupd, master(ch), sbuf, this);
     std::vector<scalar_t,NoInit<scalar_t>> rbuf;
     std::vector<scalar_t*> pbuf;
-    Comm().all_to_all_v(sbuf, rbuf, pbuf);
+    Comm().all_to_all_v(sbuf, rbuf, pbuf, ex_b_rsizes_[b.cols()]);
     if (visit(lchild_))
       lchild_->extract_column_copy_from_buffers(b, CBl, seqCBl, pbuf, this);
     if (visit(rchild_))

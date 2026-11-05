@@ -29,6 +29,7 @@
 #include <limits>
 #include <iomanip>
 #include <fstream>
+#include <numeric>
 
 #include "StrumpackConfig.hpp"
 #include "DistributedMatrix.hpp"
@@ -589,6 +590,112 @@ namespace strumpack {
     scalapack::plapiv
       (fwd ? 'F' : 'B', 'R', 'C', rows(), cols(), data(), I(), J(), desc(),
        P.data(), 1, 1, descip, NULL);
+  }
+
+  template<typename scalar_t> LaswpPlan
+  DistributedMatrix<scalar_t>::laswp_plan(const std::vector<int>& P) const {
+    LaswpPlan lp;
+    if (!active()) return lp;
+    const int nprows = this->nprows(), prow = this->prow(),
+      pcol = this->pcol(), m = rows(), lr = lrows();
+    const auto& comm = grid()->Comm_active();
+    // gather the (global) pivots of all process rows (the pivots are
+    // replicated over the process columns, take process column 0)
+    std::vector<int> mine;
+    if (pcol == 0)
+      for (int i=0; i<lr; i++) {
+        mine.push_back(rowl2g(i));
+        mine.push_back(P[i]-1);
+      }
+    int cnt = mine.size(), np = comm.size();
+    std::vector<int> cnts(np), displs(np);
+    MPI_Allgather(&cnt, 1, MPI_INT, cnts.data(), 1, MPI_INT, comm.comm());
+    int tot = 0;
+    for (int p=0; p<np; p++) { displs[p] = tot; tot += cnts[p]; }
+    std::vector<int> all(tot);
+    MPI_Allgatherv(mine.data(), cnt, MPI_INT, all.data(), cnts.data(),
+                   displs.data(), MPI_INT, comm.comm());
+    std::vector<int> gpiv(m);
+    std::iota(gpiv.begin(), gpiv.end(), 0);
+    for (int t=0; t<tot; t+=2) gpiv[all[t]] = all[t+1];
+    // the sequence of interchanges as one permutation:
+    // new row k = old row src[k]
+    std::vector<int> src(m);
+    std::iota(src.begin(), src.end(), 0);
+    for (int k=0; k<m; k++) std::swap(src[k], src[gpiv[k]]);
+    std::vector<int> spos(nprows, -1), rpos(nprows, -1);
+    for (int k=0; k<m; k++) {
+      int pd = rowg2p(k), ps = rowg2p(src[k]);
+      if (pd == prow && ps == prow) {
+        if (src[k] != k)
+          lp.loc_.emplace_back(rowg2l(k), rowg2l(src[k]));
+      } else if (pd == prow) {
+        if (rpos[ps] < 0) {
+          rpos[ps] = lp.rprow_.size(); lp.rprow_.push_back(ps);
+          lp.ridx_.emplace_back();
+        }
+        lp.ridx_[rpos[ps]].push_back(rowg2l(k));
+      } else if (ps == prow) {
+        if (spos[pd] < 0) {
+          spos[pd] = lp.sprow_.size(); lp.sprow_.push_back(pd);
+          lp.sidx_.emplace_back();
+        }
+        lp.sidx_[spos[pd]].push_back(rowg2l(src[k]));
+      }
+    }
+    lp.grid_ = grid();
+    lp.rows_ = m;
+    lp.MB_ = MB();
+    lp.ready_ = true;
+    return lp;
+  }
+
+  template<typename scalar_t> void
+  DistributedMatrix<scalar_t>::laswp(const LaswpPlan& lp) {
+    if (!active()) return;
+    assert(lp.ready_ && lp.grid_ == grid() && lp.rows_ == rows() &&
+           lp.MB_ == MB());
+    const int lc = lcols(), nprows = this->nprows(), pcol = this->pcol();
+    if (!lc) return;
+    const auto& comm = grid()->Comm_active();
+    const int tag = 7357;
+    std::vector<std::vector<scalar_t>> sbuf(lp.sprow_.size()),
+      rbuf(lp.rprow_.size());
+    std::vector<MPI_Request> reqs(lp.sprow_.size() + lp.rprow_.size());
+    int nr = 0;
+    for (std::size_t q=0; q<lp.rprow_.size(); q++) {
+      rbuf[q].resize(lp.ridx_[q].size() * lc);
+      MPI_Irecv(rbuf[q].data(), rbuf[q].size(), mpi_type<scalar_t>(),
+                lp.rprow_[q] + pcol * nprows, tag, comm.comm(), &reqs[nr++]);
+    }
+    for (std::size_t q=0; q<lp.sprow_.size(); q++) {
+      auto& sb = sbuf[q];
+      const auto& Il = lp.sidx_[q];
+      sb.resize(Il.size() * lc);
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<Il.size(); t++)
+          sb[t + c*Il.size()] = operator()(Il[t], c);
+      MPI_Isend(sb.data(), sb.size(), mpi_type<scalar_t>(),
+                lp.sprow_[q] + pcol * nprows, tag, comm.comm(), &reqs[nr++]);
+    }
+    if (!lp.loc_.empty()) {
+      std::vector<scalar_t> tmp(lp.loc_.size() * lc);
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<lp.loc_.size(); t++)
+          tmp[t + c*lp.loc_.size()] = operator()(lp.loc_[t].second, c);
+      // all sends are packed already, safe to overwrite
+      MPI_Waitall(nr, reqs.data(), MPI_STATUSES_IGNORE);
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<lp.loc_.size(); t++)
+          operator()(lp.loc_[t].first, c) = tmp[t + c*lp.loc_.size()];
+    } else
+      MPI_Waitall(nr, reqs.data(), MPI_STATUSES_IGNORE);
+    for (std::size_t q=0; q<lp.rprow_.size(); q++) {
+      const auto& Il = lp.ridx_[q];
+      for (int c=0; c<lc; c++)
+        for (std::size_t t=0; t<Il.size(); t++)
+          operator()(Il[t], c) = rbuf[q][t + c*Il.size()];
+    }
   }
 
   template<typename scalar_t> DistributedMatrix<scalar_t>
