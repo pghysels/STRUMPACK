@@ -332,7 +332,7 @@ namespace strumpack {
     sp.rcnts.assign(rcnts, rcnts+P_);
     sp.rdispls.assign(rdispls, rdispls+P_);
 
-    auto rbuf = comm_.all_to_allv
+    auto rbuf = comm_.all_to_allv_sparse
       (sbuf.data(), scnts, sdispls, rcnts, rdispls);
 
     DenseM_t xloc(local_range_.second - local_range_.first, n);
@@ -407,7 +407,7 @@ namespace strumpack {
         }
       }
     }
-    comm_.all_to_allv
+    comm_.all_to_allv_sparse
       (rbuf.data(), scnts, sdispls, sbuf.data(), rcnts, rdispls);
 
     sp.out_dst_r.resize(std::size_t(m)*n);
@@ -430,10 +430,9 @@ namespace strumpack {
     std::vector<scalar_t> sval(sp.in_src_r.size()), rval(sp.in_dst_f.size());
     for (std::size_t k=0; k<sval.size(); k++)
       sval[k] = x(sp.in_src_r[k], sp.in_src_c[k]);
-    comm_.all_to_allv
-      (sval.data(), const_cast<int*>(sp.scnts.data()),
-       const_cast<int*>(sp.sdispls.data()), rval.data(),
-       const_cast<int*>(sp.rcnts.data()), const_cast<int*>(sp.rdispls.data()));
+    comm_.all_to_allv_sparse
+      (sval.data(), sp.scnts.data(), sp.sdispls.data(), rval.data(),
+       sp.rcnts.data(), sp.rdispls.data());
 
     DenseM_t xloc(local_range_.second - local_range_.first, n);
     DenseMW_t Xloc
@@ -454,10 +453,9 @@ namespace strumpack {
       auto f = sp.out_src_f[k];
       rval[k] = (f < 0 ? xloc.data() : xdist[f].data())[sp.out_src_off[k]];
     }
-    comm_.all_to_allv
-      (rval.data(), const_cast<int*>(sp.rcnts.data()),
-       const_cast<int*>(sp.rdispls.data()), sval.data(),
-       const_cast<int*>(sp.scnts.data()), const_cast<int*>(sp.sdispls.data()));
+    comm_.all_to_allv_sparse
+      (rval.data(), sp.rcnts.data(), sp.rdispls.data(), sval.data(),
+       sp.scnts.data(), sp.sdispls.data());
     for (std::size_t i=0; i<sval.size(); i++)
       x(sp.out_dst_r[i], sp.out_dst_c[i]) = sval[i];
   }

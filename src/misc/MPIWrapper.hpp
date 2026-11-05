@@ -594,20 +594,44 @@ namespace strumpack {
       for (int p=0; p<size(); p++)
         rsize += rcnts[p];
       std::vector<T,A> rbuf(rsize);
-      all_to_allv(sbuf, scnts, sdispls, rbuf.data(), rcnts, rdispls);
+      MPI_Alltoallv
+        (sbuf, scnts, sdispls, mpi_type<T>(),
+         rbuf.data(), rcnts, rdispls, mpi_type<T>(), comm_);
       return rbuf;
     }
 
     template<typename T> void
     all_to_allv(const T* sbuf, int* scnts, int* sdispls,
                 T* rbuf, int* rcnts, int* rdispls) const {
-      // Equivalent to MPI_Alltoallv, but only exchanges the non-empty
-      // messages (the counts are known on both sides). The
-      // communication pattern is typically sparse, while
-      // MPI_Alltoallv implementations take O(P) steps. Unlike the
-      // collective, the point-to-point messages share the matching
-      // space of the communicator: use a tag of their own, and all
-      // messages are completed before returning.
+      MPI_Alltoallv
+        (sbuf, scnts, sdispls, mpi_type<T>(),
+         rbuf, rcnts, rdispls, mpi_type<T>(), comm_);
+    }
+
+    /**
+     * Same as all_to_allv, but for sparse communication patterns,
+     * where each rank sends to and receives from few other ranks:
+     * only the non-empty messages are exchanged, with point-to-point
+     * messages (the counts must be known on both sides), while
+     * MPI_Alltoallv implementations take O(P) steps.
+     */
+    template<typename T, typename A=std::allocator<T>> std::vector<T,A>
+    all_to_allv_sparse(const T* sbuf, const int* scnts, const int* sdispls,
+                       const int* rcnts, const int* rdispls) const {
+      std::size_t rsize = 0;
+      for (int p=0; p<size(); p++)
+        rsize += rcnts[p];
+      std::vector<T,A> rbuf(rsize);
+      all_to_allv_sparse(sbuf, scnts, sdispls, rbuf.data(), rcnts, rdispls);
+      return rbuf;
+    }
+
+    template<typename T> void
+    all_to_allv_sparse(const T* sbuf, const int* scnts, const int* sdispls,
+                       T* rbuf, const int* rcnts, const int* rdispls) const {
+      // Unlike the collective, the point-to-point messages share the
+      // matching space of the communicator: use a tag of their own,
+      // and all messages are completed before returning.
       constexpr int tag = 30217;
       auto P = size();
       int r = rank(), nreqs = 0;

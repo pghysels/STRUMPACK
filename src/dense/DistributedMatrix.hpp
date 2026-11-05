@@ -63,6 +63,33 @@ namespace strumpack {
 #endif
 
   /**
+   * \class LaswpPlan
+   *
+   * \brief The row interchanges of an LU factorization, composed into
+   * a single row permutation.
+   *
+   * Built by DistributedMatrix::laswp_plan from the pivots of LU, for
+   * the process grid and row distribution of the factored matrix, and
+   * applied with DistributedMatrix::laswp(const LaswpPlan&) to any
+   * matrix with the same grid and row distribution. Applying it moves
+   * every row at most once, with one exchange between the process rows
+   * of each process column, instead of one interchange at a time.
+   */
+  class LaswpPlan {
+  public:
+    bool ready() const { return ready_; }
+  private:
+    bool ready_ = false;
+    const BLACSGrid* grid_ = nullptr;
+    int rows_ = 0, MB_ = 0;
+    std::vector<int> sprow_, rprow_;          // peer process rows
+    std::vector<std::vector<int>> sidx_;      // local rows to send
+    std::vector<std::vector<int>> ridx_;      // local rows to receive
+    std::vector<std::pair<int,int>> loc_;     // local (dst,src) rows
+    template<typename T> friend class DistributedMatrix;
+  };
+
+  /**
    * \class DistributedMatrix
    *
    * \brief 2D block cyclicly distributed matrix, as used by
@@ -619,6 +646,23 @@ namespace strumpack {
               DistributedMatrix<scalar_t>& Y) const;
 
     void laswp(const std::vector<int>& P, bool fwd);
+
+    /**
+     * Plan to apply the row interchanges P (the pivots returned by
+     * LU on this matrix) forward, as laswp(P, true), to matrices with
+     * the same process grid and row distribution as this matrix.
+     * Collective on the active processes of the grid.
+     */
+    LaswpPlan laswp_plan(const std::vector<int>& P) const;
+
+    /**
+     * Same result as laswp(P, true), for the pivots P of the plan:
+     * the rows are permuted with one exchange between the process
+     * rows of each process column. Cheaper than laswp when the same
+     * interchanges are applied repeatedly, e.g. to the right-hand
+     * sides of repeated solves with few columns.
+     */
+    void laswp(const LaswpPlan& plan);
 
     DistributedMatrix<scalar_t>
     extract_rows(const std::vector<std::size_t>& Ir) const;
