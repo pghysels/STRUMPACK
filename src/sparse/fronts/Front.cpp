@@ -635,6 +635,9 @@ namespace strumpack {
     for (integer_t i=0; i<dim_upd(); i++)
       upd_[i] = perm[upd_[i]];
     std::sort(upd_.begin(), upd_.end());
+    // the separator reordering is applied again with every
+    // update_matrix_values, and can give a different permutation
+    reset_solve_caches();
 #pragma omp taskwait
   }
 

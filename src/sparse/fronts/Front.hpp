@@ -445,6 +445,14 @@ namespace strumpack {
     mutable std::size_t upd2pa_sep_ = 0;
     mutable const F_t* upd2pa_parent_ = nullptr;
 
+    // forget the index maps and communication patterns cached by the
+    // solve phase, which depend on the update indices
+    virtual void reset_solve_caches() {
+      upd2pa_.clear();
+      upd2pa_sep_ = 0;
+      upd2pa_parent_ = nullptr;
+    }
+
     virtual long long node_factor_nonzeros() const {
       return dense_node_factor_nonzeros();
     }
