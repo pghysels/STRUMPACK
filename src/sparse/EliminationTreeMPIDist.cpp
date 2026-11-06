@@ -111,6 +111,8 @@ namespace strumpack {
     // distributed sparse matrix
     // TODO avoid this, instead just locally permute Aprop_
     find_row_owner(A);
+    // the right-hand side redistribution depends on the permutation
+    solve_perm_.clear();
     Aprop_ = PropMapSparseMatrix<scalar_t,integer_t>();
     Aprop_.setup
       (A, nd_, *this, opts.compression() != CompressionType::NONE);

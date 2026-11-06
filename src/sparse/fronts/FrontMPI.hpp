@@ -160,6 +160,12 @@ namespace strumpack {
     // number of right-hand sides, reused for repeated solves
     mutable std::map<int,std::vector<int>> ea_b_rsizes_, ex_b_rsizes_;
 
+    void reset_solve_caches() override {
+      ea_b_rsizes_.clear();
+      ex_b_rsizes_.clear();
+      F_t::reset_solve_caches();
+    }
+
     virtual long long node_factor_nonzeros() const override;
 
     using F_t::lchild_;

@@ -893,6 +893,20 @@ if(STRUMPACK_USE_MPI)
     --sp_compression HSS --sp_matching 5 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25)
   set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
+  # with compression, update_matrix_values reorders the separators
+  # again: the solves with the new factorization should converge as
+  # fast as the first ones
+  set(test_name "structure_reuse_HSS_maxit")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
+    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx
+    --sp_compression HSS --sp_matching 0 --hss_leaf_size 4 --hss_rel_tol 1e-3 --hss_abs_tol 1e-10 --sp_compression_min_sep_size 25 --sp_maxit 10)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  set(test_name "structure_reuse_BLR_maxit")
+  add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
+    ${MPIEXEC_POSTFLAGS} ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx
+    --sp_compression BLR --sp_matching 0 --blr_leaf_size 4 --blr_rel_tol 1e-3 --sp_compression_min_sep_size 25 --sp_maxit 10)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
 
   # test matching, using MC64, and CombBLAS below, if available
   set(test_name "SPARSE_mpi_matching_2")
