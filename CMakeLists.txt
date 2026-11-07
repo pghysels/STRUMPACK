@@ -65,6 +65,15 @@ FortranCInterface_HEADER(
 FortranCInterface_VERIFY(CXX)
 
 if(STRUMPACK_USE_MPI)
+  if(STRUMPACK_USE_HIP)
+    # When CMAKE_CXX_COMPILER is an MPI wrapper (mpicxx), FindMPI
+    # detects that the C++ compiler supports MPI already, and leaves
+    # the include directories of the MPI:: targets empty. The HIP
+    # sources are compiled with the HIP compiler, not with the wrapper,
+    # and then fail to find mpi.h. Make FindMPI interrogate the wrapper
+    # so the MPI:: targets carry the include directories and flags.
+    set(MPI_ASSUME_NO_BUILTIN_MPI ON)
+  endif()
   find_package(MPI)
   if(NOT MPI_FOUND)
     set(STRUMPACK_USE_MPI OFF)
