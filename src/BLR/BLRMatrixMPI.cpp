@@ -1258,6 +1258,12 @@ namespace strumpack {
                 piv_tile = tile(i, i).LU(opts.pivot_threshold());
               else piv_tile.resize(tilerows(i));
               grid()->row_comm().broadcast_from(piv_tile, i % grid()->npcols());
+              // apply the row interchanges also to the (already
+              // factored) L tiles left of the diagonal, the solve
+              // applies the full pivot vector to the right-hand side
+              for (std::size_t jj=0; jj<i; jj++)
+                if (grid()->is_local_col(jj))
+                  tile(i, jj).laswp(piv_tile, true);
               int r0 = tileroff(i);
               std::transform
                 (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
@@ -1464,6 +1470,11 @@ namespace strumpack {
                 else piv_tile.resize(tilerows(c));
                 grid()->row_comm().broadcast_from(piv_tile, c % grid()->npcols());
                 piv_tile_global.push_back(piv_tile);
+                // apply the row interchanges also to the L tiles left
+                // of the diagonal (solve applies full pivot vector)
+                for (std::size_t jj=0; jj<c; jj++)
+                  if (grid()->is_local_col(jj))
+                    tile(c, jj).laswp(piv_tile, true);
                 int r0 = tileroff(c);
                 std::transform
                   (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
@@ -1641,6 +1652,11 @@ namespace strumpack {
               if (g->is_local_row(c)) {
                 g->row_comm().broadcast_from(piv_tile, c % g->npcols());
                 piv_tile_global.push_back(piv_tile);
+                // apply the row interchanges also to the L tiles left
+                // of the diagonal (solve applies full pivot vector)
+                for (std::size_t jj=0; jj<c; jj++)
+                  if (g->is_local_col(jj))
+                    F11.tile(c, jj).laswp(piv_tile, true);
                 int r0 = F11.tileroff(c);
                 std::transform
                   (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
@@ -1847,6 +1863,11 @@ namespace strumpack {
             }
             if (g->is_local_row(i)) {
               g->row_comm().broadcast_from(piv_tile, i % g->npcols());
+              // apply the row interchanges also to the L tiles left
+              // of the diagonal (solve applies full pivot vector)
+              for (std::size_t jj=0; jj<i; jj++)
+                if (g->is_local_col(jj))
+                  A11.tile(i, jj).laswp(piv_tile, true);
               int r0 = A11.tileroff(i);
               std::transform
                 (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),
@@ -2852,6 +2873,17 @@ namespace strumpack {
             gpu::copy<int>(dpiv, piv_tile.data(), mi);
             if (!gpu_aware) Tii->move_to_gpu(copy_stream, dcol1);
           }
+          // Apply the row interchanges also to the (already factored)
+          // L tiles left of the diagonal: the solve applies the full
+          // pivot vector to the right-hand side. Block column i-1 is
+          // still on the device (it is moved to the host at the end of
+          // this iteration, after comp_stream is synchronized), older
+          // block columns are already on the host.
+          for (std::size_t jj=0; jj<i; jj++)
+            if (g->is_local_col(jj)) {
+              if (jj+1 == i) A11.tile(i, jj).laswp(handle, dpiv, true);
+              else A11.tile(i, jj).laswp(piv_tile, true);
+            }
           int r0 = A11.tileroff(i);
           std::transform
             (piv_tile.begin(), piv_tile.end(), std::back_inserter(piv),

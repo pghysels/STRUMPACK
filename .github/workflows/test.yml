@@ -132,11 +132,65 @@ jobs:
           cmake ../
           make
 
+      # Cache of the sparse test matrices (downloaded by
+      # test/download_mtx.sh), since the download servers are often
+      # unreachable. Restored after the build step, which wipes build/.
+      # Only the jobs that use the matrices (3, 4, 5) need them.
+      - name: Restore sparse test matrices
+        if: matrix.test >= 3
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/test/utm300
+            build/test/mesh3e1
+            build/test/t2dal
+            build/test/bcsstk28
+            build/test/cavity16
+            build/test/bcsstm08
+            build/test/sherman4
+            build/test/rdb968
+            build/test/gemat11
+          key: mtx-${{ hashFiles('test/download_mtx.sh') }}-
+          restore-keys: |
+            mtx-${{ hashFiles('test/download_mtx.sh') }}-
+
       - name: Test
         run: |
           cd $GITHUB_WORKSPACE
           export TEST_NUMBER=${{ matrix.test }}
           sh ./.ci_tests.sh
+
+      # Save whatever matrices are available. The key contains the number
+      # of matrices present, so a more complete set is saved under a new
+      # key, and restored (most recent prefix match) by later runs. Only
+      # valid (non-empty) matrices are present: download_mtx.sh removes
+      # broken downloads.
+      - name: Count sparse test matrices
+        id: mtx
+        if: always() && matrix.test >= 3
+        run: |
+          n=0
+          for m in utm300 mesh3e1 t2dal bcsstk28 cavity16 bcsstm08 sherman4 rdb968 gemat11; do
+            [ -s "build/test/$m/$m.mtx" ] && n=$((n + 1))
+          done
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+          echo "$n test matrices available"
+      - name: Save sparse test matrices
+        if: always() && matrix.test >= 3 && steps.mtx.outputs.count != '0'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/test/utm300
+            build/test/mesh3e1
+            build/test/t2dal
+            build/test/bcsstk28
+            build/test/cavity16
+            build/test/bcsstm08
+            build/test/sherman4
+            build/test/rdb968
+            build/test/gemat11
+          key: mtx-${{ hashFiles('test/download_mtx.sh') }}-n${{ steps.mtx.outputs.count }}
 
       - name: External build
         run: |

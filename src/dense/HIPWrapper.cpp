@@ -595,8 +595,9 @@ namespace strumpack {
 
     template<typename scalar_t, typename real_t>
     int gesvdj_buffersize(Handle& handle, Jobz jobz, int m, int n) {
-      std::cerr << "TODO gesvdj_buffersize not implemented for HIP" << std::endl;
-      return 0;
+      // workspace (in units of scalar_t) for gesvdj below: V^H
+      // (min(m,n) x n), plus the device scalars residual and n_sweeps
+      return std::min(m, n) * n + 2;
     }
     template int gesvdj_buffersize<float,float>(Handle&, Jobz, int, int);
     template int gesvdj_buffersize<double,double>(Handle&, Jobz, int, int);
@@ -604,11 +605,76 @@ namespace strumpack {
     template int gesvdj_buffersize<std::complex<double>,double>(Handle&, Jobz, int, int);
 
 
+    void rocsolver_gesvdj
+    (rocblas_handle h, int m, int n, float* A, int lda, float* res,
+     int* nsw, float* S, float* U, int ldu, float* Vt, int ldvt, int* info) {
+      STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
+      gpu_check(rocsolver_sgesvdj
+                (h, rocblas_svect_singular, rocblas_svect_singular, m, n,
+                 A, lda, 0.f, res, 100, nsw, S, U, ldu, Vt, ldvt, info));
+    }
+    void rocsolver_gesvdj
+    (rocblas_handle h, int m, int n, double* A, int lda, double* res,
+     int* nsw, double* S, double* U, int ldu, double* Vt, int ldvt,
+     int* info) {
+      STRUMPACK_FLOPS(blas::gesvd_flops(m,n));
+      gpu_check(rocsolver_dgesvdj
+                (h, rocblas_svect_singular, rocblas_svect_singular, m, n,
+                 A, lda, 0., res, 100, nsw, S, U, ldu, Vt, ldvt, info));
+    }
+    void rocsolver_gesvdj
+    (rocblas_handle h, int m, int n, std::complex<float>* A, int lda,
+     float* res, int* nsw, float* S, std::complex<float>* U, int ldu,
+     std::complex<float>* Vt, int ldvt, int* info) {
+      STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
+      gpu_check(rocsolver_cgesvdj
+                (h, rocblas_svect_singular, rocblas_svect_singular, m, n,
+                 reinterpret_cast<rocblas_float_complex*>(A), lda, 0.f,
+                 res, 100, nsw, S,
+                 reinterpret_cast<rocblas_float_complex*>(U), ldu,
+                 reinterpret_cast<rocblas_float_complex*>(Vt), ldvt, info));
+    }
+    void rocsolver_gesvdj
+    (rocblas_handle h, int m, int n, std::complex<double>* A, int lda,
+     double* res, int* nsw, double* S, std::complex<double>* U, int ldu,
+     std::complex<double>* Vt, int ldvt, int* info) {
+      STRUMPACK_FLOPS(4*blas::gesvd_flops(m,n));
+      gpu_check(rocsolver_zgesvdj
+                (h, rocblas_svect_singular, rocblas_svect_singular, m, n,
+                 reinterpret_cast<rocblas_double_complex*>(A), lda, 0.,
+                 res, 100, nsw, S,
+                 reinterpret_cast<rocblas_double_complex*>(U), ldu,
+                 reinterpret_cast<rocblas_double_complex*>(Vt), ldvt, info));
+    }
+
+    /**
+     * Economy SVD A = U diag(S) V^H using rocSOLVER's Jacobi SVD, with
+     * the same interface as the CUDA version: U is m x min(m,n), V is
+     * n x min(m,n) (V, not V^H), S in decreasing order. A is
+     * overwritten. work must hold gesvdj_buffersize(...) scalars.
+     *
+     * The tol argument is not used as rocSOLVER convergence threshold
+     * (rocSOLVER interprets it relative to ||A||, while callers pass an
+     * absolute compression tolerance); machine precision is used instead.
+     * Rank truncation is done by the caller.
+     */
     template<typename scalar_t, typename real_t> void
     gesvdj(Handle& handle, Jobz jobz, DenseMatrix<scalar_t>& A, real_t* S,
            DenseMatrix<scalar_t>& U, DenseMatrix<scalar_t>& V, int* dinfo,
            scalar_t* work, int lwork, const double tol) {
-      std::cerr << "TODO gesvdj not implemented for HIP" << std::endl;
+      int m = A.rows(), n = A.cols(), minmn = std::min(m, n);
+      if (!m || !n) return;
+      assert(lwork >= minmn * n + 2);
+      auto Vt = work;                                      // minmn x n
+      auto res = reinterpret_cast<real_t*>(Vt + minmn*n);  // residual
+      auto nsw = reinterpret_cast<int*>(Vt + minmn*n + 1); // n_sweeps
+      rocsolver_gesvdj(get_rocblas_handle(handle), m, n, A.data(), A.ld(),
+                       res, nsw, S, U.data(), U.ld(), Vt, minmn, dinfo);
+      // V = (V^H)^H
+      DenseMatrixWrapper<scalar_t> dVt(minmn, n, Vt, minmn),
+        dV(n, minmn, V, 0, 0);
+      geam<scalar_t>(handle, Trans::C, Trans::N, scalar_t(1.), dVt,
+                     scalar_t(0.), dV, dV);
     }
     template void gesvdj(Handle&, Jobz, DenseMatrix<float>&, float*,
                          DenseMatrix<float>&, DenseMatrix<float>&,

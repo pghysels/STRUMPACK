@@ -1923,6 +1923,15 @@ namespace strumpack {
         if (opts.pivot_threshold() > 0)
           gpu::replace_pivots
             (D.rows(), D.data(), opts.pivot_threshold(), &copy_stream);
+        // Apply the row interchanges of diagonal tile i also to the
+        // (already factored) L tiles left of it, as in the CPU code:
+        // the solve applies the full pivot vector to the right-hand
+        // side, so L must be stored in permuted row order. Same stream
+        // as getrf. These tiles are still on the device: the strictly
+        // lower tiles of B11 are only moved to the host per block row,
+        // after this step (see below).
+        for (std::size_t jj=0; jj<i; jj++)
+          B11.tile(i, jj).laswp(handle2, dpiv+B11.tileroff(i), true);
 
         VBatchedARA<scalar_t> ara;
         for (std::size_t j=i+1; j<rb; j++) {
@@ -2007,12 +2016,21 @@ namespace strumpack {
             b3.run(scalar_t(-1.), scalar_t(1.), comp_stream, handle);
           }
           if (i > 0) {
+            // upper and diagonal tiles of block column i-1 are final
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop
 #endif
-              for (std::size_t j=0; j<rb; j++)
+              for (std::size_t j=0; j<i; j++)
                 B11.tile(j, i-1).move_to_cpu
                   (copy_stream, pinned+B11.tileroff(j)*B11.tilecols(i-1));
+            // strictly lower tiles of block row i are final now that
+            // the row interchanges of diagonal tile i have been applied
+#if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
+#pragma omp taskloop
+#endif
+              for (std::size_t jj=0; jj<i; jj++)
+                B11.tile(i, jj).move_to_cpu
+                  (copy_stream, pinned+B11.tilecoff(jj)*B11.tilerows(i));
 #if defined(STRUMPACK_USE_OPENMP_TASKLOOP)
 #pragma omp taskloop
 #endif
