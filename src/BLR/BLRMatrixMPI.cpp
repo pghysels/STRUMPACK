@@ -1409,6 +1409,17 @@ namespace strumpack {
         //construct the (i/CP+1) CP block-columns as dense tiles
         fill_col(0., i, CP);
         blockcol(i, true, CP);
+        // Apply the row interchanges of the already factored diagonal
+        // blocks to these block columns, before any update. The L
+        // tiles (k, k') (k' < k) are stored in permuted row order
+        // (permuted when diagonal block k was factored), so the
+        // updates (k, j) -= (k, k') (k', j) must be applied to the
+        // permuted (k, j).
+        for (std::size_t k=0; k<i; k++)
+          if (grid()->is_local_row(k))
+            for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++)
+              if (grid()->is_local_col(j))
+                tile(k, j).laswp(piv_tile_global[k/grid()->nprows()], true);
         for (std::size_t k=0; k<i; k++) {
 #pragma omp parallel
 #pragma omp single nowait
@@ -1429,11 +1440,9 @@ namespace strumpack {
               for (std::size_t j=i; j<std::min(i+CP, colblocks()); j++) {
                 if (grid()->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,j,k)
-                  {
-                    tile(k, j).laswp(piv_tile_global[k/grid()->nprows()], true);
-                    trsm(Side::L, UpLo::L, Trans::N, Diag::U,
-                         scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
-                  }
+                  // row interchanges were already applied, see above
+                  trsm(Side::L, UpLo::L, Trans::N, Diag::U,
+                       scalar_t(1.), Tcc_vec[k/grid()->nprows()], tile(k, j));
                 }
               }
             }
@@ -1577,6 +1586,12 @@ namespace strumpack {
         F11.fill_col(0., i, CP);
         F21.fill_col(0., i, CP);
         blockcol(i, true, CP);
+        // apply all row interchanges before the updates, see factor_col
+        for (std::size_t k=0; k<i; k++)
+          if (g->is_local_row(k))
+            for (std::size_t j=i; j<std::min(i+CP, B1_c); j++)
+              if (g->is_local_col(j))
+                F11.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
         for (std::size_t k=0; k<i; k++) {
 #pragma omp parallel
 #pragma omp single nowait
@@ -1597,7 +1612,7 @@ namespace strumpack {
               for (std::size_t j=i; j<std::min(i+CP, B1_c); j++) {
                 if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,k,j)
-                  F11.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
+                  // row interchanges were already applied, see above
                   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                        scalar_t(1.), Tcc_vec[k/g->nprows()], F11.tile(k, j));
                 }
@@ -1760,6 +1775,12 @@ namespace strumpack {
         F12.fill_col(0., i, CP);
         F22.fill_col(0., i, CP);
         blockcol(i, false, CP);
+        // apply all row interchanges before the updates, see factor_col
+        for (std::size_t k=0; k<B1_r; k++)
+          if (g->is_local_row(k))
+            for (std::size_t j=i; j<std::min(i+CP, B2_c); j++)
+              if (g->is_local_col(j))
+                F12.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
         for (std::size_t k=0; k<B1_r; k++) {
 #pragma omp parallel
 #pragma omp single nowait
@@ -1780,7 +1801,7 @@ namespace strumpack {
               for (std::size_t j=i; j<std::min(i+CP, B2_c); j++) {
                 if (g->is_local_col(j)) {
 #pragma omp task default(shared) firstprivate(i,k,j)
-                  F12.tile(k, j).laswp(piv_tile_global[k/g->nprows()], true);
+                  // row interchanges were already applied, see above
                   trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                        scalar_t(1.), Tcc_vec[k/g->nprows()], F12.tile(k, j));
                 }
@@ -2859,9 +2880,11 @@ namespace strumpack {
           if (g->is_local_col(i)) {
             auto& D = A11.tile(i, i).D();
             gpu::getrf(handle, D, dwork, getrf_work_size, dpiv, dinfo);
+            // handle uses comp_stream, replace_pivots must run on the
+            // same stream, after getrf
             if (opts.pivot_threshold() > 0)
               gpu::replace_pivots
-                (D.rows(), D.data(), opts.pivot_threshold(), &copy_stream);
+                (D.rows(), D.data(), opts.pivot_threshold(), &comp_stream);
             comp_stream.synchronize();
             gpu::copy(Tii->D(), D);
             gpu::copy<int>(piv_tile.data(), dpiv, mi);

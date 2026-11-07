@@ -1,6 +1,7 @@
 add_executable(test_HSS_seq    test_HSS_seq.cpp)
 add_executable(test_sparse_seq test_sparse_seq.cpp)
 add_executable(test_BLR_seq    test_BLR_seq.cpp)
+add_executable(test_BLR_pivot  test_BLR_pivot.cpp)
 add_executable(test_matrix_IO  test_matrix_IO.cpp)
 add_executable(test_SPD_seq test_SPD_seq.cpp)
 add_executable(test_SPD_mixedPrecision test_SPD_mixedPrecision.cpp)
@@ -8,6 +9,7 @@ add_executable(test_SPD_mixedPrecision test_SPD_mixedPrecision.cpp)
 target_link_libraries(test_HSS_seq strumpack)
 target_link_libraries(test_sparse_seq strumpack)
 target_link_libraries(test_BLR_seq strumpack)
+target_link_libraries(test_BLR_pivot strumpack)
 target_link_libraries(test_matrix_IO strumpack)
 target_link_libraries(test_SPD_seq strumpack)
 target_link_libraries(test_SPD_mixedPrecision strumpack)
@@ -230,6 +232,15 @@ set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 set(test_name "BLR_seq_6")
 strumpack_add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_seq 300 --blr_factor_algorithm Comb --blr_compression_kernel half)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+
+# BLR LU with actual row interchanges (random matrix), repeated
+# multiple times with several threads, to catch errors in the
+# pivoting and in the OpenMP task dependencies.
+foreach(alg RL LL Comb Star)
+  set(test_name "BLR_pivot_${alg}")
+  strumpack_add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_pivot 1000 10 --blr_factor_algorithm ${alg})
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
+endforeach()
 
 
 if(STRUMPACK_USE_MPI)
@@ -611,6 +622,16 @@ set(test_name "SPARSE_seq_86")
 strumpack_add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq sherman4/sherman4.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-3 --blr_abs_tol 1e-10 --sp_reordering_method metis --sp_compression_min_sep_size 25)
 set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=8")
 
+# Column-wise (COLWISE) BLR factorization with (near) exact
+# compression, for nonsymmetric matrices that require pivoting. The
+# factorization should be exact, so the solve must converge in 1-2
+# iterations.
+foreach(mtx cavity16 rdb968)
+  set(test_name "SPARSE_BLR_seq_pivot_COLWISE_${mtx}")
+  strumpack_add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_seq ${mtx}/${mtx}.mtx --sp_compression BLR --blr_factor_algorithm COLWISE --blr_leaf_size 4 --blr_rel_tol 1e-14 --blr_abs_tol 1e-14 --sp_compression_min_sep_size 25 --sp_enable_replace_tiny_pivots --sp_maxit 2 --sp_disable_gpu)
+  set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=4")
+endforeach()
+
 
 if(STRUMPACK_USE_SCOTCH)
   set(test_name "SPARSE_seq_scotch_1")
@@ -727,6 +748,24 @@ if(STRUMPACK_USE_MPI)
     strumpack_add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
       ${MPIEXEC_POSTFLAGS} bcsstk28/bcsstk28.mtx --sp_compression BLR --blr_leaf_size 4 --blr_rel_tol 1e-14 --blr_abs_tol 1e-14 --sp_reordering_method metis --sp_compression_min_sep_size 25 --sp_maxit 2)
     set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  endforeach()
+
+  # Same, but for a nonsymmetric matrix that requires (partial)
+  # pivoting, with multiple OpenMP threads per rank, and the
+  # right-looking distributed BLR factorization. GPU is disabled so
+  # the CPU code path is tested also in GPU-enabled builds.
+  foreach(np 4 9)
+    set(test_name "SPARSE_BLR_mpi_pivot_RL_np${np}")
+    strumpack_add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+      ${MPIEXEC_POSTFLAGS} cavity16/cavity16.mtx --sp_compression BLR --blr_factor_algorithm RL --blr_leaf_size 4 --blr_rel_tol 1e-14 --blr_abs_tol 1e-14 --sp_compression_min_sep_size 25 --sp_enable_replace_tiny_pivots --sp_maxit 2 --sp_disable_gpu)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=4")
+    # same for the column-wise (COLWISE) distributed BLR factorization
+    foreach(mtx cavity16 rdb968)
+      set(test_name "SPARSE_BLR_mpi_pivot_COLWISE_${mtx}_np${np}")
+      strumpack_add_test(${test_name} ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG} ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+        ${MPIEXEC_POSTFLAGS} ${mtx}/${mtx}.mtx --sp_compression BLR --blr_factor_algorithm COLWISE --blr_leaf_size 4 --blr_rel_tol 1e-14 --blr_abs_tol 1e-14 --sp_compression_min_sep_size 25 --sp_enable_replace_tiny_pivots --sp_maxit 2 --sp_disable_gpu)
+      set_property(TEST ${test_name} PROPERTY ENVIRONMENT "OMP_NUM_THREADS=4")
+    endforeach()
   endforeach()
 
   if(STRUMPACK_USE_BPACK)

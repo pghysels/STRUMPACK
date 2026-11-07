@@ -139,8 +139,8 @@ namespace strumpack {
             create_dense_tile(i, i, A);
             auto tpiv = tile(i, i).LU(opts.pivot_threshold());
             std::copy(tpiv.begin(), tpiv.end(), piv_.begin()+tileroff(i));
-            for (std::size_t jj = 0; jj < i; jj++)
-              if (block(i, jj)) tile(i, jj).laswp(tpiv, true);
+            // the row interchanges are applied to the L tiles left
+            // of the diagonal after all tasks completed, see below
           }
           // COMPRESS and SOLVE
           for (std::size_t j=i+1; j<rb; j++) {
@@ -240,6 +240,18 @@ namespace strumpack {
             }
           }
         }
+      }
+      // Apply the row interchanges of each diagonal tile to the L
+      // tiles left of it. This cannot be done in the diagonal LU
+      // task: those tiles are still read, in unpermuted row order, by
+      // Schur complement update tasks that are not ordered with
+      // respect to the diagonal LU task. Only the solve needs them in
+      // permuted row order.
+      for (std::size_t i=1; i<rb; i++) {
+        std::vector<int> tpiv
+          (piv_.begin()+tileroff(i), piv_.begin()+tileroff(i+1));
+        for (std::size_t jj=0; jj<i; jj++)
+          if (block(i, jj)) tile(i, jj).laswp(tpiv, true);
       }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=tileroff(i); l<tileroff(i+1); l++)
@@ -780,8 +792,8 @@ namespace strumpack {
               auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
               std::copy(tpiv.begin(), tpiv.end(),
                         B11.piv_.begin()+B11.tileroff(i));
-              for (std::size_t jj = 0; jj < i; jj++)
-                if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
+              // the row interchanges are applied to the L tiles left
+              // of the diagonal after all tasks completed, see below
             }
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
@@ -1036,6 +1048,16 @@ namespace strumpack {
           }
         }
       }
+      // Apply the row interchanges of each diagonal tile to the L
+      // tiles left of it, after all tasks completed (these tiles are
+      // read in unpermuted order by concurrent Schur update tasks).
+      for (std::size_t i=1; i<rb; i++) {
+        std::vector<int> tpiv
+          (B11.piv_.begin()+B11.tileroff(i),
+           B11.piv_.begin()+B11.tileroff(i+1));
+        for (std::size_t jj=0; jj<i; jj++)
+          if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
+      }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           B11.piv_[l] += B11.tileroff(i);
@@ -1281,8 +1303,8 @@ namespace strumpack {
               auto tpiv = B11.tile(i, i).LU(opts.pivot_threshold());
               std::copy(tpiv.begin(), tpiv.end(),
                         B11.piv_.begin()+B11.tileroff(i));
-              for (std::size_t jj = 0; jj < i; jj++)
-                if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
+              // the row interchanges are applied to the L tiles left
+              // of the diagonal after all tasks completed, see below
             }
             for (std::size_t j=i+1; j<rb; j++) {
 #if defined(STRUMPACK_USE_OPENMP_TASK_DEPEND)
@@ -1330,9 +1352,11 @@ namespace strumpack {
 #pragma omp task default(shared) firstprivate(i,j,j2i,ii)       \
   depend(in:B[ii]) depend(inout:B[j2i])
 #endif
-              B21.compress_tile(j, i, opts);
-              trsm(Side::R, UpLo::U, Trans::N, Diag::N,
-                   scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
+              { // both statements must be part of the task
+                B21.compress_tile(j, i, opts);
+                trsm(Side::R, UpLo::U, Trans::N, Diag::N,
+                     scalar_t(1.), B11.tile(i, i), B21.tile(j, i));
+              }
             }
             for (std::size_t j=i+1; j<rb; j++) {
               for (std::size_t k=i+1; k<rb; k++) {
@@ -1397,6 +1421,16 @@ namespace strumpack {
           }
         }
       }
+      // Apply the row interchanges of each diagonal tile to the L
+      // tiles left of it, after all tasks completed (these tiles are
+      // read in unpermuted order by concurrent Schur update tasks).
+      for (std::size_t i=1; i<rb; i++) {
+        std::vector<int> tpiv
+          (B11.piv_.begin()+B11.tileroff(i),
+           B11.piv_.begin()+B11.tileroff(i+1));
+        for (std::size_t jj=0; jj<i; jj++)
+          if (B11.block(i, jj)) B11.tile(i, jj).laswp(tpiv, true);
+      }
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           B11.piv_[l] += B11.tileroff(i);
@@ -1422,13 +1456,21 @@ namespace strumpack {
           B11.fill_col(0., i, CP);
           B21.fill_col(0., i, CP);
           blockcol(i, true, CP);
+          // Apply the row interchanges of the already factored
+          // diagonal blocks to this block column, before any update.
+          // The L tiles B11(k, k') (k' < k) are stored in permuted
+          // row order (permuted when B11(k, k) was factored), so the
+          // updates B11(k, i) -= B11(k, k') B11(k', i) below must be
+          // applied to the permuted B11(k, i).
           for (std::size_t k=0; k<i; k++) {
-            if (admissible(k, i))
-              B11.compress_tile(k, i, opts);
             std::vector<int> tpiv
               (B11.piv_.begin()+B11.tileroff(k),
                B11.piv_.begin()+B11.tileroff(k+1));
             B11.tile(k, i).laswp(tpiv, true);
+          }
+          for (std::size_t k=0; k<i; k++) {
+            if (admissible(k, i))
+              B11.compress_tile(k, i, opts);
             trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                  scalar_t(1.), B11.tile(k, k), B11.tile(k, i));
 #pragma omp taskloop
@@ -1464,12 +1506,15 @@ namespace strumpack {
           B12.fill_col(0., i, CP);
           B22.fill_col(0., i, CP);
           blockcol(i, false, CP);
+          // apply all row interchanges before the updates, see above
           for (std::size_t k=0; k<rb; k++) {
-            B12.compress_tile(k, i, opts);
             std::vector<int> tpiv
               (B11.piv_.begin()+B11.tileroff(k),
                B11.piv_.begin()+B11.tileroff(k+1));
             B12.tile(k, i).laswp(tpiv, true);
+          }
+          for (std::size_t k=0; k<rb; k++) {
+            B12.compress_tile(k, i, opts);
             trsm(Side::L, UpLo::L, Trans::N, Diag::U,
                  scalar_t(1.), B11.tile(k, k), B12.tile(k, i));
 #pragma omp taskloop
