@@ -210,6 +210,13 @@ if(TPL_ENABLE_KBLAS)
   endif()
 endif()
 
+if((STRUMPACK_USE_HIP OR STRUMPACK_USE_CUDA) AND NOT STRUMPACK_USE_KBLAS)
+  # native HIP/CUDA batched adaptive randomized approximation (ARA)
+  # for BLR compression, replaces the (private) KBLAS library
+  option(STRUMPACK_USE_GPU_ARA
+    "Native HIP/CUDA batched ARA for BLR compression" ON)
+endif()
+
 
 if(DEFINED TPL_BLAS_LIBRARIES)
   # xSDK policies require the user be able to specify BLAS libraries

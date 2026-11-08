@@ -34,7 +34,7 @@
 #include "sparse/CSRGraph.hpp"
 #include "misc/TaskTimer.hpp"
 #include "dense/BLASLAPACKWrapper.hpp"
-#if defined(STRUMPACK_USE_KBLAS)
+#if (defined(STRUMPACK_USE_KBLAS) || defined(STRUMPACK_USE_GPU_ARA))
 #include "dense/KBLASWrapper.hpp"
 #endif
 #if defined(STRUMPACK_USE_MPI)
@@ -400,11 +400,15 @@ namespace strumpack {
           gpu::assemble<scalar_t>(1, &hasmbl, dasmbl);
           if (dsep) {
             auto lopts = blr_opts;
-#if defined(STRUMPACK_USE_KBLAS) && defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
+#if (defined(STRUMPACK_USE_KBLAS) || defined(STRUMPACK_USE_GPU_ARA)) && defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
             // Match the CPU front-scaled absolute tolerance. Distributed
             // fronts already apply this scaling in FrontBLRMPI::factor.
-            lopts.set_abs_tol(lopts.abs_tol() *
-              gpu::kblas::front_norm(dF11, dF12, dF21));
+            auto nwork = workspace.get_device_bytes
+              (gpu::kblas::front_norm_worksize<scalar_t>());
+            lopts.set_abs_tol
+              (lopts.abs_tol() * gpu::kblas::front_norm
+               (dF11, dF12, dF21, nwork.template as<char>()));
+            workspace.restore(nwork);
 #endif
             BLRM_t::construct_and_partial_factor_gpu
               (dF11, dF12, dF21, F22_, F11blr_, F12blr_, F21blr_,

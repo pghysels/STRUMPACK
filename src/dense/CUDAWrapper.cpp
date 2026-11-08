@@ -71,7 +71,8 @@ namespace strumpack {
         gpu_check(cublasCreate(&bh_));
         gpu_check(cusolverDnCreate(&sh_));
 #if defined(STRUMPACK_USE_MAGMA)
-        magma_queue_create_from_cuda(0, NULL, bh_, NULL, &q_);
+        { int dev = 0; gpu_check(cudaGetDevice(&dev));
+          magma_queue_create_from_cuda(dev, NULL, bh_, NULL, &q_); }
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
         kblasCreate(&k_);
@@ -83,7 +84,8 @@ namespace strumpack {
         gpu_check(cublasCreate(&bh_));
         gpu_check(cusolverDnCreate(&sh_));
 #if defined(STRUMPACK_USE_MAGMA)
-        magma_queue_create_from_cuda(0, get_cuda_stream(s), bh_, NULL, &q_);
+        { int dev = 0; gpu_check(cudaGetDevice(&dev));
+          magma_queue_create_from_cuda(dev, get_cuda_stream(s), bh_, NULL, &q_); }
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
         kblasCreate(&k_);

@@ -110,8 +110,8 @@ ara_tolerances(Handle& handle, const int* rows, const int* cols,
 }
 
 template<typename T> typename RealType<T>::value_type
-front_norm(const DenseMatrix<T>& F11,
-           const DenseMatrix<T>& F12, const DenseMatrix<T>& F21) {
+front_norm(const DenseMatrix<T>& F11, const DenseMatrix<T>& F12,
+           const DenseMatrix<T>& F21, void* dwork) {
   using R = typename RealType<T>::value_type;
   const DenseMatrix<T>* fronts[] = {&F11, &F12, &F21};
   int dims[9];
@@ -125,14 +125,13 @@ front_norm(const DenseMatrix<T>& F11,
     dims[i] = F.rows(); dims[i+3] = F.cols(); dims[i+6] = F.ld();
     pointers[i] = const_cast<T*>(F.data());
   }
-  DeviceMemory<int> ddims(9);
-  DeviceMemory<T*> dptrs(3);
-  DeviceMemory<R> dnorms(3);
+  int* ddims = static_cast<int*>(dwork);
+  T** dptrs = aligned_ptr<T*>(ddims + 9);
+  R* dnorms = aligned_ptr<R>(dptrs + 3);
   copy_host_to_device<int>(ddims, dims, 9);
   copy_host_to_device<T*>(dptrs, pointers, 3);
   auto stream = launch_norms<T, R>
-    (nullptr, ddims, ddims.template as<int>()+3, dptrs,
-     ddims.template as<int>()+6, R(0), R(0), dnorms, 3, true);
+    (nullptr, ddims, ddims+3, dptrs, ddims+6, R(0), R(0), dnorms, 3, true);
   gpu_check(cudaStreamSynchronize(stream));
   R norms[3];
   copy_device_to_host<R>(norms, dnorms, 3);
@@ -143,7 +142,7 @@ front_norm(const DenseMatrix<T>& F11,
   template void ara_tolerances<T, R>(Handle&, const int*, const int*, \
     T* const*, const int*, R, R, R*, int); \
   template R front_norm<T>(const DenseMatrix<T>&, \
-    const DenseMatrix<T>&, const DenseMatrix<T>&);
+    const DenseMatrix<T>&, const DenseMatrix<T>&, void*);
 INSTANTIATE(float, float)
 INSTANTIATE(double, double)
 INSTANTIATE(std::complex<float>, float)

@@ -1956,6 +1956,53 @@ namespace strumpack {
 
       gpu::DeviceMemory<char> d_batch_matrix_mem;
 
+      // Batched row interchanges (one launch for a set of tiles, all
+      // using the same pivot vector). The metadata is copied
+      // asynchronously on the stream of the handle, and must stay
+      // alive (host and device) until that stream is synchronized.
+      struct LaswpBatch {
+        std::vector<int> meta;
+        std::vector<scalar_t*> A;
+        std::vector<int*> P;
+        gpu::DeviceMemory<char> dmem;
+      };
+      auto batched_laswp = [&]
+        (LaswpBatch& b, std::vector<BLRTile<scalar_t>*>& tiles, int* dp,
+         gpu::Stream& s, gpu::Handle& h) {
+        std::size_t B = 0;
+        for (auto t : tiles) {
+          auto& M = t->is_low_rank() ? t->U() : t->D();
+          if (M.rows() && M.cols()) B++;
+        }
+        if (!B) return;
+        b.meta.resize(3*B);  b.A.resize(B);  b.P.assign(B, dp);
+        int maxn = 0;
+        std::size_t k = 0;
+        for (auto t : tiles) {
+          auto& M = t->is_low_rank() ? t->U() : t->D();
+          if (!M.rows() || !M.cols()) continue;
+          b.meta[k] = M.cols();
+          b.meta[k+B] = M.ld();
+          b.meta[k+2*B] = M.rows();
+          b.A[k] = M.data();
+          maxn = std::max(maxn, int(M.cols()));
+          k++;
+        }
+        b.dmem = workspace.get_device_bytes
+          (gpu::round_up(3*B*sizeof(int)) +
+           2*gpu::round_up(B*sizeof(void*)));
+        auto dn = b.dmem.template as<int>();
+        auto dld = dn + B;
+        auto dnp = dld + B;
+        auto dA = gpu::aligned_ptr<scalar_t*>(dnp + B);
+        auto dP = gpu::aligned_ptr<int*>(dA + B);
+        gpu::copy_host_to_device_async(dn, b.meta.data(), 3*B, s);
+        gpu::copy_host_to_device_async(dA, b.A.data(), B, s);
+        gpu::copy_host_to_device_async(dP, b.P.data(), B, s);
+        gpu::laswp_fwd_vbatched
+          (h, dn, maxn, dA, dld, dP, dnp, (unsigned int)(B));
+      };
+
       B11.create_from_column_major_gpu(A11, temp_col);
       B12.create_from_column_major_gpu(A12, temp_col);
       B21.create_from_column_major_gpu(A21, temp_col);
@@ -1975,8 +2022,14 @@ namespace strumpack {
         // as getrf. These tiles are still on the device: the strictly
         // lower tiles of B11 are only moved to the host per block row,
         // after this step (see below).
-        for (std::size_t jj=0; jj<i; jj++)
-          B11.tile(i, jj).laswp(handle2, dpiv+B11.tileroff(i), true);
+        LaswpBatch laswp1, laswp2;
+        {
+          std::vector<BLRTile<scalar_t>*> tl;
+          for (std::size_t jj=0; jj<i; jj++)
+            tl.push_back(&B11.tile(i, jj));
+          batched_laswp(laswp1, tl, dpiv+B11.tileroff(i),
+                        copy_stream, handle2);
+        }
 
         VBatchedARA<scalar_t> ara;
         for (std::size_t j=i+1; j<rb; j++) {
@@ -1989,15 +2042,20 @@ namespace strumpack {
         }
         ara.run(handle, workspace, opts.rel_tol(), opts.abs_tol());
         copy_stream.synchronize(); // stream used for getrf
+        workspace.restore(laswp1.dmem);
 
         VBatchedTRSMLeftRight<scalar_t> batched_trsm;
-        for (std::size_t j=i+1; j<rb; j++) {
-          B11.tile(i, j).laswp(handle, dpiv+B11.tileroff(i), true);
-          batched_trsm.add(D, B11.tile(i, j).U(), B11.tile(j, i).V());
-        }
-        for (std::size_t j=0; j<rb2; j++) {
-          B12.tile(i, j).laswp(handle, dpiv+B11.tileroff(i), true);
-          batched_trsm.add(D, B12.tile(i, j).U(), B21.tile(j, i).V());
+        {
+          std::vector<BLRTile<scalar_t>*> tl;
+          for (std::size_t j=i+1; j<rb; j++) {
+            tl.push_back(&B11.tile(i, j));
+            batched_trsm.add(D, B11.tile(i, j).U(), B11.tile(j, i).V());
+          }
+          for (std::size_t j=0; j<rb2; j++) {
+            tl.push_back(&B12.tile(i, j));
+            batched_trsm.add(D, B12.tile(i, j).U(), B21.tile(j, i).V());
+          }
+          batched_laswp(laswp2, tl, dpiv+B11.tileroff(i), comp_stream, handle);
         }
         batched_trsm.run(handle, workspace);
 
@@ -2091,6 +2149,7 @@ namespace strumpack {
           }
         }
         comp_stream.synchronize();
+        workspace.restore(laswp2.dmem);
       }
       if (rb > 0) {
 #pragma omp parallel for schedule(static,1)

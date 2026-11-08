@@ -29,10 +29,14 @@
 
 #include "BLRBatch.hpp"
 
+#if defined(STRUMPACK_USE_KBLAS) || defined(STRUMPACK_USE_GPU_ARA)
+#define STRUMPACK_BATCHED_ARA
+#endif
+
 #if defined(STRUMPACK_USE_MAGMA)
 #include "dense/MAGMAWrapper.hpp"
 #endif
-#if defined(STRUMPACK_USE_KBLAS)
+#if defined(STRUMPACK_BATCHED_ARA)
 #include "dense/KBLASWrapper.hpp"
 #endif
 
@@ -267,12 +271,62 @@ namespace strumpack {
 #endif
     }
 
+#if defined(STRUMPACK_USE_MAGMA) && defined(STRUMPACK_USE_GPU_ARA)
+    namespace {
+      /**
+       * Adaptive randomized approximation with the sampling and the
+       * block Gram-Schmidt done by MAGMA vbatched GEMMs. Finished
+       * tiles get zero dimensions in the GEMMs. One device to host
+       * transfer (number of active tiles) per round.
+       */
+      template<typename scalar_t, typename real_t> void
+      ara_magma_run(gpu::Handle& h, gpu::kblas::AraMagma<scalar_t,real_t>& a) {
+        using gpu::magma::gemm_vbatched_max_nocheck;
+        static_assert(sizeof(magma_int_t) == sizeof(int),
+                      "magma_int_t should be int");
+        auto mi = [](int* p) { return reinterpret_cast<magma_int_t*>(p); };
+        const scalar_t one(1.), zero(0.), mone(-1.);
+        gpu::kblas::ara_magma_init(h, a);
+        const int maxiter = a.cap + a.rstop + 2;
+        for (int iter=0; iter<maxiter; iter++) {
+          gpu::kblas::ara_magma_round(h, a, iter);
+          // Y = A * Omega, stored in columns rank..rank+nb of Q
+          gemm_vbatched_max_nocheck
+            (MagmaNoTrans, MagmaNoTrans, mi(a.ymrow), mi(a.nbv), mi(a.cols),
+             one, a.M, mi(a.ldm), a.omega, mi(a.cols), zero,
+             a.Y, mi(a.ldq), a.B, a.maxm, a.bs, a.maxn, h);
+          for (int pass=0; pass<2; pass++) {
+            // C = Q^H Y,  Y -= Q C
+            gemm_vbatched_max_nocheck
+              (MagmaConjTrans, MagmaNoTrans, mi(a.rkm), mi(a.nbv),
+               mi(a.rows), one, a.Q, mi(a.ldq), a.Y, mi(a.ldq), zero,
+               a.C, mi(a.ldc), a.B, a.cap, a.bs, a.maxm, h);
+            gemm_vbatched_max_nocheck
+              (MagmaNoTrans, MagmaNoTrans, mi(a.ymrow), mi(a.nbv),
+               mi(a.rkm), mone, a.Q, mi(a.ldq), a.C, mi(a.ldc), one,
+               a.Y, mi(a.ldq), a.B, a.maxm, a.bs, a.cap, h);
+          }
+          gpu::kblas::ara_magma_inblock(h, a);
+          int active = 0;
+          gpu::copy_device_to_host(&active, a.active, 1);
+          if (!active) break;
+        }
+        gpu::kblas::ara_magma_final(h, a);
+        // V = A^H Q
+        gemm_vbatched_max_nocheck
+          (MagmaConjTrans, MagmaNoTrans, mi(a.ymrow), mi(a.rkm), mi(a.rows),
+           one, a.M, mi(a.ldm), a.Q, mi(a.ldq), zero,
+           a.V, mi(a.ldv), a.B, a.maxn, a.cap, a.maxm, h);
+      }
+    }
+#endif
+
     template<typename scalar_t>
     const int VBatchedARA<scalar_t>::KBLAS_ARA_BLOCK_SIZE = 16;
 
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::add(std::unique_ptr<BLRTile<scalar_t>>& tile) {
-#if defined(STRUMPACK_USE_KBLAS)
+#if defined(STRUMPACK_BATCHED_ARA)
       if (tile->D().rows() <= KBLAS_ARA_BLOCK_SIZE ||
           tile->D().cols() <= KBLAS_ARA_BLOCK_SIZE)
         return;
@@ -331,7 +385,7 @@ namespace strumpack {
     VBatchedARA<scalar_t>::run_kblas(gpu::Handle& handle,
                                      VectorPool<scalar_t>& workspace,
                                      real_t rel_tol, real_t abs_tol) {
-#if defined(STRUMPACK_USE_KBLAS)
+#if defined(STRUMPACK_BATCHED_ARA)
       auto B = tile_.size();
       if (!B) return;
       int maxm = 0, maxn = 0, maxminmn = KBLAS_ARA_BLOCK_SIZE;
@@ -351,13 +405,20 @@ namespace strumpack {
       for (std::size_t i=0; i<B; i++)
         smem_size += tile_[i]->get()->D().rows()*maxminmn +
           tile_[i]->get()->D().cols()*maxminmn;
+      std::size_t magma_work = 0;
+#if defined(STRUMPACK_USE_MAGMA) && defined(STRUMPACK_USE_GPU_ARA)
+      // with MAGMA, the ARA uses batched GEMMs, otherwise the fused
+      // ARA kernel is used
+      magma_work = gpu::kblas::ara_magma_worksize<scalar_t>
+        (B, maxn, maxminmn, KBLAS_ARA_BLOCK_SIZE);
+#endif
       std::size_t dmem_size =
         gpu::round_up(5*B*sizeof(int)) +
         gpu::round_up(3*B*sizeof(scalar_t*)) +
 #if defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
         gpu::round_up(B*sizeof(real_t)) +
 #endif
-        gpu::round_up(smem_size*sizeof(scalar_t));
+        gpu::round_up(smem_size*sizeof(scalar_t)) + magma_work;
       auto dmem = workspace.get_device_bytes(dmem_size);
       auto dm = dmem.template as<int>();
       auto dn = dm + B;
@@ -385,14 +446,33 @@ namespace strumpack {
 #if defined(KBLAS_HAS_ARA_TOL_ARRAY) && KBLAS_HAS_ARA_TOL_ARRAY
       gpu::kblas::ara_tolerances
         (handle, dm, dn, dA, dm, rel_tol, abs_tol, dtol, B);
+#if defined(STRUMPACK_USE_MAGMA) && defined(STRUMPACK_USE_GPU_ARA)
+      {
+        gpu::kblas::AraMagma<scalar_t,real_t> am;
+        am.B = B;  am.bs = KBLAS_ARA_BLOCK_SIZE;  am.rstop = 10;
+        am.maxm = maxm;  am.maxn = maxn;  am.cap = maxminmn;
+        am.rows = dm;  am.cols = dn;  am.ldm = dm;  am.ldq = dm;
+        am.ldv = dn;  am.ranks = dr;  am.info = dinfo;  am.maxr = dmaxr;
+        am.M = dA;  am.Q = dU;  am.V = dV;  am.tol = dtol;
+        gpu::kblas::ara_magma_layout(am, gpu::aligned_ptr<char>(smem));
+        ara_magma_run(handle, am);
+      }
+#else
       gpu::kblas::ara_tol
         (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
          dtol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, B);
+#endif
 #else
       // Preserve the scalar absolute-tolerance behavior with older KBLAS.
       gpu::kblas::ara
         (handle, dm, dn, dA, dm, dU, dm, dV, dn, dr,
          abs_tol, maxm, maxn, dmaxr, KBLAS_ARA_BLOCK_SIZE, 10, dinfo, 0, B);
+#endif
+#if defined(STRUMPACK_USE_GPU_ARA)
+      // one batched kernel (same stream as the ARA) instead of a
+      // blocking copy and a geam per tile
+      gpu::kblas::ara_finalize
+        (handle, dm, dn, dA, dU, dm, dV, dn, dr, dinfo, B);
 #endif
       std::vector<int> ranks(B), info(B);
       gpu::copy_device_to_host(ranks.data(), dr, B);
@@ -405,11 +485,13 @@ namespace strumpack {
           DenseMW_t tU(m, rank, dA, m),
             tV(rank, n, dA+m*rank, rank);
           *tile_[i] = LRTile<scalar_t>::create_as_wrapper(tU, tV);
+#if !defined(STRUMPACK_USE_GPU_ARA)
           DenseMW_t dUtmp(m, rank, AUV[i+B], m),
             dVtmp(n, rank, AUV[i+2*B], n);
           gpu::copy_device_to_device(tU, dUtmp);
           gpu::geam<scalar_t>
             (handle, Trans::C, Trans::N, 1., dVtmp, 0., dVtmp, tV);
+#endif
         }
       }
       workspace.restore(dmem);
@@ -509,7 +591,7 @@ namespace strumpack {
     VBatchedARA<scalar_t>::run(gpu::Handle& handle,
                                VectorPool<scalar_t>& workspace,
                                real_t rel_tol, real_t abs_tol) {
-#if defined(STRUMPACK_USE_KBLAS)
+#if defined(STRUMPACK_BATCHED_ARA)
       run_kblas(handle, workspace, rel_tol, abs_tol);
 #else
 #if 0 //defined(STRUMPACK_USE_MAGMA)
@@ -523,7 +605,7 @@ namespace strumpack {
     template<typename scalar_t> void
     VBatchedARA<scalar_t>::kblas_wsquery(gpu::Handle& handle,
                                          int batchcount) {
-#if defined(STRUMPACK_USE_KBLAS)
+#if defined(STRUMPACK_BATCHED_ARA)
       gpu::kblas::ara_workspace<scalar_t>
         (handle, KBLAS_ARA_BLOCK_SIZE, batchcount);
 #endif
