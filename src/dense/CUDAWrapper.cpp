@@ -554,7 +554,10 @@ namespace strumpack {
 
     template<typename scalar_t>
     std::int64_t getrf_buffersize(Handle& handle, int n) {
-      int Lwork;
+      // cuSOLVER requires lda >= max(1,m), so n == 0 (a level of
+      // fronts with empty separators) would give INVALID_VALUE
+      n = std::max(n, 1);
+      int Lwork = 0;
       getrf_buffersize(get_cusolver_handle(handle), n, n, static_cast<scalar_t*>(nullptr), n, &Lwork);
       return Lwork;
     }
@@ -683,7 +686,8 @@ namespace strumpack {
 
     template<typename scalar_t>
     int potrf_buffersize(Handle& handle, UpLo uplo, int n) {
-      int Lwork;
+      n = std::max(n, 1); // cuSOLVER requires lda >= max(1,n)
+      int Lwork = 0;
       potrf_buffersize(handle, F2cuOp(uplo), n, static_cast<scalar_t*>(nullptr), n, &Lwork);
       return Lwork;
     }
