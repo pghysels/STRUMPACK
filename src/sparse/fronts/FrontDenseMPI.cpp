@@ -28,9 +28,12 @@
  */
 #include <fstream>
 
+#include <type_traits>
+#include <memory>
 #include "FrontDenseMPI.hpp"
 #include "FrontBLRMPI.hpp"
 #include "ExtendAdd.hpp"
+#include "dense/DistTrsmNarrow.hpp"
 #include "BLR/BLRExtendAdd.hpp"
 
 namespace strumpack {
@@ -151,6 +154,8 @@ namespace strumpack {
   (const SPOptions<scalar_t>& opts) {
     ReturnCode err_code = ReturnCode::SUCCESS;
     laswp_plan_ = LaswpPlan(); // pivots change with every factorization
+    trsm_cache_[0].reset();
+    trsm_cache_[1].reset();
     if (!this->dim_sep() || !grid()->active())
       return err_code;
     TaskTimer pf("FrontDenseMPI_factor");
@@ -306,6 +311,34 @@ namespace strumpack {
   }
 #endif
 
+  // PDTRSM for the narrow right-hand sides of the solve phase: same
+  // result, fewer and cheaper messages (see dense/DistTrsmNarrow.hpp)
+  template<typename scalar_t> static bool
+  trsm_narrow(UpLo ul, Diag d, const DistributedMatrix<scalar_t>& A,
+              DistributedMatrix<scalar_t>& B,
+              std::shared_ptr<trsmnarrow::Cache>* cache) {
+    if constexpr (std::is_same<scalar_t,double>::value) {
+      const auto g = A.grid();
+      const int m = B.rows(), n = B.cols(), nb = B.MB();
+      if (!g || !g->active() || A.rows() != m || A.cols() != m || n < 1 ||
+          A.ctxt() != B.ctxt() || A.I() != 1 || A.J() != 1 ||
+          B.I() != 1 || B.J() != 1 || A.MB() != nb || A.NB() != nb ||
+          B.NB() != nb || A.desc()[6] || A.desc()[7] || B.desc()[6] ||
+          B.desc()[7] ||
+          !trsmnarrow::applicable(m, n, nb, g->nprows(), g->npcols()))
+        return false;
+      trsmnarrow::Grid tg{g->nprows(), g->npcols(), g->prow(), g->pcol(),
+                          g->ctxt(), g->Comm_active().comm()};
+      trsmnarrow::Solver s(tg, ul == UpLo::U, d == Diag::U);
+      if (cache) {
+        if (!*cache) *cache = std::make_shared<trsmnarrow::Cache>();
+        s.cache_ = cache->get();
+      }
+      s.solve(m, n, nb, A.data(), A.desc()[8], B.data(), B.desc()[8]);
+      return true;
+    } else return false;
+  }
+
   template<typename scalar_t,typename integer_t> void
   FrontDenseMPI<scalar_t,integer_t>::fwd_solve_phase2
   (const DistM_t& F11, const DistM_t& F12, const DistM_t& F21,
@@ -343,7 +376,9 @@ namespace strumpack {
         if (this->dim_upd())
           gemv(Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
       } else {
-        trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, b);
+        if (!trsm_narrow(UpLo::L, Diag::U, F11, b,
+                         &F11 == &F11_ ? &trsm_cache_[0] : nullptr))
+          trsm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, b);
         if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
       }
@@ -412,7 +447,9 @@ namespace strumpack {
       } else {
         if (this->dim_upd())
           gemm(Trans::N, Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
-        trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, y);
+        if (!trsm_narrow(UpLo::U, Diag::N, F11, y,
+                         &F11 == &F11_ ? &trsm_cache_[1] : nullptr))
+          trsm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, y);
       }
     }
 #endif
@@ -513,6 +550,8 @@ namespace strumpack {
     if (visit(lchild_)) lchild_->delete_factors();
     if (visit(rchild_)) rchild_->delete_factors();
     laswp_plan_ = LaswpPlan();
+    trsm_cache_[0].reset();
+    trsm_cache_[1].reset();
     F11_ = DistM_t();
     F12_ = DistM_t();
     F21_ = DistM_t();
