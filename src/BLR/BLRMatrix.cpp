@@ -2169,6 +2169,10 @@ namespace strumpack {
       for (std::size_t i=0; i<rb; i++)
         for (std::size_t l=B11.tileroff(i); l<B11.tileroff(i+1); l++)
           B11.piv_[l] += B11.tileroff(i);
+      // make sure no work is in flight on either stream that still
+      // uses the buffers before they go back to the shared pool
+      copy_stream.synchronize();
+      comp_stream.synchronize();
       workspace.restore(pinned);
       workspace.restore(d_batch_matrix_mem);
       workspace.restore(dmem);

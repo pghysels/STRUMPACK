@@ -111,6 +111,11 @@ namespace strumpack {
         kblasSetStream(k_, get_cuda_stream(s));
 #endif
       }
+      void synchronize() {
+        cudaStream_t st = 0;
+        gpu_check(cublasGetStream(bh_, &st));
+        gpu_check(cudaStreamSynchronize(st));
+      }
 
       operator cublasHandle_t&() { return bh_; }
       operator const cublasHandle_t&() const { return bh_; }
@@ -138,6 +143,7 @@ namespace strumpack {
     Handle::Handle(Stream& s) { h_ = std::make_unique<HandleImpl>(s); }
     Handle::~Handle() = default;
     void Handle::set_stream(Stream& s) { h_->set_stream(s); }
+    void Handle::synchronize() { h_->synchronize(); }
 
     const cublasHandle_t& get_cublas_handle(const Handle& h) { return *(h.h_); }
     cublasHandle_t& get_cublas_handle(Handle& h) { return *(h.h_); }

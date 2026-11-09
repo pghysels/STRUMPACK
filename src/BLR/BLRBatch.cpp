@@ -195,6 +195,10 @@ namespace strumpack {
         (MagmaRight, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
          maxnr, maxm, dnr, dm, scalar_t(1.),
          dA, dm, dBr, dnr, B, h);
+      // the kernels are asynchronous and read the metadata in dmem;
+      // wait before giving the memory back to the shared pool, where
+      // another thread could grab and overwrite it
+      h.synchronize();
       workspace.restore(dmem);
 #else
       for (std::size_t i=0; i<B; i++) {
@@ -258,6 +262,7 @@ namespace strumpack {
           (MagmaRight, MagmaUpper, MagmaNoTrans, MagmaNonUnit,
            maxn, maxm, dn, dm, scalar_t(1.),
            dA, dm, dB, dn, B, h);
+      h.synchronize(); // see VBatchedTRSMLeftRight::run
       workspace.restore(dmem);
 #else
       for (std::size_t i=0; i<B; i++) {
@@ -494,6 +499,9 @@ namespace strumpack {
 #endif
         }
       }
+      // the finalizing geam/dgmm work is asynchronous on the stream of
+      // the handle; make sure it is done before dmem is recycled
+      handle.synchronize();
       workspace.restore(dmem);
 #endif
     }
@@ -520,6 +528,7 @@ namespace strumpack {
       auto dinfo = gpu::aligned_ptr<int>(wptr + compress_lwork);
       for (std::size_t i=0; i<B; i++)
         compress(handle, *tile_[i], wptr, dinfo, rel_tol, abs_tol);
+      handle.synchronize();
       workspace.restore(work);
     }
 

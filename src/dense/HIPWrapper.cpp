@@ -121,6 +121,11 @@ namespace strumpack {
         kblasSetStream(k_, get_hip_stream(s));
 #endif
       }
+      void synchronize() {
+        hipStream_t st = 0;
+        gpu_check(hipblasGetStream(bh_, &st));
+        gpu_check(hipStreamSynchronize(st));
+      }
 
       operator hipblasHandle_t&() { return bh_; }
       operator const hipblasHandle_t&() const { return bh_; }
@@ -148,6 +153,7 @@ namespace strumpack {
     Handle::Handle(Stream& s) { h_ = std::make_unique<HandleImpl>(s); }
     Handle::~Handle() = default;
     void Handle::set_stream(Stream& s) { h_->set_stream(s); }
+    void Handle::synchronize() { h_->synchronize(); }
 
     const hipblasHandle_t& get_hipblas_handle(const Handle& h) { return *(h.h_); }
     hipblasHandle_t& get_hipblas_handle(Handle& h) { return *(h.h_); }

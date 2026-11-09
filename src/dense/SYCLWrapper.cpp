@@ -160,6 +160,7 @@ namespace strumpack {
       HandleImpl(Stream& s) { set_stream(s); }
       // ~HandleImpl() = default;
       void set_stream(Stream& s) { q_ = &get_sycl_queue(s); }
+      void synchronize() { q_->wait_and_throw(); }
 
       operator sycl::queue&() { return *q_; }
       operator const sycl::queue&() const { return *q_; }
@@ -169,6 +170,7 @@ namespace strumpack {
     Handle::Handle(Stream& s) { h_ = std::make_unique<HandleImpl>(s); }
     Handle::~Handle() = default;
     void Handle::set_stream(Stream& s) { h_->set_stream(s); }
+    void Handle::synchronize() { h_->synchronize(); }
 
     const sycl::queue& get_sycl_queue(const Handle& h) { return *(h.h_); }
     sycl::queue& get_sycl_queue(Handle& h) { return *(h.h_); }
