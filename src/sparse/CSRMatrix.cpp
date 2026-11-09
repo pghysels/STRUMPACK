@@ -749,7 +749,6 @@ namespace strumpack {
   if(depth < params::task_recursion_cutoff_level)
 #endif
       for (integer_t c=0; c<nbvec; c+=B) {
-        long long int local_flops = 0;
         for (auto row=slo; row<shi; row++) { // separator rows
           const auto hij = ptr_[row+1];
           for (auto j=ptr_[row]; j<hij; j++) {

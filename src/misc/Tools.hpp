@@ -129,7 +129,7 @@ namespace strumpack {
 
 #if defined(STRUMPACK_USE_GPU)
     gpu::HostMemory<scalar_t> get_pinned(std::size_t s=0) {
-      if (pinned_data_.empty() || s == 0)
+      if (s == 0)
         return gpu::HostMemory<scalar_t>(s);
       gpu::HostMemory<scalar_t> pd;
 #pragma omp critical
@@ -154,7 +154,7 @@ namespace strumpack {
     }
 
     gpu::DeviceMemory<char> get_device_bytes(std::size_t s=0) {
-      if (device_bytes_.empty() || s == 0)
+      if (s == 0)
         return gpu::DeviceMemory<char>(s);
       gpu::DeviceMemory<char> pd;
 #pragma omp critical

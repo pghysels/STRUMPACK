@@ -71,7 +71,8 @@ namespace strumpack {
         gpu_check(cublasCreate(&bh_));
         gpu_check(cusolverDnCreate(&sh_));
 #if defined(STRUMPACK_USE_MAGMA)
-        magma_queue_create_from_cuda(0, NULL, bh_, NULL, &q_);
+        { int dev = 0; gpu_check(cudaGetDevice(&dev));
+          magma_queue_create_from_cuda(dev, NULL, bh_, NULL, &q_); }
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
         kblasCreate(&k_);
@@ -83,7 +84,8 @@ namespace strumpack {
         gpu_check(cublasCreate(&bh_));
         gpu_check(cusolverDnCreate(&sh_));
 #if defined(STRUMPACK_USE_MAGMA)
-        magma_queue_create_from_cuda(0, get_cuda_stream(s), bh_, NULL, &q_);
+        { int dev = 0; gpu_check(cudaGetDevice(&dev));
+          magma_queue_create_from_cuda(dev, get_cuda_stream(s), bh_, NULL, &q_); }
 #endif
 #if defined(STRUMPACK_USE_KBLAS)
         kblasCreate(&k_);
@@ -108,6 +110,11 @@ namespace strumpack {
 #if defined(STRUMPACK_USE_KBLAS)
         kblasSetStream(k_, get_cuda_stream(s));
 #endif
+      }
+      void synchronize() {
+        cudaStream_t st = 0;
+        gpu_check(cublasGetStream(bh_, &st));
+        gpu_check(cudaStreamSynchronize(st));
       }
 
       operator cublasHandle_t&() { return bh_; }
@@ -136,6 +143,7 @@ namespace strumpack {
     Handle::Handle(Stream& s) { h_ = std::make_unique<HandleImpl>(s); }
     Handle::~Handle() = default;
     void Handle::set_stream(Stream& s) { h_->set_stream(s); }
+    void Handle::synchronize() { h_->synchronize(); }
 
     const cublasHandle_t& get_cublas_handle(const Handle& h) { return *(h.h_); }
     cublasHandle_t& get_cublas_handle(Handle& h) { return *(h.h_); }
@@ -546,7 +554,10 @@ namespace strumpack {
 
     template<typename scalar_t>
     std::int64_t getrf_buffersize(Handle& handle, int n) {
-      int Lwork;
+      // cuSOLVER requires lda >= max(1,m), so n == 0 (a level of
+      // fronts with empty separators) would give INVALID_VALUE
+      n = std::max(n, 1);
+      int Lwork = 0;
       getrf_buffersize(get_cusolver_handle(handle), n, n, static_cast<scalar_t*>(nullptr), n, &Lwork);
       return Lwork;
     }
@@ -675,7 +686,8 @@ namespace strumpack {
 
     template<typename scalar_t>
     int potrf_buffersize(Handle& handle, UpLo uplo, int n) {
-      int Lwork;
+      n = std::max(n, 1); // cuSOLVER requires lda >= max(1,n)
+      int Lwork = 0;
       potrf_buffersize(handle, F2cuOp(uplo), n, static_cast<scalar_t*>(nullptr), n, &Lwork);
       return Lwork;
     }

@@ -59,6 +59,19 @@ if(STRUMPACK_USE_HIP)
  # install(FILES HIPWrapper.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dense)
 endif()
 
+if(STRUMPACK_USE_GPU_ARA)
+  target_sources(strumpack PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/BatchedARAKernels.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/KBLASWrapper.hpp)
+  if(STRUMPACK_USE_CUDA)
+    target_sources(strumpack PRIVATE
+      ${CMAKE_CURRENT_LIST_DIR}/CUDABatchedARA.cu)
+  elseif(STRUMPACK_USE_HIP)
+    target_sources(strumpack PRIVATE
+      ${CMAKE_CURRENT_LIST_DIR}/HIPBatchedARA.hip)
+  endif()
+endif()
+
 if(STRUMPACK_USE_SYCL)
   target_sources(strumpack PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/SYCLWrapper.hpp

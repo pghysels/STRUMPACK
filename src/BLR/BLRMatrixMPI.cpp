@@ -1975,7 +1975,7 @@ namespace strumpack {
               if (g->is_local_row(k)) {
                 for (std::size_t j=i+1, lj=0; j<B1; j++) {
                   if (g->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj) priority((k==i+1 || j==i+1) ? int(B1) : 0)
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
                          *(Tki[lk]), *(Tij[lj]), scalar_t(1.),
                          A11.tile_dense(k, j).D());
@@ -1989,7 +1989,7 @@ namespace strumpack {
               if (g->is_local_row(k)) {
                 for (std::size_t j=i+1, lj=0; j<B1; j++)
                   if (g->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj) priority((j==i+1) ? int(B1) : 0)
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
                          *(Tk2i[lk]), *(Tij[lj]), scalar_t(1.),
                          A21.tile_dense(k, j).D());
@@ -2002,7 +2002,7 @@ namespace strumpack {
               if (g->is_local_row(k)) {
                 for (std::size_t j=0, lj=0; j<B2; j++)
                   if (g->is_local_col(j)) {
-#pragma omp task default(shared) firstprivate(i,j,k,lk,lj)
+#pragma omp task default(shared) firstprivate(i,j,k,lk,lj) priority((k==i+1) ? int(B1) : 0)
                     gemm(Trans::N, Trans::N, scalar_t(-1.),
                          *(Tki[lk]), *(Tij2[lj]), scalar_t(1.),
                          A12.tile_dense(k, j).D());

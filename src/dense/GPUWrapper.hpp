@@ -74,6 +74,10 @@ namespace strumpack {
       Handle(Stream& s);
       ~Handle();
       void set_stream(Stream& s);
+      /** Block until all work submitted on the stream of this handle
+          has completed. Needed before returning device memory to a
+          shared pool. */
+      void synchronize();
 
       struct HandleImpl;
       std::unique_ptr<HandleImpl> h_;
@@ -480,4 +484,3 @@ namespace strumpack {
 } // end namespace strumpack
 
 #endif // STRUMPACK_GPU_WRAPPER_HPP
-

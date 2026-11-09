@@ -210,6 +210,19 @@ namespace strumpack {
       }
     }
 
+    // MAGMA's batched getrf does not write the pivot of 1x1 fronts, and
+    // the device pivot memory is not initialized: start from the
+    // identity permutation (1-based) so these entries are valid.
+    void init_device_pivots() {
+      if (!piv_size || f.empty()) return;
+      std::vector<int> h(piv_size);
+      std::size_t pos = 0;
+      for (auto F : f)
+        for (int k=0, ds=int(F->dim_sep()); k<ds; k++)
+          h[pos++] = k + 1;
+      gpu::copy_host_to_device<int>(f[0]->piv_, h.data(), piv_size);
+    }
+
     void set_work_pointers(void* wmem) {
       auto schur = gpu::aligned_ptr<scalar_t>(wmem);
       for (auto F : f) {
@@ -431,6 +444,7 @@ namespace strumpack {
         gpu::memset<scalar_t>(work_dptr, 0, L.Schur_size);
         gpu::memset<scalar_t>(factors_dptr, 0, L.factor_size);
         L.set_factor_pointers(factors_dptr);
+        L.init_device_pivots();
         factors_dptr += L.factor_bytes;
         L.set_work_pointers(work_dptr);
 
@@ -580,6 +594,14 @@ namespace strumpack {
         gpu::gemm(h, Trans::N, Trans::N, scalar_t(-1.),
                   dF21, dF12, scalar_t(1.), F22_);
       }
+    } else if (dupd) {
+      // Front without separator: nothing to eliminate, the front only
+      // passes on its contribution block (the extend-add of the
+      // children), which must still be moved to the device, since the
+      // parent reads it from there through get_device_F22().
+      dev_Schur_.reset(new gpu::DeviceMemory<char>(dupd*dupd*sizeof(scalar_t)));
+      F22_ = DenseMW_t(dupd, dupd, dev_Schur_->template as<scalar_t>(), dupd);
+      gpu::copy_host_to_device(F22_, F22);
     }
     // count flops
     auto level_flops = LU_flops(F11_) +
@@ -711,6 +733,7 @@ namespace strumpack {
         gpu::memset<scalar_t>(work_mem, 0, L.Schur_size);
         gpu::memset<scalar_t>(dev_factors, 0, L.factor_size);
         L.set_factor_pointers(dev_factors);
+        L.init_device_pivots();
         L.set_work_pointers(work_mem);
         old_work = work_mem;
 
