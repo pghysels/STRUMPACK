@@ -108,6 +108,8 @@ namespace strumpack {
 
     void delete_factors() override;
 
+    DenseM_t schur_complement() const override { return F11_; }
+
     std::string type() const override { return "FrontDense"; }
 
 #if defined(STRUMPACK_USE_MPI)

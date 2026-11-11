@@ -122,6 +122,30 @@ namespace strumpack {
 
     virtual void delete_factors() {}
 
+    /**
+     * Make this the root front of a tree with Schur variables, which
+     * form its separator. It is assembled but not factored, so that
+     * its F11 block is the Schur complement onto them, and the solves
+     * stop at it.
+     */
+    void set_schur_root() { schur_root_ = true; }
+
+    /**
+     * The Schur complement, the F11 block of the root front with
+     * Schur variables (empty for front types without it). A
+     * distributed front gathers it on the root of its communicator.
+     */
+    virtual DenseM_t schur_complement() const { return DenseM_t(); }
+
+    /**
+     * The solves of the root front with Schur variables. The forward
+     * sweep condenses b onto them, in the rows of this front's
+     * separator. With expand, the values of the Schur variables are
+     * given in those rows, and the backward sweep then gives the
+     * other variables.
+     */
+    void schur_solve(DenseM_t& b, bool expand) const;
+
     virtual void multifrontal_solve(DenseM_t& b) const;
 
     virtual void
@@ -324,6 +348,8 @@ namespace strumpack {
     }
 
 #if defined(STRUMPACK_USE_MPI)
+    void schur_solve(DenseM_t& bloc, DistM_t* bdist, bool expand) const;
+
     virtual void
     multifrontal_solve(DenseM_t& bloc, DistM_t* bdist) const;
 
@@ -439,6 +465,7 @@ namespace strumpack {
     integer_t sep_, sep_begin_, sep_end_;
     std::vector<integer_t> upd_;
     std::unique_ptr<F_t> lchild_, rchild_;
+    bool schur_root_ = false;
 
     // cached result of upd_to_parent, used in the solve phase
     mutable std::vector<std::size_t> upd2pa_;

@@ -105,6 +105,8 @@ namespace strumpack {
                                int etree_level=0, int task_depth=0)
       override;
 
+    DenseM_t schur_complement() const override { return F11_.gather(); }
+
     void
     forward_multifrontal_solve(DenseM_t& bloc, DistM_t* bdist,
                                DistM_t& bupd, DenseM_t& seqbupd,

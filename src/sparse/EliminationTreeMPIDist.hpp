@@ -30,6 +30,7 @@
 #define ELIMINATION_TREE_MPI_DIST_HPP
 
 #include <cstddef>
+#include <functional>
 #include <map>
 
 #include "EliminationTreeMPI.hpp"
@@ -70,6 +71,13 @@ namespace strumpack {
 
     void multifrontal_solve_dist(DenseM_t& x,
                                  const std::vector<integer_t>& dist) override;
+
+    /**
+     * The solves with Schur variables (Front::schur_solve), for x in
+     * the row distribution dist of the input matrix.
+     */
+    void schur_solve_dist(DenseM_t& x, const std::vector<integer_t>& dist,
+                          bool expand);
 
     std::tuple<int,int,int>
     get_sparse_mapped_destination(const CSRMPI_t& A,
@@ -129,7 +137,11 @@ namespace strumpack {
       std::vector<int> out_dst_c;
     };
     std::map<int,SolvePerm> solve_perm_;
-    void multifrontal_solve_dist_cached(DenseM_t& x, const SolvePerm& sp);
+    using TreeSolve = std::function<void(DenseM_t&,DistM_t*)>;
+    void solve_dist(DenseM_t& x, const std::vector<integer_t>& dist,
+                    const TreeSolve& solve);
+    void multifrontal_solve_dist_cached(DenseM_t& x, const SolvePerm& sp,
+                                        const TreeSolve& solve);
 
     struct ParallelFront {
       ParallelFront() {}

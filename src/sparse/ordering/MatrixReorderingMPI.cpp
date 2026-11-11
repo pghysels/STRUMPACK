@@ -73,6 +73,13 @@ namespace strumpack {
       auto P = comm_->size();
       auto Aseq = A.gather_graph();
       SeparatorTree<integer_t> global_sep_tree;
+      // with Schur variables, order the graph of the other variables
+      std::vector<integer_t> other;
+      if (Aseq && !this->schur_.empty()) {
+        *Aseq = this->schur_free_graph(*Aseq, other);
+        perm_.resize(Aseq->size());
+        iperm_.resize(Aseq->size());
+      }
       if (Aseq) { // only root
         switch (opts.reordering_method()) {
         case ReorderingStrategy::NATURAL: {
@@ -127,6 +134,7 @@ namespace strumpack {
         default: assert(true);
         }
         Aseq.reset();
+        this->add_schur_root(global_sep_tree, other);
         global_sep_tree.check();
       }
       comm_->broadcast(perm_);

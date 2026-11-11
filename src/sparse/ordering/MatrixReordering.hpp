@@ -38,6 +38,7 @@
 #include "misc/MPIWrapper.hpp"
 #endif
 #include "sparse/SeparatorTree.hpp"
+#include "sparse/CSRGraph.hpp"
 
 namespace strumpack {
 
@@ -71,6 +72,16 @@ namespace strumpack {
     const SeparatorTree<integer_t>& tree() const { return tree_; }
     SeparatorTree<integer_t>& tree() { return tree_; }
 
+    /**
+     * Set the Schur variables (indices in the input matrix). The
+     * reordering orders the graph of the other variables, and then
+     * the Schur variables last, as the root separator.
+     */
+    void set_schur_variables(const std::vector<integer_t>& s) {
+      schur_ = s;
+    }
+    integer_t schur_size() const { return schur_.size(); }
+
   protected:
     virtual void
     separator_reordering_print(integer_t max_nr_neighbours,
@@ -84,6 +95,35 @@ namespace strumpack {
     std::vector<integer_t> perm_, iperm_;
 
     SeparatorTree<integer_t> tree_;
+
+    std::vector<integer_t> schur_;
+
+    /**
+     * The graph of A without the Schur variables, and the variables
+     * of its vertices, in other.
+     */
+    template<typename G> CSRGraph<integer_t>
+    schur_free_graph(const G& A, std::vector<integer_t>& other) const {
+      integer_t n = A.size();
+      std::vector<integer_t> num(n, 0);
+      for (auto s : schur_) num[s] = -1;
+      other.clear();
+      for (integer_t i=0; i<n; i++)
+        if (num[i] != -1) {
+          num[i] = other.size();
+          other.push_back(i);
+        }
+      std::vector<integer_t> ptr(other.size()+1, 0), ind;
+      for (std::size_t q=0; q<other.size(); q++) {
+        for (integer_t t=A.ptr()[other[q]]; t<A.ptr()[other[q]+1]; t++)
+          if (num[A.ind()[t]] >= 0) ind.push_back(num[A.ind()[t]]);
+        ptr[q+1] = ind.size();
+      }
+      return CSRGraph<integer_t>(std::move(ptr), std::move(ind));
+    }
+
+    void add_schur_root(SeparatorTree<integer_t>& tree,
+                        const std::vector<integer_t>& other);
 
   private:
     void
