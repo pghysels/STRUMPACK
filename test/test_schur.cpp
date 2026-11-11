@@ -348,6 +348,11 @@ int test_errors() {
   }
   {
     auto sp = solver();
+    expect("a negative number of Schur variables",
+           sp->set_schur_variables(-1, c.s.data()));
+  }
+  {
+    auto sp = solver();
     sp->factor();
     expect("Schur variables set after the factorization",
            sp->set_schur_variables(c.s.size(), c.s.data()));

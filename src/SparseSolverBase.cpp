@@ -732,6 +732,7 @@ namespace strumpack {
   (integer_t n, const integer_t* vars) {
     if (reordered_)
       return schur_error("set them before the matrix is reordered");
+    if (n < 0) return schur_error("their number must not be negative");
     schur_.assign(vars, vars+n);
     return ReturnCode::SUCCESS;
   }
