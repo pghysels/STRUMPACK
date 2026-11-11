@@ -430,18 +430,25 @@ namespace strumpack {
       equil_.type == EquilibrationType::BOTH;
     bool col = equil_.type == EquilibrationType::COLUMN ||
       equil_.type == EquilibrationType::BOTH;
-    DenseM_t bloc(N, d);
+    DenseM_t bloc(N, d), xs;
     transform_b(b, bloc);
     // the Schur variables are the last rows of the permuted vectors
-    if (expand)
+    if (expand) {
+      xs = DenseM_t(ns, d);
       for (integer_t j=0; j<d; j++)
-        for (integer_t i=0; i<ns; i++)
-          bloc(N-ns+i, j) = col ?
-            x(schur_[i], j) / equil_.C[schur_[i]] : x(schur_[i], j);
+        for (integer_t i=0; i<ns; i++) {
+          xs(i, j) = x(schur_[i], j);
+          bloc(N-ns+i, j) = col ? xs(i, j) / equil_.C[schur_[i]] : xs(i, j);
+        }
+    }
     tree()->root()->schur_solve(bloc, expand);
     if (expand) {
       x.copy(bloc);
       transform_x(x, bloc);
+      // the given values, not their unscaled equilibrated ones
+      for (integer_t j=0; j<d; j++)
+        for (integer_t i=0; i<ns; i++)
+          x(schur_[i], j) = xs(i, j);
     } else {
       x.zero();
       for (integer_t j=0; j<d; j++)

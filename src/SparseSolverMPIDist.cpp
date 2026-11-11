@@ -527,18 +527,26 @@ namespace strumpack {
     bool col = eq.type == EquilibrationType::COLUMN ||
       eq.type == EquilibrationType::BOTH;
     integer_t lo = mat_mpi_->begin_row(), hi = mat_mpi_->end_row();
-    DenseM_t v(b);
+    DenseM_t v(b), xs;
     if (row) v.scale_rows_real(eq.R);
-    if (expand)
+    if (expand) {
+      xs = DenseM_t(s.size(), v.cols());
       for (std::size_t i=0; i<s.size(); i++)
         if (s[i] >= lo && s[i] < hi)
-          for (std::size_t j=0; j<v.cols(); j++)
-            v(s[i]-lo, j) = col ?
-              x(s[i]-lo, j) / eq.C[s[i]] : x(s[i]-lo, j);
+          for (std::size_t j=0; j<v.cols(); j++) {
+            xs(i, j) = x(s[i]-lo, j);
+            v(s[i]-lo, j) = col ? xs(i, j) / eq.C[s[i]] : xs(i, j);
+          }
+    }
     tree_mpi_dist_->schur_solve_dist(v, mat_mpi_->dist(), expand);
     if (expand) {
       x.copy(v);
       if (col) x.scale_rows_real(eq.C.data() + lo);
+      // the given values, not their unscaled equilibrated ones
+      for (std::size_t i=0; i<s.size(); i++)
+        if (s[i] >= lo && s[i] < hi)
+          for (std::size_t j=0; j<v.cols(); j++)
+            x(s[i]-lo, j) = xs(i, j);
     } else {
       x.zero();
       for (std::size_t i=0; i<s.size(); i++)

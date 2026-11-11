@@ -179,7 +179,8 @@ template<typename scalar_t> struct Reference {
 };
 
 // Relative errors of S (on the root), g in the Schur rows, and x, for
-// rows [lo, lo + g.rows()) of the problem, with g zero in the others.
+// rows [lo, lo + g.rows()) of the problem, with g zero in the others
+// and x exactly the given values in the Schur rows.
 template<typename scalar_t> std::array<double,3>
 errors(const Reference<scalar_t>& ref, const std::vector<int>& s, int lo,
        const DenseMatrix<scalar_t>* S, const DenseMatrix<scalar_t>& g,
@@ -199,7 +200,8 @@ errors(const Reference<scalar_t>& ref, const std::vector<int>& s, int lo,
       double eg = (row[r] < 0) ? std::abs(g(r, c)) :
         std::abs(g(r, c) - ref.g(row[r], c));
       err[1] = std::max(err[1], eg / gmax);
-      err[2] = std::max(err[2], std::abs(x(r, c) - ref.x(lo + r, c)) / xmax);
+      double ex = std::abs(x(r, c) - ref.x(lo + r, c)) / xmax;
+      err[2] = std::max(err[2], (row[r] >= 0 && ex > 0.) ? 1. : ex);
     }
   return err;
 }
