@@ -5,6 +5,7 @@ add_executable(test_BLR_pivot  test_BLR_pivot.cpp)
 add_executable(test_matrix_IO  test_matrix_IO.cpp)
 add_executable(test_SPD_seq test_SPD_seq.cpp)
 add_executable(test_SPD_mixedPrecision test_SPD_mixedPrecision.cpp)
+add_executable(test_schur test_schur.cpp)
 
 target_link_libraries(test_HSS_seq strumpack)
 target_link_libraries(test_sparse_seq strumpack)
@@ -13,6 +14,7 @@ target_link_libraries(test_BLR_pivot strumpack)
 target_link_libraries(test_matrix_IO strumpack)
 target_link_libraries(test_SPD_seq strumpack)
 target_link_libraries(test_SPD_mixedPrecision strumpack)
+target_link_libraries(test_schur strumpack)
 
 # Sparse test matrices are downloaded (into the build/test directory)
 # by the Download_sparse_test_matrices test, which is a fixture setup
@@ -108,6 +110,13 @@ if(STRUMPACK_USE_MPI)
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_trsm_narrow_mpi)
   set_property(TEST "user_test_trsm_narrow_mpi" PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  foreach(np 1 3 4)
+    strumpack_add_test("user_test_schur_mpi_${np}" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${np}
+      ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+      ${CMAKE_CURRENT_BINARY_DIR}/test_schur)
+  endforeach()
+else()
+  strumpack_add_test("user_test_schur" ${CMAKE_CURRENT_BINARY_DIR}/test_schur)
 endif()
 
 set(test_name "HSS_seq_1")
