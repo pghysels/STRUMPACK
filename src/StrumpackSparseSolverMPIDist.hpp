@@ -324,6 +324,12 @@ namespace strumpack {
 
     void delete_factors_internal() override;
 
+    integer_t local_rows() const override { return mat_mpi_->local_rows(); }
+
+    DenseM_t schur_complement_internal() override;
+    ReturnCode schur_solve_internal(const DenseM_t& b, DenseM_t& x,
+                                    bool expand) override;
+
     ReturnCode
     solve_internal(const scalar_t* b, scalar_t* x,
                    bool use_initial_guess=false) override;

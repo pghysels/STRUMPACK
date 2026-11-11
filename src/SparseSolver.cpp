@@ -37,6 +37,7 @@
 #include "StrumpackOptions.hpp"
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
+#include "sparse/fronts/Front.hpp"
 #include "iterative/IterativeSolvers.hpp"
 
 namespace strumpack {
@@ -401,6 +402,54 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   SparseSolver<scalar_t,integer_t>::delete_factors_internal() {
     tree_.reset(nullptr);
+  }
+
+  template<typename scalar_t,typename integer_t> DenseMatrix<scalar_t>
+  SparseSolver<scalar_t,integer_t>::schur_complement_internal() {
+    // the Schur variables are ordered last, in their given order, so
+    // the Schur complement of the equilibrated matrix R A C is
+    // R_s S C_s
+    auto S = tree()->root()->schur_complement();
+    bool row = equil_.type == EquilibrationType::ROW ||
+      equil_.type == EquilibrationType::BOTH;
+    bool col = equil_.type == EquilibrationType::COLUMN ||
+      equil_.type == EquilibrationType::BOTH;
+    if (row || col)
+      for (std::size_t j=0; j<S.cols(); j++)
+        for (std::size_t i=0; i<S.rows(); i++)
+          S(i,j) /= (row ? equil_.R[schur_[i]] : 1) *
+            (col ? equil_.C[schur_[j]] : 1);
+    return S;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolver<scalar_t,integer_t>::schur_solve_internal
+  (const DenseM_t& b, DenseM_t& x, bool expand) {
+    integer_t N = matrix()->size(), d = b.cols(), ns = schur_.size();
+    bool row = equil_.type == EquilibrationType::ROW ||
+      equil_.type == EquilibrationType::BOTH;
+    bool col = equil_.type == EquilibrationType::COLUMN ||
+      equil_.type == EquilibrationType::BOTH;
+    DenseM_t bloc(N, d);
+    transform_b(b, bloc);
+    // the Schur variables are the last rows of the permuted vectors
+    if (expand)
+      for (integer_t j=0; j<d; j++)
+        for (integer_t i=0; i<ns; i++)
+          bloc(N-ns+i, j) = col ?
+            x(schur_[i], j) / equil_.C[schur_[i]] : x(schur_[i], j);
+    tree()->root()->schur_solve(bloc, expand);
+    if (expand) {
+      x.copy(bloc);
+      transform_x(x, bloc);
+    } else {
+      x.zero();
+      for (integer_t j=0; j<d; j++)
+        for (integer_t i=0; i<ns; i++)
+          x(schur_[i], j) = row ?
+            bloc(N-ns+i, j) / equil_.R[schur_[i]] : bloc(N-ns+i, j);
+    }
+    return ReturnCode::SUCCESS;
   }
 
   // explicit template instantiations
