@@ -235,9 +235,11 @@ template<typename scalar_t> struct Case {
 };
 
 template<typename scalar_t> int
-test_sequential(Case<scalar_t> c, const std::string& name, bool pointers) {
+test_sequential(Case<scalar_t> c, const std::string& name, bool pointers,
+                ReorderingStrategy order) {
   SparseSolver<scalar_t,int> sp(false);
   sp.options().set_matching(MatchingJob::NONE);
+  sp.options().set_reordering_method(order);
   sp.set_csr_matrix(c.A.n, c.A.ptr.data(), c.A.ind.data(), c.A.val.data(),
                     true);
   sp.set_schur_variables(c.s.size(), c.s.data());
@@ -434,7 +436,11 @@ run(const std::string& type, bool root
       std::string name = type + ", " + (plane ? "a plane" : "random points") +
         ", " + std::to_string(nrhs) + " right-hand side" +
         (nrhs > 1 ? "s" : "");
-      if (root) nfail += test_sequential(c, name, nrhs > 1);
+      if (root) {
+        nfail += test_sequential(c, name, nrhs > 1, ReorderingStrategy::METIS);
+        nfail += test_sequential
+          (c, name + ", AMD", nrhs > 1, ReorderingStrategy::AMD);
+      }
 #if defined(STRUMPACK_USE_MPI)
       nfail += test_distributed(c, name, comm);
 #endif

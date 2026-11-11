@@ -73,19 +73,49 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> int
   MatrixReordering<scalar_t,integer_t>::nested_dissection
-  (const Opts_t& opts, const CSR_t& Aall,
+  (const Opts_t& opts, const CSR_t& A,
    int nx, int ny, int nz, int components, int width) {
-    // with Schur variables, order the graph of the other variables
-    std::vector<integer_t> other;
-    CSR_t Aother;
-    if (!schur_.empty()) {
-      auto G = schur_free_graph(Aall, other);
-      std::vector<scalar_t> zeros(G.ptr()[G.size()]);
-      Aother = CSR_t(G.size(), G.ptr(), G.ind(), zeros.data(), true);
+    int ierr = 0;
+    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
+      tree_ = geometric_ND(A, nx, ny, nz, components, width,
+                           perm_, iperm_, opts);
+    else if (schur_.empty())
+      ierr = graph_nested_dissection(opts, A);
+    else {
+      // with Schur variables, order the graph of the other variables,
+      // and the Schur variables last
+      std::vector<integer_t> other;
+      auto G = schur_free_graph(A, other);
       perm_.resize(G.size());
       iperm_.resize(G.size());
+      ierr = graph_nested_dissection(opts, G);
+      if (!ierr) add_schur_root(tree_, other);
     }
-    const CSR_t& A = schur_.empty() ? Aall : Aother;
+    if (ierr) return ierr;
+    tree_.check();
+    // STRUMPACK_DUMP_ORDERING=file: write the ordering and separator
+    // tree for offline analysis (results_nd/tools/front_stats.cpp).
+    // Format (64-bit ints): n, nseps, perm[n], iperm[n],
+    // sizes[nseps+1], parent[nseps].
+    if (auto fn = std::getenv("STRUMPACK_DUMP_ORDERING")) {
+      if (FILE* f = std::fopen(fn, "wb")) {
+        auto w = [&](long long v) { std::fwrite(&v, sizeof(v), 1, f); };
+        long long n = perm_.size(), ns = tree_.separators();
+        w(n); w(ns);
+        for (auto v : perm_) w(v);
+        for (auto v : iperm_) w(v);
+        for (long long i=0; i<=ns; i++) w(tree_.sizes[i]);
+        for (long long i=0; i<ns; i++) w(tree_.parent[i]);
+        std::fclose(f);
+      }
+    }
+    nested_dissection_print(opts, A.nnz(), opts.verbose());
+    return 0;
+  }
+
+  template<typename scalar_t,typename integer_t> template<typename G> int
+  MatrixReordering<scalar_t,integer_t>::graph_nested_dissection
+  (const Opts_t& opts, const G& A) {
     switch (opts.reordering_method()) {
     case ReorderingStrategy::NATURAL: {
       std::iota(perm_.begin(), perm_.end(), 0);
@@ -104,11 +134,6 @@ namespace strumpack {
                 << std::endl;
       abort();
 #endif
-      break;
-    }
-    case ReorderingStrategy::GEOMETRIC: {
-      tree_ = geometric_ND(A, nx, ny, nz, components, width,
-                           perm_, iperm_, opts);
       break;
     }
     case ReorderingStrategy::RCM: {
@@ -144,25 +169,6 @@ namespace strumpack {
         "\tuse SparseSolverMPIDist instead." << std::endl;
       return 1;
     }
-    add_schur_root(tree_, other);
-    tree_.check();
-    // STRUMPACK_DUMP_ORDERING=file: write the ordering and separator
-    // tree for offline analysis (results_nd/tools/front_stats.cpp).
-    // Format (64-bit ints): n, nseps, perm[n], iperm[n],
-    // sizes[nseps+1], parent[nseps].
-    if (auto fn = std::getenv("STRUMPACK_DUMP_ORDERING")) {
-      if (FILE* f = std::fopen(fn, "wb")) {
-        auto w = [&](long long v) { std::fwrite(&v, sizeof(v), 1, f); };
-        long long n = perm_.size(), ns = tree_.separators();
-        w(n); w(ns);
-        for (auto v : perm_) w(v);
-        for (auto v : iperm_) w(v);
-        for (long long i=0; i<=ns; i++) w(tree_.sizes[i]);
-        for (long long i=0; i<ns; i++) w(tree_.parent[i]);
-        std::fclose(f);
-      }
-    }
-    nested_dissection_print(opts, A.nnz(), opts.verbose());
     return 0;
   }
 

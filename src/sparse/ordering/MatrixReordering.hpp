@@ -125,6 +125,13 @@ namespace strumpack {
     void add_schur_root(SeparatorTree<integer_t>& tree,
                         const std::vector<integer_t>& other);
 
+    /**
+     * The sequential graph reorderings (all but the geometric one),
+     * of the matrix or of its graph without the Schur variables.
+     */
+    template<typename G> int
+    graph_nested_dissection(const Opts_t& opts, const G& A);
+
   private:
     void
     nested_dissection_print(const Opts_t& opts, integer_t nnz,
