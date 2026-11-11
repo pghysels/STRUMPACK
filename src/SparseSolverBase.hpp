@@ -433,7 +433,8 @@ namespace strumpack {
      * The inertia will not be correct if pivoting was performed, in
      * which case the return value will be
      * ReturnCode::INACCURATE_INERTIA.  Inertia also cannot be
-     * computed when compression is applied (fi, HSS, HODLR, ...).
+     * computed when compression is applied (fi, HSS, HODLR, ...),
+     * nor with Schur variables (ReturnCode::SCHUR_ERROR).
      *
      * \param neg number of negative eigenvalues (if return value is
      * ReturnCode::SUCCESS)

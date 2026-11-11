@@ -343,6 +343,8 @@ int test_errors() {
     expect("solve with Schur variables", sp->solve(c.b.data(), x.data()));
     expect("solve with Schur variables",
            sp->solve(1, c.b.data(), c.b.ld(), x.data(), x.ld()));
+    int neg, zero, pos;
+    expect("inertia with Schur variables", sp->inertia(neg, zero, pos));
   }
   {
     auto sp = solver();

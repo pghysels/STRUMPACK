@@ -132,6 +132,8 @@ namespace strumpack {
   SparseSolverBase<scalar_t,integer_t>::inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) {
     neg = zero = pos = 0;
+    // the root front with Schur variables is not factored
+    if (!schur_.empty()) return schur_error("the inertia is not available");
     if (opts_.matching() != MatchingJob::NONE)
       return ReturnCode::INACCURATE_INERTIA;
     if (!this->factored_) {
