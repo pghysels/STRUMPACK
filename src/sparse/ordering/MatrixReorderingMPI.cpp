@@ -233,6 +233,9 @@ namespace strumpack {
         (Aseq->ptr(), Aseq->ind(), perm_, iperm_);
       Aseq.reset();
     }
+    // build_sep_tree_from_perm changes the permutation (postorder of
+    // the elimination tree), on the root only
+    comm_->broadcast(perm_);
     auto rank = comm_->rank();
     auto P = comm_->size();
     integer_t nbsep;
