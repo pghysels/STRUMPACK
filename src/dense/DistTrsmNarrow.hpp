@@ -188,7 +188,8 @@ namespace strumpack {
     }
 
     // copies of the blocks of A used by the window chains (see
-    // Solver::cptrsm_fanin), valid until A changes
+    // Solver::cptrsm_fanin), valid until A changes; each kb_i x kb_j
+    // block is stored packed (leading dimension kb_i)
     struct Cache {
       std::map<std::pair<int,long long>, std::vector<double>> L;
       bool built = false;
@@ -739,8 +740,7 @@ namespace strumpack {
                             V.data() + std::size_t(cc)*ldv);
               } else add(kbi, N, own.data(), kbi, V.data(), ldv);
               auto& L = cache_->L[key(i, j)];
-              const int ldl = Ald;
-              blas::gemm('N', 'T', kbi, N, kbj, -1., L.data(), ldl,
+              blas::gemm('N', 'T', kbi, N, kbj, -1., L.data(), kbi,
                          xr.data(), N, 1., V.data(), ldv);
               break;
             }
@@ -841,8 +841,8 @@ namespace strumpack {
               for (int qq=std::max(0, q-Pc+1); qq<q; qq++) {
                 int j = blk(qq);
                 auto& L = cache_->L[std::make_pair(k, (long long)t * nbl + j)];
-                L.resize(std::size_t(lda) * (kbs(j) - 1) + kbs(t));
-                recv(L.data(), kbs(t), kbs(j), lda,
+                L.resize(std::size_t(kbs(t)) * kbs(j));
+                recv(L.data(), kbs(t), kbs(j), kbs(t),
                      g_.rank(myrow, colof(j)), tag_l);
               }
             }
