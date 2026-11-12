@@ -258,6 +258,7 @@ namespace strumpack {
   (const SpMat_t& A, const Opts_t& opts,
    int etree_level, int task_depth) {
     ReturnCode err_code = ReturnCode::SUCCESS;
+    if (this->schur_root_) return err_code;
     if (dim_sep()) {
       if (F11_.LU(piv_, task_depth))
         err_code = ReturnCode::ZERO_PIVOT;

@@ -268,6 +268,7 @@ namespace strumpack {
     }
     if (lchild_) lchild_->release_work_memory();
     if (rchild_) rchild_->release_work_memory();
+    if (this->schur_root_) return err_code;
     auto ef = partial_factorization(opts);
     if (ef != ReturnCode::SUCCESS) err_code = ef;
 #if defined(STRUMPACK_USE_ZFP) || defined(STRUMPACK_USE_SZ3)
@@ -412,7 +413,8 @@ namespace strumpack {
       fwd_solve_phase2(F11, F12, F21, b, bupd);
     } else
 #endif
-      fwd_solve_phase2(F11_, F12_, F21_, b, bupd);
+      if (!this->schur_root_)
+        fwd_solve_phase2(F11_, F12_, F21_, b, bupd);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -470,7 +472,8 @@ namespace strumpack {
       bwd_solve_phase1(F11, F12, F21, y, yupd);
     } else
 #endif
-      bwd_solve_phase1(F11_, F12_, F21_, y, yupd);
+      if (!this->schur_root_)
+        bwd_solve_phase1(F11_, F12_, F21_, y, yupd);
     DistM_t CBl, CBr;
     DenseM_t seqCBl, seqCBr;
     this->extract_b(y, yupd, CBl, CBr, seqCBl, seqCBr);

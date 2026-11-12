@@ -243,6 +243,10 @@ namespace strumpack {
 
     void delete_factors_internal() override;
 
+    DenseM_t schur_complement_internal() override;
+    ReturnCode schur_solve_internal(const DenseM_t& b, DenseM_t& x,
+                                    bool expand) override;
+
     void transform_x0(DenseM_t& x, DenseM_t& xtmp);
     void transform_b(const DenseM_t& b, DenseM_t& bloc);
     void transform_x(DenseM_t& x, DenseM_t& xtmp);
@@ -260,6 +264,7 @@ namespace strumpack {
     using SPBase_t::reordered_;
     using SPBase_t::Krylov_its_;
     using SPBase_t::solve_internal;
+    using SPBase_t::schur_;
   };
 
   template<typename scalar_t,typename integer_t>

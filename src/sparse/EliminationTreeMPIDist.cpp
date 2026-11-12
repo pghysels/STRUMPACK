@@ -245,6 +245,20 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_solve_dist
   (DenseM_t& x, const std::vector<integer_t>& dist) {
+    solve_dist(x, dist, [&](DenseM_t& bloc, DistM_t* bdist) {
+      this->root_->multifrontal_solve(bloc, bdist); });
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  EliminationTreeMPIDist<scalar_t,integer_t>::schur_solve_dist
+  (DenseM_t& x, const std::vector<integer_t>& dist, bool expand) {
+    solve_dist(x, dist, [&](DenseM_t& bloc, DistM_t* bdist) {
+      this->root_->schur_solve(bloc, bdist, expand); });
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  EliminationTreeMPIDist<scalar_t,integer_t>::solve_dist
+  (DenseM_t& x, const std::vector<integer_t>& dist, const TreeSolve& solve) {
     integer_t B = DistM_t::default_MB;
     integer_t lo = dist[rank_];
     integer_t m = dist[rank_+1] - lo, n = x.cols();
@@ -257,7 +271,7 @@ namespace strumpack {
     // solves only exchange the values.
     auto& sp = solve_perm_[n];
     if (sp.ready && sp.m == m) {
-      multifrontal_solve_dist_cached(x, sp);
+      multifrontal_solve_dist_cached(x, sp, solve);
       return;
     }
     sp = SolvePerm();
@@ -371,7 +385,7 @@ namespace strumpack {
       }
     }
 
-    this->root_->multifrontal_solve(Xloc, xdist.data());
+    solve(Xloc, xdist.data());
 
     rcnts = ibuf;
     scnts = ibuf + P_;
@@ -427,7 +441,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::multifrontal_solve_dist_cached
-  (DenseM_t& x, const SolvePerm& sp) {
+  (DenseM_t& x, const SolvePerm& sp, const TreeSolve& solve) {
     auto n = x.cols();
     std::vector<scalar_t> sval(sp.in_src_r.size()), rval(sp.in_dst_f.size());
     for (std::size_t k=0; k<sval.size(); k++)
@@ -449,7 +463,7 @@ namespace strumpack {
       (f < 0 ? xloc.data() : xdist[f].data())[sp.in_dst_off[i]] = rval[i];
     }
 
-    this->root_->multifrontal_solve(Xloc, xdist.data());
+    solve(Xloc, xdist.data());
 
     for (std::size_t k=0; k<rval.size(); k++) {
       auto f = sp.out_src_f[k];

@@ -31,6 +31,7 @@
 #include "iterative/IterativeSolversMPI.hpp"
 #include "sparse/ordering/MatrixReorderingMPI.hpp"
 #include "sparse/Redistribute.hpp"
+#include "sparse/fronts/Front.hpp"
 
 namespace strumpack {
 
@@ -487,6 +488,74 @@ namespace strumpack {
   SparseSolverMPIDist<scalar_t,integer_t>::
   delete_factors_internal() {
     tree_mpi_dist_->delete_factors();
+  }
+
+  template<typename scalar_t,typename integer_t> DenseMatrix<scalar_t>
+  SparseSolverMPIDist<scalar_t,integer_t>::schur_complement_internal() {
+    using real_t = typename RealType<scalar_t>::value_type;
+    // gathered on the root (see SparseSolver::schur_complement_internal)
+    auto S = tree()->root()->schur_complement();
+    const auto& s = this->schur_;
+    const auto& eq = this->equil_;
+    bool row = eq.type == EquilibrationType::ROW ||
+      eq.type == EquilibrationType::BOTH;
+    bool col = eq.type == EquilibrationType::COLUMN ||
+      eq.type == EquilibrationType::BOTH;
+    if (!row && !col) return S;
+    // the row scaling of the Schur variables, from the processes
+    // holding their rows
+    std::vector<real_t> Rs(s.size(), 0.);
+    if (row) {
+      integer_t lo = mat_mpi_->begin_row(), hi = mat_mpi_->end_row();
+      for (std::size_t i=0; i<s.size(); i++)
+        if (s[i] >= lo && s[i] < hi) Rs[i] = eq.R[s[i]-lo];
+      comm_.all_reduce(Rs, MPI_SUM);
+    }
+    for (std::size_t j=0; j<S.cols(); j++)
+      for (std::size_t i=0; i<S.rows(); i++)
+        S(i,j) /= (row ? Rs[i] : 1) * (col ? eq.C[s[j]] : 1);
+    return S;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverMPIDist<scalar_t,integer_t>::schur_solve_internal
+  (const DenseM_t& b, DenseM_t& x, bool expand) {
+    const auto& s = this->schur_;
+    const auto& eq = this->equil_;
+    bool row = eq.type == EquilibrationType::ROW ||
+      eq.type == EquilibrationType::BOTH;
+    bool col = eq.type == EquilibrationType::COLUMN ||
+      eq.type == EquilibrationType::BOTH;
+    integer_t lo = mat_mpi_->begin_row(), hi = mat_mpi_->end_row();
+    DenseM_t v(b), xs;
+    if (row) v.scale_rows_real(eq.R);
+    if (expand) {
+      xs = DenseM_t(s.size(), v.cols());
+      for (std::size_t i=0; i<s.size(); i++)
+        if (s[i] >= lo && s[i] < hi)
+          for (std::size_t j=0; j<v.cols(); j++) {
+            xs(i, j) = x(s[i]-lo, j);
+            v(s[i]-lo, j) = col ? xs(i, j) / eq.C[s[i]] : xs(i, j);
+          }
+    }
+    tree_mpi_dist_->schur_solve_dist(v, mat_mpi_->dist(), expand);
+    if (expand) {
+      x.copy(v);
+      if (col) x.scale_rows_real(eq.C.data() + lo);
+      // the given values, not their unscaled equilibrated ones
+      for (std::size_t i=0; i<s.size(); i++)
+        if (s[i] >= lo && s[i] < hi)
+          for (std::size_t j=0; j<v.cols(); j++)
+            x(s[i]-lo, j) = xs(i, j);
+    } else {
+      x.zero();
+      for (std::size_t i=0; i<s.size(); i++)
+        if (s[i] >= lo && s[i] < hi)
+          for (std::size_t j=0; j<v.cols(); j++)
+            x(s[i]-lo, j) = row ?
+              v(s[i]-lo, j) / eq.R[s[i]-lo] : v(s[i]-lo, j);
+    }
+    return ReturnCode::SUCCESS;
   }
 
   // explicit template instantiations

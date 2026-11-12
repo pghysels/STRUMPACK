@@ -279,6 +279,83 @@ namespace strumpack {
                      bool use_initial_guess=false);
 
     /**
+     * Set the Schur variables, with the other variables, i, ordered
+     * as A = [A_ii A_is; A_si A_ss]. The reordering places them last,
+     * and the factorization leaves them unfactored: it computes the
+     * Schur complement S = A_ss - A_si A_ii^{-1} A_is, returned by
+     * get_schur_complement, and the factors of A_ii, which
+     * schur_condense and schur_expand apply. solve() is not available
+     * with Schur variables. This must be called before reorder()
+     * (directly, or through factor()), and needs a sequential graph
+     * reordering method (not GEOMETRIC), no matching, no compression
+     * and no GPU. The matrix values can be updated, and refactored,
+     * as usual.
+     *
+     * \param n Number of Schur variables, smaller than the dimension
+     * of the matrix.
+     * \param vars The Schur variables, indices (0-based) of rows of
+     * the input matrix, without duplicates. For SparseSolverMPIDist,
+     * the same on every process.
+     * \return error code
+     */
+    ReturnCode set_schur_variables(integer_t n, const integer_t* vars);
+
+    /**
+     * Get the Schur complement onto the Schur variables. Calls
+     * factor() if needed.
+     *
+     * \param S Output, the n x n Schur complement, with its rows and
+     * columns in the order of the Schur variables. For
+     * SparseSolverMPIDist, it is set on the root process only (and is
+     * empty on the others). Collective.
+     * \return error code
+     * \see set_schur_variables
+     */
+    ReturnCode get_schur_complement(DenseM_t& S);
+
+    /**
+     * Condense right-hand sides onto the Schur variables: g_s = b_s -
+     * A_si A_ii^{-1} b_i. Calls factor() if needed.
+     *
+     * \param b Input, the right-hand sides, laid out as for solve().
+     * \param g Output, laid out as b, with g_s in the rows of the
+     * Schur variables and 0 in the other rows.
+     * \return error code
+     * \see set_schur_variables, schur_expand
+     */
+    ReturnCode schur_condense(const DenseM_t& b, DenseM_t& g);
+
+    /**
+     * Expand the values of the Schur variables to the other
+     * variables: x_i = A_ii^{-1} (b_i - A_is x_s). Calls factor() if
+     * needed.
+     *
+     * \param b Input, the right-hand sides, laid out as for solve();
+     * the rows of the Schur variables are not used.
+     * \param x Input and output, laid out as b. On input, x_s in the
+     * rows of the Schur variables; on output, x_i in the other rows.
+     * \return error code
+     * \see set_schur_variables, schur_condense
+     */
+    ReturnCode schur_expand(const DenseM_t& b, DenseM_t& x);
+
+    /**
+     * As schur_condense(const DenseM_t&, DenseM_t&), with nrhs
+     * right-hand sides in b, with leading dimension ldb, and g, with
+     * leading dimension ldg.
+     */
+    ReturnCode schur_condense(int nrhs, const scalar_t* b, int ldb,
+                              scalar_t* g, int ldg);
+
+    /**
+     * As schur_expand(const DenseM_t&, DenseM_t&), with nrhs
+     * right-hand sides in b, with leading dimension ldb, and x, with
+     * leading dimension ldx.
+     */
+    ReturnCode schur_expand(int nrhs, const scalar_t* b, int ldb,
+                            scalar_t* x, int ldx);
+
+    /**
      * Return the object holding the options for this sparse solver.
      */
     SPOptions<scalar_t>& options();
@@ -356,7 +433,8 @@ namespace strumpack {
      * The inertia will not be correct if pivoting was performed, in
      * which case the return value will be
      * ReturnCode::INACCURATE_INERTIA.  Inertia also cannot be
-     * computed when compression is applied (fi, HSS, HODLR, ...).
+     * computed when compression is applied (fi, HSS, HODLR, ...),
+     * nor with Schur variables (ReturnCode::SCHUR_ERROR).
      *
      * \param neg number of negative eigenvalues (if return value is
      * ReturnCode::SUCCESS)
@@ -438,6 +516,17 @@ namespace strumpack {
                               scalar_t* x, int ldx,
                               bool use_initial_guess=false);
 
+    // Number of rows of the vectors of the solves on this process.
+    virtual integer_t local_rows() const { return matrix()->size(); }
+
+    // With Schur variables: the unscaled Schur complement (on the root
+    // process), and the condensation or expansion of solves.
+    virtual DenseM_t schur_complement_internal() = 0;
+    virtual ReturnCode schur_solve_internal(const DenseM_t& b, DenseM_t& x,
+                                            bool expand) = 0;
+
+    std::vector<integer_t> schur_;
+
     SPOptions<scalar_t> opts_;
     bool is_root_;
 
@@ -464,6 +553,10 @@ namespace strumpack {
 #endif
 
   private:
+    ReturnCode schur_error(const std::string& msg) const;
+    ReturnCode check_schur_variables(const int* p) const;
+    ReturnCode schur_solve(const DenseM_t& b, DenseM_t& x, bool expand);
+
     ReturnCode reorder_internal(const int* p, int base,
                                 int nx, int ny, int nz,
                                 int components, int width);

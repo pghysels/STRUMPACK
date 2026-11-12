@@ -236,6 +236,23 @@ namespace strumpack {
   }
 
   template<typename scalar_t,typename integer_t> void
+  Front<scalar_t,integer_t>::schur_solve(DenseM_t& b, bool expand) const {
+    std::vector<DenseM_t> CB(levels());
+    for (std::size_t i=0; i<CB.size(); i++)
+      CB[i] = DenseM_t(max_dim_upd(), b.cols());
+    // the forward sweep adds the condensation to the rows of the
+    // Schur variables, which hold their values when expanding
+    DenseMW_t bs(dim_sep(), b.cols(), b, sep_begin_, 0);
+    DenseM_t xs;
+    if (expand) xs = bs;
+    forward_multifrontal_solve(b, CB.data());
+    if (expand) {
+      bs.copy(xs);
+      backward_multifrontal_solve(b, CB.data());
+    }
+  }
+
+  template<typename scalar_t,typename integer_t> void
   Front<scalar_t,integer_t>::forward_multifrontal_solve
   (DenseM_t& b, DenseM_t* work, int etree_level, int task_depth) const {
     DenseMW_t bupd(dim_upd(), b.cols(), work[0], 0, 0);
@@ -246,7 +263,9 @@ namespace strumpack {
 #pragma omp single nowait
       this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
       // no tasking for the root node computations, use system blas threading!
-      fwd_solve_phase2(b, bupd, etree_level, params::task_recursion_cutoff_level);
+      if (!schur_root_)
+        fwd_solve_phase2
+          (b, bupd, etree_level, params::task_recursion_cutoff_level);
     } else {
       this->fwd_solve_phase1(b, bupd, work, etree_level, task_depth);
       fwd_solve_phase2(b, bupd, etree_level, task_depth);
@@ -304,8 +323,9 @@ namespace strumpack {
     DenseMW_t yupd(dim_upd(), y.cols(), work[0], 0, 0);
     if (task_depth == 0) {
       // no tasking in blas routines, use system threaded blas instead
-      bwd_solve_phase1
-        (y, yupd, etree_level, params::task_recursion_cutoff_level);
+      if (!schur_root_)
+        bwd_solve_phase1
+          (y, yupd, etree_level, params::task_recursion_cutoff_level);
 #pragma omp parallel if(!omp_in_parallel())
 #pragma omp single nowait
       // tasking when calling children
@@ -428,6 +448,30 @@ namespace strumpack {
   }
 
 #if defined(STRUMPACK_USE_MPI)
+  template<typename scalar_t,typename integer_t> void
+  Front<scalar_t,integer_t>::schur_solve
+  (DenseM_t& bloc, DistM_t* bdist, bool expand) const {
+    DistM_t CB;
+    DenseM_t seqCB;
+    // as in the sequential solve, the separator's rows hold the values
+    // of the Schur variables when expanding, distributed for a
+    // distributed front
+    DistM_t xsd;
+    DenseM_t xs;
+    DenseMW_t bs(grid() ? 0 : dim_sep(), bloc.cols(), bloc,
+                 grid() ? 0 : sep_begin_, 0);
+    if (expand) {
+      if (grid()) xsd = bdist[sep_];
+      else xs = bs;
+    }
+    forward_multifrontal_solve(bloc, bdist, CB, seqCB);
+    if (expand) {
+      if (grid()) bdist[sep_] = xsd;
+      else bs.copy(xs);
+      backward_multifrontal_solve(bloc, bdist, CB, seqCB);
+    }
+  }
+
   template<typename scalar_t,typename integer_t> void
   Front<scalar_t,integer_t>::multifrontal_solve
   (DenseM_t& bloc, DistM_t* bdist) const {

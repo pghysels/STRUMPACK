@@ -75,6 +75,47 @@ namespace strumpack {
   MatrixReordering<scalar_t,integer_t>::nested_dissection
   (const Opts_t& opts, const CSR_t& A,
    int nx, int ny, int nz, int components, int width) {
+    int ierr = 0;
+    if (opts.reordering_method() == ReorderingStrategy::GEOMETRIC)
+      tree_ = geometric_ND(A, nx, ny, nz, components, width,
+                           perm_, iperm_, opts);
+    else if (schur_.empty())
+      ierr = graph_nested_dissection(opts, A);
+    else {
+      // with Schur variables, order the graph of the other variables,
+      // and the Schur variables last
+      std::vector<integer_t> other;
+      auto G = schur_free_graph(A, other);
+      perm_.resize(G.size());
+      iperm_.resize(G.size());
+      ierr = graph_nested_dissection(opts, G);
+      if (!ierr) add_schur_root(tree_, other);
+    }
+    if (ierr) return ierr;
+    tree_.check();
+    // STRUMPACK_DUMP_ORDERING=file: write the ordering and separator
+    // tree for offline analysis (results_nd/tools/front_stats.cpp).
+    // Format (64-bit ints): n, nseps, perm[n], iperm[n],
+    // sizes[nseps+1], parent[nseps].
+    if (auto fn = std::getenv("STRUMPACK_DUMP_ORDERING")) {
+      if (FILE* f = std::fopen(fn, "wb")) {
+        auto w = [&](long long v) { std::fwrite(&v, sizeof(v), 1, f); };
+        long long n = perm_.size(), ns = tree_.separators();
+        w(n); w(ns);
+        for (auto v : perm_) w(v);
+        for (auto v : iperm_) w(v);
+        for (long long i=0; i<=ns; i++) w(tree_.sizes[i]);
+        for (long long i=0; i<ns; i++) w(tree_.parent[i]);
+        std::fclose(f);
+      }
+    }
+    nested_dissection_print(opts, A.nnz(), opts.verbose());
+    return 0;
+  }
+
+  template<typename scalar_t,typename integer_t> template<typename G> int
+  MatrixReordering<scalar_t,integer_t>::graph_nested_dissection
+  (const Opts_t& opts, const G& A) {
     switch (opts.reordering_method()) {
     case ReorderingStrategy::NATURAL: {
       std::iota(perm_.begin(), perm_.end(), 0);
@@ -93,11 +134,6 @@ namespace strumpack {
                 << std::endl;
       abort();
 #endif
-      break;
-    }
-    case ReorderingStrategy::GEOMETRIC: {
-      tree_ = geometric_ND(A, nx, ny, nz, components, width,
-                           perm_, iperm_, opts);
       break;
     }
     case ReorderingStrategy::RCM: {
@@ -133,25 +169,46 @@ namespace strumpack {
         "\tuse SparseSolverMPIDist instead." << std::endl;
       return 1;
     }
-    tree_.check();
-    // STRUMPACK_DUMP_ORDERING=file: write the ordering and separator
-    // tree for offline analysis (results_nd/tools/front_stats.cpp).
-    // Format (64-bit ints): n, nseps, perm[n], iperm[n],
-    // sizes[nseps+1], parent[nseps].
-    if (auto fn = std::getenv("STRUMPACK_DUMP_ORDERING")) {
-      if (FILE* f = std::fopen(fn, "wb")) {
-        auto w = [&](long long v) { std::fwrite(&v, sizeof(v), 1, f); };
-        long long n = perm_.size(), ns = tree_.separators();
-        w(n); w(ns);
-        for (auto v : perm_) w(v);
-        for (auto v : iperm_) w(v);
-        for (long long i=0; i<=ns; i++) w(tree_.sizes[i]);
-        for (long long i=0; i<ns; i++) w(tree_.parent[i]);
-        std::fclose(f);
-      }
-    }
-    nested_dissection_print(opts, A.nnz(), opts.verbose());
     return 0;
+  }
+
+  /**
+   * Turn the permutation and the separator tree of the graph without
+   * the Schur variables (the variables other) into those of all the
+   * variables: the Schur variables are ordered last, as a new root
+   * separator. Its left child is the previous root, and its right
+   * child an empty leaf, so that the tree remains a full binary tree.
+   */
+  template<typename scalar_t,typename integer_t> void
+  MatrixReordering<scalar_t,integer_t>::add_schur_root
+  (SeparatorTree<integer_t>& tree, const std::vector<integer_t>& other) {
+    if (schur_.empty()) return;
+    integer_t ni = other.size(), ns = schur_.size(), n = ni + ns,
+      nsep = tree.separators();
+    std::vector<integer_t> perm(n);
+    for (integer_t i=0; i<ni; i++) perm[other[i]] = perm_[i];
+    for (integer_t i=0; i<ns; i++) perm[schur_[i]] = ni + i;
+    perm_ = std::move(perm);
+    iperm_.resize(n);
+    for (integer_t i=0; i<n; i++) iperm_[perm_[i]] = i;
+    SeparatorTree<integer_t> t(nsep + 2);
+    for (integer_t sep=0; sep<nsep; sep++) {
+      t.sizes[sep] = tree.sizes[sep];
+      t.parent[sep] = tree.parent[sep];
+      t.lch[sep] = tree.lch[sep];
+      t.rch[sep] = tree.rch[sep];
+    }
+    auto root = tree.root();
+    integer_t leaf = nsep, top = nsep + 1;
+    t.parent[root] = top;
+    t.sizes[leaf] = t.sizes[top] = ni;
+    t.parent[leaf] = top;
+    t.lch[leaf] = t.rch[leaf] = -1;
+    t.sizes[top+1] = n;
+    t.parent[top] = -1;
+    t.lch[top] = root;
+    t.rch[top] = leaf;
+    tree = std::move(t);
   }
 
   template<typename scalar_t,typename integer_t> int

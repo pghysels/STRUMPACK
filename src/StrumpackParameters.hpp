@@ -53,7 +53,8 @@ namespace strumpack { // these are all global variables
     REORDERING_ERROR,   /*!< The matrix reordering failed.          */
     ZERO_PIVOT,         /*!< A zero pivot was encountered.          */
     NO_CONVERGENCE,     /*!< The iterative solver did not converge. */
-    INACCURATE_INERTIA  /*!< Inertia could not be computed.         */
+    INACCURATE_INERTIA, /*!< Inertia could not be computed.         */
+    SCHUR_ERROR         /*!< Invalid use of Schur variables.        */
   };
 
   inline std::ostream& operator<<(std::ostream& os, ReturnCode& e) {
@@ -64,6 +65,7 @@ namespace strumpack { // these are all global variables
     case ReturnCode::ZERO_PIVOT:         os << "ZERO_PIVOT"; break;
     case ReturnCode::NO_CONVERGENCE:     os << "NO_CONVERGENCE"; break;
     case ReturnCode::INACCURATE_INERTIA: os << "INACCURATE_INERTIA"; break;
+    case ReturnCode::SCHUR_ERROR:        os << "SCHUR_ERROR"; break;
     }
     return os;
   }

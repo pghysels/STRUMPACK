@@ -316,6 +316,42 @@ should only point to the local parts!
 
 
 
+# Schur Complement
+
+To condense the system onto a set of variables s, with the other
+variables i, so that \f$A = [A_{ii}\ A_{is};\ A_{si}\ A_{ss}]\f$, set
+them before the reordering:
+
+\code {.cpp}
+ReturnCode strumpack::SparseSolverBase::set_schur_variables(integer n, const integer* vars);
+\endcode
+
+The reordering then orders the graph of the other variables, and
+places the Schur variables last, as the root separator. The
+factorization leaves the root front unfactored. Its frontal matrix is the Schur
+complement \f$S = A_{ss} - A_{si} A_{ii}^{-1} A_{is}\f$, obtained at
+about the cost of one factorization, instead of one solve with
+\f$A_{ii}\f$ per Schur variable. After the factorization,
+
+\code {.cpp}
+ReturnCode get_schur_complement(DenseMatrix<scalar>& S);
+ReturnCode schur_condense(const DenseMatrix<scalar>& b, DenseMatrix<scalar>& g);
+ReturnCode schur_expand(const DenseMatrix<scalar>& b, DenseMatrix<scalar>& x);
+\endcode
+
+return S (on the root process for \link
+strumpack::StrumpackSparseSolverMPIDist SpMPIDist\endlink), the
+condensed right-hand sides \f$g_s = b_s - A_{si} A_{ii}^{-1} b_i\f$,
+and the expansion \f$x_i = A_{ii}^{-1} (b_i - A_{is} x_s)\f$ of given
+values \f$x_s\f$ of the Schur variables, in the rows of x. The vectors
+are laid out as for solve(), which is not available with Schur
+variables. Schur variables need a sequential graph reordering method
+(such as METIS, the default, but not GEOMETRIC), no matching
+(MatchingJob::NONE), no compression and no GPU. The matrix values can be updated and
+refactored as usual.
+
+
+
 # Reordering
 
 The STRUMPACK sparse solver applies three different matrix orderings

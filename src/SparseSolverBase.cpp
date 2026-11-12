@@ -36,6 +36,7 @@
 #include "StrumpackOptions.hpp"
 #include "sparse/ordering/MatrixReordering.hpp"
 #include "sparse/EliminationTree.hpp"
+#include "sparse/fronts/Front.hpp"
 #include "iterative/IterativeSolvers.hpp"
 #include "dense/GPUWrapper.hpp"
 
@@ -131,6 +132,8 @@ namespace strumpack {
   SparseSolverBase<scalar_t,integer_t>::inertia
   (integer_t& neg, integer_t& zero, integer_t& pos) {
     neg = zero = pos = 0;
+    // the root front with Schur variables is not factored
+    if (!schur_.empty()) return schur_error("the inertia is not available");
     if (opts_.matching() != MatchingJob::NONE)
       return ReturnCode::INACCURATE_INERTIA;
     if (!this->factored_) {
@@ -319,6 +322,10 @@ namespace strumpack {
    int components, int width) {
     if (!matrix()) return ReturnCode::MATRIX_NOT_SET;
     if (reordered_) return ReturnCode::SUCCESS;
+    if (!schur_.empty()) {
+      auto err = check_schur_variables(p);
+      if (err != ReturnCode::SUCCESS) return err;
+    }
     TaskTimer t1("permute-scale");
     int ierr;
     if (opts_.verbose() && is_root_)
@@ -365,6 +372,7 @@ namespace strumpack {
     perf_counters_start();
     t3.start();
     setup_reordering();
+    reordering()->set_schur_variables(schur_);
     ierr = compute_reordering(p, base, nx, ny, nz, components, width);
     if (ierr) {
       std::cerr << "ERROR: nested dissection went wrong, ierr="
@@ -384,6 +392,7 @@ namespace strumpack {
 
     perf_counters_start();
     TaskTimer t0("symbolic-factorization", [&](){ setup_tree(); });
+    if (!schur_.empty()) tree()->root()->set_schur_root();
     /* do not clear the tree data, because if we update the matrix
      * values, we want to reuse this information */
     // reordering()->clear_tree_data();
@@ -696,6 +705,9 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> ReturnCode
   SparseSolverBase<scalar_t,integer_t>::solve
   (const DenseM_t& b, DenseM_t& x, bool use_initial_guess) {
+    // the other solve() overloads come here through solve_internal
+    if (!schur_.empty())
+      return schur_error("use schur_condense and schur_expand to solve");
     return solve_internal(b, x, use_initial_guess);
   }
 
@@ -704,6 +716,107 @@ namespace strumpack {
   (int nrhs, const scalar_t* b, int ldb, scalar_t* x, int ldx,
    bool use_initial_guess) {
     return solve_internal(nrhs, b, ldb, x, ldx, use_initial_guess);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::schur_error
+  (const std::string& msg) const {
+    if (is_root_)
+      std::cerr << "ERROR: with Schur variables, " << msg << "."
+                << std::endl;
+    return ReturnCode::SCHUR_ERROR;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::set_schur_variables
+  (integer_t n, const integer_t* vars) {
+    if (reordered_)
+      return schur_error("set them before the matrix is reordered");
+    if (n < 0) return schur_error("their number must not be negative");
+    schur_.assign(vars, vars+n);
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::check_schur_variables
+  (const int* p) const {
+    integer_t n = matrix()->size();
+    if (integer_t(schur_.size()) >= n)
+      return schur_error("there must be fewer of them than rows");
+    std::vector<bool> mark(n, false);
+    for (auto s : schur_) {
+      if (s < 0 || s >= n)
+        return schur_error("they must be rows of the matrix");
+      if (mark[s]) return schur_error("they must not repeat");
+      mark[s] = true;
+    }
+    if (p) return schur_error("a given permutation is not supported");
+    // is_parallel includes the geometric reordering
+    if (is_parallel(opts_.reordering_method()))
+      return schur_error("the reordering method must be a sequential "
+                         "graph reordering");
+    if (opts_.matching() != MatchingJob::NONE)
+      return schur_error("matching is not supported");
+    if (opts_.compression() != CompressionType::NONE)
+      return schur_error("compression is not supported");
+    if (opts_.use_gpu())
+      return schur_error("the GPU is not supported");
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::get_schur_complement(DenseM_t& S) {
+    if (schur_.empty()) return schur_error("none are set");
+    if (!factored_) {
+      auto err = factor();
+      if (err != ReturnCode::SUCCESS) return err;
+    }
+    S = schur_complement_internal();
+    return ReturnCode::SUCCESS;
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::schur_solve
+  (const DenseM_t& b, DenseM_t& x, bool expand) {
+    if (schur_.empty()) return schur_error("none are set");
+    if (!factored_) {
+      auto err = factor();
+      if (err != ReturnCode::SUCCESS) return err;
+    }
+    assert(b.rows() == x.rows() && b.cols() == x.cols());
+    return schur_solve_internal(b, x, expand);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::schur_condense
+  (const DenseM_t& b, DenseM_t& g) {
+    return schur_solve(b, g, false);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::schur_expand
+  (const DenseM_t& b, DenseM_t& x) {
+    return schur_solve(b, x, true);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::schur_condense
+  (int nrhs, const scalar_t* b, int ldb, scalar_t* g, int ldg) {
+    if (!nrhs) return ReturnCode::SUCCESS;
+    auto N = local_rows();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMW_t G(N, nrhs, g, ldg);
+    return schur_solve(*B, G, false);
+  }
+
+  template<typename scalar_t,typename integer_t> ReturnCode
+  SparseSolverBase<scalar_t,integer_t>::schur_expand
+  (int nrhs, const scalar_t* b, int ldb, scalar_t* x, int ldx) {
+    if (!nrhs) return ReturnCode::SUCCESS;
+    auto N = local_rows();
+    auto B = ConstDenseMatrixWrapperPtr(N, nrhs, b, ldb);
+    DenseMW_t X(N, nrhs, x, ldx);
+    return schur_solve(*B, X, true);
   }
 
   template<typename scalar_t,typename integer_t> ReturnCode
