@@ -398,7 +398,7 @@ namespace strumpack {
    */
   template<typename scalar_t,typename integer_t> CSRGraph<integer_t>
   CSRMatrixMPI<scalar_t,integer_t>::get_sub_graph
-  (const std::vector<integer_t>& perm,
+  (const integer_t* perm,
    const std::vector<std::pair<integer_t,integer_t>>& graph_ranges) const {
     auto rank = comm_.rank();
     auto P = comm_.size();

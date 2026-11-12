@@ -153,9 +153,15 @@ namespace strumpack {
     add_missing_diagonal(const scalar_t& s) const;
 
     CSRGraph<integer_t>
-    get_sub_graph(const std::vector<integer_t>& perm,
+    get_sub_graph(const integer_t* perm,
                   const std::vector<std::pair<integer_t,integer_t>>&
                   graph_ranges) const;
+    CSRGraph<integer_t>
+    get_sub_graph(const std::vector<integer_t>& perm,
+                  const std::vector<std::pair<integer_t,integer_t>>&
+                  graph_ranges) const {
+      return get_sub_graph(perm.data(), graph_ranges);
+    }
 
     CSRGraph<integer_t>
     extract_graph(int ordering_level,

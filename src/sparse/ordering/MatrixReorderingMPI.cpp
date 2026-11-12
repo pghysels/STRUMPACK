@@ -29,6 +29,10 @@
 
 #include <unordered_map>
 #include <algorithm>
+#include <cstdlib>
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/statvfs.h>
+#endif
 
 #include "MatrixReorderingMPI.hpp"
 #include "StrumpackConfig.hpp"
@@ -58,19 +62,156 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t>
   MatrixReorderingMPI<scalar_t,integer_t>::MatrixReorderingMPI
   (integer_t n, const MPIComm& c)
-    : MatrixReordering<scalar_t,integer_t>(n), comm_(&c), dsep_leaf_(-1) {
+    : MatrixReordering<scalar_t,integer_t>(0), comm_(&c), n_(n),
+      dsep_leaf_(-1) {
+    // perm_ and iperm_ are allocated when the permutation is
+    // computed, and not at all when it is shared per node
   }
 
   template<typename scalar_t,typename integer_t>
-  MatrixReorderingMPI<scalar_t,integer_t>::~MatrixReorderingMPI() {}
+  MatrixReorderingMPI<scalar_t,integer_t>::~MatrixReorderingMPI() {
+    free_shared_perm();
+  }
+
+  template<typename scalar_t,typename integer_t> void
+  MatrixReorderingMPI<scalar_t,integer_t>::alloc_perm() {
+    perm_.resize(n_);
+    iperm_.resize(n_);
+  }
+
+  /**
+   * Collective. Frees the node-shared permutation, if any.
+   */
+  template<typename scalar_t,typename integer_t> void
+  MatrixReorderingMPI<scalar_t,integer_t>::free_shared_perm() {
+    if (shm_win_ == MPI_WIN_NULL) return;
+    int finalized = 0;
+    MPI_Finalized(&finalized);
+    if (!finalized) {
+      MPI_Win_unlock_all(shm_win_);
+      MPI_Win_free(&shm_win_);
+      MPI_Comm_free(&shm_comm_);
+    }
+    shm_win_ = MPI_WIN_NULL;
+    shm_comm_ = MPI_COMM_NULL;
+    shm_perm_ = shm_iperm_ = nullptr;
+  }
+
+  /**
+   * Collective. On entry the root holds the permutation in perm_ (and
+   * the other processes nothing). The lowest rank of every node
+   * allocates a shared window of 2n integers, the root broadcasts the
+   * permutation to these node leaders, which compute the inverse, and
+   * all processes of the node read both with perm_data() and
+   * iperm_data(). perm_ and iperm_ are then released. Returns false,
+   * on all processes, if a window could not be allocated; perm_ and
+   * iperm_ are then unchanged.
+   *
+   * For testing, STRUMPACK_SHARED_PERM_GROUP=k makes groups of k
+   * consecutive ranks act as nodes (the ranks of a group must still
+   * be able to share memory), so several node leaders can be tested
+   * on one node.
+   */
+  template<typename scalar_t,typename integer_t> bool
+  MatrixReorderingMPI<scalar_t,integer_t>::share_perm() {
+    free_shared_perm();
+    auto comm = comm_->comm();
+    int rank = comm_->rank(), lrank;
+    if (auto g = std::getenv("STRUMPACK_SHARED_PERM_GROUP"))
+      MPI_Comm_split(comm, rank / std::max(1, std::atoi(g)), rank, &shm_comm_);
+    else
+      MPI_Comm_split_type
+        (comm, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &shm_comm_);
+    MPI_Comm_rank(shm_comm_, &lrank);
+    MPI_Comm_set_errhandler(shm_comm_, MPI_ERRORS_RETURN);
+    MPI_Aint bytes = (lrank == 0) ? shared_perm_bytes() : 0;
+    // The window is usually backed by a file in /dev/shm (Linux). A
+    // failure for lack of space there cannot be handled. Open MPI
+    // (5.0) asks for 5% more free space than the size of the file
+    // (the window and a header), and when the node leader cannot
+    // create it, the other processes of the node keep waiting in
+    // MPI_Win_allocate_shared. And the pages of the file are not
+    // reserved: if the space runs out later, writing to the window
+    // raises SIGBUS. So check the free space of /dev/shm, if there
+    // is one, before allocating, with a margin of 10% and 1 MB. This
+    // is a best effort: the free space can change, and the MPI
+    // library can put the file elsewhere.
+    int ok = 1;
+#if defined(__unix__) || defined(__APPLE__)
+    struct statvfs fs;
+    if (bytes && !statvfs("/dev/shm", &fs) &&
+        double(fs.f_bavail) * double(fs.f_frsize) <
+        1.1 * double(bytes) + double(1 << 20))
+      ok = 0;
+#endif
+    // An error of MPI_Win_allocate_shared on all processes of a node
+    // (an MPI library or configuration without shared memory
+    // windows) is handled: all processes then keep a copy.
+    integer_t* base = nullptr;
+    ok = comm_->all_reduce(ok, MPI_MIN);
+    if (ok) {
+      int ierr = MPI_Win_allocate_shared
+        (bytes, sizeof(integer_t), MPI_INFO_NULL, shm_comm_, &base, &shm_win_);
+      ok = comm_->all_reduce(int(ierr == MPI_SUCCESS), MPI_MIN);
+      if (!ok && ierr == MPI_SUCCESS) MPI_Win_free(&shm_win_);
+    }
+    if (!ok) {
+      shm_win_ = MPI_WIN_NULL;
+      MPI_Comm_free(&shm_comm_);
+      shm_comm_ = MPI_COMM_NULL;
+      return false;
+    }
+    MPI_Aint qbytes;
+    int qdisp;
+    MPI_Win_shared_query(shm_win_, 0, &qbytes, &qdisp, &base);
+    MPI_Win_lock_all(MPI_MODE_NOCHECK, shm_win_);
+    shm_perm_ = base;
+    shm_iperm_ = base + n_;
+    MPI_Comm leaders;
+    MPI_Comm_split(comm, lrank == 0 ? 0 : MPI_UNDEFINED, rank, &leaders);
+    if (lrank == 0) {
+      // the root is the leader of its node, and rank 0 of leaders
+      if (rank == 0) std::copy(perm_.begin(), perm_.end(), shm_perm_);
+      const std::size_t n = n_, chunk = std::size_t(1) << 28;
+      for (std::size_t i=0; i<n; i+=chunk)
+        MPI_Bcast(shm_perm_+i, int(std::min(chunk, n-i)),
+                  mpi_type<integer_t>(), 0, leaders);
+      for (integer_t i=0; i<n_; i++) shm_iperm_[shm_perm_[i]] = i;
+      MPI_Comm_free(&leaders);
+    }
+    MPI_Win_sync(shm_win_);
+    MPI_Barrier(shm_comm_);
+    MPI_Win_sync(shm_win_);
+    std::vector<integer_t>().swap(perm_);
+    std::vector<integer_t>().swap(iperm_);
+    return true;
+  }
+
+  /**
+   * Collective. Replaces the node-shared permutation, if any, by a
+   * copy per process.
+   */
+  template<typename scalar_t,typename integer_t> void
+  MatrixReorderingMPI<scalar_t,integer_t>::unshare_perm() {
+    if (shm_win_ == MPI_WIN_NULL) return;
+    alloc_perm();
+    std::copy(shm_perm_, shm_perm_+n_, perm_.data());
+    std::copy(shm_iperm_, shm_iperm_+n_, iperm_.data());
+    free_shared_perm();
+  }
 
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::nested_dissection
   (const Opts_t& opts, const CSRMPI_t& A,
    int nx, int ny, int nz, int components, int width) {
+    free_shared_perm();
     if (!is_parallel(opts.reordering_method())) {
       auto rank = comm_->rank();
       auto P = comm_->size();
+      // separator_reordering (compression) modifies the permutation
+      bool shared = opts.use_shared_permutation() &&
+        opts.compression() == CompressionType::NONE;
+      if (!shared || !rank) alloc_perm();
       auto Aseq = A.gather_graph();
       SeparatorTree<integer_t> global_sep_tree;
       // with Schur variables, order the graph of the other variables
@@ -137,8 +278,21 @@ namespace strumpack {
         this->add_schur_root(global_sep_tree, other);
         global_sep_tree.check();
       }
-      comm_->broadcast(perm_);
-      comm_->broadcast(iperm_);
+      if (shared && !share_perm()) {
+        if (!rank)
+          std::cerr << "# WARNING: enable_shared_permutation: could not"
+                    << " allocate a shared memory window of "
+                    << shared_perm_bytes() / 1e6 << " MB per node"
+                    << " (MPI_Win_allocate_shared failed, or not enough"
+                    << " free space in /dev/shm), using a copy of the"
+                    << " permutation per process" << std::endl;
+        shared = false;
+        if (rank) alloc_perm();
+      }
+      if (!shared) {
+        comm_->broadcast(perm_);
+        comm_->broadcast(iperm_);
+      }
       integer_t nbsep;
       if (!rank) nbsep = global_sep_tree.separators();
       comm_->broadcast(nbsep);
@@ -149,10 +303,12 @@ namespace strumpack {
       tree_ = global_sep_tree.toptree(P);
       ltree_.check();
       tree_.check();
-      for (std::size_t i=0; i<perm_.size(); i++)
-        iperm_[perm_[i]] = i;
+      if (!shared)
+        for (std::size_t i=0; i<perm_.size(); i++)
+          iperm_[perm_[i]] = i;
       get_local_graphs(A);
     } else {
+      alloc_perm();
       switch (opts.reordering_method()) {
       case ReorderingStrategy::GEOMETRIC: {
         if (nx*ny*nz*components != A.size()) {
@@ -222,6 +378,8 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> int
   MatrixReorderingMPI<scalar_t,integer_t>::set_permutation
   (const Opts_t& opts, const CSRMPI_t& A, const int* p, int base) {
+    free_shared_perm();
+    alloc_perm();
     auto n = perm_.size();
     assert(A.size() == integer_t(n));
     if (base == 0) std::copy(p, p+n, perm_.data());
@@ -258,6 +416,9 @@ namespace strumpack {
   (const Opts_t& opts, CSM_t& A, F_t* F) {
     if (opts.compression() == CompressionType::NONE)
       return;
+    // compression enabled after a reordering with the shared
+    // permutation, which is modified here
+    unshare_perm();
     auto n = A.size();
     std::vector<integer_t> sorder(n, -1);
 #pragma omp parallel
@@ -301,8 +462,8 @@ namespace strumpack {
     }
     sub_graph_range = sub_graph_ranges[rank];
     dist_sep_range = dist_sep_ranges[rank];
-    my_sub_graph = A.get_sub_graph(perm_, sub_graph_ranges);
-    my_dist_sep = A.get_sub_graph(perm_, dist_sep_ranges);
+    my_sub_graph = A.get_sub_graph(perm_data(), sub_graph_ranges);
+    my_dist_sep = A.get_sub_graph(perm_data(), dist_sep_ranges);
   }
 
   template<typename scalar_t,typename integer_t> void
@@ -374,7 +535,7 @@ namespace strumpack {
       integer_t max_level = comm_->all_reduce(local_levels, MPI_MAX);
       if (comm_->is_root())
         MatrixReordering<scalar_t,integer_t>::nested_dissection_print
-          (opts, nnz, max_level, total_separators, true);
+          (opts, n_, nnz, max_level, total_separators, true);
     }
   }
 

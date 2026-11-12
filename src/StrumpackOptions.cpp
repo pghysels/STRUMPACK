@@ -185,6 +185,8 @@ namespace strumpack {
        {"sp_proportional_mapping",      required_argument, 0, 50},
        {"sp_enable_openmp_tree",        no_argument, 0, 51},
        {"sp_disable_openmp_tree",       no_argument, 0, 52},
+       {"sp_enable_shared_permutation", no_argument, 0, 53},
+       {"sp_disable_shared_permutation", no_argument, 0, 54},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -428,6 +430,8 @@ namespace strumpack {
       } break;
       case 51: enable_openmp_tree(); break;
       case 52: disable_openmp_tree(); break;
+      case 53: enable_shared_permutation(); break;
+      case 54: disable_shared_permutation(); break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -569,6 +573,12 @@ namespace strumpack {
               << std::boolalpha << !use_openmp_tree_ << ")" << std::endl
               << "#          uses less more memory, but scales worse with OpenMP threads"
               << std::endl;
+    std::cout << "#   --sp_enable_shared_permutation (default "
+              << std::boolalpha << shared_perm_ << ")" << std::endl
+              << "#          store the permutation once per node (MPI-3 shared memory)"
+              << std::endl;
+    std::cout << "#   --sp_disable_shared_permutation (default "
+              << std::boolalpha << !shared_perm_ << ")" << std::endl;
     std::cout << "#   --sp_lossy_precision [1-64] (default "
               << lossy_precision() << ")" << std::endl
               << "#          lossy compression precision" << std::endl

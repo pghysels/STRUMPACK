@@ -253,17 +253,17 @@ namespace strumpack {
   MatrixReordering<scalar_t,integer_t>::nested_dissection_print
   (const Opts_t& opts, integer_t nnz, bool verbose) const {
     nested_dissection_print
-      (opts, nnz, tree_.levels(), tree_.separators(), verbose);
+      (opts, perm_.size(), nnz, tree_.levels(), tree_.separators(), verbose);
   }
 
   template<typename scalar_t,typename integer_t> void
   MatrixReordering<scalar_t,integer_t>::nested_dissection_print
-  (const Opts_t& opts, integer_t nnz, int max_level,
+  (const Opts_t& opts, integer_t n, integer_t nnz, int max_level,
    int total_separators, bool verbose) const {
     if (verbose) {
       std::cout << "# initial matrix:" << std::endl;
       std::cout << "#   - number of unknowns = "
-                << number_format_with_commas(perm_.size()) << std::endl;
+                << number_format_with_commas(n) << std::endl;
       std::cout << "#   - number of nonzeros = "
                 << number_format_with_commas(nnz) << std::endl;
       std::cout << "# nested dissection reordering:" << std::endl;

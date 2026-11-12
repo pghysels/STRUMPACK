@@ -790,6 +790,33 @@ namespace strumpack {
     void disable_openmp_tree() { use_openmp_tree_ = false; }
 
     /**
+     * Store the fill-reducing permutation and its inverse once per
+     * node, in an MPI-3 shared memory window, instead of on every
+     * process. Only used by the distributed solver
+     * (SparseSolverMPIDist), with a sequential reordering (METIS,
+     * Scotch, AMD, ...) and without compression; the other cases keep
+     * a copy per process. This saves 2 integers per matrix row on
+     * every process but one per node. The window needs shared memory
+     * (usually /dev/shm) of 2 integers per matrix row on every node.
+     * If MPI cannot allocate it, or /dev/shm does not have this much
+     * free space plus a margin (10% and 1 MB), all processes keep a
+     * copy, and the root prints a warning on stderr. The destructor
+     * of the solver frees the window: like a collective MPI call, it
+     * then waits until the other processes of the node call it too.
+     *
+     * \see disable_shared_permutation()
+     */
+    void enable_shared_permutation() { shared_perm_ = true; }
+
+    /**
+     * Keep a copy of the fill-reducing permutation on every process
+     * (the default).
+     *
+     * \see enable_shared_permutation()
+     */
+    void disable_shared_permutation() { shared_perm_ = false; }
+
+    /**
      * Set the precision for lossy compression. Preferred mode is
      * accuracy. To use precision mode, set the accuracy to a negative
      * value. For lossless compression, set both accuracy and
@@ -1187,6 +1214,14 @@ namespace strumpack {
     bool use_openmp_tree() const { return use_openmp_tree_; }
 
     /**
+     * Check whether the distributed solver stores the permutation
+     * once per node.
+     *
+     * \see enable_shared_permutation()
+     */
+    bool use_shared_permutation() const { return shared_perm_; }
+
+    /**
      * Returns the number of GPU streams to use.
      */
     int gpu_streams() const { return gpu_streams_; }
@@ -1327,6 +1362,7 @@ namespace strumpack {
     bool print_comp_front_stats_ = false;
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
     bool use_openmp_tree_ = true;
+    bool shared_perm_ = false;
     bool use_symmetric_ = false;
     bool use_positive_definite_ = false;
 

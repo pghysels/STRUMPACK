@@ -85,6 +85,9 @@ namespace strumpack {
 
   public:
     MatrixReorderingMPI(integer_t n, const MPIComm& c);
+    // owns MPI handles (shared memory window and its communicator)
+    MatrixReorderingMPI(const MatrixReorderingMPI&) = delete;
+    MatrixReorderingMPI& operator=(const MatrixReorderingMPI&) = delete;
     virtual ~MatrixReorderingMPI();
 
     int nested_dissection(const Opts_t& opts, const CSRMPI_t& A,
@@ -133,9 +136,35 @@ namespace strumpack {
 
     const SeparatorTree<integer_t>& ltree() const { return ltree_; }
 
+    /**
+     * The permutation and its inverse, size n. With
+     * SPOptions::enable_shared_permutation() they can be stored once
+     * per node (perm() and iperm() are then empty on all processes,
+     * the root included), use these instead of perm() and iperm().
+     */
+    const integer_t* perm_data() const
+    { return shm_perm_ ? shm_perm_ : perm_.data(); }
+    const integer_t* iperm_data() const
+    { return shm_iperm_ ? shm_iperm_ : iperm_.data(); }
+
   private:
     const MPIComm* comm_;
+    integer_t n_;
     SeparatorTree<integer_t> ltree_;
+
+    /**
+     * Shared memory window of a node, allocated by its lowest rank,
+     * holding perm (n integers) followed by iperm (n integers).
+     */
+    MPI_Comm shm_comm_ = MPI_COMM_NULL;
+    MPI_Win shm_win_ = MPI_WIN_NULL;
+    integer_t *shm_perm_ = nullptr, *shm_iperm_ = nullptr;
+    MPI_Aint shared_perm_bytes() const
+    { return MPI_Aint(2) * MPI_Aint(n_) * MPI_Aint(sizeof(integer_t)); }
+    void alloc_perm();
+    bool share_perm();
+    void unshare_perm();
+    void free_shared_perm();
 
     /**
      * Number of the node in tree corresponding to the root of the

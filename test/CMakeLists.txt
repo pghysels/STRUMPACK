@@ -82,6 +82,7 @@ if(STRUMPACK_USE_MPI)
   add_executable(test_trsm_narrow_mpi     test_trsm_narrow_mpi.cpp)
   add_executable(test_reorder_user_perm_mpi test_reorder_user_perm_mpi.cpp)
   add_executable(test_equilibration_mpi   test_equilibration_mpi.cpp)
+  add_executable(test_shared_permutation_mpi test_shared_permutation_mpi.cpp)
 
   target_link_libraries(test_HSS_mpi strumpack)
   target_link_libraries(test_sparse_mpi strumpack)
@@ -90,6 +91,7 @@ if(STRUMPACK_USE_MPI)
   target_link_libraries(test_trsm_narrow_mpi strumpack)
   target_link_libraries(test_reorder_user_perm_mpi strumpack)
   target_link_libraries(test_equilibration_mpi strumpack)
+  target_link_libraries(test_shared_permutation_mpi strumpack)
 
   execute_process(COMMAND ${MPIEXEC} --oversubscribe --version RESULT_VARIABLE oversubscribe_supported)
   if(${oversubscribe_supported} EQUAL 0)
@@ -107,6 +109,42 @@ if(STRUMPACK_USE_MPI)
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
     ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx)
+  strumpack_add_test("user_test_sparse_mpi_shared_perm" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4
+    ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+    ${CMAKE_CURRENT_BINARY_DIR}/test_sparse_mpi
+    ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx --sp_enable_shared_permutation)
+  strumpack_add_test("user_structure_reuse_mpi_shared_perm" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4
+    ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+    ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
+    ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx --sp_enable_shared_permutation)
+  # STRUMPACK_SHARED_PERM_GROUP=k: groups of k ranks act as nodes, to
+  # test several node leaders on one node
+  strumpack_add_test("user_structure_reuse_mpi_shared_perm_group2" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4
+    ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+    ${CMAKE_CURRENT_BINARY_DIR}/test_structure_reuse_mpi
+    ${PROJECT_SOURCE_DIR}/examples/sparse/data/pde900.mtx --sp_enable_shared_permutation)
+  set_property(TEST "user_structure_reuse_mpi_shared_perm_group2"
+    PROPERTY ENVIRONMENT "STRUMPACK_SHARED_PERM_GROUP=2")
+  strumpack_add_test("user_test_shared_permutation_mpi_4" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 4
+    ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+    ${CMAKE_CURRENT_BINARY_DIR}/test_shared_permutation_mpi)
+  foreach(group 1 2)
+    strumpack_add_test("user_test_shared_permutation_mpi_5_group${group}" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 5
+      ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+      ${CMAKE_CURRENT_BINARY_DIR}/test_shared_permutation_mpi)
+    set_property(TEST "user_test_shared_permutation_mpi_5_group${group}"
+      PROPERTY ENVIRONMENT "STRUMPACK_SHARED_PERM_GROUP=${group}")
+  endforeach()
+  execute_process(COMMAND ${MPIEXEC} --version OUTPUT_VARIABLE mpiexec_version
+    ERROR_QUIET)
+  if("${mpiexec_version}" MATCHES "Open MPI|OpenRTE")
+    # without the osc/sm component the window cannot be allocated
+    strumpack_add_test("user_test_shared_permutation_mpi_fallback" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 3
+      ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+      ${CMAKE_CURRENT_BINARY_DIR}/test_shared_permutation_mpi fallback)
+    set_property(TEST "user_test_shared_permutation_mpi_fallback"
+      PROPERTY ENVIRONMENT "OMPI_MCA_osc=^sm")
+  endif()
   # add_test("user_test_BLR_mpi" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2
   #   ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
   #   ${CMAKE_CURRENT_BINARY_DIR}/test_BLR_mpi 1000)
