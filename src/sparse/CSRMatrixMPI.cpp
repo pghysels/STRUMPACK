@@ -794,7 +794,7 @@ namespace strumpack {
 
   template<typename scalar_t,typename integer_t> Equilibration<scalar_t>
   CSRMatrixMPI<scalar_t,integer_t>::equilibration() const {
-    Equil_t eq(lrows_, n_);
+    Equil_t eq(lrows_, 0); // C (global size) is allocated only if used
     if (!n_) return eq;
     real_t small = blas::lamch<real_t>('S');
     real_t big = 1. / small;
@@ -821,31 +821,92 @@ namespace strumpack {
     for (integer_t r=0; r<lrows_; r++)
       eq.R[r] = 1. / std::min(std::max(eq.R[r], small), big);
     eq.rcond = std::max(rmin, small) / std::min(rmax, big);
-    // cannot use openmp here
-    for (integer_t r=0; r<lrows_; r++) {
-      for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
-        auto indj = ind_[j];
-        eq.C[indj] = std::max(eq.C[indj], std::abs(val_[j]) * eq.R[r]);
+    // Column maxima: every process reduces the columns it owns (the
+    // columns of its rows in the block-row distribution dist_). The
+    // other columns of its rows are first reduced locally, then one
+    // (column, maximum) pair per distinct column is sent to its
+    // owner, instead of reducing a vector of the global size on every
+    // process.
+    auto P = comm_.size();
+    auto lo = brow_, hi = brow_ + lrows_;
+    std::vector<real_t> Cloc(lrows_, 0.);
+    {
+      using IdxVal_t = IdxVal<real_t,integer_t>;
+      std::vector<std::vector<IdxVal_t>> sbuf(P);
+      {
+        // distinct off-process columns, sorted, hence grouped by owner
+        std::vector<integer_t> hcol;
+        {
+          std::size_t noff = 0;
+          for (integer_t r=0; r<lrows_; r++)
+            for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
+              if (ind_[j] < lo || ind_[j] >= hi) noff++;
+          hcol.reserve(noff);
+        }
+        for (integer_t r=0; r<lrows_; r++)
+          for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++)
+            if (ind_[j] < lo || ind_[j] >= hi) hcol.push_back(ind_[j]);
+        std::sort(hcol.begin(), hcol.end());
+        hcol.erase(std::unique(hcol.begin(), hcol.end()), hcol.end());
+        hcol.shrink_to_fit();
+        std::vector<real_t> hval(hcol.size(), 0.);
+        // cannot use openmp here
+        for (integer_t r=0; r<lrows_; r++)
+          for (integer_t j=ptr_[r]; j<ptr_[r+1]; j++) {
+            auto c = ind_[j];
+            auto v = std::abs(val_[j]) * eq.R[r];
+            auto& m = (c >= lo && c < hi) ? Cloc[c-lo] :
+              hval[std::lower_bound(hcol.begin(), hcol.end(), c)
+                   - hcol.begin()];
+            m = std::max(m, v);
+          }
+        for (std::size_t k=0, p=0; k<hcol.size(); ) {
+          auto k1 = std::lower_bound
+            (hcol.begin()+k, hcol.end(), dist_[p+1]) - hcol.begin();
+          sbuf[p].reserve(k1 - k);
+          for (; k<std::size_t(k1); k++)
+            sbuf[p].emplace_back(hcol[k], hval[k]);
+          p++;
+        }
+      }
+      for (const auto& iv : comm_.all_to_all_v(sbuf)) {
+        auto& m = Cloc[iv.i-lo];
+        m = std::max(m, iv.v);
       }
     }
-    comm_.all_reduce(eq.C, MPI_MAX);
-    mM = std::minmax_element(eq.C.begin(), eq.C.end());
+    mM = std::minmax_element(Cloc.begin(), Cloc.end());
     real_t cmin = lrows_ ? *(mM.first) : std::numeric_limits<real_t>::max();
     real_t cmax = lrows_ ? *(mM.second) : 0;
     cmin = comm_.all_reduce(cmin, MPI_MIN);
     cmax = comm_.all_reduce(cmax, MPI_MAX);
     if (cmin == 0.) {
-      for (integer_t i=0; i<n_; i++)
-        if (eq.C[i] == 0.) {
-          eq.info = n_+i+1;
-          return eq;
+      integer_t first = n_;
+      for (integer_t i=0; i<lrows_; i++)
+        if (Cloc[i] == 0.) {
+          first = brow_ + i;
+          break;
         }
+      eq.info = n_ + comm_.all_reduce(first, MPI_MIN) + 1;
+      return eq;
     }
 #pragma omp parallel for
-    for (integer_t i=0; i<n_; i++)
-      eq.C[i] = 1. / std::min(std::max(eq.C[i], small), big);
+    for (integer_t i=0; i<lrows_; i++)
+      Cloc[i] = 1. / std::min(std::max(Cloc[i], small), big);
     eq.ccond = std::max(cmin, small) / std::min(cmax, big);
     eq.set_type();
+    // the global column scaling is only used for COLUMN and BOTH
+    if (eq.type == EquilibrationType::COLUMN ||
+        eq.type == EquilibrationType::BOTH) {
+      std::vector<int> cnts(P), displs(P);
+      for (int p=0; p<P; p++) {
+        cnts[p] = dist_[p+1] - dist_[p];
+        displs[p] = dist_[p];
+      }
+      eq.C.resize(n_);
+      MPI_Allgatherv
+        (Cloc.data(), lrows_, mpi_type<real_t>(), eq.C.data(),
+         cnts.data(), displs.data(), mpi_type<real_t>(), comm_.comm());
+    }
     return eq;
   }
 
