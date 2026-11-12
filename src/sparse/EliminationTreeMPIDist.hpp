@@ -29,6 +29,7 @@
 #ifndef ELIMINATION_TREE_MPI_DIST_HPP
 #define ELIMINATION_TREE_MPI_DIST_HPP
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
 #include <map>
@@ -107,10 +108,18 @@ namespace strumpack {
     void find_row_owner(const CSRMPI_t& A);
 
     /**
-     * vector of size A.size(), storing for each row, to which front
-     * it belongs.
+     * For each (permuted) row, the front it belongs to: -p-1 for the
+     * local subtree of process p, else the index in all_pfronts_.
+     * Stored as sorted intervals, rows [rpf_lo_[k], rpf_lo_[k+1])
+     * belong to front rpf_val_[k], instead of one int per row.
      */
-    std::vector<int> row_pfront_;
+    std::vector<integer_t> rpf_lo_;
+    std::vector<int> rpf_val_;
+    int row_pfront(integer_t r) const {
+      auto k = std::upper_bound(rpf_lo_.begin(), rpf_lo_.end(), r)
+        - rpf_lo_.begin() - 1;
+      return rpf_val_[k];
+    }
     void find_row_front(const CSRMPI_t& A);
 
     /**
