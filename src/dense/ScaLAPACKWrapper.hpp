@@ -274,6 +274,31 @@ namespace strumpack {
                int ia, int ja, const int *desca,
                std::complex<double>* b, int ib, int jb, const int *descb);
 
+    void ptrmm(char side, char uplo, char trans, char diag, int m, int n,
+               float alpha, const float* a, int ia, int ja,
+               const int *desca, float* b, int ib, int jb,
+               const int *descb);
+    void ptrmm(char side, char uplo, char trans, char diag, int m, int n,
+               double alpha, const double* a, int ia, int ja,
+               const int *desca, double* b, int ib, int jb,
+               const int *descb);
+    void ptrmm(char side, char uplo, char trans, char diag, int m, int n,
+               std::complex<float> alpha, const std::complex<float>* a, int ia, int ja,
+               const int *desca, std::complex<float>* b, int ib, int jb,
+               const int *descb);
+    void ptrmm(char side, char uplo, char trans, char diag, int m, int n,
+               std::complex<double> alpha, const std::complex<double>* a, int ia, int ja,
+               const int *desca, std::complex<double>* b, int ib, int jb,
+               const int *descb);
+    int ptrtri(char uplo, char diag, int n, float* a, int ia, int ja,
+               const int *desca);
+    int ptrtri(char uplo, char diag, int n, double* a, int ia, int ja,
+               const int *desca);
+    int ptrtri(char uplo, char diag, int n, std::complex<float>* a, int ia, int ja,
+               const int *desca);
+    int ptrtri(char uplo, char diag, int n, std::complex<double>* a, int ia, int ja,
+               const int *desca);
+
     void ptrsv(char uplo, char trans, char diag, int m,
                const float* a, int ia, int ja, const int *desca,
                float* b, int ib, int jb, const int *descb, int incb);
