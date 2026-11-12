@@ -27,6 +27,8 @@
  *
  */
 #include <fstream>
+#include <limits>
+#include <cmath>
 
 #include <type_traits>
 #include <memory>
@@ -149,6 +151,74 @@ namespace strumpack {
     extend_add();
   }
 
+#if !defined(STRUMPACK_USE_SLATE_SCALAPACK)
+  // t = [|L| sL; |U| sU], with L the strictly lower part of A plus the
+  // unit diagonal and U the upper triangle of A, sL, sU and t replicated
+  // on all processes of the grid of A
+  template<typename scalar_t> static std::vector<double>
+  abs_tri_mv(const DistributedMatrix<scalar_t>& A,
+             const std::vector<double>& sL, const std::vector<double>& sU) {
+    const int n = A.rows();
+    std::vector<double> t(2 * std::size_t(n), 0.);
+    for (int c=0; c<A.lcols(); c++) {
+      const int gc = A.coll2g(c);
+      for (int r=0; r<A.lrows(); r++) {
+        const int gr = A.rowl2g(r);
+        const double a = std::abs(A(r,c));
+        if (gr > gc) t[gr] += a * sL[gc];
+        else t[n + gr] += a * sU[gc];
+      }
+    }
+    for (int i=0; i<n; i++)
+      if (A.rowg2p(i) == A.prow() && A.colg2p(i) == A.pcol())
+        t[i] += sL[i];
+    A.grid()->Comm_active().all_reduce(t, MPI_SUM);
+    return t;
+  }
+
+  template<typename scalar_t,typename integer_t> long long
+  FrontDenseMPI<scalar_t,integer_t>::invert_factors
+  (const SPOptions<scalar_t>& opts, double& cond) {
+    // Multiplying by the computed inverse of a triangular factor T has a
+    // backward error of about u || |T^{-1}| |T| ||_inf, compared to u for
+    // the triangular solve. The inverses are kept only if this condition
+    // number is at most opts.selective_inversion_max_cond() for L11 and
+    // for U11, which bounds the loss of backward accuracy of the solve
+    // phase in this front to about that factor. The inverses are
+    // computed in a copy of F11. A limit below 1 (the condition number
+    // is at least 1) skips the inversion.
+    cond = 0.;
+    if (opts.selective_inversion_max_cond() < 1) return 0;
+    const int n = F11_.rows();
+    std::vector<double> e(n, 1.);
+    // s = [|L11| e; |U11| e], then t = [|L11^-1| sL; |U11^-1| sU]
+    auto s = abs_tri_mv(F11_, e, e);
+    DistM_t Finv(F11_);
+    int info = scalapack::ptrtri
+      ('U', 'N', n, Finv.data(), Finv.I(), Finv.J(), Finv.desc());
+    cond = std::numeric_limits<double>::infinity();
+    if (!info) {
+      scalapack::ptrtri
+        ('L', 'U', n, Finv.data(), Finv.I(), Finv.J(), Finv.desc());
+      std::vector<double> sL(s.begin(), s.begin() + n),
+        sU(s.begin() + n, s.end());
+      auto t = abs_tri_mv(Finv, sL, sU);
+      // max over t, a NaN (inverse with a NaN or Inf) gives infinity
+      cond = 0.;
+      for (auto v : t)
+        if (!(v <= cond))
+          cond = std::isnan(v) ? std::numeric_limits<double>::infinity() : v;
+    }
+    // the same choice on all processes of the front
+    inverted_ = grid()->Comm_active().all_reduce
+      (int(cond <= opts.selective_inversion_max_cond()), MPI_MIN);
+    if (inverted_) F11_ = std::move(Finv);
+    // PxTRTRI: n^3 / 3 for each triangle
+    return (is_complex<scalar_t>() ? 4 : 1) * 2 * (long long)n * n * n / 3 /
+      F11_.npactives();
+  }
+#endif
+
   template<typename scalar_t,typename integer_t> ReturnCode
   FrontDenseMPI<scalar_t,integer_t>::partial_factorization
   (const SPOptions<scalar_t>& opts) {
@@ -156,6 +226,7 @@ namespace strumpack {
     laswp_plan_ = LaswpPlan(); // pivots change with every factorization
     trsm_cache_[0].reset();
     trsm_cache_[1].reset();
+    inverted_ = false;
     if (!this->dim_sep() || !grid()->active())
       return err_code;
     TaskTimer pf("FrontDenseMPI_factor");
@@ -206,6 +277,11 @@ namespace strumpack {
         trsm_flops(Side::L, scalar_t(1.), F11_, F12_) +
         trsm_flops(Side::R, scalar_t(1.), F11_, F21_);
     }
+#if !defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    double si_cond = 0.;
+    if (opts.selective_inversion() && err_code == ReturnCode::SUCCESS)
+      flops += invert_factors(opts, si_cond);
+#endif
     if (Comm().is_root() && opts.verbose()) {
       auto time = pf.elapsed();
       std::cout << "# DenseMPI factorization complete, "
@@ -219,7 +295,16 @@ namespace strumpack {
                 << flops*F11_.npactives() / 1.e9  << " GFLOPS, "
                 << (float(flops)*F11_.npactives() / time) / 1.e9 << " GFLOP/s, "
                 << " ds=" << this->dim_sep()
-                << ", du=" << this->dim_upd() << std::endl;
+                << ", du=" << this->dim_upd();
+#if defined(STRUMPACK_USE_SLATE_SCALAPACK)
+      if (opts.selective_inversion())
+        std::cout << ", no selective inversion with SLATE";
+#else
+      if (opts.selective_inversion())
+        std::cout << ", inversion cond=" << si_cond
+                  << (inverted_ ? " (inverted)" : " (not inverted)");
+#endif
+      std::cout << std::endl;
     }
     STRUMPACK_FULL_RANK_FLOPS(flops);
 #if defined(STRUMPACK_USE_SLATE_SCALAPACK)
@@ -372,7 +457,11 @@ namespace strumpack {
     if (this->dim_sep()) {
       if (!laswp_plan_.ready()) laswp_plan_ = F11.laswp_plan(piv);
       b.laswp(laswp_plan_);
-      if (b.cols() == 1) {
+      if (inverted_) {
+        trmm(Side::L, UpLo::L, Trans::N, Diag::U, scalar_t(1.), F11, b);
+        if (this->dim_upd())
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
+      } else if (b.cols() == 1) {
         trsv(UpLo::L, Trans::N, Diag::U, F11, b);
         if (this->dim_upd())
           gemv(Trans::N, scalar_t(-1.), F21, b, scalar_t(1.), bupd);
@@ -442,7 +531,11 @@ namespace strumpack {
 #else
     if (this->dim_sep()) {
       TIMER_TIME(TaskType::SOLVE_UPPER, 0, t_s);
-      if (y.cols() == 1) {
+      if (inverted_) {
+        if (this->dim_upd())
+          gemm(Trans::N, Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
+        trmm(Side::L, UpLo::U, Trans::N, Diag::N, scalar_t(1.), F11, y);
+      } else if (y.cols() == 1) {
         if (this->dim_upd())
           gemv(Trans::N, scalar_t(-1.), F12, yupd, scalar_t(1.), y);
         trsv(UpLo::U, Trans::N, Diag::N, F11, y);
@@ -555,6 +648,7 @@ namespace strumpack {
     laswp_plan_ = LaswpPlan();
     trsm_cache_[0].reset();
     trsm_cache_[1].reset();
+    inverted_ = false;
     F11_ = DistM_t();
     F12_ = DistM_t();
     F21_ = DistM_t();
