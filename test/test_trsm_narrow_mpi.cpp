@@ -53,7 +53,7 @@ int run(const MPIComm& world) {
     // grid on the first p ranks, as for a front with p processes
     BLACSGrid g(world.sub(0, p), p);
     if (!g.active()) continue;
-    for (int nb : {4, 8, DistributedMatrix<double>::default_MB})
+    for (int nb : {4, 8, 16, DistributedMatrix<double>::default_MB})
       for (int m : {1, 3, nb-1, nb, nb+1, 2*nb+3, 5*nb, 9*nb+7})
         for (int n : {1, 2, nb/2+1, nb}) {
           if (m < 1 || n > nb) continue;
@@ -106,6 +106,9 @@ int run(const MPIComm& world) {
             }
         }
   }
+  // block sizes which the solver does not handle: the fronts use PDTRSM
+  for (int nb : {12, 24, 48, 64, 128})
+    if (trsmnarrow::applicable(9*nb+7, 2, nb, 2, 2)) nfail++;
   // rank 0 is in all the grids, and counts all the cases
   nfail = world.all_reduce(nfail, MPI_MAX);
   if (world.is_root())
