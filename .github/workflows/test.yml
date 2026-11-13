@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -215,7 +215,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install CUDA toolkit, MAGMA, BLAS/LAPACK and METIS from conda-forge
         uses: mamba-org/setup-micromamba@v2
@@ -273,7 +273,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
