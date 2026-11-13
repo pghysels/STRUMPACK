@@ -27,6 +27,8 @@
  *
  */
 #include <stack>
+#include <cassert>
+#include <tuple>
 
 #include "EliminationTreeMPIDist.hpp"
 #include "Redistribute.hpp"
@@ -132,9 +134,9 @@ namespace strumpack {
   EliminationTreeMPIDist<scalar_t,integer_t>::get_sparse_mapped_destination
   (const CSRMPI_t& A, integer_t oi, integer_t oj,
    integer_t i, integer_t j, bool duplicate_fronts) const {
-    auto fi = row_pfront_[i];
+    auto fi = row_pfront(i);
     if (fi < 0) return std::make_tuple(-fi-1, 1, 1);
-    auto fj = row_pfront_[j];
+    auto fj = row_pfront(j);
     if (fj < 0) return std::make_tuple(-fj-1, 1, 1);
     constexpr auto B = DistM_t::default_MB;
     int pfront =
@@ -210,7 +212,7 @@ namespace strumpack {
 #pragma omp parallel for
     for (std::size_t r=0; r<n_loc; r++) {
       std::size_t pr = nd_.perm()[r+lo];
-      auto rf = row_pfront_[pr];
+      auto rf = row_pfront(pr);
       if (rf < 0)
         row_owner_[r] = -rf-1;
       else {
@@ -223,15 +225,35 @@ namespace strumpack {
   template<typename scalar_t,typename integer_t> void
   EliminationTreeMPIDist<scalar_t,integer_t>::find_row_front
   (const CSRMPI_t& A) {
-    row_pfront_.resize(A.size());
+    // the local subtrees and the separators of the distributed fronts
+    // are disjoint ranges; rows in none of them map to 0
+    std::vector<std::tuple<integer_t,integer_t,int>> iv;
     for (int p=0; p<P_; p++) // local separators
-      for (integer_t r=subtree_ranges_[p].first;
-           r<subtree_ranges_[p].second; r++)
-        row_pfront_[r] = -p-1;
+      if (subtree_ranges_[p].first < subtree_ranges_[p].second)
+        iv.emplace_back
+          (subtree_ranges_[p].first, subtree_ranges_[p].second, -p-1);
     for (std::size_t i=0; i<all_pfronts_.size(); i++) {
       auto& f = all_pfronts_[i];
-      for (integer_t r=f.sep_begin; r<f.sep_end; r++)
-        row_pfront_[r] = i;
+      if (f.sep_begin < f.sep_end)
+        iv.emplace_back(f.sep_begin, f.sep_end, int(i));
+    }
+    std::sort(iv.begin(), iv.end());
+    rpf_lo_.clear();
+    rpf_val_.clear();
+    integer_t end = 0;
+    for (auto& t : iv) {
+      assert(std::get<0>(t) >= end);
+      if (std::get<0>(t) > end) {
+        rpf_lo_.push_back(end);
+        rpf_val_.push_back(0);
+      }
+      rpf_lo_.push_back(std::get<0>(t));
+      rpf_val_.push_back(std::get<2>(t));
+      end = std::get<1>(t);
+    }
+    if (end < A.size() || rpf_lo_.empty()) {
+      rpf_lo_.push_back(end);
+      rpf_val_.push_back(0);
     }
   }
 
@@ -294,7 +316,7 @@ namespace strumpack {
         scnts[row_owner_[r]]++;
     else {
       for (integer_t r=0; r<m; r++) {
-        int pf = row_pfront_[nd_.perm()[r+lo]];
+        int pf = row_pfront(nd_.perm()[r+lo]);
         if (pf < 0) scnts[row_owner_[r]] += n;
         else {
           auto& f = all_pfronts_[pf];
@@ -320,7 +342,7 @@ namespace strumpack {
       for (integer_t r=0; r<m; r++) {
         auto destr = row_owner_[r];
         auto permr = nd_.perm()[r+lo];
-        int pf = row_pfront_[permr];
+        int pf = row_pfront(permr);
         if (pf < 0)
           for (integer_t c=0; c<n; c++) {
             auto k = pp[destr]++;

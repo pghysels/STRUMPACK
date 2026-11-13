@@ -60,7 +60,7 @@ namespace strumpack {
     std::vector<std::tuple<int,int,int>> dest(Ampi.local_nnz());
     std::vector<std::size_t> scnts(P);
     integer_t lrows = Ampi.local_rows();
-    auto perm = nd.perm();
+    const auto& perm = nd.perm();
     auto Aptr = Ampi.ptr();
     auto Aind = Ampi.ind();
     auto Aval = Ampi.val();
