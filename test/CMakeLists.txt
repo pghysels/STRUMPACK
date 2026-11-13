@@ -80,12 +80,14 @@ if(STRUMPACK_USE_MPI)
   add_executable(test_structure_reuse_mpi test_structure_reuse_mpi.cpp)
   add_executable(test_BLR_mpi             test_BLR_mpi.cpp)
   add_executable(test_trsm_narrow_mpi     test_trsm_narrow_mpi.cpp)
+  add_executable(test_reorder_user_perm_mpi test_reorder_user_perm_mpi.cpp)
 
   target_link_libraries(test_HSS_mpi strumpack)
   target_link_libraries(test_sparse_mpi strumpack)
   target_link_libraries(test_structure_reuse_mpi strumpack)
   target_link_libraries(test_BLR_mpi strumpack)
   target_link_libraries(test_trsm_narrow_mpi strumpack)
+  target_link_libraries(test_reorder_user_perm_mpi strumpack)
 
   execute_process(COMMAND ${MPIEXEC} --oversubscribe --version RESULT_VARIABLE oversubscribe_supported)
   if(${oversubscribe_supported} EQUAL 0)
@@ -110,6 +112,11 @@ if(STRUMPACK_USE_MPI)
     ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
     ${CMAKE_CURRENT_BINARY_DIR}/test_trsm_narrow_mpi)
   set_property(TEST "user_test_trsm_narrow_mpi" PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+  foreach(np 1 2 3)
+    strumpack_add_test("user_test_reorder_user_perm_mpi_${np}" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${np}
+      ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+      ${CMAKE_CURRENT_BINARY_DIR}/test_reorder_user_perm_mpi)
+  endforeach()
   foreach(np 1 3 4)
     strumpack_add_test("user_test_schur_mpi_${np}" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${np}
       ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
