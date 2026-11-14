@@ -790,6 +790,57 @@ namespace strumpack {
     void disable_openmp_tree() { use_openmp_tree_ = false; }
 
     /**
+     * Enable selective inversion of the distributed (MPI) dense
+     * fronts: after the LU factorization of the separator block F11 =
+     * L11 U11 of a front distributed over several processes, L11 and
+     * U11 are replaced by their inverses. The triangular solves with
+     * L11 and U11 of the distributed fronts in the solve phase then
+     * become triangular matrix products, which need a constant number
+     * of messages instead of one message per block row of F11. This
+     * lowers the latency of each solve, at the cost of extra flops
+     * (about 2/3 dim_sep^3 per distributed front) in the
+     * factorization, and of a temporary copy of F11 while a front is
+     * factored: dim_sep^2 / P entries per process of a front, which
+     * doubles the memory of the root front (no F12, F21) during its
+     * factorization. The factors keep their size. A front is only
+     * inverted if its triangular factors are well enough conditioned,
+     * see set_selective_inversion_max_cond(). For inverted fronts,
+     * the subnormal and zero counts of the factors (subnormals())
+     * count the entries of the inverses. Sequential fronts are not
+     * changed. The option is ignored with SLATE.
+     *
+     * \see disable_selective_inversion()
+     */
+    void enable_selective_inversion() { selective_inversion_ = true; }
+
+    /**
+     * Disable selective inversion of the distributed fronts
+     * (default).
+     *
+     * \see enable_selective_inversion()
+     */
+    void disable_selective_inversion() { selective_inversion_ = false; }
+
+    /**
+     * Set the largest condition number || |T^{-1}| |T| ||_inf of the
+     * triangular factors T = L11, U11 of a distributed front for which
+     * selective inversion is applied to that front; the other fronts
+     * keep the triangular solves. Multiplying by the computed inverse
+     * of T can lose backward accuracy up to about this factor compared
+     * to a triangular solve with T. L11 and U11 of a front are
+     * inverted together, if both are at most the limit. The condition
+     * numbers are computed in double precision for all scalar types.
+     * The default is 1e3. A value below 1 disables the inversion of
+     * every front.
+     *
+     * \see enable_selective_inversion()
+     */
+    void set_selective_inversion_max_cond(double c) {
+      assert(c >= 0);
+      si_max_cond_ = c;
+    }
+
+    /**
      * Set the precision for lossy compression. Preferred mode is
      * accuracy. To use precision mode, set the accuracy to a negative
      * value. For lossless compression, set both accuracy and
@@ -936,6 +987,18 @@ namespace strumpack {
      * \see enable_agg_amalg(), enable_MUMPS_SYMQAMD()
      */
     bool use_agg_amalg() const { return use_agg_amalg_; }
+
+    /**
+     * Is selective inversion of the distributed fronts enabled?
+     * \see enable_selective_inversion()
+     */
+    bool selective_inversion() const { return selective_inversion_; }
+
+    /**
+     * Get the condition number limit for selective inversion.
+     * \see set_selective_inversion_max_cond()
+     */
+    double selective_inversion_max_cond() const { return si_max_cond_; }
 
     /**
      * Get the matching job to use for numerical stability reordering.
@@ -1327,6 +1390,8 @@ namespace strumpack {
     bool print_comp_front_stats_ = false;
     ProportionalMapping prop_map_ = ProportionalMapping::FLOPS;
     bool use_openmp_tree_ = true;
+    bool selective_inversion_ = false;
+    double si_max_cond_ = 1e3;
     bool use_symmetric_ = false;
     bool use_positive_definite_ = false;
 

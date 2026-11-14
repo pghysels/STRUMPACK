@@ -124,6 +124,18 @@ if(STRUMPACK_USE_MPI)
       ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
       ${CMAKE_CURRENT_BINARY_DIR}/test_equilibration_mpi)
   endforeach()
+  # selective inversion is not used with SLATE; 3 processes: grids 3x1
+  # and 2x1, 4: 2x2, 5: 2x2 with an inactive process
+  if(NOT STRUMPACK_USE_SLATE_SCALAPACK)
+    add_executable(test_selective_inversion_mpi test_selective_inversion_mpi.cpp)
+    target_link_libraries(test_selective_inversion_mpi strumpack)
+    foreach(np 3 4 5)
+      strumpack_add_test("user_test_selective_inversion_mpi_${np}" ${MPIEXEC}
+        ${MPIEXEC_NUMPROC_FLAG} ${np} ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
+        ${CMAKE_CURRENT_BINARY_DIR}/test_selective_inversion_mpi)
+      set_property(TEST "user_test_selective_inversion_mpi_${np}" PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+    endforeach()
+  endif()
   foreach(np 1 3 4)
     strumpack_add_test("user_test_schur_mpi_${np}" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${np}
       ${MPIEXEC_PREFLAGS} ${OVERSUBSCRIBEFLAG}
