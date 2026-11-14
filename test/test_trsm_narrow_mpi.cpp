@@ -92,7 +92,9 @@ int run(const MPIComm& world) {
                 same = g.Comm_active().all_reduce(same, MPI_MIN);
                 cases++;
                 identical += same;
-                if (err[0] > SOLVE_TOLERANCE * err[1]) {
+                // every case must be bitwise identical to PDTRSM (this also
+                // checks the cached blocks of A)
+                if (err[0] > SOLVE_TOLERANCE * err[1] || !same) {
                   nfail++;
                   if (g.Comm_active().is_root())
                     cout << "# FAILED: grid " << g.nprows() << "x" << g.npcols()
@@ -100,7 +102,8 @@ int run(const MPIComm& world) {
                          << (upper ? " upper" : " lower")
                          << (unit ? " unit" : " non-unit") << " solve " << rep
                          << ": max |X - X_pdtrsm| / max |X_pdtrsm| = "
-                         << err[0] / err[1] << endl;
+                         << err[0] / err[1] << (same ? "" : ", not bitwise")
+                         << endl;
                 }
               }
             }
