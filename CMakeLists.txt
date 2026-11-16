@@ -18,7 +18,7 @@ option(TPL_ENABLE_COMBBLAS   "Use CombBLAS for weighted matching" OFF)
 option(TPL_ENABLE_BPACK      "Use BPACK (ButterflyPACK) code by Yang Liu" ON)
 option(TPL_ENABLE_ZFP        "Build with support for ZFP compression" ON)
 option(TPL_ENABLE_SZ3        "Build with support for SZ3 compression" OFF)
-option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" OFF)
+option(TPL_ENABLE_MAGMA      "Build with support for MAGMA" ON)
 option(TPL_ENABLE_KBLAS      "Build with support for KBLAS (requires CUDA)" OFF)
 option(TPL_ENABLE_MATLAB     "Build with Matlab interface" OFF)
 
@@ -201,12 +201,11 @@ endif()
 
 
 if(TPL_ENABLE_KBLAS)
-  if(MAGMA_FOUND)
-    # TODO check for KBLAS
-    message(WARNING "To use KBLAS, set TPL_KBLAS_INCLUDE_DIR and TPL_KBLAS_LIBRARIES.")
+  list(APPEND CMAKE_PREFIX_PATH
+    ${TPL_KBLAS_PREFIX} $ENV{KBLAS_DIR} $ENV{KBLAS_ROOT})
+  find_package(kblasgpu)
+  if(kblasgpu_FOUND)
     option(STRUMPACK_USE_KBLAS "" ON)
-  else()
-    message(STATUS "Disabling KBLAS, MAGMA not found.")
   endif()
 endif()
 
@@ -718,9 +717,8 @@ if(MAGMA_FOUND)
   target_link_libraries(strumpack PUBLIC MAGMA::magma)
 endif()
 
-if(TPL_ENABLE_KBLAS)
-  target_include_directories(strumpack PUBLIC ${TPL_KBLAS_INCLUDE_DIR})
-  target_link_libraries(strumpack PUBLIC ${TPL_KBLAS_LIBRARIES})
+if(kblasgpu_FOUND)
+  target_link_libraries(strumpack PUBLIC KBLASGPU::kblasgpu)
 endif()
 
 if(hipblas_FOUND)

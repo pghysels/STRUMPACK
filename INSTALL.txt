@@ -267,6 +267,27 @@ Alternatively, add the following to the CMake invocation:
     -DTPL_BPACK_LIBRARIES="$BPACKHOME/build/SRC_DOUBLE/libdbutterflypack.a;$BPACKHOME/build/SRC_DOUBLECOMPLEX/libzbutterflypack.a"
 
 
+KBLAS (Optional, needs >= 4.0.0)
+================================
+See: https://github.com/ecrc/kblas-gpu
+
+KBLAS can be used in the BLR compression on GPU, but is optional. BLR
+compression will still work on GPU without KBLAS. KBLAS provides
+batched adaptive randomized approximation (ARA), low rank compression
+routines. KBLAS requires MAGMA and is for now only supported on CUDA
+(not HIP or SYCL).
+
+Enable/disable support for ButterflyPACK using:
+    -DTPL_ENABLE_KBLAS=ON
+ or
+    -DTPL_ENABLE_KBLAS=OFF
+
+And then set
+> export KBLAS_DIR=/path/to/kblas/
+or
+> export kblasgpu_DIR=/path/to/kblas/
+
+
 Usage Instructions
 ==================
 Please see the examples in the examples/ folder.
