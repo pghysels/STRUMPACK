@@ -37,7 +37,7 @@
 // plane of the grid, which separates it, or random points of it, in
 // random order. Each case is factored, then refactored with updated
 // values. SparseSolver runs on the root process, SparseSolverMPIDist
-// on all of them.
+// on all of them, with and without the shared permutation.
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -272,13 +272,14 @@ test_sequential(Case<scalar_t> c, const std::string& name, bool pointers,
 #if defined(STRUMPACK_USE_MPI)
 template<typename scalar_t> int
 test_distributed(Case<scalar_t> c, const std::string& name,
-                 const MPIComm& comm) {
+                 const MPIComm& comm, bool shared_perm) {
   int P = comm.size(), rank = comm.rank(), n = c.A.n, d = c.b.cols();
   std::vector<int> dist(P+1);
   for (int p=0; p<=P; p++) dist[p] = (long long)(n) * p / P;
   int lo = dist[rank], m = dist[rank+1] - lo;
   SparseSolverMPIDist<scalar_t,int> sp(comm.comm(), false);
   sp.options().set_matching(MatchingJob::NONE);
+  if (shared_perm) sp.options().enable_shared_permutation();
   auto local = [&](std::vector<int>& lptr, std::vector<int>& lind,
                    std::vector<scalar_t>& lval) {
     auto p0 = c.A.ptr[lo], p1 = c.A.ptr[lo+m];
@@ -442,7 +443,9 @@ run(const std::string& type, bool root
           (c, name + ", AMD", nrhs > 1, ReorderingStrategy::AMD);
       }
 #if defined(STRUMPACK_USE_MPI)
-      nfail += test_distributed(c, name, comm);
+      nfail += test_distributed(c, name, comm, false);
+      nfail += test_distributed
+        (c, name + ", shared permutation", comm, true);
 #endif
     }
   return nfail;

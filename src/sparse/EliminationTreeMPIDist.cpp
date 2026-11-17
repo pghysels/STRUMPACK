@@ -211,7 +211,7 @@ namespace strumpack {
     row_owner_.assign(n_loc, -1);
 #pragma omp parallel for
     for (std::size_t r=0; r<n_loc; r++) {
-      std::size_t pr = nd_.perm()[r+lo];
+      std::size_t pr = nd_.perm_data()[r+lo];
       auto rf = row_pfront(pr);
       if (rf < 0)
         row_owner_[r] = -rf-1;
@@ -316,7 +316,7 @@ namespace strumpack {
         scnts[row_owner_[r]]++;
     else {
       for (integer_t r=0; r<m; r++) {
-        int pf = row_pfront(nd_.perm()[r+lo]);
+        int pf = row_pfront(nd_.perm_data()[r+lo]);
         if (pf < 0) scnts[row_owner_[r]] += n;
         else {
           auto& f = all_pfronts_[pf];
@@ -331,7 +331,7 @@ namespace strumpack {
     for (int p=1; p<P_; p++)
       pp[p] = sdispls[p] = sdispls[p-1] + scnts[p-1];
     if (n == 1) {
-      const auto perm = nd_.perm().data() + lo;
+      const auto perm = nd_.perm_data() + lo;
       for (integer_t r=0; r<m; r++) {
         auto k = pp[row_owner_[r]]++;
         sbuf[k] = {perm[r], 0, x(r,0)};
@@ -341,7 +341,7 @@ namespace strumpack {
     } else {
       for (integer_t r=0; r<m; r++) {
         auto destr = row_owner_[r];
-        auto permr = nd_.perm()[r+lo];
+        auto permr = nd_.perm_data()[r+lo];
         int pf = row_pfront(permr);
         if (pf < 0)
           for (integer_t c=0; c<n; c++) {
@@ -419,8 +419,8 @@ namespace strumpack {
     sp.out_src_off.resize(rsize);
     for (integer_t r=local_range_.first; r<local_range_.second; r++) {
       auto dest = std::upper_bound
-        (dist.begin(), dist.end(), nd_.iperm()[r])-dist.begin()-1;
-      auto permgr = nd_.iperm()[r];
+        (dist.begin(), dist.end(), nd_.iperm_data()[r])-dist.begin()-1;
+      auto permgr = nd_.iperm_data()[r];
       for (integer_t c=0; c<n; c++) {
         auto k = pp[dest]++;
         auto& xrc = Xloc(r,c);
@@ -433,7 +433,7 @@ namespace strumpack {
       if (xdist[i].lcols() == 0) continue;
       auto slo = local_pfronts_[i].sep_begin;
       for (int r=0; r<xdist[i].lrows(); r++) {
-        auto permgr = nd_.iperm()[xdist[i].rowl2g(r) + slo];
+        auto permgr = nd_.iperm_data()[xdist[i].rowl2g(r) + slo];
         auto dest = std::upper_bound
           (dist.begin(), dist.end(), permgr)-dist.begin()-1;
         for (int c=0; c<xdist[i].lcols(); c++) {

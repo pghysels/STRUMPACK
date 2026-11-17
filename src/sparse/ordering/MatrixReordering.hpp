@@ -88,7 +88,7 @@ namespace strumpack {
                                integer_t max_dim_sep);
 
     void
-    nested_dissection_print(const Opts_t& opts, integer_t nnz,
+    nested_dissection_print(const Opts_t& opts, integer_t n, integer_t nnz,
                             int max_level, int total_separators,
                             bool verbose) const;
 
