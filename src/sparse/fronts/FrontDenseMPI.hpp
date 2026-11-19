@@ -129,6 +129,12 @@ namespace strumpack {
   private:
     DistM_t F11_, F12_, F21_, F22_;
     std::vector<int> piv;
+    // F11_ holds the inverses of L11 (strictly lower part) and U11
+    // instead of the factors (see SPOptions::enable_selective_inversion)
+    bool inverted_ = false;
+#if !defined(STRUMPACK_USE_SLATE_SCALAPACK)
+    long long invert_factors(const SPOptions<scalar_t>& opts, double& cond);
+#endif
 
     // row interchanges (piv) as one permutation, applied to the
     // right-hand side in the forward solve, built at the first solve

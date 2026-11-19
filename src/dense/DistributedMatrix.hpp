@@ -878,6 +878,15 @@ namespace strumpack {
   }
 
   template<typename scalar_t> long long int
+  trmm_flops(Side s, scalar_t alpha, const DistributedMatrix<scalar_t>& a,
+             const DistributedMatrix<scalar_t>& b) {
+    if (!a.active()) return 0;
+    return (is_complex<scalar_t>() ? 4:1) *
+      blas::trmm_flops(b.rows(), b.cols(), alpha, char(s)) /
+      a.npactives();
+  }
+
+  template<typename scalar_t> long long int
   gemm_flops(Trans ta, Trans tb, scalar_t alpha,
              const DistributedMatrix<scalar_t>& a,
              const DistributedMatrix<scalar_t>& b, scalar_t beta) {
@@ -932,6 +941,10 @@ namespace strumpack {
    DistributedMatrix<scalar_t>& C);
 
   template<typename scalar_t> void trsm
+  (Side s, UpLo u, Trans ta, Diag d, scalar_t alpha,
+   const DistributedMatrix<scalar_t>& A, DistributedMatrix<scalar_t>& B);
+
+  template<typename scalar_t> void trmm
   (Side s, UpLo u, Trans ta, Diag d, scalar_t alpha,
    const DistributedMatrix<scalar_t>& A, DistributedMatrix<scalar_t>& B);
 

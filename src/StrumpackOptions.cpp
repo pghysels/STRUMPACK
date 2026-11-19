@@ -187,6 +187,9 @@ namespace strumpack {
        {"sp_disable_openmp_tree",       no_argument, 0, 52},
        {"sp_enable_shared_permutation", no_argument, 0, 53},
        {"sp_disable_shared_permutation", no_argument, 0, 54},
+       {"sp_enable_selective_inversion",  no_argument, 0, 55},
+       {"sp_disable_selective_inversion", no_argument, 0, 56},
+       {"sp_selective_inversion_max_cond", required_argument, 0, 57},
        {"sp_verbose",                   no_argument, 0, 'v'},
        {"sp_quiet",                     no_argument, 0, 'q'},
        {"help",                         no_argument, 0, 'h'},
@@ -432,6 +435,14 @@ namespace strumpack {
       case 52: disable_openmp_tree(); break;
       case 53: enable_shared_permutation(); break;
       case 54: disable_shared_permutation(); break;
+      case 55: enable_selective_inversion(); break;
+      case 56: disable_selective_inversion(); break;
+      case 57: {
+        std::istringstream iss(optarg);
+        double c;
+        iss >> c;
+        set_selective_inversion_max_cond(c);
+      } break;
       case 'h': { describe_options(); } break;
       case 'v': set_verbose(true); break;
       case 'q': set_verbose(false); break;
@@ -579,6 +590,17 @@ namespace strumpack {
               << std::endl;
     std::cout << "#   --sp_disable_shared_permutation (default "
               << std::boolalpha << !shared_perm_ << ")" << std::endl;
+    std::cout << "#   --sp_enable_selective_inversion (default "
+              << std::boolalpha << selective_inversion_ << ")" << std::endl
+              << "#          invert the triangular factors of the distributed fronts:"
+              << std::endl
+              << "#          faster solves, slower factorization" << std::endl;
+    std::cout << "#   --sp_disable_selective_inversion (default "
+              << std::boolalpha << !selective_inversion_ << ")" << std::endl;
+    std::cout << "#   --sp_selective_inversion_max_cond (default "
+              << si_max_cond_ << ")" << std::endl
+              << "#          invert only the fronts whose triangular factors have"
+              << " a condition number || |T^-1| |T| || below this" << std::endl;
     std::cout << "#   --sp_lossy_precision [1-64] (default "
               << lossy_precision() << ")" << std::endl
               << "#          lossy compression precision" << std::endl
