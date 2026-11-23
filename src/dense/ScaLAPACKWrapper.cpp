@@ -287,6 +287,31 @@ namespace strumpack {
          const std::complex<double> *, int *, int *, const int *,
          std::complex<double> *, int *, int *, const int *);
 
+      void STRUMPACK_FC_GLOBAL(pstrmm,PSTRMM)
+        (char *, char *, char *, char *, int *, int *, float *,
+         const float *, int *, int *, const int *,
+         float *, int *, int *, const int *);
+      void STRUMPACK_FC_GLOBAL(pdtrmm,PDTRMM)
+        (char *, char *, char *, char *, int *, int *, double *,
+         const double *, int *, int *, const int *,
+         double *, int *, int *, const int *);
+      void STRUMPACK_FC_GLOBAL(pctrmm,PCTRMM)
+        (char *, char *, char *, char *, int *, int *, std::complex<float> *,
+         const std::complex<float> *, int *, int *, const int *,
+         std::complex<float> *, int *, int *, const int *);
+      void STRUMPACK_FC_GLOBAL(pztrmm,PZTRMM)
+        (char *, char *, char *, char *, int *, int *, std::complex<double> *,
+         const std::complex<double> *, int *, int *, const int *,
+         std::complex<double> *, int *, int *, const int *);
+      void STRUMPACK_FC_GLOBAL(pstrtri,PSTRTRI)
+        (char *, char *, int *, float *, int *, int *, const int *, int *);
+      void STRUMPACK_FC_GLOBAL(pdtrtri,PDTRTRI)
+        (char *, char *, int *, double *, int *, int *, const int *, int *);
+      void STRUMPACK_FC_GLOBAL(pctrtri,PCTRTRI)
+        (char *, char *, int *, std::complex<float> *, int *, int *, const int *, int *);
+      void STRUMPACK_FC_GLOBAL(pztrtri,PZTRTRI)
+        (char *, char *, int *, std::complex<double> *, int *, int *, const int *, int *);
+
       void STRUMPACK_FC_GLOBAL(pstrsv,PSTRSV)
         (char *, char *, char *, int *,
          const float *, int *, int *, const int *,
@@ -967,6 +992,71 @@ namespace strumpack {
       STRUMPACK_FC_GLOBAL(pztrsm,PZTRSM)
         (&side, &uplo, &trans, &diag, &m, &n, &alpha,
          a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+
+    void ptrmm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     float alpha, const float* a, int ia, int ja, const int *desca,
+     float* b, int ib, int jb, const int *descb) {
+      STRUMPACK_FC_GLOBAL(pstrmm,PSTRMM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+    void ptrmm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     double alpha, const double* a, int ia, int ja, const int *desca,
+     double* b, int ib, int jb, const int *descb) {
+      STRUMPACK_FC_GLOBAL(pdtrmm,PDTRMM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+    void ptrmm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     std::complex<float> alpha, const std::complex<float>* a, int ia, int ja, const int *desca,
+     std::complex<float>* b, int ib, int jb, const int *descb) {
+      STRUMPACK_FC_GLOBAL(pctrmm,PCTRMM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+    void ptrmm
+    (char side, char uplo, char trans, char diag, int m, int n,
+     std::complex<double> alpha, const std::complex<double>* a, int ia, int ja, const int *desca,
+     std::complex<double>* b, int ib, int jb, const int *descb) {
+      STRUMPACK_FC_GLOBAL(pztrmm,PZTRMM)
+        (&side, &uplo, &trans, &diag, &m, &n, &alpha,
+         a, &ia, &ja, desca, b, &ib, &jb, descb);
+    }
+    int ptrtri
+    (char uplo, char diag, int n, float* a, int ia, int ja,
+     const int *desca) {
+      int info;
+      STRUMPACK_FC_GLOBAL(pstrtri,PSTRTRI)
+        (&uplo, &diag, &n, a, &ia, &ja, desca, &info);
+      return info;
+    }
+    int ptrtri
+    (char uplo, char diag, int n, double* a, int ia, int ja,
+     const int *desca) {
+      int info;
+      STRUMPACK_FC_GLOBAL(pdtrtri,PDTRTRI)
+        (&uplo, &diag, &n, a, &ia, &ja, desca, &info);
+      return info;
+    }
+    int ptrtri
+    (char uplo, char diag, int n, std::complex<float>* a, int ia, int ja,
+     const int *desca) {
+      int info;
+      STRUMPACK_FC_GLOBAL(pctrtri,PCTRTRI)
+        (&uplo, &diag, &n, a, &ia, &ja, desca, &info);
+      return info;
+    }
+    int ptrtri
+    (char uplo, char diag, int n, std::complex<double>* a, int ia, int ja,
+     const int *desca) {
+      int info;
+      STRUMPACK_FC_GLOBAL(pztrtri,PZTRTRI)
+        (&uplo, &diag, &n, a, &ia, &ja, desca, &info);
+      return info;
     }
 
     void ptrsv

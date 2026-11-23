@@ -1262,6 +1262,20 @@ namespace strumpack {
     STRUMPACK_FLOPS(trsm_flops(s, alpha, A, B));
   }
 
+  template<typename scalar_t> void trmm
+  (Side s, UpLo u, Trans ta, Diag d, scalar_t alpha,
+   const DistributedMatrix<scalar_t>& A, DistributedMatrix<scalar_t>& B) {
+    if (!A.active()) return;
+    assert(A.rows()==A.cols());
+    assert(s!=Side::L || A.cols()==B.rows());
+    assert(s!=Side::R || A.rows()==B.cols());
+    scalapack::ptrmm
+      (char(s), char(u), char(ta), char(d), B.rows(), B.cols(),
+       alpha, A.data(), A.I(), A.J(), A.desc(),
+       B.data(), B.I(), B.J(), B.desc());
+    STRUMPACK_FLOPS(trmm_flops(s, alpha, A, B));
+  }
+
   template<typename scalar_t> void trsv
   (UpLo ul, Trans ta, Diag d, const DistributedMatrix<scalar_t>& A,
    DistributedMatrix<scalar_t>& B) {
@@ -1489,6 +1503,19 @@ namespace strumpack {
   (Side s, UpLo u, Trans ta, Diag d, std::complex<double> alpha,
    const DistributedMatrix<std::complex<double>>& A,
    DistributedMatrix<std::complex<double>>& B);
+
+  template void trmm
+  (Side s, UpLo u, Trans ta, Diag d, float alpha,
+   const DistributedMatrix<float>& A, DistributedMatrix<float>& B);
+  template void trmm
+  (Side s, UpLo u, Trans ta, Diag d, double alpha,
+   const DistributedMatrix<double>& A, DistributedMatrix<double>& B);
+  template void trmm
+  (Side s, UpLo u, Trans ta, Diag d, std::complex<float> alpha,
+   const DistributedMatrix<std::complex<float>>& A, DistributedMatrix<std::complex<float>>& B);
+  template void trmm
+  (Side s, UpLo u, Trans ta, Diag d, std::complex<double> alpha,
+   const DistributedMatrix<std::complex<double>>& A, DistributedMatrix<std::complex<double>>& B);
 
   template void trsv
   (UpLo ul, Trans ta, Diag d, const DistributedMatrix<float>& A,
